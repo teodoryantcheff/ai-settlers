@@ -194,7 +194,7 @@ Complete the whole session experience with Continue/New Colony/Load, named manua
 - Verify victory statistics, continued analysis/feedback/management beyond victory, safe Return Home, and subsequent Continue of the same colony.
 - Verify all screens' empty, unavailable, loading, and failure states as well as normal states. Check non-hover explanations, text/symbol status cues, visible feedback while muted, and keyboard paths.
 - Perform visual inspection in the actual game at 1440×900 and 1280×720, with Reduced Motion and both supported rendering qualities. Confirm density, contrast, unobscured information, legible controls, and coherent style across welcome, play, reports, dialogs, reference, About, settings, and victory. Preserve world anchors, input coordinates, scene ordering, and cached rendering behavior.
-- Run the repository's full validation sequence with Node.js 22.18+ and a clean dependency install. Preserve failure logs, inspect browser failures, and rebuild generated bundles/development pages from source. Documentation synthesis alone does not constitute implementation validation.
+- Follow the current validation policy in `AGENTS.md`: routine validation runs only `npm test`; broader browser validation requires an explicit user request. Use Node.js 22.18+ and preserve failure logs. When browser validation is requested, inspect browser failures and rebuild generated bundles/development pages from source. Documentation synthesis alone does not constitute implementation validation.
 
 ## Out of Scope
 

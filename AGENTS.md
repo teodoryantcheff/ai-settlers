@@ -8,7 +8,7 @@
 - Keep painted pack installation atomic, crop definitions in the manifest, and original generated images/reference/provenance together. Preserve building entrances, tree roots and gameplay footprints.
 - Keep development scenarios in `src/dev/`, excluded from the release bundle. Supported rendering quality is 1 or 0.75; respect Reduced Motion.
 - Tests compose the real subsystem graph through `tests/helpers/game.cjs` and reach closure internals via the typed `internals` hooks each factory accepts; keep new test-only access in those hooks and out of the runtime surface.
-- Use Node.js 22.18+ and `npm ci`. Use `npm run check` for full validation; it sequences the existing checks and retains failure logs (see README, “Validate and capture”). Await asynchronous browser boot. Verify visual changes in the actual game.
+- Use Node.js 22.18+ and `npm ci`. Run only `npm test` for routine validation; it checks types and Node tests and retains failure logs (see README, “Validate and capture”). Run `npm run check`, browser tests or visual captures only when the user explicitly requests that broader validation. When browser validation is requested, await asynchronous boot and verify visual changes in the actual game.
 - Update `SPEC.md` when mechanics or architecture change. Keep README operational and concise; keep generation provenance in `assets/art/prompts.md`.
 
 ## Agent skills

@@ -41,10 +41,12 @@ Reference searches buildings, actual recipes, resources, transport and diagnosti
 ## Validate and capture
 
 ```sh
-npm run check
+npm test
 ```
 
-`npm run check` runs formatting, typechecking, each Node test file, the build, and then browser tests sequentially. Browser tests default to one worker because software WebGL is load-sensitive. Each run retains full per-step logs, a JSON summary, and browser failure artifacts under `output/validation/<run>/`; failures print the log tail and stop the sequence. `npm test` runs just typechecking and Node tests with the same logging.
+Run only `npm test` for routine validation. It runs typechecking and Node tests, retaining per-step logs and a JSON summary under `output/validation/<run>/`; failures print the log tail and stop the sequence.
+
+Run the slower `npm run check`, browser tests or visual captures only when explicitly requested. The full check adds formatting, the build and browser tests. Browser tests use one worker because software WebGL is load-sensitive; the suite can take about 25 minutes and retains browser failure artifacts alongside its logs.
 
 Tests and builds run TypeScript 7 checking through `npm run typecheck`, which invokes the TypeScript 7 compiler explicitly. Browser tests require Playwright Chromium (`npx playwright install chromium` once). If port 8765 is occupied by another server, use `PLAYWRIGHT_PORT=8766 npm run test:browser`. Development scenarios are available at `tests/game.html?uitest&buildrules&seed=2024`, `?saveload&seed=123`, and `?devshot&seed=2024`.
 
@@ -74,6 +76,6 @@ Soft-launch headers disable search indexing (`X-Robots-Tag: noindex`) and embedd
 
 Source lives in the public [teodoryantcheff/ai-settlers repository](https://github.com/teodoryantcheff/ai-settlers), with `main` as the default branch. Clone it with `gh repo clone teodoryantcheff/ai-settlers`, then follow Run and play above. Commit source, original art/provenance, shared agent skills and lockfiles. Generated bundles, `dist/`, dependencies, captures, scratch notes, caches and credentials are ignored; rebuild after cloning.
 
-GitHub publishing does not deploy the game or configure CI. Future Git CI can run `npm run check` for pull requests and retain this Pages project by running the guarded `npm run deploy` on `main`, using protected `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` secrets (token permission: Account / Cloudflare Pages / Edit). Never commit credentials, and do not run the production deploy script from pull requests.
+GitHub publishing does not deploy the game or configure CI. Future Git CI can run `npm test` for pull requests and retain this Pages project by running the guarded `npm run deploy` on `main`, using protected `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` secrets (token permission: Account / Cloudflare Pages / Edit). Never commit credentials, and do not run the production deploy script from pull requests.
 
 Cloudflare's native Git integration is a different option: a Direct Upload project cannot switch to it. Create a new Git-integrated Pages project when adopting that workflow, with framework preset **None**, build command `npm run build:pages`, output directory `dist`, and Node.js 22.18+; production branch `main`. Plan the domain cutover before retiring the existing site. Changing origins also separates browser-local saves, so export/import saves when moving. See [Direct Upload](https://developers.cloudflare.com/pages/get-started/direct-upload/) and [Git CI with Wrangler](https://developers.cloudflare.com/pages/how-to/use-direct-upload-with-continuous-integration/).

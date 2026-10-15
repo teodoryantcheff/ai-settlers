@@ -2,7 +2,7 @@
 
 ADR-0004's presentation revision is implemented. Subsequent work is tracked in [GitHub Issues](https://github.com/teodoryantcheff/ai-settlers/issues). [SPEC.md](../SPEC.md) describes the current mechanics and ownership; the earlier [redesign specification](ui-redesign-spec.md) preserves the historical accounting, observation and session contract.
 
-Capture links under `output/` below refer to ignored, machine-local historical evidence. A fresh clone can reproduce validation with `npm ci` and `npm run check`; attach new evidence to the relevant GitHub issue or pull request.
+Capture links under `output/` below refer to ignored, machine-local historical evidence. Routine validation uses `npm test`, following `AGENTS.md`. Reproducing the historical full validation with `npm ci` and `npm run check` requires an explicit user request; attach new evidence to the relevant GitHub issue or pull request.
 
 Validation status: passed on 2026-10-15. Node.js 24.18.1 and a clean `npm ci --offline` installation are used. No deployment is part of acceptance.
 
