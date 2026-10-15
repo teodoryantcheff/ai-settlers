@@ -130,7 +130,7 @@ test('supported headless audio with browser doubles retains typed hooks and inje
   const { game, internals } = createGame({
     seed: 2024,
     headless: true,
-    modules: [...DEFAULT_MODULES, 'audio'],
+    modules: [...DEFAULT_MODULES, 'economicNotices', 'audio'],
     stubs: { msg: (message) => messages.push(message) },
   });
   game.initializeColony();

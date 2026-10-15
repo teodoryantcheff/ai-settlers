@@ -31,6 +31,7 @@ import type { RoadsSubsystem } from './simulation/roads.ts';
 import type { EngineSubsystem } from './simulation/engine.ts';
 import type { InteractionSubsystem } from './ui/interaction.ts';
 import type { MessagesSubsystem } from './ui/messages.ts';
+import type { EconomicNoticesSubsystem } from './ui/economic-notices.ts';
 import type { ProgressionViewSubsystem } from './ui/progression-view.ts';
 import type { LoopSubsystem } from './application/loop.ts';
 export type GameRuntime = ReferenceViewSubsystem &
@@ -43,6 +44,7 @@ export type GameRuntime = ReferenceViewSubsystem &
   EngineSubsystem &
   InteractionSubsystem &
   MessagesSubsystem &
+  EconomicNoticesSubsystem &
   ProgressionViewSubsystem &
   LoopSubsystem &
   WorldSubsystem &
