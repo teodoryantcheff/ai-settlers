@@ -454,7 +454,8 @@ export function createMusic(game: GameRuntime, runtime: AudioRuntime, internals?
         new tone.MembraneSynth({
           context,
           pitchDecay: 0.1,
-          octaves: Math.log2(95 / 52),
+          // Tone's parameter is a frequency multiplier despite its name.
+          octaves: 95 / 52,
           oscillator: { type: 'sine' },
           envelope: { attack: 0.001, decay: 0.13, sustain: 0, release: 0.07 },
         }),

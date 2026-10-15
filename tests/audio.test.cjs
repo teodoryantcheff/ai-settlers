@@ -1,14 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const {
-  audioHarness,
-  workers,
-  connectedNodes,
-  finishSources,
-  feedbackProducer,
-  feedbackFrame,
-} = require('./helpers/audio.cjs');
+const { audioHarness, workers, feedbackProducer, feedbackFrame } = require('./helpers/audio.cjs');
 test('the real graph and pinned Tone class entrypoint import without browser audio', async () => {
   const classes = await import('tone/build/esm/classes.js');
   assert.equal(typeof classes.Synth, 'function');
