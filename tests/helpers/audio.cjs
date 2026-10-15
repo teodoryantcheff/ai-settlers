@@ -2,7 +2,6 @@
 const { createEventBus } = require('../../src/core/state.ts');
 const { createGame, fakeElement, installGlobals } = require('./game.cjs');
 
-const test = require('node:test');
 const assert = require('node:assert/strict');
 
 class MockAudioParam {
@@ -40,15 +39,13 @@ class MockAudioParam {
   }
 }
 
-class MockAudioNode {
+class ToneOutput {
   constructor(type, nodes) {
     this.type = type;
     this.gain = new MockAudioParam(1);
     this.frequency = new MockAudioParam(440);
     this.pan = new MockAudioParam();
     this.Q = new MockAudioParam();
-    this.playbackRate = new MockAudioParam(1);
-    this.listeners = [];
     this.connections = [];
     nodes.push(this);
   }
@@ -64,14 +61,6 @@ class MockAudioNode {
   }
   stop(time) {
     this.stopped = time;
-  }
-  addEventListener(event, callback) {
-    assert.equal(event, 'ended');
-    this.listeners.push(callback);
-  }
-  finish() {
-    if (this.onended) this.onended();
-    for (const callback of this.listeners) callback();
   }
 }
 
@@ -119,30 +108,6 @@ function audioHarness({
     close() {
       this.state = 'closed';
       return Promise.resolve();
-    }
-    createDynamicsCompressor() {
-      const node = new MockAudioNode('compressor', nodes);
-      for (const key of ['threshold', 'knee', 'ratio', 'attack', 'release'])
-        node[key] = new MockAudioParam();
-      return node;
-    }
-    createGain() {
-      return new MockAudioNode('gain', nodes);
-    }
-    createOscillator() {
-      return new MockAudioNode('oscillator', nodes);
-    }
-    createBufferSource() {
-      return new MockAudioNode('buffer', nodes);
-    }
-    createBiquadFilter() {
-      return new MockAudioNode('filter', nodes);
-    }
-    createStereoPanner() {
-      return new MockAudioNode('panner', nodes);
-    }
-    createBuffer(channels, length) {
-      return { getChannelData: () => new Float32Array(length) };
     }
     suspend() {
       this.suspendCalls++;
@@ -235,25 +200,11 @@ function audioHarness({
       timeouts.delete(id);
     }
   }
-  for (const name of [
-    'createBuffer',
-    'createBufferSource',
-    'createGain',
-    'createOscillator',
-    'createStereoPanner',
-    'createBiquadFilter',
-  ])
-    ToneContext.prototype[name] = function (...args) {
-      return this.rawContext[name](...args);
-    };
   class ToneNode {
     constructor(options, type = 'gain') {
       this.options = options;
       this.type = this.name = type;
-      this.input =
-        type === 'compressor'
-          ? options.context.rawContext.createDynamicsCompressor()
-          : new MockAudioNode(type, nodes);
+      this.input = new ToneOutput(type, nodes);
       this.gain = this.input.gain;
       this.frequency = this.input.frequency;
       this.pan = this.input.pan;
@@ -489,16 +440,6 @@ function workers(count) {
   return Array.from({ length: count }, () => ({ type: 'lumberjack', done: true, timer: 7 }));
 }
 
-function connectedNodes(nodes) {
-  return nodes.filter((node) => node.connections.length > 0);
-}
-
-function finishSources(nodes) {
-  const finite = nodes.filter((node) => node.stopped !== undefined);
-  finite.sort((a, b) => a.stopped - b.stopped).forEach((node) => node.finish());
-  return finite;
-}
-
 function feedbackProducer() {
   return {
     id: 1,
@@ -521,8 +462,6 @@ function feedbackFrame(audio, now) {
 module.exports = {
   audioHarness,
   workers,
-  connectedNodes,
-  finishSources,
   feedbackProducer,
   feedbackFrame,
 };
