@@ -1,14 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const {
-  audioHarness,
-  workers,
-  connectedNodes,
-  finishSources,
-  feedbackProducer,
-  feedbackFrame,
-} = require('./helpers/audio.cjs');
+const { audioHarness, workers, feedbackProducer, feedbackFrame } = require('./helpers/audio.cjs');
 test('the full score has three longer themes and reserves each quiet phrase for ambience', async () => {
   const { audio, nodes, notes } = audioHarness();
   await audio.initAudio();
@@ -233,6 +226,20 @@ test('music controls cancel finite voices and resume one score without overdue a
   await audio.initAudio();
   assert.equal(transport.events.size, 1);
   assert.equal(notes.length, before, 'controls never replay queued notes');
+});
+
+test('score percussion retains the original 95 Hz down to 52 Hz contour', async () => {
+  const { audio, notes } = audioHarness();
+  await audio.initAudio();
+  audio.buildings = workers(14);
+  for (let bar = 0; bar < 24; bar++) audio.scheduleBar(bar, 100 + bar * audio.BAR);
+  const drums = notes.filter(({ instrument }) => instrument === 'MembraneSynth');
+  assert.ok(drums.length > 0);
+  for (const { frequency, node } of drums) {
+    assert.equal(frequency, 52);
+    // Tone 15.1.22's MembraneSynth multiplies the base frequency by octaves.
+    assert.equal(frequency * node.options.octaves, 95);
+  }
 });
 
 test('finite score voices release and seeded score variation never consumes gameplay RNG', async () => {
