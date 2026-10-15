@@ -158,14 +158,14 @@ export function createWorldEffects(
       new cue.graph.tone.FMSynth({
         context: cue.graph.context,
         // Tone attenuates both FM voices by 10 dB and scales both by velocity.
-        // Keep the bell's level and metallic color at these quiet cue velocities.
-        volume: 10,
+        // Keep the gentler bell color consistent at these quiet cue velocities.
+        volume: 5,
         harmonicity: 2.51,
-        modulationIndex: 0.28 / (velocity * Math.pow(10, -0.5)),
+        modulationIndex: 0.14 / (velocity * Math.pow(10, -0.5)),
         oscillator: { type: 'sine' },
         modulation: { type: 'sine' },
-        envelope: { attack: 0.001, decay: duration, sustain: 0, release: 0.05 },
-        modulationEnvelope: { attack: 0.001, decay: duration * 0.4, sustain: 0, release: 0.02 },
+        envelope: { attack: 0.004, decay: duration, sustain: 0, release: 0.05 },
+        modulationEnvelope: { attack: 0.004, decay: duration * 0.4, sustain: 0, release: 0.02 },
       }),
     );
     synth.connect(cue.output);

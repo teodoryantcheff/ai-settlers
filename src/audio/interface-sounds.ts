@@ -28,15 +28,15 @@ export function createInterfaceSounds(
   return {
     ui() {
       const t = runtime.immediate();
-      sweep(t, 'triangle', 720, 540, 0.05, 0.055);
+      sweep(t, 'triangle', 720, 540, 0.05, 0.033);
     },
     tick() {
       const t = runtime.immediate();
-      sweep(t, 'sine', 950, 880, 0.025, 0.018);
+      sweep(t, 'sine', 950, 880, 0.025, 0.0108);
     },
     uiOpen() {
       const t = runtime.immediate();
-      sweep(t, 'triangle', 520, 760, 0.09, 0.05);
+      sweep(t, 'triangle', 520, 760, 0.09, 0.03);
     },
     fail() {
       const t = runtime.immediate();
