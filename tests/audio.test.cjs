@@ -326,9 +326,9 @@ test('the latest visibility state wins when a running-context reconciliation set
 });
 
 test('constructor failures report once and audio controls retry a clean startup', async () => {
-  const { audio, tone, notes, contexts, intervals } = audioHarness();
-  const Constructor = tone.Context;
-  tone.Context = class {
+  const { audio, window, notes, contexts, intervals } = audioHarness();
+  const Constructor = window.AudioContext;
+  window.AudioContext = class {
     constructor() {
       throw new Error('audio device denied');
     }
@@ -341,7 +341,7 @@ test('constructor failures report once and audio controls retry a clean startup'
   assert.match(audio.msgs[0].t, /Audio unavailable.*retry/);
   audio.SND.ui();
   assert.equal(notes.length, 0);
-  tone.Context = Constructor;
+  window.AudioContext = Constructor;
   audio.setMuted(false);
   await audio.initAudio();
   assert.equal(audio.audioPhase, 'ready');
@@ -420,4 +420,28 @@ test('preferences and visibility before the first gesture never start audio', as
   audio.setAmbVol(0.4);
   await audio.initAudio();
   assert.equal(audio.AC.resumeCalls, 1, 'ready controls do not repeatedly resume the context');
+});
+
+test('a Tone context constructor that fails after native creation closes the native attempt', async () => {
+  const { audio, tone, contexts, intervals } = audioHarness();
+  const Context = tone.Context;
+  tone.Context = class extends Context {
+    constructor(options) {
+      super(options);
+      throw new Error('context subgraph initialization failed');
+    }
+  };
+  await audio.initAudio();
+  assert.equal(audio.audioPhase, 'failed');
+  assert.equal(audio.msgs.length, 1);
+  assert.equal(contexts.length, 1);
+  assert.equal(contexts[0].state, 'closed', 'native ownership survives a throwing Tone wrapper');
+  assert.equal(intervals.size, 0);
+  tone.Context = Context;
+  await audio.initAudio();
+  assert.equal(audio.audioPhase, 'ready');
+  assert.deepEqual(
+    contexts.map(({ state }) => state),
+    ['closed', 'running'],
+  );
 });

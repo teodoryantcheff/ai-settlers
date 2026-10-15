@@ -165,8 +165,8 @@ function audioHarness({
   }
 
   class ToneContext {
-    constructor() {
-      this.rawContext = new MockAudioContext();
+    constructor(options = {}) {
+      this.rawContext = options.context ?? new MockAudioContext();
       this.destination = this.rawContext.destination;
     }
     get currentTime() {

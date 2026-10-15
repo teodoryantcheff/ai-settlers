@@ -36,6 +36,7 @@ export function createAudio(game: GameRuntime, internals?: AudioInternals): Audi
   if (internals) delete internals.loadTone;
   let graph: AudioGraph = null;
   let context: AudioGraph['context'] = null;
+  let nativeContext: AudioContext = null;
   let phase: 'idle' | 'starting' | 'ready' | 'failed' = 'idle';
   let muted = false,
     musicOn = true,
@@ -136,6 +137,8 @@ export function createAudio(game: GameRuntime, internals?: AudioInternals): Audi
 
   function disposeGraph() {
     const old = context;
+    const native = nativeContext;
+    nativeContext = null;
     graph = null;
     context = null;
     transition = null;
@@ -155,14 +158,18 @@ export function createAudio(game: GameRuntime, internals?: AudioInternals): Audi
     releases.clear();
     release([...owned].reverse());
     cleanup = (async () => {
-      if (!old) return;
       try {
-        await old.close();
+        await old?.close();
       } catch {
         /* A broken context still needs disposal. */
       }
+      // Native ownership starts before Tone's constructor, which can throw after
+      // allocating browser resources but before returning a wrapper to dispose.
       try {
-        old.dispose();
+        if (native && native.state !== 'closed') await native.close();
+      } catch {}
+      try {
+        old?.dispose();
       } catch {}
     })();
   }
@@ -233,7 +240,14 @@ export function createAudio(game: GameRuntime, internals?: AudioInternals): Audi
     startup = (async () => {
       await cleanup;
       const tone = await load();
-      context = new tone.Context({ latencyHint: 'interactive' });
+      const BrowserAudioContext =
+        typeof window === 'undefined'
+          ? null
+          : window.AudioContext ||
+            (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!BrowserAudioContext) throw new Error('Browser audio is unavailable');
+      nativeContext = new BrowserAudioContext({ latencyHint: 'interactive' });
+      context = new tone.Context({ context: nativeContext });
       tone.setContext(context);
       if (visible()) {
         await context.resume();
