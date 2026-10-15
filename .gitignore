@@ -1,0 +1,42 @@
+# Dependencies and generated build output (npm ci && npm run build).
+/node_modules/
+/dist/
+/game.min.js
+/game.min.js.br
+/game.min.js.gz
+/game.test.js
+/tests/game.html
+
+# Local validation, screenshots, prototypes and browser artifacts.
+/output/
+/test-results/
+/playwright-report/
+/blob-report/
+/coverage/
+*.log
+
+# Local work notes and historical task files.
+/.scratch/
+/misc/
+
+# Deployment state, credentials and machine-specific agent settings.
+/.wrangler/
+/.aws/
+/.codex/
+/.claude/settings.local.json
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+*.pem
+*.key
+
+# Editor and OS metadata.
+/.idea/
+/.vscode/
+.DS_Store
+Thumbs.db
+*~
+*.swp

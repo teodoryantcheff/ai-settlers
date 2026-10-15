@@ -1,0 +1,52 @@
+{
+  "seed": 42,
+  "fixedTimestep": 0.016666666666666666,
+  "failureBeforeFix": {
+    "simulationSeconds": 7200,
+    "bankedGold": 0,
+    "stocks": {
+      "planks": 149,
+      "stone": 591,
+      "food": 20,
+      "tools": 12,
+      "weapons": 4
+    },
+    "carriers": 16,
+    "goldMines": 0,
+    "outposts": 2
+  },
+  "diagnosticCheckpoint": {
+    "simulationSeconds": 1200,
+    "corridorLength": 31,
+    "outposts": [
+      {
+        "id": 20,
+        "x": 65,
+        "y": 51,
+        "done": true,
+        "manned": true,
+        "corridorIndex": 18
+      },
+      {
+        "id": 123,
+        "x": 63,
+        "y": 49,
+        "done": false,
+        "manned": false,
+        "corridorIndex": 16,
+        "constructionProgress": 0.9716666666666756,
+        "allMaterialsDelivered": true
+      }
+    ],
+    "nextOutpostCandidate": [61, 49]
+  },
+  "cause": "The next expansion outpost lies earlier on the walking corridor around water. As soon as it is manned, the old recycling rule razes it because an older outpost has a larger corridor index. The AI repeatedly rebuilds the same claim and cannot reach the mining frontier.",
+  "fix": "Choose clear sites beside the corridor by projecting the manned territory flood and scoring newly reached route tiles and the target mine\u2019s required land neighbors. Only recycle an outpost if its removal loses no owned territory, and retain the newest manned outpost until a successor exists.",
+  "regression": "tests/economy.test.cjs must reach 200 banked gold for seed 42 using the actual advisor, gameplay milestones and road construction.",
+  "secondaryCause": "Exact walking-route tiles could not support another outpost near a coastal bend and reserved mine faces. Random frontier fallback spent the outpost budget on unrelated claims while the forced gold faces stayed outside territory.",
+  "verifiedWinsSeconds": {
+    "2024": 2080,
+    "123": 1851,
+    "42": 1799
+  }
+}

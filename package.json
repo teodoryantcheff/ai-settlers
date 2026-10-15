@@ -1,0 +1,34 @@
+{
+  "name": "settlers-tribute",
+  "version": "2.0.0",
+  "private": true,
+  "description": "A peaceful browser economy and logistics game",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "prototype:ui": "node scripts/ui-prototype.mjs",
+    "capture:production-art": "npm run build && node scripts/capture-production-art.mjs",
+    "build": "npm run typecheck && node scripts/build.mjs",
+    "build:pages": "npm run build && node scripts/package-pages.mjs",
+    "deploy": "npm run check && node scripts/package-pages.mjs && wrangler pages deploy dist --project-name settlers-tribute --branch main",
+    "preview:pages": "npm run build:pages && wrangler pages dev dist --compatibility-date 2026-10-12",
+    "typecheck": "node node_modules/typescript/bin/tsc --noEmit",
+    "test": "node scripts/validate.mjs --node-tests",
+    "test:browser": "npm run build && playwright test",
+    "test:pages": "node scripts/test-pages.mjs",
+    "format": "prettier --write src scripts tests index.html tsconfig.json",
+    "format:check": "prettier --check src scripts tests index.html tsconfig.json",
+    "dev": "python3 -m http.server 8765 --bind 127.0.0.1",
+    "check": "node scripts/validate.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.0",
+    "esbuild": "0.28.2",
+    "pixi.js": "8.22.0",
+    "prettier": "3.9.10",
+    "typescript": "7.0.2",
+    "wrangler": "4.149.0"
+  },
+  "type": "module"
+}
