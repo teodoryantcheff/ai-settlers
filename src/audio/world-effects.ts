@@ -1,4 +1,5 @@
 import { observePresentation } from '../ui/domain-feedback.ts';
+import { bellOptions } from './bell-options.ts';
 import type { GameRuntime } from '../runtime.ts';
 import type { BuildingType } from '../types.ts';
 import type { AudioGraph, AudioRuntime, Disposable } from './audio-runtime.ts';
@@ -157,15 +158,7 @@ export function createWorldEffects(
       cue,
       new cue.graph.tone.FMSynth({
         context: cue.graph.context,
-        // Tone attenuates both FM voices by 10 dB and scales both by velocity.
-        // Keep the gentler bell color consistent at these quiet cue velocities.
-        volume: 5,
-        harmonicity: 2.51,
-        modulationIndex: 0.14 / (velocity * Math.pow(10, -0.5)),
-        oscillator: { type: 'sine' },
-        modulation: { type: 'sine' },
-        envelope: { attack: 0.004, decay: duration, sustain: 0, release: 0.05 },
-        modulationEnvelope: { attack: 0.004, decay: duration * 0.4, sustain: 0, release: 0.02 },
+        ...bellOptions(velocity, duration, 0.05, 0.02),
       }),
     );
     synth.connect(cue.output);

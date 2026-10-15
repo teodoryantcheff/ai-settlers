@@ -37,6 +37,7 @@ export function createAudio(game: GameRuntime, internals?: AudioInternals): Audi
   let graph: AudioGraph = null;
   let context: AudioGraph['context'] = null;
   let nativeContext: AudioContext = null;
+  let contextStateChange: () => void = null;
   let phase: 'idle' | 'starting' | 'ready' | 'failed' = 'idle';
   let muted = false,
     musicOn = true,
@@ -138,6 +139,8 @@ export function createAudio(game: GameRuntime, internals?: AudioInternals): Audi
   function disposeGraph() {
     const old = context;
     const native = nativeContext;
+    if (native && contextStateChange) native.removeEventListener('statechange', contextStateChange);
+    contextStateChange = null;
     nativeContext = null;
     graph = null;
     context = null;
@@ -247,6 +250,12 @@ export function createAudio(game: GameRuntime, internals?: AudioInternals): Audi
             (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!BrowserAudioContext) throw new Error('Browser audio is unavailable');
       nativeContext = new BrowserAudioContext({ latencyHint: 'interactive' });
+      const owner = nativeContext;
+      contextStateChange = () => {
+        if (nativeContext === owner && owner.state === 'closed')
+          fail(new Error('Audio context closed'));
+      };
+      owner.addEventListener('statechange', contextStateChange);
       context = new tone.Context({ context: nativeContext });
       tone.setContext(context);
       if (visible()) {
