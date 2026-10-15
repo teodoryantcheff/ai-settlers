@@ -1,6 +1,6 @@
 import type { GameRuntime } from '../runtime.ts';
 import { ingredientShortages } from '../gameplay/production-rules.ts';
-import type { AudioGraph, AudioRuntime } from './audio-runtime.ts';
+import type { AudioGraph, AudioRuntime, Disposable } from './audio-runtime.ts';
 import type {
   AudioInternals,
   MusicTheme,
@@ -8,9 +8,9 @@ import type {
   MusicColonyState,
   MusicArrangement,
 } from './audio-types.ts';
-import { getLegacyBridge, type LegacyBridge } from './legacy-bridge.ts';
 export function createMusic(game: GameRuntime, runtime: AudioRuntime, internals?: AudioInternals) {
-  let bridge: LegacyBridge = null;
+  let graph: AudioGraph = null;
+  const voices = new Set<Disposable>();
   // ---------- MUSIC ----------
   // Three 48-bar themes form a roughly four-and-a-half minute pastoral suite.
   // Every theme has an introduction, two melodic phrases, an eight-bar stretch of
@@ -185,12 +185,12 @@ export function createMusic(game: GameRuntime, runtime: AudioRuntime, internals?
       texture = returnPhrase ? 0.55 : local < 8 ? 0.75 : 1;
     var rnd = game.mulberry32(bar * 97 + ((game.seed % 1000) | 0)),
       phraseBar = local % 8;
-    if (bar % 2 === 0) bridge.padChord(t0, ch.pad, BAR * 2 * 0.98, texture);
+    if (bar % 2 === 0) padChord(t0, ch.pad, BAR * 2 * 0.98, texture);
     if (bar % 2 === 0 && a.gold > 0.45)
-      bridge.droneNote(t0, ch.r - 12, BAR * 2 * 0.98, (texture * (a.gold - 0.45)) / 0.55);
+      droneNote(t0, ch.r - 12, BAR * 2 * 0.98, (texture * (a.gold - 0.45)) / 0.55);
     if (a.bass > 0.12) {
-      bridge.bassNote(t0, ch.r, 0.09 * a.bass * texture);
-      if (!returnPhrase && rnd() < 0.4) bridge.bassNote(t0 + EI * 3, ch.r, 0.055 * a.bass);
+      bassNote(t0, ch.r, 0.09 * a.bass * texture);
+      if (!returnPhrase && rnd() < 0.4) bassNote(t0 + EI * 3, ch.r, 0.055 * a.bass);
     }
     var mot = MOTIFS[(rnd() * MOTIFS.length) | 0],
       tones = ch.pad;
@@ -199,7 +199,7 @@ export function createMusic(game: GameRuntime, runtime: AudioRuntime, internals?
       if (d < 0 || (returnPhrase && s !== 0 && s !== 3)) continue;
       var m = tones[d % tones.length] + 12 * (d >= tones.length ? 1 : 0);
       if (rnd() < 0.08) m += 12;
-      bridge.pluck(
+      pluck(
         t0 + s * EI + (s === 5 ? EI * 0.06 : 0),
         m,
         (0.052 + rnd() * 0.025) * texture * theme.lute,
@@ -207,7 +207,7 @@ export function createMusic(game: GameRuntime, runtime: AudioRuntime, internals?
         theme.brightness + ((s * 7 + bar) % 5) * 100,
       );
       if (local >= 16 && local < 24 && rnd() < 0.14)
-        bridge.pluck(
+        pluck(
           t0 + s * EI + EI * 0.5,
           SCALE[(rnd() * SCALE.length) | 0],
           0.02,
@@ -220,10 +220,10 @@ export function createMusic(game: GameRuntime, runtime: AudioRuntime, internals?
       var melodyIndex = (phraseBar * 2 + (local >= 24 ? 2 : 0)) % theme.melody.length;
       var fluteLevel = 0.043 * a.flute * (1 - a.hungry * 0.55) * texture;
       var note = theme.melody[melodyIndex];
-      if (note > 0) bridge.fluteNote(t0, note, EI * 2.2, fluteLevel, -0.22);
+      if (note > 0) fluteNote(t0, note, EI * 2.2, fluteLevel, -0.22);
       note = theme.melody[(melodyIndex + 1) % theme.melody.length];
       if (note > 0 && phraseBar % 2 === 0)
-        bridge.fluteNote(t0 + EI * 3, note, EI * 2.1, fluteLevel * 0.8, 0.22);
+        fluteNote(t0 + EI * 3, note, EI * 2.1, fluteLevel * 0.8, 0.22);
     }
     var percussion = a.drums * (1 - a.night * 0.95);
     if (!returnPhrase && local >= 16 && percussion > 0.08) {
@@ -233,70 +233,294 @@ export function createMusic(game: GameRuntime, runtime: AudioRuntime, internals?
       tickT(t0 + EI * 5, 0.014 * percussion);
     }
     if (phraseBar === 7 && local < 32) {
-      bridge.bellTone(bridge.gMusic, t0, bridge.mtof(ch.pad[0] + 12), 0.02, 2.4, 0);
-      // Alternate phrase turns use a short bridge.dulcimer response rather than a flourish
+      bellTone(t0, mtof(ch.pad[0] + 12), 0.02, 2.4, 0);
+      // Alternate phrase turns use a short dulcimer response rather than a flourish
       // every few seconds. Its timbre remains a highlight throughout a long game.
       if (local % 16 === 15) {
-        bridge.dulcimer(t0, ch.pad[0] + 12, 0.04, -0.25);
-        bridge.dulcimer(t0 + EI, ch.pad[1] + 12, 0.035, 0.1);
-        bridge.dulcimer(t0 + EI * 2, ch.pad[2] + 12, 0.04, 0.25);
+        dulcimer(t0, ch.pad[0] + 12, 0.04, -0.25);
+        dulcimer(t0 + EI, ch.pad[1] + 12, 0.035, 0.1);
+        dulcimer(t0 + EI * 2, ch.pad[2] + 12, 0.04, 0.25);
       }
     }
     if (a.gold > 0.25 && local < 32 && bar % 8 === 4 && rnd() < a.gold)
-      bridge.bellTone(
-        bridge.gMusic,
+      bellTone(t0, mtof(SCALE[(rnd() * SCALE.length) | 0] + 12), 0.011, 1.6, (rnd() - 0.5) * 0.5);
+  }
+  // Tone owns each finite voice's oscillators, envelopes and filters. Ownership
+  // wrappers also let a hidden page cancel notes already scheduled within a bar.
+  function ownVoice<T extends Disposable>(node: T, resources: Disposable[]): T {
+    let disposed = false;
+    const owner = runtime.own({
+      dispose() {
+        if (disposed) return;
+        disposed = true;
+        voices.delete(owner);
+        node.dispose();
+      },
+    });
+    voices.add(owner);
+    resources.push(owner);
+    return node;
+  }
+  interface ScoreInstrument extends Disposable {
+    connect(
+      destination: AudioGraph['channels']['music'] | InstanceType<AudioGraph['tone']['Panner']>,
+    ): unknown;
+    triggerAttackRelease(
+      frequency: number,
+      duration: number,
+      time: number,
+      velocity: number,
+    ): unknown;
+  }
+  function note(
+    t0: number,
+    frequency: number,
+    duration: number,
+    velocity: number,
+    pan: number,
+    release: number,
+    create: (owner: AudioGraph) => ScoreInstrument,
+  ) {
+    if (!graph) return;
+    const resources: Disposable[] = [];
+    const panner = ownVoice(new graph.tone.Panner({ context: graph.context, pan }), resources);
+    panner.connect(graph.channels.music);
+    const instrument = ownVoice(create(graph), resources);
+    instrument.connect(panner);
+    instrument.triggerAttackRelease(frequency, duration, t0, velocity);
+    runtime.releaseAt(t0 + duration + release + 0.1, resources);
+  }
+  function mtof(midi: number) {
+    return 440 * Math.pow(2, (midi - 69) / 12);
+  }
+  function pluck(t0: number, midi: number, velocity: number, pan: number, brightness: number) {
+    note(
+      t0,
+      mtof(midi),
+      0.5,
+      velocity,
+      pan,
+      0.08,
+      ({ tone, context }) =>
+        new tone.MonoSynth({
+          context,
+          oscillator: { type: 'triangle' },
+          envelope: { attack: 0.004, decay: 0.42, sustain: 0, release: 0.08 },
+          filter: { type: 'lowpass', Q: 1.1 },
+          filterEnvelope: {
+            attack: 0.001,
+            decay: 0.5,
+            sustain: 0,
+            release: 0.08,
+            baseFrequency: 500,
+            octaves: Math.log2(brightness / 500),
+          },
+        }),
+    );
+  }
+  function fluteNote(t0: number, midi: number, duration: number, velocity: number, pan: number) {
+    const frequency = mtof(midi);
+    note(
+      t0,
+      frequency,
+      duration,
+      velocity,
+      pan,
+      0.15,
+      ({ tone, context }) =>
+        new tone.FMSynth({
+          context,
+          oscillator: { type: 'sine' },
+          modulation: { type: 'sine' },
+          harmonicity: 5.2 / frequency,
+          // Tone attenuates its FM carrier/modulator by 10 dB internally.
+          volume: 10,
+          modulationIndex: 0.006 / (velocity * Math.pow(10, -0.5)),
+          envelope: { attack: 0.09, decay: 0.01, sustain: 1, release: 0.15 },
+          modulationEnvelope: { attack: 0.35, decay: 0.01, sustain: 1, release: 0.15 },
+        }),
+    );
+  }
+  function padChord(t0: number, midis: number[], duration: number, level = 1) {
+    for (const midi of midis)
+      note(
         t0,
-        bridge.mtof(SCALE[(rnd() * SCALE.length) | 0] + 12),
-        0.011,
-        1.6,
-        (rnd() - 0.5) * 0.5,
+        mtof(midi),
+        duration - 0.7,
+        0.021 * level,
+        0,
+        1.3,
+        ({ tone, context }) =>
+          new tone.Synth({
+            context,
+            oscillator: { type: 'custom', partials: [1, 0.22] },
+            envelope: { attack: 1.1, decay: 0.01, sustain: 1, release: 1.3 },
+          }),
       );
   }
-  function thumpMusic(t0: number, vel: number) {
-    var o = bridge.AC.createOscillator();
-    o.type = 'sine';
-    o.frequency.setValueAtTime(95, t0);
-    o.frequency.exponentialRampToValueAtTime(52, t0 + 0.1);
-    var gn = bridge.AC.createGain();
-    gn.gain.setValueAtTime(vel, t0);
-    gn.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.13);
-    o.connect(gn);
-    gn.connect(bridge.gMusic);
-    o.start(t0);
-    o.stop(t0 + 0.2);
-    bridge.disposeAudio([o], [gn]);
+  function bassNote(t0: number, midi: number, velocity: number) {
+    note(
+      t0,
+      mtof(midi),
+      1.1,
+      velocity,
+      0,
+      0.1,
+      ({ tone, context }) =>
+        new tone.Synth({
+          context,
+          oscillator: { type: 'custom', partials: [1, 0.22] },
+          envelope: { attack: 0.02, decay: 1.1, sustain: 0, release: 0.1 },
+        }),
+    );
   }
-  function tickT(t0: number, vel: number) {
-    bridge.playNoise(bridge.gMusic, t0, 0.03, 'highpass', 6200, 0, vel, 1);
+  function dulcimer(t0: number, midi: number, velocity: number, pan: number) {
+    note(
+      t0,
+      mtof(midi),
+      0.55,
+      velocity,
+      pan,
+      0.05,
+      ({ tone, context }) =>
+        new tone.MonoSynth({
+          context,
+          oscillator: { type: 'triangle' },
+          envelope: { attack: 0.002, decay: 0.5, sustain: 0, release: 0.05 },
+          filter: { type: 'lowpass', Q: 0.9 },
+          filterEnvelope: {
+            attack: 0.001,
+            decay: 0.55,
+            sustain: 0,
+            release: 0.05,
+            baseFrequency: 800,
+            octaves: Math.log2(3400 / 800),
+          },
+        }),
+    );
   }
-  var musicNext = 0,
-    musicBar = 0,
-    musicTimer: ReturnType<typeof setInterval> = null;
+  function droneNote(t0: number, midi: number, duration: number, level = 1) {
+    note(
+      t0,
+      mtof(midi),
+      duration * 0.7,
+      0.024 * level,
+      0,
+      duration * 0.3,
+      ({ tone, context }) =>
+        new tone.Synth({
+          context,
+          oscillator: { type: 'fatsine', count: 2, spread: 5 },
+          envelope: { attack: duration * 0.35, decay: 0.01, sustain: 1, release: duration * 0.3 },
+        }),
+    );
+  }
+  function bellTone(
+    t0: number,
+    frequency: number,
+    velocity: number,
+    duration: number,
+    pan: number,
+  ) {
+    note(
+      t0,
+      frequency,
+      duration,
+      velocity,
+      pan,
+      0.1,
+      ({ tone, context }) =>
+        new tone.FMSynth({
+          context,
+          oscillator: { type: 'sine' },
+          modulation: { type: 'sine' },
+          harmonicity: 2.51,
+          volume: 10,
+          modulationIndex: 0.28 / (velocity * Math.pow(10, -0.5)),
+          envelope: { attack: 0.001, decay: duration, sustain: 0, release: 0.1 },
+          modulationEnvelope: { attack: 0.001, decay: duration * 0.4, sustain: 0, release: 0.1 },
+        }),
+    );
+  }
+  function thumpMusic(t0: number, velocity: number) {
+    note(
+      t0,
+      52,
+      0.13,
+      velocity,
+      0,
+      0.07,
+      ({ tone, context }) =>
+        new tone.MembraneSynth({
+          context,
+          pitchDecay: 0.1,
+          octaves: Math.log2(95 / 52),
+          oscillator: { type: 'sine' },
+          envelope: { attack: 0.001, decay: 0.13, sustain: 0, release: 0.07 },
+        }),
+    );
+  }
+  function tickT(t0: number, velocity: number) {
+    if (!graph) return;
+    const resources: Disposable[] = [];
+    const filter = ownVoice(
+      new graph.tone.Filter({ context: graph.context, type: 'highpass', frequency: 6200, Q: 1 }),
+      resources,
+    );
+    filter.connect(graph.channels.music);
+    const noise = ownVoice(
+      new graph.tone.NoiseSynth({
+        context: graph.context,
+        noise: { type: 'white' },
+        envelope: { attack: 0.001, decay: 0.03, sustain: 0, release: 0.01 },
+      }),
+      resources,
+    );
+    noise.connect(filter);
+    noise.triggerAttackRelease(0.03, t0, velocity);
+    runtime.releaseAt(t0 + 0.1, resources);
+  }
+  let musicBar = 0;
+  let musicSchedule: number = null;
+  let scheduleGeneration = 0;
 
   function suspend() {
-    if (musicTimer !== null) clearInterval(musicTimer);
-    musicTimer = null;
+    scheduleGeneration++;
+    if (graph) {
+      const transport = graph.context.transport;
+      if (musicSchedule !== null) transport.clear(musicSchedule);
+      transport.stop(runtime.immediate());
+    }
+    musicSchedule = null;
+    for (const voice of [...voices]) voice.dispose();
     musicBar = Math.ceil(musicBar / MUSIC_PHRASE_BARS) * MUSIC_PHRASE_BARS;
   }
   function resume() {
-    if (!runtime.canPlay('music') || musicTimer !== null) return;
-    musicNext = runtime.immediate() + 0.25;
-    musicTimer = setInterval(
-      () =>
+    if (!graph || !runtime.canPlay('music') || musicSchedule !== null) return;
+    const owner = graph;
+    const generation = ++scheduleGeneration;
+    const transport = owner.context.transport;
+    transport.bpm.value = TEMPO;
+    transport.timeSignature = 3;
+    musicSchedule = transport.scheduleRepeat(
+      (time) =>
         runtime.guard(() => {
-          if (!runtime.canPlay('music')) return;
-          if (musicNext < runtime.immediate()) {
-            musicNext = runtime.immediate() + 0.15;
-            musicBar = Math.ceil(musicBar / MUSIC_PHRASE_BARS) * MUSIC_PHRASE_BARS;
+          if (graph !== owner || generation !== scheduleGeneration || !runtime.canPlay('music'))
+            return;
+          // An interrupted browser clock may deliver old callbacks. Drop the old
+          // schedule entirely; the replacement begins at one fresh phrase boundary.
+          if (time < runtime.immediate()) {
+            suspend();
+            resume();
+            return;
           }
-          while (musicNext < runtime.immediate() + 0.4) {
-            scheduleBar(musicBar, musicNext);
-            musicNext += BAR;
-            musicBar++;
-          }
+          scheduleBar(musicBar, time);
+          musicBar++;
         }),
-      90,
+      BAR,
+      0,
     );
+    transport.start(runtime.immediate() + Math.max(0.25, owner.context.lookAhead + 0.05), 0);
   }
   if (internals) {
     Object.assign(internals, {
@@ -308,13 +532,6 @@ export function createMusic(game: GameRuntime, runtime: AudioRuntime, internals?
     });
     Object.defineProperties(internals, {
       BAR: { get: () => BAR, enumerable: true },
-      musicNext: {
-        get: () => musicNext,
-        set: (v: number) => {
-          musicNext = v;
-        },
-        enumerable: true,
-      },
       musicBar: {
         get: () => musicBar,
         set: (v: number) => {
@@ -322,18 +539,18 @@ export function createMusic(game: GameRuntime, runtime: AudioRuntime, internals?
         },
         enumerable: true,
       },
-      musicTimer: { get: () => musicTimer, enumerable: true },
+      musicSchedule: { get: () => musicSchedule, enumerable: true },
     });
   }
   return {
-    start(graph: AudioGraph) {
-      bridge = getLegacyBridge(graph);
+    start(nextGraph: AudioGraph) {
+      graph = nextGraph;
     },
     suspend,
     resume,
     dispose() {
       suspend();
-      bridge = null;
+      graph = null;
     },
   };
 }

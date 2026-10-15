@@ -54,9 +54,8 @@ export interface AudioInternals {
   readonly gMusic: GainNode;
   readonly gSfx: GainNode;
   readonly industrialVoices: IndustrialVoice[];
-  musicNext: number;
   musicBar: number;
-  readonly musicTimer: ReturnType<typeof setInterval>;
+  readonly musicSchedule: number;
 }
 
 export interface SoundCatalog {
