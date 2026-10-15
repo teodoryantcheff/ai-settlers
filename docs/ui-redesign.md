@@ -108,7 +108,7 @@ The redesign is complete only when the full experience works consistently, inclu
 9. **Whole-interface consistency:** exercise welcome, catalog, inspectors, Economy, Logistics, colony management, attention/activity, saves, settings, contextual help, reference, About, loading, errors, confirmations, and victory, including empty and unavailable states.
 10. **Presentation and access:** check 1440×900 and 1280×720, keyboard paths and focus restoration, readable contrast, non-color status cues, Reduced Motion, mute, and both supported rendering qualities. Preserve camera/input coordinates, sprite anchors, scene ordering, and deterministic simulation.
 
-Use the repository's full validation workflow and await asynchronous browser boot. Production UI uses actual measurements; development scenarios remain isolated from the release bundle. Update SPEC.md when the agreed architecture is implemented so it continues to describe the current game.
+Follow the validation policy in `AGENTS.md`: routine validation runs only `npm test`; broader browser validation requires an explicit user request. Await asynchronous browser boot when that validation is requested. Production UI uses actual measurements; development scenarios remain isolated from the release bundle. Update SPEC.md when the agreed architecture is implemented so it continues to describe the current game.
 
 ## Current evidence
 
