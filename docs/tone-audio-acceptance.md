@@ -1,8 +1,8 @@
 # Tone audio acceptance
 
-[ADR-0005](adr/0005-tone-audio-and-independent-economic-notices.md) is implemented in the shared Tone runtime and independent economic-notice observer. [SPEC.md](../SPEC.md#audio) describes the final ownership. Overall acceptance of [issue #6](https://github.com/teodoryantcheff/ai-settlers/issues/6) remains pending the user's listening check.
+[ADR-0005](adr/0005-tone-audio-and-independent-economic-notices.md) is implemented in the shared Tone runtime and independent economic-notice observer. [SPEC.md](../SPEC.md#audio) describes the final ownership. The user accepted the refined sound on 2026-10-15. The remaining technical gate for [issue #6](https://github.com/teodoryantcheff/ai-settlers/issues/6) is the final review correction and its validation.
 
-The initial listening review requested reducing the loudness and sharpness of dings and pings. Revised interface, world and score accents require another listening review. No automated check establishes audible parity.
+The initial listening review requested reducing the loudness and sharpness of dings and pings. Interface click/hover/open accents now use 60% of their prior velocity; world and score bell accents have lower level, half the modulation depth and a gentler attack, retaining pitches and timing. The score drum also retains its original 95 Hz down-to-52 Hz contour using Tone’s frequency-multiplier parameter. On 2026-10-15 the user listened to the revised clips and confirmed: “Accept the revised sound.” This accepts the refined representative cues and Meadow extract below; automated checks alone do not establish audible parity.
 
 ## Behavioral coverage
 
@@ -33,8 +33,15 @@ Run it after the build. The test awaits asynchronous boot, checks the production
 
 - [Native startup/retry matrix](../output/audio-acceptance/runtime-browser.json): successful startup plus constructor, context-node, partial mixer and resume failure; each failed context closes and retry produces one running context.
 - [Environment transitions](../output/audio-acceptance/ambience-browser.json): day, water, rain, night, thunder and channel silence; continuous loop count remains stable and exported save/gameplay RNG remain unchanged.
-- Original and migrated [cue recordings](../output/audio-acceptance/tone-cues.mp3), [remaining world cues](../output/audio-acceptance/tone-other-cues.webm), [three-theme extracts](../output/audio-acceptance/tone-themes.mp3) and [ambience recording](../output/audio-acceptance/tone-ambience.mp3). Original recordings are retained alongside the migrated versions for listening comparison.
+- Initial original and migrated [cue recordings](../output/audio-acceptance/tone-cues.mp3), [remaining world cues](../output/audio-acceptance/tone-other-cues.webm), [three-theme extracts](../output/audio-acceptance/tone-themes.mp3) and [ambience recording](../output/audio-acceptance/tone-ambience.mp3). Original recordings are retained alongside these initial migrated versions. This initial mix prompted the user’s request to soften bright accents; it is not the acceptance candidate.
+- Revised [representative cues](../output/audio-acceptance/tone-refined-cues.mp3) and [Meadow extract](../output/audio-acceptance/tone-refined-music.mp3) are the accepted listening clips. The extract includes score bell accents and the corrected drum contour; the original native streams and setup evidence are retained as `tone-refined-cues.webm` and `tone-refined-score.webm`/`.json`.
 - [Full-score quiet analysis](../output/audio-acceptance/score-quiet-analysis.json): all three quiet sections contain exact digital silence in both original and migrated scores. Decode the complete MediaRecorder stream before selecting sample windows; container timestamp seeks under CPU load can select the wrong musical section.
 - Category validation directories and the final `acceptance-node-validation/` copy of `npm test` logs. Final focused browser attachments are retained in `acceptance-browser/`.
 
-Final automated validation and revised listening evidence are recorded below as integration completes.
+## Integrated validation
+
+Node.js 24.18.1 with a clean `npm ci` installation passed `npm run build` and all 43 `npm test` steps on the integrated refined mix before the final review correction. The [retained Node summary](../output/audio-acceptance/acceptance-node-validation/summary.json) includes type checking and the original 95-to-52 Hz percussion regression, alongside the complete policy, lifecycle, save and simulation coverage. The [red percussion regression](../output/audio-acceptance/acceptance-regression-red/04-audio-music.test.cjs.log) records the incorrect 45.21 Hz attack before correcting Tone’s multiplier parameter.
+
+On 2026-10-15 the rebuilt combined graph passed all five focused browser cases in 89.1 seconds, with no page errors, skips or flaky cases. The [retained report](../output/audio-acceptance/acceptance-browser/report.json) and [run log](../output/audio-acceptance/acceptance-browser/run.log) cover the refined sound mix and corrected drum contour. The live-loop failure capture visibly shows the nonblocking notice alongside the running rendered game. Browser evidence observes one live context, finite source cleanup, exact sound-only save/RNG preservation and unchanged save continuation after a new colony and load.
+
+The final code review additionally identified the need to observe an unexpected native context close immediately. Its correction and final validation are recorded with the review fix. The user’s listening acceptance applies to the refined clips linked above; the review correction preserves their audible output.
