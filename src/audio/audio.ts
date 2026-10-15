@@ -47,7 +47,7 @@ export function createAudio(game: GameRuntime, internals?: AudioInternals): Audi
     transition: Promise<void> = null;
   let cleanup: Promise<void> = Promise.resolve();
   let pageAway = false,
-    visibilityVersion = 0,
+    playbackVersion = 0,
     failureNotified = false;
   const owned = new Set<Disposable>();
   const releases = new Set<number>();
@@ -203,11 +203,11 @@ export function createAudio(game: GameRuntime, internals?: AudioInternals): Audi
     let pending: Promise<void>;
     pending = (async () => {
       while (graph && context === owner && phase === 'ready') {
-        const version = visibilityVersion;
+        const version = playbackVersion;
         if (visible()) {
           if (owner.state === 'closed') throw new Error('Audio context closed');
           if (owner.state !== 'running') await owner.resume();
-          if (context === owner && phase === 'ready' && version === visibilityVersion && visible())
+          if (context === owner && phase === 'ready' && version === playbackVersion && visible())
             music.resume();
         } else {
           music.suspend();
@@ -215,7 +215,7 @@ export function createAudio(game: GameRuntime, internals?: AudioInternals): Audi
         }
         appliedVersion = version;
         await Promise.resolve();
-        if (version === visibilityVersion) break;
+        if (version === playbackVersion) break;
       }
     })()
       .catch((error) => {
@@ -224,7 +224,7 @@ export function createAudio(game: GameRuntime, internals?: AudioInternals): Audi
       .finally(() => {
         if (transition !== pending) return;
         transition = null;
-        if (context === owner && phase === 'ready' && appliedVersion !== visibilityVersion)
+        if (context === owner && phase === 'ready' && appliedVersion !== playbackVersion)
           return playback();
       });
     transition = pending;
@@ -287,7 +287,7 @@ export function createAudio(game: GameRuntime, internals?: AudioInternals): Audi
     return startup;
   }
   function visibility() {
-    visibilityVersion++;
+    playbackVersion++;
     void playback();
   }
   if (typeof document !== 'undefined') document.addEventListener('visibilitychange', visibility);
@@ -310,12 +310,14 @@ export function createAudio(game: GameRuntime, internals?: AudioInternals): Audi
   }
   function setMusicVol(on: boolean) {
     musicOn = !!on;
+    playbackVersion++;
     runtime.guard(applyMusic);
     if (musicOn) retryOrResume();
     else runtime.guard(() => music.suspend());
   }
   function setMusVol(value: number) {
     musVol = audioVolume(value);
+    playbackVersion++;
     runtime.guard(applyMusic);
     if (musVol <= 0) runtime.guard(() => music.suspend());
     else if (phase === 'ready') void playback();
@@ -333,6 +335,7 @@ export function createAudio(game: GameRuntime, internals?: AudioInternals): Audi
   }
   function setMuted(value: boolean) {
     muted = !!value;
+    playbackVersion++;
     runtime.guard(() => {
       gain('master', muted ? 0 : 0.9, 0.15);
       applyMusic();
@@ -367,6 +370,7 @@ export function createAudio(game: GameRuntime, internals?: AudioInternals): Audi
     },
     set musVol(value: number) {
       musVol = audioVolume(value);
+      playbackVersion++;
     },
     get sfxVol() {
       return sfxVol;
