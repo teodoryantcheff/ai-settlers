@@ -1,0 +1,271 @@
+{
+  "version": 1,
+  "sheets": {
+    "buildings": "buildings.png",
+    "foliage": "foliage.png",
+    "meadow": "meadow.png",
+    "mountains": "mountains.png",
+    "windmill": "windmill.png",
+    "bakery": "bakery.png",
+    "pigfarm": "pigfarm.png",
+    "butcher": "butcher.png",
+    "well": "well.png",
+    "brewery": "brewery.png",
+    "smelter": "smelter.png",
+    "workshop": "workshop.png"
+  },
+  "buildings": {
+    "hq": {
+      "sheet": "buildings",
+      "x": 30,
+      "y": 45,
+      "w": 303,
+      "h": 291
+    },
+    "warehouse": {
+      "sheet": "buildings",
+      "x": 348,
+      "y": 75,
+      "w": 280,
+      "h": 256
+    },
+    "lumberjack": {
+      "sheet": "buildings",
+      "x": 644,
+      "y": 94,
+      "w": 285,
+      "h": 241
+    },
+    "forester": {
+      "sheet": "buildings",
+      "x": 964,
+      "y": 96,
+      "w": 262,
+      "h": 238
+    },
+    "sawmill": {
+      "sheet": "buildings",
+      "x": 26,
+      "y": 367,
+      "w": 312,
+      "h": 262
+    },
+    "quarry": {
+      "sheet": "buildings",
+      "x": 350,
+      "y": 363,
+      "w": 280,
+      "h": 268
+    },
+    "fisherman": {
+      "sheet": "buildings",
+      "x": 652,
+      "y": 362,
+      "w": 267,
+      "h": 268
+    },
+    "farm": {
+      "sheet": "buildings",
+      "x": 937,
+      "y": 387,
+      "w": 304,
+      "h": 252
+    },
+    "mine_coal": {
+      "sheet": "buildings",
+      "x": 23,
+      "y": 675,
+      "w": 295,
+      "h": 250
+    },
+    "mine_iron": {
+      "sheet": "buildings",
+      "x": 337,
+      "y": 677,
+      "w": 293,
+      "h": 249
+    },
+    "mine_gold": {
+      "sheet": "buildings",
+      "x": 637,
+      "y": 681,
+      "w": 296,
+      "h": 239
+    },
+    "toolsmith": {
+      "sheet": "buildings",
+      "x": 948,
+      "y": 664,
+      "w": 282,
+      "h": 273
+    },
+    "armory": {
+      "sheet": "buildings",
+      "x": 34,
+      "y": 948,
+      "w": 290,
+      "h": 264
+    },
+    "guard": {
+      "sheet": "buildings",
+      "x": 354,
+      "y": 949,
+      "w": 237,
+      "h": 269
+    },
+    "windmill": {
+      "sheet": "windmill",
+      "x": 0,
+      "y": 0,
+      "w": 1254,
+      "h": 1254
+    },
+    "bakery": {
+      "sheet": "bakery",
+      "x": 0,
+      "y": 0,
+      "w": 1240,
+      "h": 1268
+    },
+    "pigfarm": {
+      "sheet": "pigfarm",
+      "x": 0,
+      "y": 0,
+      "w": 1254,
+      "h": 1254
+    },
+    "butcher": {
+      "sheet": "butcher",
+      "x": 0,
+      "y": 0,
+      "w": 1254,
+      "h": 1254
+    },
+    "well": {
+      "sheet": "well",
+      "x": 0,
+      "y": 0,
+      "w": 1254,
+      "h": 1254
+    },
+    "brewery": {
+      "sheet": "brewery",
+      "x": 0,
+      "y": 0,
+      "w": 1254,
+      "h": 1254
+    },
+    "smelter": {
+      "sheet": "smelter",
+      "x": 0,
+      "y": 0,
+      "w": 1254,
+      "h": 1254
+    },
+    "workshop": {
+      "sheet": "workshop",
+      "x": 0,
+      "y": 0,
+      "w": 1254,
+      "h": 1254
+    }
+  },
+  "site": {
+    "sheet": "buildings",
+    "x": 634,
+    "y": 976,
+    "w": 287,
+    "h": 235
+  },
+  "trees": [
+    {
+      "sheet": "foliage",
+      "x": 13,
+      "y": 43,
+      "w": 381,
+      "h": 422
+    },
+    {
+      "sheet": "foliage",
+      "x": 397,
+      "y": 66,
+      "w": 377,
+      "h": 392
+    },
+    {
+      "sheet": "foliage",
+      "x": 775,
+      "y": 16,
+      "w": 312,
+      "h": 449
+    }
+  ],
+  "rocks": [
+    {
+      "sheet": "foliage",
+      "x": 27,
+      "y": 808,
+      "w": 342,
+      "h": 243
+    },
+    {
+      "sheet": "foliage",
+      "x": 422,
+      "y": 825,
+      "w": 307,
+      "h": 218
+    }
+  ],
+  "terrain": {
+    "sheet": "meadow",
+    "worldSize": 384
+  },
+  "mountains": {
+    "dry": [
+      {
+        "sheet": "mountains",
+        "x": 0,
+        "y": 0,
+        "w": 512,
+        "h": 512
+      },
+      {
+        "sheet": "mountains",
+        "x": 512,
+        "y": 0,
+        "w": 512,
+        "h": 512
+      },
+      {
+        "sheet": "mountains",
+        "x": 1024,
+        "y": 0,
+        "w": 512,
+        "h": 512
+      }
+    ],
+    "snowy": [
+      {
+        "sheet": "mountains",
+        "x": 0,
+        "y": 512,
+        "w": 512,
+        "h": 512
+      },
+      {
+        "sheet": "mountains",
+        "x": 512,
+        "y": 512,
+        "w": 512,
+        "h": 512
+      }
+    ],
+    "foothill": {
+      "sheet": "mountains",
+      "x": 1024,
+      "y": 512,
+      "w": 512,
+      "h": 512
+    }
+  }
+}
