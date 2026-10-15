@@ -164,10 +164,43 @@ function audioHarness({
     }
   }
 
+  class ToneTransport {
+    constructor() {
+      this.bpm = new MockAudioParam(120);
+      this.timeSignature = 4;
+      this.seconds = 0;
+      this.state = 'stopped';
+      this.events = new Map();
+      this.nextEvent = 1;
+    }
+    scheduleRepeat(callback, interval, startTime = 0) {
+      const id = this.nextEvent++;
+      this.events.set(id, { callback, interval, startTime });
+      return id;
+    }
+    clear(id) {
+      this.events.delete(id);
+      return this;
+    }
+    start(time = 0, offset = 0) {
+      this.started = time;
+      this.seconds = offset;
+      this.state = 'started';
+      return this;
+    }
+    stop(time = 0) {
+      this.stopped = time;
+      this.seconds = 0;
+      this.state = 'stopped';
+      return this;
+    }
+  }
   class ToneContext {
     constructor(options = {}) {
       this.rawContext = options.context ?? new MockAudioContext();
       this.destination = this.rawContext.destination;
+      this.transport = new ToneTransport();
+      this.lookAhead = 0.1;
     }
     get currentTime() {
       return this.rawContext.currentTime;
@@ -216,17 +249,34 @@ function audioHarness({
   class ToneNode {
     constructor(options, type = 'gain') {
       this.options = options;
+      this.type = this.name = type;
       this.input =
         type === 'compressor'
           ? options.context.rawContext.createDynamicsCompressor()
           : new MockAudioNode(type, nodes);
       this.gain = this.input.gain;
       this.frequency = this.input.frequency;
+      this.pan = this.input.pan;
+      this.Q = this.input.Q;
+      this.volume = new MockAudioParam(options.volume ?? 0);
+      this.playbackRate = options.playbackRate ?? 1;
       this.gain.value = options.gain ?? 1;
+      this.frequency.value = options.frequency ?? 440;
+      this.Q.value = options.Q ?? 0;
       toneNodes.push(this);
     }
     connect(destination) {
       this.input.connect(destination.input ?? destination);
+      return this;
+    }
+    start(time = 0) {
+      this.started = time;
+      this.input.start(time);
+      return this;
+    }
+    stop(time = 0) {
+      this.stopped = time;
+      this.input.stop(time);
       return this;
     }
     dispose() {
@@ -242,11 +292,20 @@ function audioHarness({
     }
   }
   class ToneSynth extends ToneNode {
-    constructor(options) {
+    constructor(options, instrument = 'Synth') {
       super(options, 'tone-synth');
+      this.instrument = instrument;
     }
     triggerAttackRelease(frequency, duration, time, velocity) {
-      notes.push({ frequency, duration, time, velocity, type: this.options.oscillator.type });
+      notes.push({
+        frequency,
+        duration,
+        time,
+        velocity,
+        type: this.options.oscillator?.type ?? 'sine',
+        instrument: this.instrument,
+        node: this,
+      });
       this.input.started = time;
       this.input.stopped = time + duration + 0.1;
     }
@@ -256,7 +315,7 @@ function audioHarness({
       super(options, 'tone-noise');
     }
     triggerAttackRelease(duration, time, velocity) {
-      notes.push({ duration, time, velocity, type: 'noise' });
+      notes.push({ duration, time, velocity, type: 'noise', instrument: 'NoiseSynth', node: this });
       this.input.started = time;
       this.input.stopped = time + duration + 0.1;
     }
@@ -264,6 +323,39 @@ function audioHarness({
   class ToneFilter extends ToneNode {
     constructor(options) {
       super(options, 'tone-filter');
+    }
+  }
+  class TonePanner extends ToneNode {
+    constructor(options) {
+      super(options, 'tone-panner');
+      this.pan.value = options.pan ?? 0;
+    }
+  }
+  class ToneMonoSynth extends ToneSynth {
+    constructor(options) {
+      super(options, 'MonoSynth');
+    }
+  }
+  class ToneFMSynth extends ToneSynth {
+    constructor(options) {
+      super(options, 'FMSynth');
+    }
+  }
+  class ToneMembraneSynth extends ToneSynth {
+    constructor(options) {
+      super(options, 'MembraneSynth');
+    }
+  }
+  class ToneNoise extends ToneNode {
+    constructor(options) {
+      super(options, 'tone-noise-source');
+    }
+  }
+  class ToneLFO extends ToneNode {
+    constructor(options) {
+      super(options, 'tone-lfo');
+      this.min = options.min;
+      this.max = options.max;
     }
   }
   const tone = {
@@ -274,6 +366,12 @@ function audioHarness({
     Synth: ToneSynth,
     NoiseSynth: ToneNoiseSynth,
     Filter: ToneFilter,
+    Panner: TonePanner,
+    MonoSynth: ToneMonoSynth,
+    FMSynth: ToneFMSynth,
+    MembraneSynth: ToneMembraneSynth,
+    Noise: ToneNoise,
+    LFO: ToneLFO,
   };
   const document = Object.assign(eventTarget(), {
     visibilityState: 'visible',
