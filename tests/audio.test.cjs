@@ -181,7 +181,7 @@ function audioHarness({ savedPrefs, initialState = 'running', deferTransitions =
     clearInterval: (id) => intervals.delete(id),
   });
   const { game: audio } = createGame({
-    modules: ['audio', 'hud'],
+    modules: ['economicNotices', 'audio', 'hud'],
     stubs: {
       view: fakeElement('view'),
       mini: fakeElement('mini'),
@@ -683,4 +683,38 @@ test('economic cues have distinct contours and release every finite voice', () =
     );
   }
   assert.equal(new Set(signatures).size, 3);
+});
+
+test('failed economic sound never interrupts text delivery or replays committed transitions', (t) => {
+  const { audio } = audioHarness();
+  audio.initAudio();
+  const b = feedbackProducer();
+  audio.buildings.push(b);
+  feedbackFrame(audio, 0);
+  const failure = new Error('sound device unavailable');
+  const report = t.mock.method(console, 'error', () => {});
+  const device = t.mock.method(audio.AC, 'createOscillator', () => {
+    throw failure;
+  });
+  for (let now = 250; now <= 41_000; now += 250) {
+    if (now === 250) b.produced = 1;
+    if (now === 500) {
+      b.stock.logs = 0;
+      b.blockedReason = 'inputs';
+    }
+    if (now === 21_000) {
+      b.produced = 2;
+      b.blockedReason = '';
+    }
+    assert.doesNotThrow(() => feedbackFrame(audio, now));
+  }
+  assert.equal(audio.msgs.length, 3);
+  assert.match(audio.msgs[0].t, /first planks produced/);
+  assert.match(audio.msgs[1].t, /blocked — needs logs/);
+  assert.match(audio.msgs[2].t, /production resumed/);
+  assert.equal(report.mock.calls.length, 3);
+  assert.ok(report.mock.calls.every(({ arguments: args }) => args[1] === failure));
+  device.mock.restore();
+  feedbackFrame(audio, 42_000);
+  assert.equal(audio.msgs.length, 3, 'a recovered sound device cannot replay committed notices');
 });

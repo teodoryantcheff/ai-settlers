@@ -1,7 +1,6 @@
 import { observePresentation } from '../ui/domain-feedback.ts';
 import type { GameRuntime } from '../runtime.ts';
 import type { BuildingType } from '../types.ts';
-import { createEconomicFeedback, type EconomicFeedbackNotice } from './economic-feedback.ts';
 import { ingredientShortages } from '../gameplay/production-rules.ts';
 
 export function createAudio(game: GameRuntime, internals?: AudioInternals): AudioSubsystem {
@@ -22,60 +21,6 @@ export function createAudio(game: GameRuntime, internals?: AudioInternals): Audi
     rainG: GainNode = null;
   var audioVisibilityBound = false,
     audioWorkBound = false;
-
-  // This observer exists before AudioContext initialization, so muted players and
-  // browsers that have not unlocked audio still receive the same information.
-  var economicFeedback = createEconomicFeedback({
-    get buildings() {
-      return game.buildings;
-    },
-    get state() {
-      return game.state;
-    },
-    get BSPEC() {
-      return game.BSPEC;
-    },
-    get GOODS() {
-      return game.GOODS;
-    },
-  });
-  function updateEconomicFeedback(realNowMs: number, active = true): EconomicFeedbackNotice | null {
-    var messages = game.msgs || [];
-    var canNotify = typeof game.msg === 'function';
-    // Never evict a still-visible message from the eight-entry shared feed, and
-    // leave fresh player actions/errors room to read before adding a quiet cue.
-    if (messages.length >= 8 && realNowMs - messages[0].at < 7000) canNotify = false;
-    for (var message of messages) {
-      var age = realNowMs - message.at;
-      if (
-        age < 750 ||
-        (age < 3500 && /failed|failure|cannot|can't|✖|exhausted|error|no route/i.test(message.t))
-      )
-        canNotify = false;
-    }
-    var notification = economicFeedback.update(realNowMs, {
-      active: active && document.visibilityState !== 'hidden',
-      canNotify,
-    });
-    if (notification) {
-      game.msg(notification.message, {
-        workspace: notification.kind === 'blocked' ? 'attention' : 'activity',
-        entity: notification.buildings[0],
-      });
-      if (sfxCanPlay()) {
-        var b = notification.buildings[0];
-        var method = (
-          {
-            started: 'chainStart',
-            blocked: 'chainBlocked',
-            recovered: 'chainRecovered',
-          } as const
-        )[notification.kind];
-        SND[method](b.x, b.y);
-      }
-    }
-    return notification;
-  }
 
   function audioCanPlay() {
     return !!AC && AC.state === 'running' && !muted && document.visibilityState !== 'hidden';
@@ -1395,7 +1340,6 @@ export function createAudio(game: GameRuntime, internals?: AudioInternals): Audi
       return SND;
     },
     ambTick,
-    updateEconomicFeedback,
     setMusicVol,
     setMusVol,
     setSfxVol,
@@ -1493,8 +1437,6 @@ export interface AudioSubsystem {
     fanfare: () => void;
   };
   ambTick: (dt: number) => void;
-  /** Call after simulation on every frame, including paused frames for load baselines. */
-  updateEconomicFeedback: (realNowMs: number, active?: boolean) => EconomicFeedbackNotice | null;
   setMusicVol: (on: boolean) => void;
   setMusVol: (v: number) => void;
   setSfxVol: (v: number) => void;
