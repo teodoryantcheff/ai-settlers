@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, DEFAULT_MODULES } from './helpers/game.cjs';
-import { createEconomicFeedback } from '../src/audio/economic-feedback.ts';
+import { createEconomicFeedback } from '../src/ui/economic-feedback.ts';
 import { ingredientShortages, ingredientsConsumedNext } from '../src/gameplay/production-rules.ts';
 
 function colony(type, stock, legacyIndustry = false, audio = false) {

@@ -69,7 +69,7 @@ function createGame(options = {}) {
   for (const name of modules) {
     const factory = MODULES[name];
     if (!factory) throw new Error(`Unknown test module: ${name}`);
-    const hooks = {};
+    const hooks = { ...(options.internals?.[name] ?? {}) };
     const subsystem = factory(game, factoryOptions, hooks);
     for (const key of Object.keys(subsystem)) if (key in stubs) delete game[key];
     attachSubsystem(game, subsystem);
