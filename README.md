@@ -59,16 +59,16 @@ The game is a static site: no backend, Pages Functions, or Cloudflare runtime bi
 ```sh
 npm ci
 npx wrangler login                          # once per developer machine
-npm run deploy                             # validate, package, publish production (main)
+npm run deploy                             # Node tests, build, package, publish production (main)
 ```
 
 The Direct Upload project is `settlers-tribute`, served at https://settlers-tribute.pages.dev/. To recreate it in a new account, first run `npx wrangler pages project create settlers-tribute --production-branch main`. Wrangler 4.149.0 may delegate creation of new projects to Workers in agent environments; add `--force` to that one-time create command to explicitly retain Pages. Existing Pages projects do not need this flag for deployment. Ensure Wrangler targets the intended account; set `CLOUDFLARE_ACCOUNT_ID` when needed.
 
-`npm run deploy` requires a successful full validation before packaging and publishing; any failed or interrupted check prevents deployment.
+`npm run deploy` runs `npm test` (typechecking and Node tests), then builds a fresh production package before publishing. Any failed or interrupted command prevents deployment. The full browser suite is an explicit check through `npm run check` or `npm run test:browser`; it is not part of deployment.
 
 `npm run build:pages` creates a clean, deploy-only `dist/`: entry HTML, a real 404 page, Pages headers, and content-hashed releases containing the minified game and complete artwork/reference/provenance pack. Code and artwork share a release hash, preserving their relative paths and allowing one-year immutable caching; HTML revalidates. Cloudflare handles compression. Never deploy the repository root or manually add unversioned assets to the immutable release paths.
 
-`npm run preview:pages` builds and serves this production package locally through Wrangler. In another terminal, run `npm run test:pages -- http://localhost:8788/` (or pass the deployed URL) to check production WebGL boot, artwork, cache/security headers, missing-file 404s, and save/load. Set `PAGES_SCREENSHOT` to save a screenshot. Run `npm run check` before manually publishing a branch preview. A branch preview can be uploaded with `npx wrangler pages deploy dist --project-name settlers-tribute --branch staging` after building.
+`npm run preview:pages` builds and serves this production package locally through Wrangler. In another terminal, run `npm run test:pages -- http://localhost:8788/` (or pass the deployed URL) to check production WebGL boot, artwork, cache/security headers, missing-file 404s, and save/load. Set `PAGES_SCREENSHOT` to save a screenshot. Run `npm test` and `npm run build:pages` before manually publishing a branch preview. A branch preview can be uploaded with `npx wrangler pages deploy dist --project-name settlers-tribute --branch staging` after building.
 
 Soft-launch headers disable search indexing (`X-Robots-Tag: noindex`) and embedding, and add basic browser security protections. The site is still public, not access-controlled. Remove `noindex` from `scripts/pages-headers.txt` when ready for discovery. Saves and preferences stay in browser-local storage, separately for each origin; localhost/preview saves do not automatically transfer to production. Serve over HTTP(S); direct `file://` opening and offline caching are unsupported.
 
