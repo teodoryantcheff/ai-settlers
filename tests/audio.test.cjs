@@ -311,7 +311,11 @@ test('replacing a browser-closed context disposes the old Tone graph before rebu
     oldNodes.every((node) => node.disposed),
     'the replaced graph releases every owned node',
   );
-  assert.equal(intervals.size, 1, 'the replacement retains a single score schedule');
+  assert.equal(
+    audio.audioGraph.context.transport.events.size,
+    1,
+    'the replacement retains a single score schedule',
+  );
 });
 
 test('the latest visibility state wins when a running-context reconciliation settles immediately', async () => {
@@ -346,7 +350,7 @@ test('constructor failures report once and audio controls retry a clean startup'
   await audio.initAudio();
   assert.equal(audio.audioPhase, 'ready');
   assert.equal(contexts.length, 1);
-  assert.equal(intervals.size, 1);
+  assert.equal(audio.audioGraph.context.transport.events.size, 1);
   assert.equal(notes.length, 0, 'retry does not replay missed effects');
   audio.SND.ui();
   assert.equal(notes.length, 1);
@@ -371,7 +375,7 @@ test('a partial mixer failure releases owned nodes before the next attempt', asy
   tone.Gain = Gain;
   await audio.initAudio();
   assert.equal(audio.audioPhase, 'ready');
-  assert.equal(intervals.size, 1);
+  assert.equal(audio.audioGraph.context.transport.events.size, 1);
   assert.equal(contexts.length, 2);
 });
 
