@@ -213,6 +213,46 @@ for (const failure of ['constructor', 'context-node', 'mixer', 'resume']) {
   });
 }
 
+test('native context loss during play reports automatically and controls restore audible output', async ({
+  page,
+}) => {
+  const errors = await boot(page, { liveFrames: true });
+  await ready(page);
+  const before = await page.evaluate(() => ({
+    time: productionArtPreview.game.state.time,
+    frames: audioEvidence.frames,
+  }));
+  await page.evaluate(() => audioEvidence.contexts[0].close());
+  // No startup, control or manual frame call may be needed to discover failure.
+  await expect(page.locator('#msgs')).toContainText('Audio unavailable', { timeout: 15000 });
+  await expect
+    .poll(() => page.evaluate(() => productionArtPreview.game.state.time))
+    .toBeGreaterThan(before.time);
+  expect(await page.evaluate(() => audioEvidence.frames)).toBeGreaterThan(before.frames);
+  expect((await summary(page)).notices).toBe(1);
+  await page.screenshot({ path: test.info().outputPath('playback-loss-notice.png') });
+  await menu(page);
+  await page.locator('#mute').click();
+  await page.locator('#mute').click();
+  await ready(page);
+  await page.evaluate(() => {
+    const game = productionArtPreview.game;
+    game.state.paused = true;
+    game.setMusicVol(false);
+    game.setAmbVol(0);
+  });
+  await expectCue(page);
+  const result = await summary(page);
+  expect(result.contexts).toEqual(['closed', 'running']);
+  expect(result.notices).toBe(1);
+  expect(result.preferences).toEqual([0.21, 0.57]);
+  expect(errors).toEqual([]);
+  await test.info().attach('native-playback-loss-evidence', {
+    body: JSON.stringify(result, null, 2),
+    contentType: 'application/json',
+  });
+});
+
 test('startup, settings, pause, speed, world replacement and background recovery share one graph', async ({
   page,
 }) => {
