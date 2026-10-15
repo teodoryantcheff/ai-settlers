@@ -50,11 +50,27 @@ try {
   await page.locator('#sp0').click();
   await page.locator('#utility summary').click();
   await page.locator('#saveb').click();
-  const saved = await page.evaluate(() => localStorage.getItem('settlers.save'));
+  await page.locator('#checkpoint-name').fill('Production smoke checkpoint');
+  await page.locator('#create-checkpoint').click();
+  const checkpoint = page
+    .locator('.save-entry')
+    .filter({ has: page.getByText('Production smoke checkpoint', { exact: true }) });
+  await checkpoint.waitFor({ state: 'visible' });
+  const saved = await page.evaluate(() => localStorage.getItem('settlers.saves.v1'));
   assert.ok(saved);
-  await page.locator('#loadb').click();
-  assert.equal(await page.evaluate(() => localStorage.getItem('settlers.save')), saved);
+  const entry = JSON.parse(saved).entries.find((entry) => entry.name === 'Production smoke checkpoint');
+  assert.equal(entry.kind, 'manual');
+  assert.equal(entry.data.seed, 2024);
+  await page.locator('#colony-name').fill('Unsaved smoke colony');
+  await page.locator('#colony-name').press('Tab');
+  await checkpoint.getByRole('button', { name: 'Load', exact: true }).click();
+  await page.locator('#confirm-save-action').click();
+  await page.locator('#savedata').waitFor({ state: 'hidden' });
+  assert.equal(await page.evaluate(() => localStorage.getItem('settlers.saves.v1')), saved);
   await page.locator('#utility summary').click();
+  await page.locator('#saveb').click();
+  assert.equal(await page.locator('#colony-name').inputValue(), entry.data.identity.name);
+  await page.locator('#close-saves').click();
   if (process.env.PAGES_SCREENSHOT) await page.screenshot({ path: process.env.PAGES_SCREENSHOT });
   assert.deepEqual(errors, []);
   console.log(`Pages smoke check passed: ${base} (WebGL, artwork, headers, 404s, save/load).`);
