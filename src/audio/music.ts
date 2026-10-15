@@ -435,10 +435,10 @@ export function createMusic(game: GameRuntime, runtime: AudioRuntime, internals?
           oscillator: { type: 'sine' },
           modulation: { type: 'sine' },
           harmonicity: 2.51,
-          volume: 10,
-          modulationIndex: 0.28 / (velocity * Math.pow(10, -0.5)),
-          envelope: { attack: 0.001, decay: duration, sustain: 0, release: 0.1 },
-          modulationEnvelope: { attack: 0.001, decay: duration * 0.4, sustain: 0, release: 0.1 },
+          volume: 5,
+          modulationIndex: 0.14 / (velocity * Math.pow(10, -0.5)),
+          envelope: { attack: 0.004, decay: duration, sustain: 0, release: 0.1 },
+          modulationEnvelope: { attack: 0.004, decay: duration * 0.4, sustain: 0, release: 0.1 },
         }),
     );
   }
