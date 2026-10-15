@@ -1,6 +1,7 @@
 import { createAttentionView } from '../ui/attention-view.ts';
 import { createInteraction } from '../ui/interaction.ts';
 import { createMessages } from '../ui/messages.ts';
+import { createEconomicNotices } from '../ui/economic-notices.ts';
 import { createProgressionView } from '../ui/progression-view.ts';
 import { bindDomainFeedback } from '../ui/domain-feedback.ts';
 import { createLoop, type LoopInternals } from './loop.ts';
@@ -31,6 +32,7 @@ export interface PresentationOptions {
 export const PRESENTATION_SUBSYSTEMS = [
   presentationSubsystem('interaction', (game) => createInteraction(game)),
   presentationSubsystem('messages', (game) => createMessages(game)),
+  presentationSubsystem('economicNotices', (game) => createEconomicNotices(game)),
   presentationSubsystem('audio', (game, _options, hooks?: AudioInternals) =>
     createAudio(game, hooks),
   ),

@@ -6,7 +6,7 @@ import {
   ECONOMIC_BLOCKAGE_DELAY_MS,
   ECONOMIC_GLOBAL_COOLDOWN_MS,
   ECONOMIC_BUILDING_COOLDOWN_MS,
-} from '../src/audio/economic-feedback.ts';
+} from '../src/ui/economic-feedback.ts';
 
 function producer(overrides = {}) {
   return {
