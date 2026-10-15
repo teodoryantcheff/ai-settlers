@@ -292,6 +292,59 @@ test('one gesture startup stays pending and skips interface cues until Tone is r
   assert.equal(notes.at(-1).time, 4, 'the immediate cue excludes musical lookahead');
 });
 
+test('a context closing during play reports once while independent notices continue, and controls retry', async () => {
+  const { audio, toneNodes, contexts, notes } = audioHarness();
+  const producer = feedbackProducer();
+  audio.buildings.push(producer);
+  feedbackFrame(audio, 0);
+  await audio.initAudio();
+  const closed = audio.AC;
+  const oldNodes = [...toneNodes];
+  await closed.close();
+  closed.dispatch('statechange');
+  assert.equal(
+    audio.audioPhase,
+    'failed',
+    'the native lifecycle event detects loss without another gesture',
+  );
+  assert.equal(audio.AC, null);
+  assert.equal(audio.msgs.filter(({ t }) => t.startsWith('Audio unavailable.')).length, 1);
+  assert.ok(
+    oldNodes.every((node) => node.disposed),
+    'the failed playback graph releases its nodes',
+  );
+  producer.produced = 1;
+  assert.equal(
+    feedbackFrame(audio, 250),
+    null,
+    'the fresh failure notice retains its reading time',
+  );
+  const notice = feedbackFrame(audio, 1000);
+  assert.equal(notice.kind, 'started');
+  assert.equal(audio.msgs.at(-1).t, notice.message, 'economic observation continues without audio');
+  const before = notes.length;
+  audio.SND.ui();
+  assert.equal(notes.length, before, 'effects during failure are skipped');
+  audio.setMuted(false);
+  await audio.initAudio();
+  assert.equal(audio.audioPhase, 'ready');
+  assert.deepEqual(
+    contexts.map(({ state }) => state),
+    ['closed', 'running'],
+  );
+  assert.equal(audio.audioGraph.context.transport.events.size, 1);
+  closed.dispatch('statechange');
+  assert.equal(
+    audio.audioPhase,
+    'ready',
+    'a late event from the disposed context cannot fail its replacement',
+  );
+  assert.equal(audio.msgs.filter(({ t }) => t.startsWith('Audio unavailable.')).length, 1);
+  assert.equal(notes.length, before, 'retry never replays skipped cues');
+  audio.SND.ui();
+  assert.equal(notes.length, before + 1, 'the replacement plays new cues');
+});
+
 test('replacing a browser-closed context disposes the old Tone graph before rebuilding', async () => {
   const { audio, toneNodes, contexts, intervals } = audioHarness();
   await audio.initAudio();

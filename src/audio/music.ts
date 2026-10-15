@@ -1,4 +1,5 @@
 import type { GameRuntime } from '../runtime.ts';
+import { bellOptions } from './bell-options.ts';
 import { ingredientShortages } from '../gameplay/production-rules.ts';
 import type { AudioGraph, AudioRuntime, Disposable } from './audio-runtime.ts';
 import type {
@@ -432,13 +433,7 @@ export function createMusic(game: GameRuntime, runtime: AudioRuntime, internals?
       ({ tone, context }) =>
         new tone.FMSynth({
           context,
-          oscillator: { type: 'sine' },
-          modulation: { type: 'sine' },
-          harmonicity: 2.51,
-          volume: 5,
-          modulationIndex: 0.14 / (velocity * Math.pow(10, -0.5)),
-          envelope: { attack: 0.004, decay: duration, sustain: 0, release: 0.1 },
-          modulationEnvelope: { attack: 0.004, decay: duration * 0.4, sustain: 0, release: 0.1 },
+          ...bellOptions(velocity, duration, 0.1, 0.1),
         }),
     );
   }

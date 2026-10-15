@@ -71,8 +71,13 @@ function eventTarget() {
       if (!listeners.has(name)) listeners.set(name, []);
       listeners.get(name).push(listener);
     },
+    removeEventListener(name, listener) {
+      const handlers = listeners.get(name);
+      const index = handlers?.indexOf(listener) ?? -1;
+      if (index >= 0) handlers.splice(index, 1);
+    },
     dispatch(name) {
-      for (const listener of listeners.get(name) || []) listener();
+      for (const listener of [...(listeners.get(name) || [])]) listener();
     },
   };
 }
@@ -98,6 +103,7 @@ function audioHarness({
 
   class MockAudioContext {
     constructor() {
+      Object.assign(this, eventTarget());
       this.currentTime = 0;
       this.sampleRate = 100;
       this.state = initialState;
@@ -107,6 +113,7 @@ function audioHarness({
     }
     close() {
       this.state = 'closed';
+      this.dispatch('statechange');
       return Promise.resolve();
     }
     suspend() {
