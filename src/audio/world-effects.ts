@@ -1,16 +1,16 @@
 import { observePresentation } from '../ui/domain-feedback.ts';
 import type { GameRuntime } from '../runtime.ts';
 import type { BuildingType } from '../types.ts';
-import type { AudioGraph, AudioRuntime } from './audio-runtime.ts';
+import type { AudioGraph, AudioRuntime, Disposable } from './audio-runtime.ts';
 import type { AudioInternals, IndustrialVoice, SoundCatalog } from './audio-types.ts';
-import { getLegacyBridge, type LegacyBridge } from './legacy-bridge.ts';
+import type { Panner } from 'tone/build/esm/classes.js';
 type WorldSounds = Omit<SoundCatalog, 'ui' | 'tick' | 'uiOpen' | 'fail' | 'thunder'>;
 export function createWorldEffects(
   game: GameRuntime,
   runtime: AudioRuntime,
   internals?: AudioInternals,
 ) {
-  let bridge: LegacyBridge = null;
+  let graph: AudioGraph = null;
   let audioWorkBound = false;
   const sfxCanPlay = () => runtime.canPlay('effects');
   function panOf(wx: number) {
@@ -19,6 +19,158 @@ export function createWorldEffects(
       half = game.vw / 2 / game.z;
     var p = (wx * game.TS - cx) / half;
     return Math.max(-0.75, Math.min(0.75, p * 0.55));
+  }
+  interface Cue {
+    graph: AudioGraph;
+    time: number;
+    output: Panner;
+    resources: Disposable[];
+    until: number;
+  }
+  function own<T extends Disposable>(cue: Cue, resource: T): T {
+    runtime.own(resource);
+    cue.resources.push(resource);
+    return resource;
+  }
+  function play(pan: number, build: (cue: Cue) => void, at?: number) {
+    if (!graph || !sfxCanPlay()) return;
+    runtime.guard(() => {
+      const time = at ?? runtime.immediate();
+      const output = runtime.own(new graph.tone.Panner({ context: graph.context, pan }));
+      const cue: Cue = { graph, time, output, resources: [output], until: time };
+      output.connect(graph.channels.effects);
+      build(cue);
+      runtime.releaseAt(cue.until, cue.resources);
+    });
+  }
+  function note(
+    cue: Cue,
+    time: number,
+    frequency: number,
+    duration: number,
+    velocity: number,
+    type: 'sine' | 'triangle' | 'sawtooth' = 'triangle',
+    to = frequency,
+    attack = 0.008,
+    cutoff = 0,
+  ) {
+    const synth = own(
+      cue,
+      new cue.graph.tone.Synth({
+        context: cue.graph.context,
+        oscillator: { type },
+        envelope: { attack, decay: Math.max(0.01, duration - attack), sustain: 0, release: 0.025 },
+      }),
+    );
+    if (cutoff) {
+      const filter = own(
+        cue,
+        new cue.graph.tone.Filter({
+          context: cue.graph.context,
+          type: 'lowpass',
+          frequency: cutoff,
+        }),
+      );
+      synth.connect(filter);
+      filter.connect(cue.output);
+    } else synth.connect(cue.output);
+    synth.triggerAttackRelease(frequency, duration, time, velocity);
+    if (to !== frequency) synth.frequency.exponentialRampToValueAtTime(to, time + duration);
+    cue.until = Math.max(cue.until, time + duration + 0.1);
+  }
+  function noise(
+    cue: Cue,
+    time: number,
+    duration: number,
+    type: BiquadFilterType,
+    frequency: number,
+    to: number,
+    velocity: number,
+    Q = 0.8,
+    attack = 0.001,
+  ) {
+    const synth = own(
+      cue,
+      new cue.graph.tone.NoiseSynth({
+        context: cue.graph.context,
+        noise: { type: 'white' },
+        envelope: { attack, decay: Math.max(0.01, duration - attack), sustain: 0, release: 0.02 },
+      }),
+    );
+    const filter = own(
+      cue,
+      new cue.graph.tone.Filter({
+        context: cue.graph.context,
+        type,
+        frequency,
+        Q,
+      }),
+    );
+    synth.connect(filter);
+    filter.connect(cue.output);
+    if (to) filter.frequency.exponentialRampToValueAtTime(to, time + duration);
+    synth.triggerAttackRelease(duration, time, velocity);
+    cue.until = Math.max(cue.until, time + duration + 0.1);
+    return filter;
+  }
+  function thump(cue: Cue, time: number, pitch: number, velocity: number) {
+    const synth = own(
+      cue,
+      new cue.graph.tone.MembraneSynth({
+        context: cue.graph.context,
+        oscillator: { type: 'sine' },
+        pitchDecay: 0.11,
+        octaves: 1 / 0.35,
+        envelope: { attack: 0.001, decay: 0.14, sustain: 0, release: 0.03 },
+      }),
+    );
+    synth.connect(cue.output);
+    synth.triggerAttackRelease(pitch * 0.35, 0.14, time, velocity);
+    noise(cue, time, 0.045, 'lowpass', 900, 300, velocity * 0.7, 0.6);
+    cue.until = Math.max(cue.until, time + 0.2);
+  }
+  function melodic(cue: Cue, time: number, midi: number, velocity: number, brass = false) {
+    const duration = brass ? 0.6 : 0.5;
+    const synth = own(
+      cue,
+      new cue.graph.tone.MonoSynth({
+        context: cue.graph.context,
+        oscillator: brass ? { type: 'fatsawtooth', count: 2, spread: 8 } : { type: 'triangle' },
+        envelope: { attack: brass ? 0.03 : 0.004, decay: duration, sustain: 0, release: 0.05 },
+        filter: { type: 'lowpass', Q: 1 },
+        filterEnvelope: {
+          attack: 0.002,
+          decay: duration,
+          sustain: 0,
+          release: 0.05,
+          baseFrequency: 500,
+          octaves: brass ? 2.3 : 2.14,
+        },
+      }),
+    );
+    synth.connect(cue.output);
+    synth.triggerAttackRelease(440 * Math.pow(2, (midi - 69) / 12), duration, time, velocity);
+    cue.until = Math.max(cue.until, time + duration + 0.1);
+  }
+  function bell(cue: Cue, time: number, frequency: number, duration: number, velocity: number) {
+    const synth = own(
+      cue,
+      new cue.graph.tone.FMSynth({
+        context: cue.graph.context,
+        // Tone attenuates both FM voices by 10 dB and scales both by velocity.
+        // Keep the bell's level and metallic color at these quiet cue velocities.
+        volume: 10,
+        harmonicity: 2.51,
+        modulationIndex: 0.28 / (velocity * Math.pow(10, -0.5)),
+        oscillator: { type: 'sine' },
+        modulation: { type: 'sine' },
+        envelope: { attack: 0.001, decay: duration, sustain: 0, release: 0.05 },
+        modulationEnvelope: { attack: 0.001, decay: duration * 0.4, sustain: 0, release: 0.02 },
+      }),
+    );
+    synth.connect(cue.output);
+    synth.triggerAttackRelease(frequency, duration, time, velocity);
+    cue.until = Math.max(cue.until, time + duration + 0.1);
   }
   function bindWorkAudio() {
     if (audioWorkBound || typeof game.gameEvents === 'undefined' || !game.gameEvents.on) return;
@@ -63,9 +215,8 @@ export function createWorldEffects(
     wx: number,
     wy: number,
     dur: number,
+    t: number,
   ) {
-    if (!sfxCanPlay()) return false;
-    var t = bridge.AC.currentTime;
     if (typeof wx === 'number' && typeof wy === 'number') {
       var margin = game.TS * 5;
       if (
@@ -92,212 +243,138 @@ export function createWorldEffects(
     industrialVoices.push({ until: t + dur });
     return true;
   }
+  function work(
+    kind: 'hammer' | 'chop' | 'saw' | 'clang' | 'forge',
+    wx: number,
+    wy: number,
+    duration: number,
+    build: (cue: Cue) => void,
+  ) {
+    if (!graph || !sfxCanPlay()) return;
+    const time = runtime.immediate();
+    if (industrialAudio(kind, wx, wy, duration, time)) play(panOf(wx), build, time);
+  }
   var sounds: WorldSounds = {
-    place: function () {
-      if (!sfxCanPlay()) return;
-      var t = bridge.AC.currentTime;
-      bridge.thump(t, 0, 150, 0.22);
-      bridge.thump(t + 0.11, 0, 120, 0.18);
-      bridge.playNoise(bridge.gSfx, t + 0.02, 0.08, 'bandpass', 2600, 1400, 0.05, 1.4);
-    },
-    done: function () {
-      if (!sfxCanPlay()) return;
-      var t = bridge.AC.currentTime;
-      bridge.pluck(t, 74, 0.12, 0, 2200, bridge.gSfx);
-      bridge.pluck(t + 0.1, 77, 0.12, 0, 2200, bridge.gSfx);
-      bridge.pluck(t + 0.2, 81, 0.13, 0, 2400, bridge.gSfx);
-      bridge.bellTone(bridge.gSfx, t + 0.3, 1760, 0.05, 1.2, 0);
-    },
-    demolish: function () {
-      if (!sfxCanPlay()) return;
-      var t = bridge.AC.currentTime;
-      bridge.playNoise(bridge.gSfx, t, 0.5, 'lowpass', 420, 90, 0.16, 0.5);
-      bridge.thump(t + 0.05, 0, 110, 0.2);
-      bridge.playNoise(bridge.gSfx, t + 0.18, 0.3, 'lowpass', 300, 90, 0.1, 0.5);
-      bridge.playNoise(bridge.gSfx, t, 0.06, 'highpass', 2500, 0, 0.06, 1);
-    },
-    man: function () {
-      if (!sfxCanPlay()) return;
-      var t = bridge.AC.currentTime;
-      var o = bridge.AC.createOscillator();
-      o.type = 'sawtooth';
-      o.frequency.setValueAtTime(220, t);
-      o.frequency.linearRampToValueAtTime(228, t + 0.3);
-      var o2 = bridge.AC.createOscillator();
-      o2.type = 'sawtooth';
-      o2.frequency.setValueAtTime(330, t);
-      o2.frequency.linearRampToValueAtTime(336, t + 0.3);
-      var flt = bridge.AC.createBiquadFilter();
-      flt.type = 'lowpass';
-      flt.frequency.value = 1200;
-      var gn = bridge.AC.createGain();
-      gn.gain.setValueAtTime(0.0001, t);
-      gn.gain.linearRampToValueAtTime(0.06, t + 0.08);
-      gn.gain.setValueAtTime(0.06, t + 0.26);
-      gn.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
-      o.connect(flt);
-      o2.connect(flt);
-      flt.connect(gn);
-      gn.connect(bridge.gSfx);
-      o.start(t);
-      o.stop(t + 0.6);
-      o2.start(t);
-      o2.stop(t + 0.6);
-      bridge.disposeAudio([o, o2], [flt, gn]);
-    },
-    gone: function () {
-      if (!sfxCanPlay()) return;
-      var t = bridge.AC.currentTime;
-      bridge.playOsc(bridge.gSfx, t, 'sine', 110, 44, 0.5, 0.09);
-      bridge.playNoise(bridge.gSfx, t, 0.4, 'lowpass', 260, 80, 0.07, 0.6);
-    },
-    road: function (n) {
-      if (!sfxCanPlay()) return;
-      var t = bridge.AC.currentTime;
-      var k = Math.min(6, n || 1);
-      for (var i = 0; i < k; i++) {
-        var f = 300 + i * 60;
-        bridge.playNoise(bridge.gSfx, t + i * 0.055, 0.04, 'bandpass', f + 900, 0, 0.05, 2);
-        bridge.thump(t + i * 0.055, 0, 190, 0.08);
-      }
-    },
-    coin: function (wx, _wy) {
-      if (!sfxCanPlay()) return;
-      var t = bridge.AC.currentTime,
-        p = panOf(wx);
-      bridge.bellTone(bridge.gSfx, t, 1318, 0.075, 0.7, p);
-      bridge.bellTone(bridge.gSfx, t + 0.07, 1760, 0.06, 0.8, p);
-      bridge.playNoise(bridge.gSfx, t, 0.05, 'highpass', 6000, 0, 0.028, 1);
-    },
-    chainStart: function (wx, _wy) {
-      if (!sfxCanPlay()) return;
-      var t = bridge.AC.currentTime,
-        pn = bridge.busPan(bridge.gSfx, panOf(wx));
-      bridge.playOsc(pn, t, 'triangle', 523, 523, 0.12, 0.045);
-      var tail = bridge.playOsc(pn, t + 0.1, 'triangle', 784, 784, 0.2, 0.04);
-      tail.addEventListener('ended', function () {
-        if (pn !== bridge.gSfx) pn.disconnect();
+    place() {
+      play(0, (cue) => {
+        thump(cue, cue.time, 150, 0.22);
+        thump(cue, cue.time + 0.11, 120, 0.18);
+        noise(cue, cue.time + 0.02, 0.08, 'bandpass', 2600, 1400, 0.05, 1.4);
       });
     },
-    chainBlocked: function (wx, _wy) {
-      if (!sfxCanPlay()) return;
-      var t = bridge.AC.currentTime,
-        pn = bridge.busPan(bridge.gSfx, panOf(wx));
-      // A soft falling pair, not the harsh placement-failure alarm.
-      bridge.playOsc(pn, t, 'triangle', 233, 233, 0.16, 0.04);
-      var tail = bridge.playOsc(pn, t + 0.13, 'triangle', 196, 196, 0.22, 0.035);
-      tail.addEventListener('ended', function () {
-        if (pn !== bridge.gSfx) pn.disconnect();
+    done() {
+      play(0, (cue) => {
+        melodic(cue, cue.time, 74, 0.12);
+        melodic(cue, cue.time + 0.1, 77, 0.12);
+        melodic(cue, cue.time + 0.2, 81, 0.13);
+        bell(cue, cue.time + 0.3, 1760, 1.2, 0.05);
       });
     },
-    chainRecovered: function (wx, _wy) {
-      if (!sfxCanPlay()) return;
-      var t = bridge.AC.currentTime,
-        p = panOf(wx);
-      bridge.bellTone(bridge.gSfx, t, 659, 0.035, 0.45, p);
-      bridge.bellTone(bridge.gSfx, t + 0.12, 880, 0.025, 0.55, p);
-    },
-    hammer: function (wx, wy) {
-      if (!industrialAudio('hammer', wx, wy, 0.22)) return;
-      var t = bridge.AC.currentTime,
-        p = panOf(wx);
-      bridge.playNoise(bridge.gSfx, t, 0.035, 'bandpass', 3000, 1200, 0.045, 2);
-      bridge.thump(t, p, 210, 0.09);
-    },
-    chop: function (wx, wy) {
-      if (!industrialAudio('chop', wx, wy, 0.25)) return;
-      var t = bridge.AC.currentTime,
-        p = panOf(wx);
-      bridge.playNoise(bridge.gSfx, t, 0.07, 'bandpass', 1300, 500, 0.07, 1.5);
-      bridge.thump(t, p, 240, 0.1);
-    },
-    saw: function (wx, wy) {
-      if (!industrialAudio('saw', wx, wy, 0.5)) return;
-      var t = bridge.AC.currentTime,
-        p = panOf(wx);
-      var pn = bridge.busPan(bridge.gSfx, p);
-      bridge.playNoise(pn, t, 0.3, 'bandpass', 1500, 650, 0.07, 1.4);
-      bridge.playOsc(pn, t, 'sawtooth', 115, 88, 0.28, 0.028);
-      var tail = bridge.playNoise(pn, t + 0.31, 0.12, 'bandpass', 1100, 500, 0.045, 1.4);
-      tail.addEventListener('ended', function () {
-        if (pn !== bridge.gSfx) pn.disconnect();
+    demolish() {
+      play(0, (cue) => {
+        noise(cue, cue.time, 0.5, 'lowpass', 420, 90, 0.16, 0.5);
+        thump(cue, cue.time + 0.05, 110, 0.2);
+        noise(cue, cue.time + 0.18, 0.3, 'lowpass', 300, 90, 0.1, 0.5);
+        noise(cue, cue.time, 0.06, 'highpass', 2500, 0, 0.06, 1);
       });
     },
-    clang: function (wx, wy) {
-      if (!industrialAudio('clang', wx, wy, 0.3)) return;
-      var t = bridge.AC.currentTime,
-        p = panOf(wx);
-      bridge.bellTone(bridge.gSfx, t, 728, 0.09, 0.14, p);
-      bridge.bellTone(bridge.gSfx, t, 1097, 0.045, 0.1, p);
-      bridge.thump(t, p, 320, 0.09);
-      bridge.playNoise(bridge.gSfx, t, 0.025, 'highpass', 4200, 0, 0.04, 1);
+    man() {
+      play(0, (cue) => {
+        note(cue, cue.time, 220, 0.5, 0.06, 'sawtooth', 228, 0.08, 1200);
+        note(cue, cue.time, 330, 0.5, 0.06, 'sawtooth', 336, 0.08, 1200);
+      });
     },
-    forge: function (wx, wy) {
-      if (!industrialAudio('forge', wx, wy, 0.75)) return;
-      var t = bridge.AC.currentTime,
-        p = panOf(wx);
-      var pn = bridge.busPan(bridge.gSfx, p);
-      var src = bridge.AC.createBufferSource();
-      src.buffer = bridge.noiseB;
-      src.loop = true;
-      var flt = bridge.AC.createBiquadFilter();
-      flt.type = 'lowpass';
-      flt.frequency.setValueAtTime(700, t);
-      flt.frequency.linearRampToValueAtTime(1600, t + 0.22);
-      flt.frequency.linearRampToValueAtTime(300, t + 0.5);
-      var gn = bridge.AC.createGain();
-      gn.gain.setValueAtTime(0.0001, t);
-      gn.gain.linearRampToValueAtTime(0.055, t + 0.18);
-      gn.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
-      src.connect(flt);
-      flt.connect(gn);
-      gn.connect(pn);
-      src.start(t);
-      src.stop(t + 0.55);
-      bridge.disposeAudio([src], [flt, gn, bridge.ownPanner(pn, bridge.gSfx)]);
-      bridge.bellTone(bridge.gSfx, t + 0.3, 1568, 0.05, 0.4, p);
-      bridge.bellTone(bridge.gSfx, t + 0.3, 2352, 0.022, 0.28, p);
+    gone() {
+      play(0, (cue) => {
+        note(cue, cue.time, 110, 0.5, 0.09, 'sine', 44);
+        noise(cue, cue.time, 0.4, 'lowpass', 260, 80, 0.07, 0.6);
+      });
     },
-    fanfare: function () {
-      if (!sfxCanPlay()) return;
-      var t = bridge.AC.currentTime;
-      runtime.duckMusic(t);
-      var seq = [
-        [62, 0],
-        [66, 0.16],
-        [69, 0.32],
-        [74, 0.5],
-        [69, 0.85],
-        [74, 1.05],
-      ];
-      for (var i = 0; i < seq.length; i++) {
-        var m = seq[i][0],
-          tt = t + seq[i][1];
-        var flt = bridge.AC.createBiquadFilter();
-        flt.type = 'lowpass';
-        flt.frequency.value = 2400;
-        var gn = bridge.AC.createGain();
-        gn.gain.setValueAtTime(0.0001, tt);
-        gn.gain.linearRampToValueAtTime(0.085, tt + 0.03);
-        gn.gain.exponentialRampToValueAtTime(0.0001, tt + 0.6);
-        var o = bridge.AC.createOscillator();
-        o.type = 'sawtooth';
-        o.frequency.value = bridge.mtof(m);
-        var o2 = bridge.AC.createOscillator();
-        o2.type = 'sawtooth';
-        o2.frequency.value = bridge.mtof(m) * 1.005;
-        o.connect(flt);
-        o2.connect(flt);
-        flt.connect(gn);
-        gn.connect(bridge.gSfx);
-        o.start(tt);
-        o.stop(tt + 0.7);
-        o2.start(tt);
-        o2.stop(tt + 0.7);
-        bridge.disposeAudio([o, o2], [flt, gn]);
-      }
-      bridge.bellTone(bridge.gSfx, t + 1.3, 1174, 0.09, 2.2, 0);
-      bridge.bellTone(bridge.gSfx, t + 1.42, 1760, 0.07, 2.4, 0);
+    road(n) {
+      play(0, (cue) => {
+        for (let i = 0; i < Math.min(6, n || 1); i++) {
+          const time = cue.time + i * 0.055;
+          noise(cue, time, 0.04, 'bandpass', 1200 + i * 60, 0, 0.05, 2);
+          thump(cue, time, 190, 0.08);
+        }
+      });
+    },
+    coin(wx) {
+      play(panOf(wx), (cue) => {
+        bell(cue, cue.time, 1318, 0.7, 0.075);
+        bell(cue, cue.time + 0.07, 1760, 0.8, 0.06);
+        noise(cue, cue.time, 0.05, 'highpass', 6000, 0, 0.028, 1);
+      });
+    },
+    chainStart(wx) {
+      play(panOf(wx), (cue) => {
+        note(cue, cue.time, 523, 0.12, 0.045);
+        note(cue, cue.time + 0.1, 784, 0.2, 0.04);
+      });
+    },
+    chainBlocked(wx) {
+      play(panOf(wx), (cue) => {
+        note(cue, cue.time, 233, 0.16, 0.04);
+        note(cue, cue.time + 0.13, 196, 0.22, 0.035);
+      });
+    },
+    chainRecovered(wx) {
+      play(panOf(wx), (cue) => {
+        bell(cue, cue.time, 659, 0.45, 0.035);
+        bell(cue, cue.time + 0.12, 880, 0.55, 0.025);
+      });
+    },
+    hammer(wx, wy) {
+      work('hammer', wx, wy, 0.22, (cue) => {
+        noise(cue, cue.time, 0.035, 'bandpass', 3000, 1200, 0.045, 2);
+        thump(cue, cue.time, 210, 0.09);
+      });
+    },
+    chop(wx, wy) {
+      work('chop', wx, wy, 0.25, (cue) => {
+        noise(cue, cue.time, 0.07, 'bandpass', 1300, 500, 0.07, 1.5);
+        thump(cue, cue.time, 240, 0.1);
+      });
+    },
+    saw(wx, wy) {
+      work('saw', wx, wy, 0.5, (cue) => {
+        noise(cue, cue.time, 0.3, 'bandpass', 1500, 650, 0.07, 1.4);
+        note(cue, cue.time, 115, 0.28, 0.028, 'sawtooth', 88);
+        noise(cue, cue.time + 0.31, 0.12, 'bandpass', 1100, 500, 0.045, 1.4);
+      });
+    },
+    clang(wx, wy) {
+      work('clang', wx, wy, 0.3, (cue) => {
+        bell(cue, cue.time, 728, 0.14, 0.09);
+        bell(cue, cue.time, 1097, 0.1, 0.045);
+        thump(cue, cue.time, 320, 0.09);
+        noise(cue, cue.time, 0.025, 'highpass', 4200, 0, 0.04, 1);
+      });
+    },
+    forge(wx, wy) {
+      work('forge', wx, wy, 0.75, (cue) => {
+        const filter = noise(cue, cue.time, 0.5, 'lowpass', 700, 0, 0.055, 0.8, 0.18);
+        filter.frequency.linearRampToValueAtTime(1600, cue.time + 0.22);
+        filter.frequency.linearRampToValueAtTime(300, cue.time + 0.5);
+        bell(cue, cue.time + 0.3, 1568, 0.4, 0.05);
+        bell(cue, cue.time + 0.3, 2352, 0.28, 0.022);
+      });
+    },
+    fanfare() {
+      play(0, (cue) => {
+        runtime.duckMusic(cue.time);
+        const sequence = [
+          [62, 0],
+          [66, 0.16],
+          [69, 0.32],
+          [74, 0.5],
+          [69, 0.85],
+          [74, 1.05],
+        ];
+        for (const [midi, offset] of sequence) melodic(cue, cue.time + offset, midi, 0.085, true);
+        bell(cue, cue.time + 1.3, 1174, 2.2, 0.09);
+        bell(cue, cue.time + 1.42, 1760, 2.4, 0.07);
+      });
     },
   };
 
@@ -315,13 +392,13 @@ export function createWorldEffects(
   return {
     sounds,
     resetWork,
-    start(graph: AudioGraph) {
-      bridge = getLegacyBridge(graph);
+    start(value: AudioGraph) {
+      graph = value;
       resetWork();
     },
     dispose() {
       resetWork();
-      bridge = null;
+      graph = null;
     },
   };
 }
