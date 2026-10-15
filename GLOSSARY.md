@@ -1,6 +1,6 @@
 # Colony
 
-Terms for colony production, goods accounting, and road planning.
+Terms for colony production, goods accounting, road planning, and production feedback.
 
 ## Language
 
@@ -63,3 +63,7 @@ _Avoid_: Current armory, when describing the retained recipe.
 **Road plan**:
 The preferred route between two endpoints and the clear, owned tiles that would gain road pavement in the current colony, or the reason the road cannot be built. A route can pass through occupied tiles without paving them, but its starting tile must be clear and owned.
 _Avoid_: Walking path, when describing which tiles will be paved.
+
+**Economic notice**:
+A player-facing report that production has started, remained blocked, or recovered, identifying the affected producers and the reason where applicable.
+_Avoid_: Production sound, when referring to the information rather than its optional audible cue; economic history, when referring to a transient report.
