@@ -41,7 +41,8 @@ export function createAdvisor(game: AdvisorDependencies): AdvisorSubsystem {
       c[b.type] = (c[b.type] || 0) + 1;
       if (b.done && !b.exhausted && game.BSPEC[b.type].prod === 'mine') {
         mines++;
-        foodRate += 1 / game.BSPEC[b.type].time;
+        const cycleTime = game.BSPEC[b.type].time;
+        if (cycleTime !== undefined) foodRate += 1 / cycleTime;
       }
       const store = game.nearestStoragePos(b.x, b.y);
       if (store && Math.hypot(b.x - store.x, b.y - store.y) > 14) far = true;
@@ -268,10 +269,10 @@ export function createAdvisor(game: AdvisorDependencies): AdvisorSubsystem {
             bottleneck.metrics.inputBlocked / bottleneck.metrics.elapsed)
       ) {
         bottleneck = b;
-        missing = good as Good;
+        missing = good;
       }
     }
-    if (!bottleneck) {
+    if (!bottleneck || !missing) {
       const expansion = list.find(function (r) {
         return r.waiting;
       });
@@ -283,10 +284,11 @@ export function createAdvisor(game: AdvisorDependencies): AdvisorSubsystem {
     let ready = alternatives.reduce(function (sum, good) {
       return sum + game.totalGood(good);
     }, 0);
-    for (const source of game.buildings)
-      if (alternatives.includes(game.BSPEC[source.type].out))
-        ready += source.stock[game.BSPEC[source.type].out] || 0;
-    for (const u of game.units) if (alternatives.includes(u.carry)) ready++;
+    for (const source of game.buildings) {
+      const output = game.BSPEC[source.type].out;
+      if (output && alternatives.includes(output)) ready += source.stock[output] || 0;
+    }
+    for (const u of game.units) if (u.carry && alternatives.includes(u.carry)) ready++;
     if (!ready) {
       const supplier = list.find(function (r) {
         return (

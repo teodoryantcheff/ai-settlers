@@ -178,7 +178,7 @@ export interface NavigationSubsystem {
   connectedLand: (ax: number, ay: number, bx: number, by: number) => boolean;
   moveCost: (n: number) => 1 | 0.3 | 1.6 | 1.15;
   /** Tile indexes from the first step after the start to the target, or null when unreachable. */
-  findPath: (sx: number, sy: number, tx: number, ty: number) => number[];
+  findPath: (sx: number, sy: number, tx: number, ty: number) => number[] | null;
 }
 
 export interface NavigationDependencies extends Pick<

@@ -103,7 +103,7 @@ export function createProgression(
   ) {
     if (!game.requestStock(cost)) return false;
     for (const good in cost) {
-      let remaining = cost[good as Good];
+      let remaining = cost[good as Good] || 0;
       for (const store of game.storages()) {
         const take = Math.min(
           remaining,
@@ -131,9 +131,10 @@ export function createProgression(
     const store = game.anyStorage();
     if (!store) return;
     for (const g in c.reward) {
-      store.stock[g as Good] = (store.stock[g as Good] || 0) + c.reward[g as Good];
-      if (g === 'gold') game.state.gold += c.reward[g as Good];
-      game.recordEconomicFlow('contractReward', g as Good, c.reward[g as Good]);
+      const amount = c.reward[g as Good] || 0;
+      store.stock[g as Good] = (store.stock[g as Good] || 0) + amount;
+      if (g === 'gold') game.state.gold += amount;
+      game.recordEconomicFlow('contractReward', g as Good, amount);
     }
     game.state.contracts.push(index);
     game.emitGameEvent('contractFulfilled', { index, name: c.name, x: store.x, y: store.y });
@@ -221,11 +222,11 @@ export interface ProgressionSubsystem {
   claimContract: (index: number) => void;
   buyUpgrade: (kind: 'haul' | 'production') => void;
   gameTick: () => void;
-  pendingOutpost: () => Building;
+  pendingOutpost: () => Building | undefined;
   currentLesson: () => {
     step: LessonStep;
     index: number;
-  };
+  } | null;
   readonly contracts: Array<{ name: string; cost: Inventory; reward: Inventory }>;
 }
 

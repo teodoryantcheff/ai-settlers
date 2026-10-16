@@ -181,7 +181,7 @@ export function createMap(game: MapDependencies, internals?: MapInternals): MapS
       const st5 = [game.idx(cx, cy)];
       reach[game.idx(cx, cy)] = 1;
       while (st5.length) {
-        const s6 = st5.pop(),
+        const s6 = st5.pop()!,
           sx6 = s6 % game.W,
           sy6 = (s6 / game.W) | 0;
         for (let d8 = 0; d8 < 4; d8++) {

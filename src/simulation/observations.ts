@@ -66,8 +66,9 @@ export function createObservations(game: ObservationDependencies): ObservationSu
       totals: Inventory = {},
       rates: Inventory = {};
     for (const good of Object.keys(cargo.totals) as Good[]) {
-      totals[good] = cargo.totals[good] - (baseline.totals[good] || 0);
-      if (elapsed) rates[good] = (totals[good] * 60) / elapsed;
+      const amount = (cargo.totals[good] || 0) - (baseline.totals[good] || 0);
+      totals[good] = amount;
+      if (elapsed) rates[good] = (amount * 60) / elapsed;
     }
     return { from: baseline.time, to: now, elapsed, available: elapsed > 0, totals, rates };
   }
@@ -78,7 +79,7 @@ export function createObservations(game: ObservationDependencies): ObservationSu
       samples.push({ time: now, totals: structuredClone(observationData.totals) });
     while (samples.length > 301 || samples[0].time < now - 600 - 1e-9) samples.shift();
     const cargo = observationData.cargo;
-    if (now - cargo.recent.at(-1).time >= 2 - 1e-9)
+    if (now - cargo.recent.at(-1)!.time >= 2 - 1e-9)
       cargo.recent.push({ time: now, totals: { ...cargo.totals } });
     while (cargo.recent.length > 301 || cargo.recent[0].time < now - 600 - 1e-9)
       cargo.recent.shift();
@@ -98,8 +99,8 @@ export function createObservations(game: ObservationDependencies): ObservationSu
     for (const flow of ECONOMIC_FLOWS)
       for (const good of Object.keys(observationData.totals[flow]) as Good[]) {
         totals[flow][good] =
-          observationData.totals[flow][good] - (baseline.totals[flow][good] || 0);
-        if (elapsed > 0) rates[flow][good] = (totals[flow][good] * 60) / elapsed;
+          (observationData.totals[flow][good] || 0) - (baseline.totals[flow][good] || 0);
+        if (elapsed > 0) rates[flow][good] = ((totals[flow][good] || 0) * 60) / elapsed;
       }
     return {
       window,

@@ -32,7 +32,7 @@ export function createAutoplay(
   }
   function afford(bt: BuildingType) {
     const c = game.BSPEC[bt].cost || {};
-    for (const g in c) if (game.availGood(g as Good) < c[g as Good]) return false;
+    for (const g in c) if (game.availGood(g as Good) < (c[g as Good] || 0)) return false;
     return true;
   }
   function randTile(): [number, number] {
@@ -55,12 +55,13 @@ export function createAutoplay(
   function mineDeficits(): DepositKind[] {
     const w: DepositKind[] = [],
       list = game.advTargets();
-    for (let i = 0; i < list.length; i++)
-      if (list[i].def > 0 && game.BSPEC[list[i].bt as BuildingType].resKind)
-        w.push(game.BSPEC[list[i].bt as BuildingType].resKind);
+    for (const target of list) {
+      const kind = game.BSPEC[target.bt].resKind;
+      if (target.def > 0 && kind) w.push(kind);
+    }
     return w;
   }
-  function findSpot(bt: BuildingType, want?: DepositKind[]): [number, number] | null {
+  function findSpot(bt: BuildingType, want?: DepositKind[] | null): [number, number] | null {
     const sp = game.BSPEC[bt];
     let i, d, nx, ny;
     if (sp.resKind) {
@@ -77,7 +78,7 @@ export function createAutoplay(
     if (bt === 'lumberjack' || bt === 'quarry') {
       // needs a mature tree / rock anywhere inside its work radius, not just adjacent - frontier trees
       // sit outside the owned-4-neighbors rule, so interior sites with resource in range are the target
-      const rr2 = sp.rad,
+      const rr2 = sp.rad ?? 0,
         needTree = bt === 'lumberjack';
       for (let x = 1; x < game.W - 1; x++)
         for (let y = 1; y < game.H - 1; y++) {
@@ -138,7 +139,7 @@ export function createAutoplay(
     }
     if (bt === 'forester') {
       // site beside an existing lumberjack so replanting actually feeds its work radius
-      let bestF: [number, number] = null,
+      let bestF: [number, number] | null = null,
         bdF = 1e9;
       for (let xf = 1; xf < game.W - 1; xf++)
         for (let yf = 1; yf < game.H - 1; yf++) {
@@ -194,7 +195,7 @@ export function createAutoplay(
     }
     if (bt === 'warehouse') {
       // site it beside the most remote worker so carriers spawn near the frontier cluster
-      let farB: Building = null,
+      let farB: Building | null = null,
         fd = 0;
       for (let i = 0; i < game.buildings.length; i++) {
         const b4 = game.buildings[i];
@@ -208,7 +209,7 @@ export function createAutoplay(
         }
       }
       if (farB) {
-        let bestW: [number, number] = null,
+        let bestW: [number, number] | null = null,
           bdW = 1e9;
         for (let xw = 1; xw < game.W - 1; xw++)
           for (let yw = 1; yw < game.H - 1; yw++) {
@@ -265,30 +266,30 @@ export function createAutoplay(
       golds: number[] = [],
       others: number[] = [];
     for (let k = 0; k < deps.length; k++)
-      (game.tiles[deps[k]].deposit.kind === 'gold' ? golds : others).push(deps[k]);
-    function byDist(arr: number[]) {
+      (game.tiles[deps[k]].deposit?.kind === 'gold' ? golds : others).push(deps[k]);
+    function byDist(arr: number[], storage: Building) {
       arr.sort(function (a, b) {
         const da =
-          ((a % game.W) - s.x) * ((a % game.W) - s.x) +
-          (((a / game.W) | 0) - s.y) * (((a / game.W) | 0) - s.y);
+          ((a % game.W) - storage.x) * ((a % game.W) - storage.x) +
+          (((a / game.W) | 0) - storage.y) * (((a / game.W) | 0) - storage.y);
         const db =
-          ((b % game.W) - s.x) * ((b % game.W) - s.x) +
-          (((b / game.W) | 0) - s.y) * (((b / game.W) | 0) - s.y);
+          ((b % game.W) - storage.x) * ((b % game.W) - storage.x) +
+          (((b / game.W) | 0) - storage.y) * (((b / game.W) | 0) - storage.y);
         return da - db;
       });
     }
-    byDist(others);
-    byDist(golds);
+    byDist(others, s);
+    byDist(golds, s);
     // gold is the victory resource - go for the biggest live gold deposit, not the nearest one;
     // small deposits exhaust too fast and the re-expansion churn eats the whole guard budget
     golds.sort(function (a, b) {
-      return game.tiles[b].deposit.amt - game.tiles[a].deposit.amt;
+      return (game.tiles[b].deposit?.amt || 0) - (game.tiles[a].deposit?.amt || 0);
     });
     const take: number[] = [];
     if (golds.length && want.indexOf('gold') >= 0) take.push(golds[0]);
     for (let k = 0; k < others.length && take.length < 6; k++) take.push(others[k]);
     if (!take.length) return null;
-    let path: number[] = null;
+    let path: number[] | null = null;
     for (let k = 0; k < take.length; k++) {
       const di = take[k];
       let dl = -1;
@@ -303,11 +304,11 @@ export function createAutoplay(
       if (dl < 0) continue;
       const p = game.findPath(s.x, s.y, dl % game.W, (dl / game.W) | 0);
       if (!p) continue;
-      if (!path || game.tiles[di].deposit.kind === 'gold') path = p;
+      if (!path || game.tiles[di].deposit?.kind === 'gold') path = p;
     }
     return path;
   }
-  function isFaceTile(x: number, y: number, want: DepositKind[]) {
+  function isFaceTile(x: number, y: number, want?: DepositKind[] | null) {
     // Reserve both meadow mining faces and their building-spacing clearance.
     // An outpost one tile behind a face blocks that mine just as surely as an
     // outpost built on the face itself, even after its border reaches the ore.
@@ -326,7 +327,7 @@ export function createAutoplay(
       }
     return false;
   }
-  function spotOnCorridor(cor: number[], want: DepositKind[]): [number, number] | null {
+  function spotOnCorridor(cor: number[] | null, want: DepositKind[]): [number, number] | null {
     if (!cor || !cor.length) return null;
     // The road can pass through reserved mine faces or a narrow coastal bend. Search
     // nearby buildable land and score the territory its manned flood would add.
@@ -345,7 +346,7 @@ export function createAutoplay(
       critical.push(game.idx(nx, ny));
       if (!game.owned[game.idx(nx, ny)]) missing++;
     }
-    let best: [number, number] = null,
+    let best: [number, number] | null = null,
       bestScore = -Infinity;
     for (let q = cor.length - 1; q >= 0; q--) {
       const px = cor[q] % game.W,
@@ -398,7 +399,7 @@ export function createAutoplay(
   function guardCoverRedundant(g: Building, want: DepositKind[]) {
     // a manned guard earns its keep only while its territory covers a standing mine or a live
     // wanted deposit; rear-of-chain guards whose deposits are gone are recyclable scaffolding
-    const r = game.BSPEC[g.type].rad + 2;
+    const r = (game.BSPEC[g.type].rad ?? 0) + 2;
     let keep = false;
     game.forRadius(g, r, function (i) {
       const tl = game.tiles[i],
@@ -426,8 +427,8 @@ export function createAutoplay(
     return true;
   }
   function autoRoad() {
-    let best: Building = null,
-      bs: Building = null,
+    let best: Building | null = null,
+      bs: Building | null = null,
       bd = 0;
     for (let i = 0; i < game.buildings.length; i++) {
       const b = game.buildings[i];
@@ -441,7 +442,7 @@ export function createAutoplay(
         bs = s;
       }
     }
-    if (!best || bd < 12 || roadNear(best, 3)) return;
+    if (!best || !bs || bd < 12 || roadNear(best, 3)) return;
     const a1 = clearNeighbor(bs),
       a2 = clearNeighbor(best);
     if (a1 && a2) game.commitRoad(a1, a2);
@@ -589,11 +590,11 @@ export function createAutoplay(
 export interface AutoplayInternals {
   afford: (bt: BuildingType) => boolean;
   mineDeficits: () => DepositKind[];
-  findSpot: (bt: BuildingType, want?: DepositKind[]) => [number, number] | null;
+  findSpot: (bt: BuildingType, want?: DepositKind[] | null) => [number, number] | null;
   clearNeighbor: (b: Building) => TilePoint | null;
   buildCorridor: (want: DepositKind[]) => number[] | null;
-  isFaceTile: (x: number, y: number, want: DepositKind[]) => boolean;
-  spotOnCorridor: (cor: number[], want: DepositKind[]) => [number, number] | null;
+  isFaceTile: (x: number, y: number, want?: DepositKind[] | null) => boolean;
+  spotOnCorridor: (cor: number[] | null, want: DepositKind[]) => [number, number] | null;
   pathPos: (cor: number[], tx: number, ty: number) => number;
   guardCoverRedundant: (g: Building, want: DepositKind[]) => boolean;
   guardTerritoryRedundant: (guard: Building) => boolean;

@@ -10,6 +10,7 @@ import { ingredientAlternatives } from '../gameplay/production-rules.ts';
 import type {
   Building,
   EconomicTotals,
+  EconomicObservations,
   EconomicSample,
   CargoSample,
   BuildingSpec,
@@ -21,6 +22,8 @@ import type {
   ProductionSample,
   SavedUnit,
   SaveData,
+  ValidatedSave,
+  SimulationState,
 } from '../types.ts';
 
 export interface EventBus<Events extends object> {
@@ -54,68 +57,79 @@ export function validateSave(
   height: number,
   specs: Record<BuildingType, BuildingSpec>,
   goods: Record<Good, { name: string; c: string }>,
-): SaveData {
+): ValidatedSave {
   const fail: (message: string) => never = (message) => {
     throw new Error(message);
   };
   // Imported JSON remains dynamically shaped until every schema field is validated.
   const object = (v: unknown): v is Record<string, unknown> =>
-    !!v && typeof v === 'object' && !Array.isArray(v);
-  const num = (v: unknown, min = 0, max = 1e9) =>
+    !!v && typeof v === 'object' && !array(v);
+  const array = (v: unknown): v is unknown[] => Array.isArray(v);
+  const knownKey = <K extends string>(table: Record<K, unknown>, v: unknown): v is K =>
+    typeof v === 'string' && Object.hasOwn(table, v);
+  const oneOf = <T extends string | number>(v: unknown, values: readonly T[]): v is T =>
+    values.some((value) => value === v);
+  const num = (v: unknown, min = 0, max = 1e9): v is number =>
     typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max;
-  const int = (v: unknown, min = 0, max = 1e9) => Number.isInteger(v) && num(v, min, max);
-  const bool = (v: unknown) => typeof v === 'boolean';
+  const int = (v: unknown, min = 0, max = 1e9): v is number =>
+    Number.isInteger(v) && num(v, min, max);
+  const bool = (v: unknown): v is boolean => typeof v === 'boolean';
   const record = (v: unknown = {}, max = 1e7): Inventory => {
     if (!object(v)) fail('Invalid resource table');
     const out: Inventory = {};
     for (const [key, value] of Object.entries(v)) {
-      if (!Object.hasOwn(goods, key) || !int(value, 0, max)) fail('Invalid resource quantity');
-      out[key as Good] = value as number;
+      if (!knownKey(goods, key) || !int(value, 0, max)) fail('Invalid resource quantity');
+      out[key] = value;
     }
     return out;
   };
   const size = width * height;
-  if (!object(input) || ![1, 2].includes(input.v as number)) fail('Unsupported save version');
-  const d = structuredClone(input) as unknown as SaveData;
+  if (!object(input) || !oneOf(input.v, [1, 2])) fail('Unsupported save version');
+  const d = structuredClone(input);
   if (d.economy !== undefined && d.economy !== 2) fail('Unsupported economy version');
-  if (
-    !int(d.seed, -2147483648, 2147483647) ||
-    !int(d.nextId, 1) ||
-    !Array.isArray(d.t) ||
-    d.t.length !== 5
-  )
+  if (!int(d.seed, -2147483648, 2147483647) || !int(d.nextId, 1) || !array(d.t) || d.t.length !== 5)
     fail('Invalid world header');
-  if (!d.t.every((a) => Array.isArray(a) && a.length === size)) fail('Wrong map dimensions');
+  const terrain = d.t;
+  if (!terrain.every((a): a is unknown[] => array(a) && a.length === size))
+    fail('Wrong map dimensions');
   for (let i = 0; i < size; i++) {
     if (
-      !int(d.t[0][i], 0, 3) ||
-      !int(d.t[1][i], 0, 4) ||
-      !int(d.t[2][i], 0, 1e6) ||
-      ![0, 1].includes(d.t[3][i])
+      !int(terrain[0][i], 0, 3) ||
+      !int(terrain[1][i], 0, 4) ||
+      !int(terrain[2][i], 0, 1e6) ||
+      !oneOf(terrain[3][i], [0, 1])
     )
       fail('Invalid terrain');
-    const r = d.t[4][i];
+    const r = terrain[4][i];
     if (
       r !== null &&
-      (!Array.isArray(r) ||
+      (!array(r) ||
         ![2, 3].includes(r.length) ||
-        !['gold', 'iron', 'coal'].includes(r[0]) ||
+        !oneOf(r[0], ['gold', 'iron', 'coal']) ||
         !int(r[1], 0, 1e6) ||
         (r.length === 3 && !int(r[2], 0, 1e6)) ||
-        d.t[0][i] !== 3)
+        terrain[0][i] !== 3)
     )
       fail('Invalid deposit');
   }
   if (
-    !Array.isArray(d.b) ||
+    !array(d.b) ||
     d.b.length < 1 ||
     d.b.length > size ||
-    !Array.isArray(d.j) ||
+    !array(d.j) ||
     d.j.length > 50000 ||
-    !Array.isArray(d.u) ||
+    !array(d.u) ||
     d.u.length > 5000
   )
     fail('Invalid entity arrays');
+  // Hydrate only checked fields; imported own __proto__ keys never reach live entities.
+  // Only the terrain columns are asserted here, after validating every cell.
+  const checkedTerrain = terrain as SaveData['t'];
+  const pick = <R extends object>(value: object, keys: string[]): R =>
+    Object.fromEntries(keys.map((key) => [key, (value as Record<string, unknown>)[key]])) as R;
+  const checkedBuildings: Building[] = [];
+  const checkedJobs: Job[] = [];
+  const checkedUnits: SavedUnit[] = [];
   const ids = new Set<number>();
   const positions = new Set();
   const legacyBuildingFields = [
@@ -129,14 +143,12 @@ export function validateSave(
     if (!object(b)) fail('Invalid building');
     // Both historical save versions used these aliases. Migrate only missing
     // fields on the detached import; canonical values still require validation.
-    const imported: Record<string, unknown> = b;
     for (const [current, legacy] of legacyBuildingFields)
-      if (!Object.hasOwn(imported, current) && Object.hasOwn(imported, legacy))
-        imported[current] = imported[legacy];
+      if (!Object.hasOwn(b, current) && Object.hasOwn(b, legacy)) b[current] = b[legacy];
     if (
       !int(b.id, 1) ||
       ids.has(b.id) ||
-      !Object.hasOwn(specs, b.type) ||
+      !knownKey(specs, b.type) ||
       !int(b.x, 0, width - 1) ||
       !int(b.y, 0, height - 1) ||
       !bool(b.done) ||
@@ -147,7 +159,7 @@ export function validateSave(
     if (b.legacyIndustry !== undefined && (!bool(b.legacyIndustry) || b.type !== 'armory'))
       fail('Invalid legacy industry');
     const pos = b.y * width + b.x;
-    if (positions.has(pos) || [0, 3].includes(d.t[0][pos])) fail('Invalid building site');
+    if (positions.has(pos) || oneOf(terrain[0][pos], [0, 3])) fail('Invalid building site');
     positions.add(pos);
     ids.add(b.id);
     for (const key of ['needs', 'got', 'stock', 'reservedStock'] as const) b[key] = record(b[key]);
@@ -160,37 +172,38 @@ export function validateSave(
     b.foodBlockedNoticeSent = !!b.foodBlockedNoticeSent;
     b.rocksExhaustedNoticeSent = !!b.rocksExhaustedNoticeSent;
     const m: Record<string, unknown> = object(b.metrics) ? b.metrics : {};
-    b.metrics = {} as ProductionMetrics;
+    const metrics = {} as ProductionMetrics;
+    b.metrics = metrics;
     for (const key of ['elapsed', 'active', 'blocked', 'inputBlocked', 'outputBlocked'] as const)
-      b.metrics[key] = num(m[key]) ? (m[key] as number) : 0;
+      metrics[key] = num(m[key]) ? (m[key] as number) : 0;
     for (const key of ['produced', 'consumed', 'delivered'] as const)
-      b.metrics[key] = record(m[key] || {});
+      metrics[key] = record(m[key] || {});
     const deliveryKnown = m.deliveryStarted !== undefined;
-    if (deliveryKnown && !num(m.deliveryStarted, 0, b.metrics.elapsed))
+    if (deliveryKnown && !num(m.deliveryStarted, 0, metrics.elapsed))
       fail('Invalid production delivery coverage');
-    b.metrics.deliveryStarted = deliveryKnown ? (m.deliveryStarted as number) : b.metrics.elapsed;
+    metrics.deliveryStarted = deliveryKnown ? (m.deliveryStarted as number) : metrics.elapsed;
     for (const key of ['inputDelivered', 'outputDelivered'] as const)
-      b.metrics[key] = deliveryKnown ? record(m[key] || {}) : {};
+      metrics[key] = deliveryKnown ? record(m[key] || {}) : {};
     const flowKeys = ['produced', 'consumed', 'inputDelivered', 'outputDelivered'] as const;
     if (m.recent === undefined) {
       // Old saves have no recent baseline. Preserve lifetime totals and begin
       // recent/delivery observation here instead of pretending they cover the past.
-      b.metrics.recent = [
+      metrics.recent = [
         {
-          elapsed: b.metrics.elapsed,
-          inputBlocked: b.metrics.inputBlocked,
-          ...Object.fromEntries(flowKeys.map((key) => [key, { ...b.metrics[key] }])),
+          elapsed: metrics.elapsed,
+          inputBlocked: metrics.inputBlocked,
+          ...Object.fromEntries(flowKeys.map((key) => [key, { ...metrics[key] }])),
         } as ProductionSample,
       ];
     } else {
-      if (!Array.isArray(m.recent) || !m.recent.length || m.recent.length > 301)
+      if (!array(m.recent) || !m.recent.length || m.recent.length > 301)
         fail('Invalid production history');
       let previous: ProductionSample | null = null;
-      b.metrics.recent = m.recent.map((sample: Record<string, unknown>) => {
+      metrics.recent = m.recent.map((sample) => {
         if (
           !object(sample) ||
-          !num(sample.elapsed, Math.max(0, b.metrics.elapsed - 600 - 1e-9), b.metrics.elapsed) ||
-          !num(sample.inputBlocked, 0, b.metrics.inputBlocked) ||
+          !num(sample.elapsed, Math.max(0, metrics.elapsed - 600 - 1e-9), metrics.elapsed) ||
+          !num(sample.inputBlocked, 0, metrics.inputBlocked) ||
           (previous &&
             ((sample.elapsed as number) <= previous.elapsed ||
               (sample.inputBlocked as number) < previous.inputBlocked))
@@ -206,7 +219,7 @@ export function validateSave(
           for (const good of Object.keys(goods) as Good[]) {
             const amount = clean[key][good] || 0;
             if (
-              amount > (b.metrics[key][good] || 0) ||
+              amount > (metrics[key]?.[good] || 0) ||
               (previous && amount < (previous[key][good] || 0))
             )
               fail('Invalid production history totals');
@@ -230,39 +243,69 @@ export function validateSave(
       default:
         b.blockedReason = '';
     }
+    checkedBuildings.push(
+      pick<Building>(b, [
+        'id',
+        'type',
+        'x',
+        'y',
+        'done',
+        'constructionProgress',
+        'needs',
+        'got',
+        'stock',
+        'reservedStock',
+        'manned',
+        'exhausted',
+        'produced',
+        'timer',
+        'foodBlockedNoticeSent',
+        'legacyIndustry',
+        'rocksExhaustedNoticeSent',
+        'metrics',
+        'blockedReason',
+        'priority',
+        'targets',
+        'disabled',
+      ]),
+    );
   }
-  if (d.b.filter((b) => b.type === 'hq' && b.done).length !== 1) fail('Missing headquarters');
-  const buildings = new Map<number, Building>(d.b.map((b) => [b.id, b]));
+  if (checkedBuildings.filter((b) => b.type === 'hq' && b.done).length !== 1)
+    fail('Missing headquarters');
+  const buildings = new Map<number, Building>(checkedBuildings.map((b) => [b.id, b]));
   for (const j of d.j) {
     if (
       !object(j) ||
-      !['fetch', 'deliver', 'soldier', 'transfer'].includes(j.kind) ||
-      !['p', 't'].includes(j.state)
+      !oneOf(j.kind, ['fetch', 'deliver', 'soldier', 'transfer']) ||
+      !oneOf(j.state, ['p', 't'])
     )
       fail('Invalid job');
-    if (j.kind !== 'soldier' && !Object.hasOwn(goods, j.good)) fail('Invalid cargo');
-    if (['fetch', 'soldier', 'transfer'].includes(j.kind) && !buildings.has(j.to))
+    if (j.good !== null && j.good !== undefined && !knownKey(goods, j.good)) fail('Invalid cargo');
+    if (j.kind !== 'soldier' && !knownKey(goods, j.good)) fail('Invalid cargo');
+    for (const key of ['to', 'from', 's'] as const)
+      if (j[key] !== undefined && !int(j[key])) fail('Invalid job reference');
+    const target = typeof j.to === 'number' ? buildings.get(j.to) : undefined;
+    const source = typeof j.from === 'number' ? buildings.get(j.from) : undefined;
+    const store = typeof j.s === 'number' ? buildings.get(j.s) : undefined;
+    if ((j.kind === 'fetch' || j.kind === 'soldier' || j.kind === 'transfer') && !target)
       fail('Missing job destination');
-    if (
-      j.kind === 'fetch' &&
-      (!buildings.has(j.s) || !buildings.get(j.s).done || !specs[buildings.get(j.s).type].store)
-    )
+    if (j.kind === 'fetch' && (!store || !store.done || !specs[store.type].store))
       fail('Missing source store');
-    if (['deliver', 'transfer'].includes(j.kind) && !buildings.has(j.from))
-      fail('Missing job source');
+    if ((j.kind === 'deliver' || j.kind === 'transfer') && !source) fail('Missing job source');
     if (
       j.kind === 'transfer' &&
-      (j.s !== j.from ||
-        !buildings.get(j.from).done ||
-        !buildings.get(j.to).done ||
-        !specs[buildings.get(j.from).type].store ||
-        !specs[buildings.get(j.to).type].store)
+      (!source ||
+        !target ||
+        j.s !== j.from ||
+        !source.done ||
+        !target.done ||
+        !specs[source.type].store ||
+        !specs[target.type].store)
     )
       fail('Invalid transfer');
     if (j.kind === 'fetch') {
-      const target = buildings.get(j.to);
-      // Save acceptance deliberately unions current specifications with historical
-      // exceptions below. It is broader than the live recipe of migrated industry.
+      if (!target || !knownKey(goods, j.good)) fail('Invalid fetch destination');
+      // Save acceptance unions current recipes with historical industry and meals.
       const needed = target.done ? specs[target.type].in : target.needs;
       const meal =
         target.done &&
@@ -282,55 +325,60 @@ export function validateSave(
         fail('Invalid fetch destination');
     }
     if (j.kind === 'deliver') {
-      const source = buildings.get(j.from);
+      if (!source) fail('Missing job source');
       const legacyMeal = j.good === 'food' && ['farm', 'fisherman'].includes(source.type);
       if (!source.done || (specs[source.type].out !== j.good && !legacyMeal))
         fail('Invalid delivery source');
     }
-    if (j.kind === 'soldier') {
-      const target = buildings.get(j.to);
-      if (!target.done || !specs[target.type].guard || target.manned)
-        fail('Invalid soldier destination');
-    }
+    if (
+      j.kind === 'soldier' &&
+      (!target || !target.done || !specs[target.type].guard || target.manned)
+    )
+      fail('Invalid soldier destination');
+    checkedJobs.push(pick<Job>(j, ['kind', 'good', 'to', 's', 'from', 'state']));
   }
   const jobOwners = new Set();
-  const ownerByJob = new Map();
+  const ownerByJob = new Map<number, SavedUnit>();
   for (const u of d.u) {
     if (
       !object(u) ||
       !int(u.id, 1) ||
       ids.has(u.id) ||
-      !['carrier', 'soldier'].includes(u.kind) ||
+      !oneOf(u.kind, ['carrier', 'soldier']) ||
       !num(u.x, 0, width) ||
       !num(u.y, 0, height) ||
-      !['idle', 'p', 'd'].includes(u.phase) ||
-      !int(u.ji, -1, d.j.length - 1) ||
+      !oneOf(u.phase, ['idle', 'p', 'd']) ||
+      !int(u.ji, -1, checkedJobs.length - 1) ||
       !num(u.lx, -1, 1) ||
       !num(u.ly, -1, 1)
     )
       fail('Invalid settler');
     ids.add(u.id);
-    if (u.carry !== null && u.carry !== undefined && !Object.hasOwn(goods, u.carry))
+    if (u.carry !== null && u.carry !== undefined && !knownKey(goods, u.carry))
       fail('Invalid carried resource');
     if (
       u.path !== null &&
-      (!Array.isArray(u.path) ||
+      (!array(u.path) ||
         u.path.length > size * 2 ||
-        !u.path.every((n) => int(n, 0, size - 1) && ![0, 3].includes(d.t[0][n])))
+        !u.path.every((n) => int(n, 0, size - 1) && !oneOf(terrain[0][n], [0, 3])))
     )
       fail('Invalid route');
-    if (!int(u.pi, 0, u.path ? u.path.length : size * 2)) fail('Invalid route progress');
-    if (u.dropB && !buildings.has(u.dropB)) fail('Missing drop destination');
+    if (!int(u.pi, 0, array(u.path) ? u.path.length : size * 2)) fail('Invalid route progress');
+    if (
+      u.dropB !== null &&
+      u.dropB !== undefined &&
+      (!int(u.dropB) || (u.dropB !== 0 && !buildings.has(u.dropB)))
+    )
+      fail('Missing drop destination');
     if (u.ji >= 0) {
-      if (jobOwners.has(u.ji) || d.j[u.ji].state !== 't') fail('Invalid job ownership');
+      if (jobOwners.has(u.ji) || checkedJobs[u.ji].state !== 't') fail('Invalid job ownership');
       jobOwners.add(u.ji);
-      ownerByJob.set(u.ji, u);
     }
     u.carryTransfer =
       d.v === 1
-        ? !!(u.carry && u.ji >= 0 && ['fetch', 'transfer'].includes(d.j[u.ji].kind))
+        ? !!(u.carry && u.ji >= 0 && ['fetch', 'transfer'].includes(checkedJobs[u.ji].kind))
         : !!u.carryTransfer;
-    const job = u.ji >= 0 ? d.j[u.ji] : null;
+    const job = u.ji >= 0 ? checkedJobs[u.ji] : null;
     if (u.carryWarehouseTransfer === undefined)
       u.carryWarehouseTransfer = !!(u.carry && job?.kind === 'transfer');
     if (
@@ -393,89 +441,10 @@ export function validateSave(
     u.walkDistance = num(u.walkDistance) ? u.walkDistance : 0;
     u.faceDX = num(u.faceDX, -1, 1) ? u.faceDX : 1;
     u.faceDY = num(u.faceDY, -1, 1) ? u.faceDY : 0;
-  }
-  const reservations = new Map();
-  for (let i = 0; i < d.j.length; i++) {
-    const j = d.j[i];
-    const owner = ownerByJob.get(i);
-    if (['fetch', 'transfer'].includes(j.kind) && (!owner || !owner.carry)) {
-      const key = j.s + '/' + j.good;
-      reservations.set(key, (reservations.get(key) || 0) + 1);
-    }
-  }
-  for (const b of d.b) {
-    for (const good of Object.keys(goods) as Good[]) {
-      if (
-        (b.reservedStock[good] || 0) !== (reservations.get(b.id + '/' + good) || 0) ||
-        (b.reservedStock[good] || 0) > (b.stock[good] || 0)
-      )
-        fail('Invalid resource reservations');
-    }
-  }
-  if (ids.size && d.nextId <= Math.max(...ids)) fail('Invalid next entity ID');
-  if (d.j.some((j, i) => j.state === 't' && !jobOwners.has(i))) fail('Unowned active job');
-  if (
-    !object(d.st) ||
-    ![1, 2, 4, 8].includes(d.st.speed) ||
-    !num(d.st.time) ||
-    !int(d.st.gold) ||
-    !bool(d.st.paused) ||
-    !bool(d.st.won) ||
-    !bool(d.st.auto)
-  )
-    fail('Invalid simulation state');
-  if (!object(d.p)) fail('Invalid simulation pools');
-  for (const k of ['serfPool', 'soldierPool'] as const)
-    if (!int(d.p[k], 0, 1e5)) fail('Invalid population');
-  for (const k of ['spawnT', 'serfT', 'solT'] as const)
-    if (!num(d.p[k], -100, 1e6)) fail('Invalid timer');
-  d.p.assignT = num(d.p.assignT, -100, 10) ? d.p.assignT : 0;
-  d.p.autoT = num(d.p.autoT, -100, 10) ? d.p.autoT : 0;
-  d.p.treeGrowthT = num(d.p.treeGrowthT, 0, 1) ? d.p.treeGrowthT : 0;
-  if (d.v === 2 && !int(d.rng, -2147483648, 4294967295)) fail('Invalid RNG state');
-  d.st.upgrades = object(d.st.upgrades) ? d.st.upgrades : ({} as SaveData['st']['upgrades']);
-  for (const k of ['haul', 'production'] as const)
-    if (!int(d.st.upgrades[k], 0, 3)) d.st.upgrades[k] = 0;
-  d.st.spentGold = int(d.st.spentGold) ? d.st.spentGold : 0;
-  d.st.goldDelivered = int(d.st.goldDelivered) ? d.st.goldDelivered : d.st.gold;
-  d.st.contracts = Array.isArray(d.st.contracts) ? d.st.contracts.filter((x) => int(x, 0, 5)) : [];
-  d.st.milestones = Array.isArray(d.st.milestones)
-    ? d.st.milestones.filter((x) => int(x, 0, 5))
-    : [];
-  d.st.roadsBuilt = int(d.st.roadsBuilt) ? d.st.roadsBuilt : d.t[3].filter(Boolean).length;
-  // Hydrate the schema, rather than assigning arbitrary imported object keys to entities.
-  // Object.assign treats an imported own __proto__ key as a prototype setter.
-  const pick = <R extends object>(value: object, keys: string[]): R =>
-    Object.fromEntries(keys.map((key) => [key, (value as Record<string, unknown>)[key]])) as R;
-  d.b = d.b.map((b) =>
-    pick<Building>(b, [
-      'id',
-      'type',
-      'x',
-      'y',
-      'done',
-      'constructionProgress',
-      'needs',
-      'got',
-      'stock',
-      'reservedStock',
-      'manned',
-      'exhausted',
-      'produced',
-      'timer',
-      'foodBlockedNoticeSent',
-      'legacyIndustry',
-      'rocksExhaustedNoticeSent',
-      'metrics',
-      'blockedReason',
-      'priority',
-      'targets',
-      'disabled',
-    ]),
-  );
-  d.j = d.j.map((j) => pick<Job>(j, ['kind', 'good', 'to', 's', 'from', 'state']));
-  d.u = d.u.map((u) =>
-    pick<SavedUnit>(u, [
+    u.carry ??= null;
+    u.dropB ??= null;
+    if (!bool(u.dropIsSite)) fail('Invalid delivery destination');
+    const unit = pick<SavedUnit>(u, [
       'id',
       'kind',
       'x',
@@ -495,29 +464,79 @@ export function validateSave(
       'walkDistance',
       'faceDX',
       'faceDY',
-    ]),
-  );
-  d.st = {
+    ]);
+    checkedUnits.push(unit);
+    if (unit.ji >= 0) ownerByJob.set(unit.ji, unit);
+  }
+  const reservations = new Map();
+  for (let i = 0; i < checkedJobs.length; i++) {
+    const j = checkedJobs[i];
+    const owner = ownerByJob.get(i);
+    if (['fetch', 'transfer'].includes(j.kind) && (!owner || !owner.carry)) {
+      const key = j.s + '/' + j.good;
+      reservations.set(key, (reservations.get(key) || 0) + 1);
+    }
+  }
+  for (const b of checkedBuildings) {
+    for (const good of Object.keys(goods) as Good[]) {
+      if (
+        (b.reservedStock[good] || 0) !== (reservations.get(b.id + '/' + good) || 0) ||
+        (b.reservedStock[good] || 0) > (b.stock[good] || 0)
+      )
+        fail('Invalid resource reservations');
+    }
+  }
+  if (ids.size && d.nextId <= Math.max(...ids)) fail('Invalid next entity ID');
+  if (checkedJobs.some((j, i) => j.state === 't' && !jobOwners.has(i))) fail('Unowned active job');
+  if (
+    !object(d.st) ||
+    !oneOf(d.st.speed, [1, 2, 4, 8]) ||
+    !num(d.st.time) ||
+    !int(d.st.gold) ||
+    !bool(d.st.paused) ||
+    !bool(d.st.won) ||
+    !bool(d.st.auto)
+  )
+    fail('Invalid simulation state');
+  if (!object(d.p)) fail('Invalid simulation pools');
+  for (const k of ['serfPool', 'soldierPool'] as const)
+    if (!int(d.p[k], 0, 1e5)) fail('Invalid population');
+  for (const k of ['spawnT', 'serfT', 'solT'] as const)
+    if (!num(d.p[k], -100, 1e6)) fail('Invalid timer');
+  d.p.assignT = num(d.p.assignT, -100, 10) ? d.p.assignT : 0;
+  d.p.autoT = num(d.p.autoT, -100, 10) ? d.p.autoT : 0;
+  d.p.treeGrowthT = num(d.p.treeGrowthT, 0, 1) ? d.p.treeGrowthT : 0;
+  if (d.v === 2 && !int(d.rng, -2147483648, 4294967295)) fail('Invalid RNG state');
+  const upgrades = object(d.st.upgrades) ? d.st.upgrades : {};
+  for (const k of ['haul', 'production'] as const) if (!int(upgrades[k], 0, 3)) upgrades[k] = 0;
+  d.b = checkedBuildings;
+  d.j = checkedJobs;
+  d.u = checkedUnits;
+  const state: SimulationState = {
     paused: d.st.paused,
     speed: d.st.speed,
     won: d.st.won,
     time: d.st.time,
     gold: d.st.gold,
     auto: d.st.auto,
-    upgrades: { haul: d.st.upgrades.haul, production: d.st.upgrades.production },
-    spentGold: d.st.spentGold,
-    goldDelivered: d.st.goldDelivered,
-    contracts: d.st.contracts,
-    milestones: d.st.milestones,
-    roadsBuilt: d.st.roadsBuilt,
+    upgrades: { haul: upgrades.haul as number, production: upgrades.production as number },
+    spentGold: int(d.st.spentGold) ? d.st.spentGold : 0,
+    goldDelivered: int(d.st.goldDelivered) ? d.st.goldDelivered : d.st.gold,
+    contracts: array(d.st.contracts) ? d.st.contracts.filter((x): x is number => int(x, 0, 5)) : [],
+    milestones: array(d.st.milestones)
+      ? d.st.milestones.filter((x): x is number => int(x, 0, 5))
+      : [],
+    roadsBuilt: int(d.st.roadsBuilt) ? d.st.roadsBuilt : checkedTerrain[3].filter(Boolean).length,
   };
-  if (d.observations === undefined) d.observations = freshEconomicObservations(d.st.time);
+  d.st = state;
+  let observations: EconomicObservations;
+  if (d.observations === undefined) observations = freshEconomicObservations(state.time);
   else {
     const obs = d.observations;
     if (
       !object(obs) ||
-      !num(obs.started, 0, d.st.time) ||
-      !Array.isArray(obs.recent) ||
+      !num(obs.started, 0, state.time) ||
+      !array(obs.recent) ||
       !obs.recent.length ||
       obs.recent.length > 301
     )
@@ -532,11 +551,12 @@ export function validateSave(
       return clean;
     };
     const current = totals(obs.totals);
+    const started = obs.started;
     let previous: EconomicSample | null = null;
     const recent = obs.recent.map((raw): EconomicSample => {
       if (
         !object(raw) ||
-        !num(raw.time, Math.max(obs.started, d.st.time - 600 - 1e-9), d.st.time) ||
+        !num(raw.time, Math.max(started, state.time - 600 - 1e-9), state.time) ||
         (previous && raw.time <= previous.time)
       )
         fail('Invalid economic observation coverage');
@@ -553,25 +573,26 @@ export function validateSave(
       previous = sample;
       return sample;
     });
-    let cargo = freshCargoObservations(d.st.time);
+    let cargo = freshCargoObservations(state.time);
     if (obs.cargo !== undefined) {
       const rawCargo = obs.cargo;
       if (
         !object(rawCargo) ||
         !object(rawCargo.totals) ||
-        !num(rawCargo.started, 0, d.st.time) ||
-        !Array.isArray(rawCargo.recent) ||
+        !num(rawCargo.started, 0, state.time) ||
+        !array(rawCargo.recent) ||
         !rawCargo.recent.length ||
         rawCargo.recent.length > 301
       )
         fail('Invalid cargo arrival observations');
       const cargoTotals = record(rawCargo.totals, 1e9);
+      const cargoStarted = rawCargo.started;
       let previousCargo: CargoSample | null = null;
       const cargoRecent = rawCargo.recent.map((raw): CargoSample => {
         if (
           !object(raw) ||
           !object(raw.totals) ||
-          !num(raw.time, Math.max(rawCargo.started, d.st.time - 600 - 1e-9), d.st.time) ||
+          !num(raw.time, Math.max(cargoStarted, state.time - 600 - 1e-9), state.time) ||
           (previousCargo && raw.time <= previousCargo.time)
         )
           fail('Invalid cargo arrival coverage');
@@ -587,20 +608,40 @@ export function validateSave(
       });
       cargo = { started: rawCargo.started, totals: cargoTotals, recent: cargoRecent };
     }
-    d.observations = { started: obs.started, totals: current, recent, cargo };
+    observations = { started: obs.started, totals: current, recent, cargo };
   }
+  d.observations = observations;
   if (d.identity !== undefined && (!object(d.identity) || !Object.hasOwn(d.identity, 'name')))
     fail('Invalid colony identity');
-  d.identity = { name: d.identity === undefined ? 'Unnamed colony' : saveName(d.identity.name) };
-  d.attention = validateAttention(
+  const identity = { name: object(d.identity) ? saveName(d.identity.name) : 'Unnamed colony' };
+  d.identity = identity;
+  const attention = validateAttention(
     d.attention,
-    d.st.time,
+    state.time,
     width,
     height,
     specs,
     goods,
-    d.b,
+    checkedBuildings,
     d.nextId,
   );
-  return d as SaveData;
+  d.attention = attention;
+  const checked = {
+    ...d,
+    economy: d.economy as 2 | undefined,
+    rng: int(d.rng, -2147483648, 4294967295) ? d.rng : undefined,
+    seed: d.seed,
+    nextId: d.nextId,
+    t: checkedTerrain,
+    b: checkedBuildings,
+    j: checkedJobs,
+    u: checkedUnits,
+    st: state,
+    // Every pool and timer was checked or defaulted above.
+    p: d.p as SaveData['p'],
+    identity,
+    observations,
+    attention,
+  };
+  return d.v === 1 ? { ...checked, v: 1 } : { ...checked, v: 2, rng: d.rng as number };
 }

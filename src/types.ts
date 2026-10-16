@@ -130,7 +130,7 @@ export interface BuildingStatus {
 }
 export interface Job {
   kind: 'fetch' | 'deliver' | 'transfer' | 'soldier';
-  good?: Good;
+  good?: Good | null;
   to?: number;
   from?: number;
   s?: number;
@@ -341,8 +341,15 @@ export interface SaveData {
     treeGrowthT: number;
   };
 }
+/** The validator has supplied the historical defaults required to adopt a world. */
+export type ValidatedSave = SaveData & {
+  identity: ColonyIdentity;
+  observations: EconomicObservations;
+  attention: import('./observations/attention.ts').AttentionData;
+} & ({ v: 1 } | { v: 2; rng: number });
+
 export interface PreparedSave {
-  data: SaveData;
+  data: ValidatedSave;
   tiles: Tile[];
   buildings: Building[];
   jobs: Job[];

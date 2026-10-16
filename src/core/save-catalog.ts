@@ -1,4 +1,4 @@
-import type { SaveData, SaveMetadata } from '../types.ts';
+import type { ValidatedSave, SaveMetadata } from '../types.ts';
 import type { StoragePort } from './persistence.ts';
 
 export const SAVE_CATALOG_KEY = 'settlers.saves.v1';
@@ -10,7 +10,7 @@ export interface CatalogEntry {
   name: string;
   kind: SaveMetadata['kind'];
   savedAt: number | null;
-  data: SaveData;
+  data: ValidatedSave;
 }
 export interface SaveCatalog {
   v: 1;
@@ -37,17 +37,23 @@ export function saveMetadata(entry: CatalogEntry): SaveMetadata {
 }
 
 /** One envelope is the atomic storage transaction; the legacy slot is never rewritten. */
-export function createSaveCatalog(storage: StoragePort, normalize: (data: unknown) => SaveData) {
-  function checkedSave(raw: string) {
+export function createSaveCatalog(
+  storage: StoragePort | undefined,
+  normalize: (data: unknown) => ValidatedSave,
+) {
+  function checkedSave(raw: unknown) {
     if (typeof raw !== 'string' || raw.length > MAX_SAVE_TEXT)
       throw new Error('Save code is too large');
     return normalize(JSON.parse(raw));
   }
   function validate(input: unknown): SaveCatalog {
-    if (!input || typeof input !== 'object') throw new Error('Invalid save catalog');
-    const value = input as SaveCatalog;
+    const object = (value: unknown): value is Record<string, unknown> =>
+      !!value && typeof value === 'object' && !Array.isArray(value);
+    if (!object(input)) throw new Error('Invalid save catalog');
+    const value = input;
     if (
       value.v !== 1 ||
+      typeof value.nextId !== 'number' ||
       !Number.isInteger(value.nextId) ||
       value.nextId < 1 ||
       value.nextId > 1e9 ||
@@ -56,19 +62,21 @@ export function createSaveCatalog(storage: StoragePort, normalize: (data: unknow
     )
       throw new Error('Invalid save catalog');
     const ids = new Set<string>();
-    const entries = value.entries.map((entry): CatalogEntry => {
+    const importedEntries: unknown[] = value.entries;
+    const nextId = value.nextId;
+    const entries = importedEntries.map((entry): CatalogEntry => {
       if (
-        !entry ||
-        typeof entry !== 'object' ||
+        !object(entry) ||
         typeof entry.id !== 'string' ||
         !/^(save-[1-9]\d{0,8}|autosave|legacy)$/.test(entry.id) ||
         ids.has(entry.id) ||
-        !['manual', 'autosave', 'legacy'].includes(entry.kind) ||
+        (entry.kind !== 'manual' && entry.kind !== 'autosave' && entry.kind !== 'legacy') ||
         (entry.kind === 'autosave') !== (entry.id === 'autosave') ||
         (entry.kind === 'legacy') !== (entry.id === 'legacy') ||
-        (entry.id.startsWith('save-') && +entry.id.slice(5) >= value.nextId) ||
+        (entry.id.startsWith('save-') && +entry.id.slice(5) >= nextId) ||
         (entry.savedAt !== null &&
-          (!Number.isSafeInteger(entry.savedAt) ||
+          (typeof entry.savedAt !== 'number' ||
+            !Number.isSafeInteger(entry.savedAt) ||
             entry.savedAt < 0 ||
             entry.savedAt > 8640000000000000)) ||
         (entry.savedAt === null && entry.kind !== 'legacy')
@@ -80,13 +88,14 @@ export function createSaveCatalog(storage: StoragePort, normalize: (data: unknow
         id: entry.id,
         name: saveName(entry.name, 'Checkpoint'),
         kind: entry.kind,
-        savedAt: entry.savedAt,
+        savedAt: typeof entry.savedAt === 'number' ? entry.savedAt : null,
         data: checkedSave(text),
       };
     });
     return { v: 1, nextId: value.nextId, entries };
   }
   function read(): SaveCatalog {
+    if (!storage) throw new Error('Browser storage is unavailable');
     const raw = storage.getItem(SAVE_CATALOG_KEY);
     if (raw !== null) {
       if (raw.length > MAX_CATALOG_TEXT) throw new Error('Save catalog is too large');
@@ -113,6 +122,7 @@ export function createSaveCatalog(storage: StoragePort, normalize: (data: unknow
     const clean = validate(value);
     const raw = JSON.stringify(clean);
     if (raw.length > MAX_CATALOG_TEXT) throw new Error('Save catalog is too large');
+    if (!storage) throw new Error('Browser storage is unavailable');
     storage.setItem(SAVE_CATALOG_KEY, raw);
   }
   return { read, write };
