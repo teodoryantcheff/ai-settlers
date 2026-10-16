@@ -34,27 +34,7 @@
   },
   "overrides": [
     {
-      "files": [
-        "src/application/loop.ts",
-        "src/audio/ambience.ts",
-        "src/audio/music.ts",
-        "src/audio/world-effects.ts",
-        "src/core/persistence.ts",
-        "src/core/world.ts",
-        "src/dev/scenarios.ts",
-        "src/gameplay/advisor.ts",
-        "src/gameplay/progression.ts",
-        "src/simulation/autoplay.ts",
-        "src/simulation/economy.ts",
-        "src/simulation/map.ts",
-        "src/simulation/navigation.ts",
-        "src/simulation/roads.ts",
-        "src/simulation/state.ts",
-        "src/ui/economic-notices.ts",
-        "src/ui/hud.ts",
-        "src/ui/inspector-view.ts",
-        "src/ui/interaction.ts"
-      ],
+      "files": [],
       "rules": {
         "no-var": "off",
         "prefer-const": "off"

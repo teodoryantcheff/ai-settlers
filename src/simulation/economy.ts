@@ -42,7 +42,7 @@ export function createEconomy(
   // per-building done/store signature so completion flips made outside this
   // subsystem (tests, tools) stay visible; a cache hit never allocates.
   // No caller mutates the array storages() returns.
-  var buildingVersion = 0,
+  let buildingVersion = 0,
     storagesSource: Building[] = null,
     storagesVersion = -1,
     storagesLength = -1,
@@ -50,9 +50,9 @@ export function createEconomy(
     storagesSig: boolean[] = null,
     byIdSource: Building[] = null,
     byIdVersion = -1,
-    byIdLength = -1,
-    byIdMap = new Map<number, Building>(),
-    unitsDirty = false,
+    byIdLength = -1;
+  const byIdMap = new Map<number, Building>();
+  let unitsDirty = false,
     unitsSource: Unit[] = null;
   function byId(id: number): Building | null {
     if (
@@ -61,26 +61,26 @@ export function createEconomy(
       byIdLength !== game.buildings.length
     ) {
       byIdMap.clear();
-      for (var i = 0; i < game.buildings.length; i++) {
-        var b = game.buildings[i];
+      for (let i = 0; i < game.buildings.length; i++) {
+        const b = game.buildings[i];
         if (!byIdMap.has(b.id)) byIdMap.set(b.id, b);
       }
       byIdSource = game.buildings;
       byIdVersion = buildingVersion;
       byIdLength = game.buildings.length;
     }
-    var found = byIdMap.get(id);
+    const found = byIdMap.get(id);
     return found === undefined ? null : found;
   }
   function buildingAt(x: number, y: number): Building | null {
-    for (var i = 0; i < game.buildings.length; i++)
+    for (let i = 0; i < game.buildings.length; i++)
       if (game.buildings[i].x === x && game.buildings[i].y === y) return game.buildings[i];
     return null;
   }
   function storages(): Building[] {
-    var src = game.buildings,
-      n = src.length,
-      i = 0,
+    const src = game.buildings,
+      n = src.length;
+    let i = 0,
       b: Building = null;
     if (
       storagesCache !== null &&
@@ -88,7 +88,7 @@ export function createEconomy(
       storagesVersion === buildingVersion &&
       storagesLength === n
     ) {
-      var fresh = true;
+      let fresh = true;
       for (i = 0; i < n; i++) {
         b = src[i];
         if (!!(b.done && game.BSPEC[b.type].store) !== storagesSig[i]) {
@@ -98,11 +98,11 @@ export function createEconomy(
       }
       if (fresh) return storagesCache;
     }
-    var r = [],
+    const r = [],
       sig = [];
     for (i = 0; i < n; i++) {
       b = src[i];
-      var isStore = !!(b.done && game.BSPEC[b.type].store);
+      const isStore = !!(b.done && game.BSPEC[b.type].store);
       sig.push(isStore);
       if (isStore) r.push(b);
     }
@@ -114,16 +114,16 @@ export function createEconomy(
     return r;
   }
   function anyStorage(): Building | null {
-    var s = storages();
+    const s = storages();
     return s.length ? s[0] : null;
   }
   function nearestStoragePos(x: number, y: number): Building | null {
-    var best = null,
-      bd = 1e9,
-      ss = storages();
-    for (var i = 0; i < ss.length; i++) {
+    let best = null,
+      bd = 1e9;
+    const ss = storages();
+    for (let i = 0; i < ss.length; i++) {
       if (!game.connectedLand(x, y, ss[i].x, ss[i].y)) continue;
-      var d = (ss[i].x - x) * (ss[i].x - x) + (ss[i].y - y) * (ss[i].y - y);
+      const d = (ss[i].x - x) * (ss[i].x - x) + (ss[i].y - y) * (ss[i].y - y);
       if (d < bd) {
         bd = d;
         best = ss[i];
@@ -132,13 +132,13 @@ export function createEconomy(
     return best;
   }
   function nearestStorageWith(x: number, y: number, g: Good): Building | null {
-    var best = null,
-      bd = 1e9,
-      ss = storages();
-    for (var i = 0; i < ss.length; i++) {
+    let best = null,
+      bd = 1e9;
+    const ss = storages();
+    for (let i = 0; i < ss.length; i++) {
       if ((ss[i].stock[g] | 0) - (ss[i].res[g] | 0) <= 0) continue;
       if (!game.connectedLand(x, y, ss[i].x, ss[i].y)) continue;
-      var d = (ss[i].x - x) * (ss[i].x - x) + (ss[i].y - y) * (ss[i].y - y);
+      const d = (ss[i].x - x) * (ss[i].x - x) + (ss[i].y - y) * (ss[i].y - y);
       if (d < bd) {
         bd = d;
         best = ss[i];
@@ -147,23 +147,23 @@ export function createEconomy(
     return best;
   }
   function totalGood(g: Good) {
-    var s = 0,
-      ss = storages();
-    for (var i = 0; i < ss.length; i++) s += ss[i].stock[g] | 0;
+    let s = 0;
+    const ss = storages();
+    for (let i = 0; i < ss.length; i++) s += ss[i].stock[g] | 0;
     return s;
   }
   function liveMines() {
-    var n = 0;
-    for (var i = 0; i < game.buildings.length; i++) {
-      var b = game.buildings[i];
+    let n = 0;
+    for (let i = 0; i < game.buildings.length; i++) {
+      const b = game.buildings[i];
       if (b.done && !b.exhausted && game.BSPEC[b.type].prod === 'mine') n++;
     }
     return n;
   }
   function stockTargetTotal(g: Good) {
-    var target = 0,
-      ss = storages();
-    for (var i = 0; i < ss.length; i++) target += Math.max(0, (ss[i].targets || {})[g] | 0);
+    let target = 0;
+    const ss = storages();
+    for (let i = 0; i < ss.length; i++) target += Math.max(0, (ss[i].targets || {})[g] | 0);
     return target;
   }
   function foodSaturated(good?: Good) {
@@ -177,7 +177,7 @@ export function createEconomy(
     );
   }
   function intermediateSaturated(good: Good) {
-    var reserve = good === 'grain' ? 24 : ['flour', 'pigs', 'iron_bars'].includes(good) ? 12 : 0;
+    const reserve = good === 'grain' ? 24 : ['flour', 'pigs', 'iron_bars'].includes(good) ? 12 : 0;
     return reserve > 0 && totalGood(good) >= Math.max(reserve, stockTargetTotal(good));
   }
   function hasLocalWater(b: Pick<Building, 'x' | 'y'>) {
@@ -187,25 +187,25 @@ export function createEconomy(
     return 8 + 8 * Math.max(0, storages().length - 1);
   }
   function countFetch(g: Good, bid: number) {
-    var n = 0;
-    for (var i = 0; i < game.jobs.length; i++) {
-      var j = game.jobs[i];
+    let n = 0;
+    for (let i = 0; i < game.jobs.length; i++) {
+      const j = game.jobs[i];
       if (j.kind === 'fetch' && j.good === g && j.to === bid) n++;
     }
     return n;
   }
   function countDeliver(g: Good, bid: number) {
-    var n = 0;
-    for (var i = 0; i < game.jobs.length; i++) {
-      var j = game.jobs[i];
+    let n = 0;
+    for (let i = 0; i < game.jobs.length; i++) {
+      const j = game.jobs[i];
       if (j.kind === 'deliver' && j.good === g && j.from === bid) n++;
     }
     return n;
   }
   function countSoldier(bid: number) {
-    var n = 0;
-    for (var i = 0; i < game.jobs.length; i++) {
-      var j = game.jobs[i];
+    let n = 0;
+    for (let i = 0; i < game.jobs.length; i++) {
+      const j = game.jobs[i];
       if (j.kind === 'soldier' && j.to === bid) n++;
     }
     return n;
@@ -214,7 +214,7 @@ export function createEconomy(
     game.emitGameEvent(name, payload);
   }
   function productionMetrics(): ProductionMetrics {
-    var m: ProductionMetrics = {
+    const m: ProductionMetrics = {
       elapsed: 0,
       active: 0,
       blocked: 0,
@@ -253,7 +253,7 @@ export function createEconomy(
   }
   function sampleProduction(m: ProductionMetrics) {
     ensureProductionHistory(m);
-    var samples = m.recent;
+    const samples = m.recent;
     if (m.elapsed - samples[samples.length - 1].elapsed >= 2 - 1e-9)
       samples.push(productionSample(m));
     // Keep only complete covered intervals, never interpolate goods or invent a
@@ -264,29 +264,29 @@ export function createEconomy(
     m: ProductionMetrics,
     window: ProductionRateWindow,
   ): ProductionWindowMetrics {
-    var empty = {
-        elapsed: 0,
-        inputBlocked: 0,
-        produced: {},
-        consumed: {},
-        inputDelivered: {},
-        outputDelivered: {},
-      },
-      baseline: ProductionSample = empty;
+    const empty = {
+      elapsed: 0,
+      inputBlocked: 0,
+      produced: {},
+      consumed: {},
+      inputDelivered: {},
+      outputDelivered: {},
+    };
+    let baseline: ProductionSample = empty;
     if (window !== 'lifetime') {
       baseline = (m.recent || []).find(function (sample) {
         return sample.elapsed >= m.elapsed - window - 1e-9;
       });
       if (!baseline) baseline = productionSample(m);
     }
-    var elapsed = Math.max(0, m.elapsed - baseline.elapsed),
+    const elapsed = Math.max(0, m.elapsed - baseline.elapsed),
       deliveryElapsed =
         m.deliveryStarted === undefined
           ? 0
           : Math.max(0, m.elapsed - Math.max(baseline.elapsed, m.deliveryStarted));
     function difference(current: Inventory, before: Inventory): Inventory {
-      var out: Inventory = {};
-      for (var good in current)
+      const out: Inventory = {};
+      for (const good in current)
         out[good as Good] = Math.max(0, current[good as Good] - (before[good as Good] || 0));
       return out;
     }
@@ -302,7 +302,7 @@ export function createEconomy(
     };
   }
   function addStock(b: Building, g: Good, n: number) {
-    var accepted = Math.min(n, Math.max(0, 8 - (b.stock[g] | 0)));
+    const accepted = Math.min(n, Math.max(0, 8 - (b.stock[g] | 0)));
     b.stock[g] = (b.stock[g] | 0) + accepted;
     b.produced = (b.produced | 0) + accepted;
     if (!b.metrics) b.metrics = productionMetrics();
@@ -337,12 +337,12 @@ export function createEconomy(
     };
   }
   function copyObj(o: Inventory): Inventory {
-    var r: Inventory = {};
-    for (var k in o) r[k as Good] = o[k as Good];
+    const r: Inventory = {};
+    for (const k in o) r[k as Good] = o[k as Good];
     return r;
   }
   function siteReady(b: Building) {
-    for (var g in b.needs) if ((b.got[g as Good] | 0) < b.needs[g as Good]) return false;
+    for (const g in b.needs) if ((b.got[g as Good] | 0) < b.needs[g as Good]) return false;
     return true;
   }
   function onDone(b: Building) {
@@ -352,16 +352,16 @@ export function createEconomy(
     gameEvent('buildingCompleted', { building: b });
   }
   function pickStorageFor(g: Good, ref: Pick<Building, 'x' | 'y'>) {
-    var best = null,
-      bd = 1e9,
-      ss = storages();
-    var rx = ref ? ref.x : game.W / 2,
+    let best = null,
+      bd = 1e9;
+    const ss = storages();
+    const rx = ref ? ref.x : game.W / 2,
       ry = ref ? ref.y : game.H / 2;
-    for (var i = 0; i < ss.length; i++) {
-      var av = (ss[i].stock[g] | 0) - (ss[i].res[g] | 0);
+    for (let i = 0; i < ss.length; i++) {
+      const av = (ss[i].stock[g] | 0) - (ss[i].res[g] | 0);
       if (av <= 0) continue;
       if (ref && !game.connectedLand(rx, ry, ss[i].x, ss[i].y)) continue;
-      var d = (ss[i].x - rx) * (ss[i].x - rx) + (ss[i].y - ry) * (ss[i].y - ry);
+      const d = (ss[i].x - rx) * (ss[i].x - rx) + (ss[i].y - ry) * (ss[i].y - ry);
       if (d < bd) {
         bd = d;
         best = ss[i];
@@ -370,15 +370,15 @@ export function createEconomy(
     return best;
   }
   function availableGood(g: Good, ref: Pick<Building, 'x' | 'y'>, includeTransfers: boolean) {
-    var s = 0,
-      ss = storages();
-    for (var i = 0; i < ss.length; i++) {
-      var store = ss[i];
+    let s = 0;
+    const ss = storages();
+    for (let i = 0; i < ss.length; i++) {
+      const store = ss[i];
       if (ref && !game.connectedLand(ref.x, ref.y, store.x, store.y)) continue;
-      var free = (store.stock[g] | 0) - (store.res[g] | 0);
+      let free = (store.stock[g] | 0) - (store.res[g] | 0);
       if (includeTransfers)
-        for (var j = 0; j < game.jobs.length; j++) {
-          var job = game.jobs[j];
+        for (let j = 0; j < game.jobs.length; j++) {
+          const job = game.jobs[j];
           if (job.kind === 'transfer' && job.s === store.id && job.good === g && !collectedJob(job))
             free++;
         }
@@ -416,16 +416,16 @@ export function createEconomy(
     };
   }
   function requestStock(cost: Inventory, ref?: Pick<Building, 'x' | 'y'>) {
-    var shortage: Inventory = {};
+    const shortage: Inventory = {};
     // Validate every good before releasing anything: an unaffordable request must
     // not disturb existing logistics merely because one material was available.
-    for (var g in cost) {
+    for (const g in cost) {
       if (availGood(g as Good, ref) < cost[g as Good]) return false;
       shortage[g as Good] = Math.max(0, cost[g as Good] - availableGood(g as Good, ref, false));
     }
     cancelJobs(function (job) {
       if (job.kind !== 'transfer' || !shortage[job.good] || collectedJob(job)) return false;
-      var source = byId(job.s);
+      const source = byId(job.s);
       if (!source || !source.done || !game.BSPEC[source.type].store) return false;
       if (ref && !game.connectedLand(ref.x, ref.y, source.x, source.y)) return false;
       shortage[job.good]--;
@@ -434,8 +434,8 @@ export function createEconomy(
     return true;
   }
   function cancelJobs(pred: (j: Job) => boolean) {
-    for (var i = game.jobs.length - 1; i >= 0; i--) {
-      var j = game.jobs[i];
+    for (let i = game.jobs.length - 1; i >= 0; i--) {
+      const j = game.jobs[i];
       if (!pred(j)) continue;
       game.jobs.splice(i, 1);
       unwindJob(j);
@@ -444,14 +444,14 @@ export function createEconomy(
   // Both pending and assigned pickups hold a reservation until their cargo is collected.
   // Cancellation detaches units as well as queue entries so no ghost job can create goods.
   function unwindJob(j: Job) {
-    var assigned = null;
-    for (var i = 0; i < game.units.length; i++)
+    let assigned = null;
+    for (let i = 0; i < game.units.length; i++)
       if (game.units[i].job === j) {
         assigned = game.units[i];
         break;
       }
     if ((j.kind === 'fetch' || j.kind === 'transfer') && (!assigned || !assigned.carry)) {
-      var s = byId(j.s);
+      const s = byId(j.s);
       if (s) s.res[j.good] = Math.max(0, (s.res[j.good] | 0) - 1);
     }
     if (j.kind === 'soldier') {
@@ -503,49 +503,49 @@ export function createEconomy(
         ownership: { ok: null, reason: 'Choose a tile inside the map' },
         resources: { ok: null, reason: 'Choose a tile inside the map' },
       };
-    var i = game.idx(x, y),
+    const i = game.idx(x, y),
       tl = game.tiles[i];
     if (tl.t === game.WATER) if (fail('terrain', 'Cannot build on water')) return checks;
     if (tl.t === game.MTN) if (fail('terrain', 'Cannot build on mountains')) return checks;
     if (!game.owned[i]) if (fail('ownership', 'Outside your territory')) return checks;
-    var sp = game.BSPEC[type];
+    const sp = game.BSPEC[type];
     if (type === 'fisherman') {
       if (!game.owned[i]) if (fail('ownership', 'Outside your territory')) return checks;
       if (tl.t !== game.GRASS && tl.t !== game.SAND)
         if (fail('terrain', 'Must stand on land by the shore')) return checks;
-      var wa = false;
-      for (var wy2 = y - 2; wy2 <= y + 2 && !wa; wy2++)
-        for (var wx2 = x - 2; wx2 <= x + 2 && !wa; wx2++)
+      let wa = false;
+      for (let wy2 = y - 2; wy2 <= y + 2 && !wa; wy2++)
+        for (let wx2 = x - 2; wx2 <= x + 2 && !wa; wx2++)
           if (game.inB(wx2, wy2) && game.tiles[game.idx(wx2, wy2)].t === game.WATER) wa = true;
       if (!wa) if (fail('resources', 'No water nearby')) return checks;
-      for (var d = 0; d < 4; d++) {
-        var nx = x + game.DX[d],
+      for (let d = 0; d < 4; d++) {
+        const nx = x + game.DX[d],
           ny = y + game.DY[d];
         if (!game.inB(nx, ny)) continue;
-        var n = game.idx(nx, ny);
+        const n = game.idx(nx, ny);
         if (!game.passI(n)) continue;
         if (!game.owned[n]) if (fail('ownership', 'Outside your territory')) return checks;
       }
     } else {
-      for (var d2 = 0; d2 < 4; d2++) {
-        var nx2 = x + game.DX[d2],
+      for (let d2 = 0; d2 < 4; d2++) {
+        const nx2 = x + game.DX[d2],
           ny2 = y + game.DY[d2];
         if (!game.inB(nx2, ny2)) {
           if (fail('ownership', 'Outside your territory')) return checks;
           continue;
         }
-        var n2 = game.idx(nx2, ny2);
+        const n2 = game.idx(nx2, ny2);
         if (!game.passI(n2)) continue;
         if (!game.owned[n2]) if (fail('ownership', 'Outside your territory')) return checks;
       }
       if (tl.t !== game.GRASS) if (fail('terrain', 'Must stand on meadow')) return checks;
       if (sp.resKind) {
-        var ok = false;
-        for (var dd = 0; dd < 8; dd++) {
-          var mx = x + game.DX[dd],
+        let ok = false;
+        for (let dd = 0; dd < 8; dd++) {
+          const mx = x + game.DX[dd],
             my = y + game.DY[dd];
           if (game.inB(mx, my)) {
-            var mt = game.tiles[game.idx(mx, my)];
+            const mt = game.tiles[game.idx(mx, my)];
             if (mt.t === game.MTN && mt.res && mt.res.kind === sp.resKind && mt.res.amt > 0)
               ok = true;
           }
@@ -562,10 +562,10 @@ export function createEconomy(
             return checks;
       }
       if (type === 'quarry') {
-        var fr = sp.rad,
-          found = false;
-        for (var yy = y - fr; yy <= y + fr && !found; yy++)
-          for (var xx = x - fr; xx <= x + fr && !found; xx++) {
+        const fr = sp.rad;
+        let found = false;
+        for (let yy = y - fr; yy <= y + fr && !found; yy++)
+          for (let xx = x - fr; xx <= x + fr && !found; xx++) {
             if (!game.inB(xx, yy)) continue;
             if ((x - xx) * (x - xx) + (y - yy) * (y - yy) > fr * fr) continue;
             if (game.tiles[game.idx(xx, yy)].rock) found = true;
@@ -574,9 +574,9 @@ export function createEconomy(
       }
     }
     if (buildingAt(x, y)) if (fail('terrain', 'Blocked')) return checks;
-    var mind = type === 'hq' ? 2.8 : 1.9;
-    for (var bi = 0; bi < game.buildings.length; bi++) {
-      var ob = game.buildings[bi];
+    const mind = type === 'hq' ? 2.8 : 1.9;
+    for (let bi = 0; bi < game.buildings.length; bi++) {
+      const ob = game.buildings[bi];
       if (Math.hypot(ob.x - x, ob.y - y) < mind)
         if (fail('terrain', 'Too close to ' + game.BSPEC[ob.type].name)) return checks;
     }
@@ -606,24 +606,24 @@ export function createEconomy(
     return '';
   }
   function placeBuilding(type: BuildingType, x: number, y: number) {
-    var c = canPlace(type, x, y);
+    const c = canPlace(type, x, y);
     if (!c[0]) {
       gameEvent('placementRejected', { type, x, y, reason: c[1], stock: false });
       return false;
     }
-    var sp = game.BSPEC[type],
+    const sp = game.BSPEC[type],
       needs = copyObj(sp.cost || {});
-    for (var g in needs)
+    for (const g in needs)
       if (availGood(g as Good, { x: x, y: y }) < needs[g as Good]) {
-        var r = 'Not enough ' + game.GOODS[g as Good].name;
+        const r = 'Not enough ' + game.GOODS[g as Good].name;
         gameEvent('placementRejected', { type, x, y, reason: r, stock: true });
         return false;
       }
     if (!requestStock(needs, { x: x, y: y })) return false;
-    var i2 = game.idx(x, y),
+    const i2 = game.idx(x, y),
       tl2 = game.tiles[i2];
     if (tl2.tree || tl2.rock) {
-      var clearedTree = !!tl2.tree;
+      const clearedTree = !!tl2.tree;
       game.tiles[i2].tree = 0;
       game.tiles[i2].rock = null;
       gameEvent('tileChanged', { index: i2 });
@@ -740,35 +740,35 @@ export function createEconomy(
     }
     if (b.type === 'guard' && b.man) {
       game.soldierPool++;
-      var ws = nearestStoragePos(b.x, b.y);
+      const ws = nearestStoragePos(b.x, b.y);
       if (ws) {
         ws.stock['weapons'] = (ws.stock['weapons'] | 0) + 1;
         game.recordEconomicFlow('salvage', 'weapons', 1);
       }
     }
-    var sp = game.BSPEC[b.type],
-      s = null,
-      sd = Infinity,
-      ss = storages();
-    for (var si = 0; si < ss.length; si++) {
+    const sp = game.BSPEC[b.type];
+    let s = null,
+      sd = Infinity;
+    const ss = storages();
+    for (let si = 0; si < ss.length; si++) {
       if (ss[si] === b) continue;
-      var dd = Math.hypot(ss[si].x - b.x, ss[si].y - b.y);
+      const dd = Math.hypot(ss[si].x - b.x, ss[si].y - b.y);
       if (dd < sd) {
         sd = dd;
         s = ss[si];
       }
     }
     if (s) {
-      for (var g in sp.cost) {
-        var n = Math.floor((b.done ? sp.cost[g as Good] : b.got[g as Good] | 0) / 2);
+      for (const g in sp.cost) {
+        const n = Math.floor((b.done ? sp.cost[g as Good] : b.got[g as Good] | 0) / 2);
         if (n > 0) {
           s.stock[g as Good] = (s.stock[g as Good] | 0) + n;
           game.recordEconomicFlow('refund', g as Good, n);
         }
       }
-      for (g in b.stock)
+      for (const g in b.stock)
         if ((b.stock[g as Good] | 0) > 0) {
-          var salvaged = b.stock[g as Good] | 0;
+          const salvaged = b.stock[g as Good] | 0;
           s.stock[g as Good] = (s.stock[g as Good] | 0) + salvaged;
           game.recordEconomicFlow('salvage', g as Good, salvaged);
           if (g === 'gold' && !sp.store) {
@@ -787,8 +787,8 @@ export function createEconomy(
     game.buildings.splice(game.buildings.indexOf(b), 1);
     buildingVersion++;
     game.recomputeTerritory();
-    for (var d = 0; d < 4; d++) {
-      var nx = b.x + game.DX[d],
+    for (let d = 0; d < 4; d++) {
+      const nx = b.x + game.DX[d],
         ny = b.y + game.DY[d];
       if (game.inB(nx, ny) && game.tiles[game.idx(nx, ny)].road)
         gameEvent('tileChanged', { index: game.idx(nx, ny) });
@@ -803,7 +803,7 @@ export function createEconomy(
   /** Exact scheduling gate; also read by the inspector without mutating recorded reasons. */
   function productionConstraint(b: Building) {
     const sp = game.BSPEC[b.type];
-    var reason = '';
+    let reason = '';
     if (b.disabled) reason = 'paused';
     else if (b.exhausted) reason = 'exhausted';
     else if (sp.out && (b.stock[sp.out] | 0) + (sp.prod === 'gather' ? 2 : 1) > 8)
@@ -869,7 +869,7 @@ export function createEconomy(
     };
   }
   function bTick(b: Building, dt: number) {
-    var sp = game.BSPEC[b.type];
+    const sp = game.BSPEC[b.type];
     if (!b.done) {
       if (!siteReady(b)) return;
       b.prog += dt / 10;
@@ -879,8 +879,8 @@ export function createEconomy(
     if (sp.prod === 'none' || sp.store) return;
     if (!b.metrics) b.metrics = productionMetrics();
     ensureProductionHistory(b.metrics);
-    var reason = productionConstraint(b),
-      g: Good;
+    const reason = productionConstraint(b);
+    let g: Good;
     b.blockedReason = reason;
     b.metrics.elapsed += dt;
     if (reason) {
@@ -895,7 +895,7 @@ export function createEconomy(
     if (b.timer > 0) return;
     switch (sp.prod) {
       case 'gather': {
-        var tr = findTree(b, sp.rad);
+        const tr = findTree(b, sp.rad);
         if (tr >= 0) {
           game.tiles[tr].tree = 0;
           gameEvent('tileChanged', { index: tr });
@@ -913,23 +913,23 @@ export function createEconomy(
         // chop zone (plant rad 5 around the LJ, gate on the LJ's own supply). Planting around the
         // forester itself can fill the un-choppable crescent of its circle, close the gate and
         // starve the pair (seen on ?autoplay&seed=2024).
-        var lb4 = null,
+        let lb4 = null,
           bd4 = 1e9;
-        for (var i6 = 0; i6 < game.buildings.length; i6++) {
-          var lb5 = game.buildings[i6];
+        for (let i6 = 0; i6 < game.buildings.length; i6++) {
+          const lb5 = game.buildings[i6];
           if (lb5.done && lb5.type === 'lumberjack') {
-            var dd4 = Math.abs(lb5.x - b.x) + Math.abs(lb5.y - b.y);
+            const dd4 = Math.abs(lb5.x - b.x) + Math.abs(lb5.y - b.y);
             if (dd4 < bd4) {
               bd4 = dd4;
               lb4 = lb5;
             }
           }
         }
-        var tgt6 = lb4 || b,
+        const tgt6 = lb4 || b,
           gt6 = lb4 ? 20 : 25,
           pr6 = lb4 ? 5 : sp.rad;
         if (countTrees(tgt6, lb4 ? 6 : 7) < gt6) {
-          var p = randPlantSpot(tgt6, pr6);
+          const p = randPlantSpot(tgt6, pr6);
           if (p >= 0) {
             game.tiles[p].tree = 3;
             gameEvent('tileChanged', { index: p });
@@ -939,9 +939,9 @@ export function createEconomy(
         break;
       }
       case 'rock': {
-        var rk = findRock(b, sp.rad);
+        const rk = findRock(b, sp.rad);
         if (rk >= 0) {
-          var t2 = game.tiles[rk];
+          const t2 = game.tiles[rk];
           t2.rock.amt--;
           addStock(b, 'stone', 1);
           b.norock = false;
@@ -991,7 +991,7 @@ export function createEconomy(
           }
           break;
         }
-        var inputs = ingredientsConsumedNext(b, sp);
+        const inputs = ingredientsConsumedNext(b, sp);
         if (sp.prod === 'mine' && !mineDeposit(b)) {
           b.exhausted = true;
           b.blockedReason = 'exhausted';
@@ -1016,11 +1016,11 @@ export function createEconomy(
     r: number,
     f: (i: number, x: number, y: number) => T | undefined,
   ) {
-    for (var y = b.y - r; y <= b.y + r; y++)
-      for (var x = b.x - r; x <= b.x + r; x++) {
+    for (let y = b.y - r; y <= b.y + r; y++)
+      for (let x = b.x - r; x <= b.x + r; x++) {
         if (!game.inB(x, y)) continue;
         if ((b.x - x) * (b.x - x) + (b.y - y) * (b.y - y) > r * r) continue;
-        var r2 = f(game.idx(x, y), x, y);
+        const r2 = f(game.idx(x, y), x, y);
         if (r2 !== undefined) return r2;
       }
     return undefined;
@@ -1031,7 +1031,7 @@ export function createEconomy(
     });
   }
   function countTrees(b: Building, r: number) {
-    var n = 0;
+    let n = 0;
     forRadius(b, r, function (i) {
       if (game.tiles[i].tree >= 2) n++;
     });
@@ -1044,7 +1044,7 @@ export function createEconomy(
   }
   function randPlantSpot(b: Building, r: number) {
     return forRadius(b, r, function (i, x, y) {
-      var tl = game.tiles[i];
+      const tl = game.tiles[i];
       return tl.t === game.GRASS &&
         !tl.tree &&
         !tl.rock &&
@@ -1057,17 +1057,17 @@ export function createEconomy(
     });
   }
   function hasWaterNear(b: Building) {
-    for (var y = b.y - 2; y <= b.y + 2; y++)
-      for (var x = b.x - 2; x <= b.x + 2; x++)
+    for (let y = b.y - 2; y <= b.y + 2; y++)
+      for (let x = b.x - 2; x <= b.x + 2; x++)
         if (game.inB(x, y) && game.tiles[game.idx(x, y)].t === game.WATER) return true;
     return false;
   }
   function mineDeposit(b: Building) {
-    for (var d = 0; d < 8; d++) {
-      var x = b.x + game.DX[d],
+    for (let d = 0; d < 8; d++) {
+      const x = b.x + game.DX[d],
         y = b.y + game.DY[d];
       if (!game.inB(x, y)) continue;
-      var t = game.tiles[game.idx(x, y)];
+      const t = game.tiles[game.idx(x, y)];
       if (t.t === game.MTN && t.res && t.res.kind === game.BSPEC[b.type].resKind && t.res.amt > 0) {
         t.res.amt--;
         gameEvent('tileChanged', { index: game.idx(x, y) });
@@ -1077,37 +1077,37 @@ export function createEconomy(
     return false;
   }
   function incomingStock(g: Good, bid: number) {
-    var n = 0;
-    for (var i = 0; i < game.jobs.length; i++)
+    let n = 0;
+    for (let i = 0; i < game.jobs.length; i++)
       if (game.jobs[i].kind === 'transfer' && game.jobs[i].good === g && game.jobs[i].to === bid)
         n++;
-    for (i = 0; i < game.units.length; i++) {
-      var u = game.units[i];
+    for (let i = 0; i < game.units.length; i++) {
+      const u = game.units[i];
       if (u.carry === g && u.dropB === bid && (!u.job || u.job.kind !== 'transfer')) n++;
     }
     return n;
   }
   function collectedJob(job: Job) {
-    for (var i = 0; i < game.units.length; i++)
+    for (let i = 0; i < game.units.length; i++)
       if (game.units[i].job === job && game.units[i].carry) return true;
     return false;
   }
   function deliveryStorage(g: Good, ref: Pick<Building, 'x' | 'y'>): Building | null {
-    var ss = storages(),
-      best = null,
+    const ss = storages();
+    let best = null,
       score = -Infinity,
       nearest = null,
       dist = Infinity;
-    for (var i = 0; i < ss.length; i++) {
-      var s = ss[i],
+    for (let i = 0; i < ss.length; i++) {
+      const s = ss[i],
         d = Math.hypot(s.x - ref.x, s.y - ref.y);
       if (!game.connectedLand(ref.x, ref.y, s.x, s.y)) continue;
       if (d < dist) {
         nearest = s;
         dist = d;
       }
-      var deficit = ((s.targets || {})[g] | 0) - (s.stock[g] | 0) - incomingStock(g, s.id);
-      var value = deficit / (1 + d * 0.15);
+      const deficit = ((s.targets || {})[g] | 0) - (s.stock[g] | 0) - incomingStock(g, s.id);
+      const value = deficit / (1 + d * 0.15);
       if (deficit > 0 && value > score) {
         best = s;
         score = value;
@@ -1116,14 +1116,14 @@ export function createEconomy(
     return best || nearest;
   }
   function replenishTargets() {
-    var ss = storages();
-    var carried: Record<string, number> = {},
+    const ss = storages();
+    const carried: Record<string, number> = {},
       retained: Record<string, number> = {},
       exportBudget: Record<string, number> = {};
-    for (var ji = 0; ji < game.jobs.length; ji++) {
-      var pending = game.jobs[ji];
+    for (let ji = 0; ji < game.jobs.length; ji++) {
+      const pending = game.jobs[ji];
       if (pending.kind !== 'transfer' || collectedJob(pending)) continue;
-      var source = byId(pending.s),
+      const source = byId(pending.s),
         sourceKey = pending.s + '/' + pending.good;
       if (exportBudget[sourceKey] === undefined)
         exportBudget[sourceKey] = source
@@ -1135,22 +1135,22 @@ export function createEconomy(
       // reservations still protect construction and production ingredients.
       exportBudget[sourceKey]++;
     }
-    for (var ui = 0; ui < game.units.length; ui++) {
-      var u = game.units[ui];
+    for (let ui = 0; ui < game.units.length; ui++) {
+      const u = game.units[ui];
       if (!u.carry || !u.dropB) continue;
-      var key = u.dropB + '/' + u.carry;
+      const key = u.dropB + '/' + u.carry;
       carried[key] = (carried[key] || 0) + 1;
     }
     cancelJobs(function (job) {
       if (job.kind !== 'transfer') return false;
       if (collectedJob(job)) return false;
-      var target = byId(job.to),
+      const target = byId(job.to),
         source = byId(job.s),
         key = job.to + '/' + job.good,
         sourceKey = job.s + '/' + job.good;
       if (!target || !source || !game.connectedLand(source.x, source.y, target.x, target.y))
         return true;
-      var needed = Math.max(
+      const needed = Math.max(
         0,
         ((target.targets || {})[job.good] | 0) - (target.stock[job.good] | 0) - (carried[key] || 0),
       );
@@ -1159,30 +1159,30 @@ export function createEconomy(
       exportBudget[sourceKey]--;
       return false;
     });
-    for (var i = 0; i < ss.length; i++) {
-      var target = ss[i],
+    for (let i = 0; i < ss.length; i++) {
+      const target = ss[i],
         targets: Inventory = target.targets || {};
-      for (var g in targets) {
-        var missing = Math.max(
+      for (const g in targets) {
+        const missing = Math.max(
           0,
           (targets[g as Good] | 0) -
             (target.stock[g as Good] | 0) -
             incomingStock(g as Good, target.id),
         );
         // Keep a small queue: construction and producers retain first use of carriers.
-        for (var k = 0; k < Math.min(2, missing); k++) {
-          var source: Building = null,
+        for (let k = 0; k < Math.min(2, missing); k++) {
+          let source: Building = null,
             dist = Infinity;
-          for (var j = 0; j < ss.length; j++) {
-            var candidate = ss[j];
+          for (let j = 0; j < ss.length; j++) {
+            const candidate = ss[j];
             if (candidate === target) continue;
             if (!game.connectedLand(candidate.x, candidate.y, target.x, target.y)) continue;
-            var surplus =
+            const surplus =
               (candidate.stock[g as Good] | 0) -
               (candidate.res[g as Good] | 0) -
               ((candidate.targets || {})[g as Good] | 0);
             if (surplus <= 0) continue;
-            var d = Math.hypot(candidate.x - target.x, candidate.y - target.y);
+            const d = Math.hypot(candidate.x - target.x, candidate.y - target.y);
             if (d < dist) {
               source = candidate;
               dist = d;
@@ -1203,17 +1203,17 @@ export function createEconomy(
     }
   }
   function jobPriority(j: Job) {
-    var b = j.to ? byId(j.to) : null;
+    const b = j.to ? byId(j.to) : null;
     if (j.kind === 'fetch') return (b && !b.done ? 100 : 20) + 10 * (b ? b.priority || 0 : 0);
     if (j.kind === 'soldier') return 80;
     if (j.kind === 'deliver') {
-      var source = byId(j.from);
+      const source = byId(j.from);
       return 40 + (source ? source.stock[j.good] | 0 : 0);
     }
     return 5 + 10 * (b ? b.priority || 0 : 0);
   }
   function ensureJobs() {
-    var ordered = game.buildings
+    const ordered = game.buildings
       .slice()
       .sort(function (a, b) {
         return (
@@ -1224,13 +1224,13 @@ export function createEconomy(
         );
       })
       .reverse();
-    for (var bi = 0; bi < ordered.length; bi++) {
-      var b = ordered[bi],
-        sp = game.BSPEC[b.type],
-        g: Good;
+    for (let bi = 0; bi < ordered.length; bi++) {
+      const b = ordered[bi],
+        sp = game.BSPEC[b.type];
+      let g: Good;
       if (!b.done) {
         for (g in b.needs) {
-          var rem = b.needs[g] - (b.got[g] | 0);
+          const rem = b.needs[g] - (b.got[g] | 0);
           if (rem <= 0) {
             cancelJobs(
               (function (g2, g3) {
@@ -1241,11 +1241,11 @@ export function createEconomy(
             );
             continue;
           }
-          var pen = countFetch(g, b.id);
-          for (var c2 = pen; c2 < rem; c2++) {
-            var s = pickStorageFor(g, b);
+          const pen = countFetch(g, b.id);
+          for (let c2 = pen; c2 < rem; c2++) {
+            let s = pickStorageFor(g, b);
             if (!s) {
-              var request: Inventory = {};
+              const request: Inventory = {};
               request[g] = 1;
               if (requestStock(request, b)) s = pickStorageFor(g, b);
             }
@@ -1257,9 +1257,9 @@ export function createEconomy(
         continue;
       }
       if (sp.in && !b.disabled && !b.exhausted) {
-        var fetchInputs = eligibleIngredients(b, sp);
+        const fetchInputs = eligibleIngredients(b, sp);
         for (g in fetchInputs) {
-          var want = 3,
+          const want = 3,
             have = b.stock[g] | 0;
           if (have >= want) {
             cancelJobs(
@@ -1271,9 +1271,9 @@ export function createEconomy(
             );
             continue;
           }
-          var toC = want - have - countFetch(g, b.id);
-          for (var c3 = 0; c3 < toC; c3++) {
-            var s3 = pickStorageFor(g, b);
+          const toC = want - have - countFetch(g, b.id);
+          for (let c3 = 0; c3 < toC; c3++) {
+            const s3 = pickStorageFor(g, b);
             if (!s3) break;
             s3.res[g] = (s3.res[g] | 0) + 1;
             game.jobs.push({ kind: 'fetch', good: g as Good, to: b.id, s: s3.id, state: 'p' });
@@ -1291,7 +1291,7 @@ export function createEconomy(
       )
         game.jobs.push({ kind: 'deliver', good: 'food', from: b.id, state: 'p' });
       if (sp.out) {
-        var outN = b.stock[sp.out] | 0,
+        const outN = b.stock[sp.out] | 0,
           dlMax = outN >= 4 ? 2 : 1,
           dl = countDeliver(sp.out, b.id);
         if (outN <= 0) {
@@ -1300,7 +1300,7 @@ export function createEconomy(
               (function (g6, g7) {
                 return function (a) {
                   if (a.kind !== 'deliver' || a.good !== g6 || a.from !== g7) return false;
-                  for (var ui = 0; ui < game.units.length; ui++)
+                  for (let ui = 0; ui < game.units.length; ui++)
                     if (game.units[ui].job === a && game.units[ui].carry) return false;
                   return true;
                 };
@@ -1318,15 +1318,15 @@ export function createEconomy(
   }
   function pickupPosOf(j: Job) {
     if (j.kind === 'fetch' || j.kind === 'transfer') {
-      var s = byId(j.s);
+      const s = byId(j.s);
       if (!s || (s.stock[j.good] | 0) <= 0) {
-        var old = s,
-          nb = null,
-          bd = 1e9,
-          ss = storages();
-        for (var i = 0; i < ss.length; i++) {
+        const old = s;
+        let nb = null,
+          bd = 1e9;
+        const ss = storages();
+        for (let i = 0; i < ss.length; i++) {
           if ((ss[i].stock[j.good] | 0) - (ss[i].res[j.good] | 0) <= 0) continue;
-          var ddx = ss[i].x - (old ? old.x : 0),
+          const ddx = ss[i].x - (old ? old.x : 0),
             ddy = ss[i].y - (old ? old.y : 0),
             d2 = ddx * ddx + ddy * ddy;
           if (d2 < bd) {
@@ -1339,29 +1339,29 @@ export function createEconomy(
         nb.res[j.good] = (nb.res[j.good] | 0) + 1;
         j.s = nb.id;
       }
-      var s2 = byId(j.s);
+      const s2 = byId(j.s);
       return s2 ? { x: s2.x, y: s2.y } : null;
     }
     if (j.kind === 'deliver') {
-      var b = byId(j.from);
+      const b = byId(j.from);
       return b ? { x: b.x, y: b.y } : null;
     }
     if (j.kind === 'soldier') {
-      var s3 = anyStorage();
+      const s3 = anyStorage();
       return s3 ? { x: s3.x, y: s3.y } : null;
     }
     return null;
   }
   function nearestIdleCarrier(j: Job) {
-    var pp = pickupPosOf(j);
+    const pp = pickupPosOf(j);
     if (!pp) return null;
-    var best = null,
+    let best = null,
       bd = 1e9;
-    for (var i = 0; i < game.units.length; i++) {
-      var u = game.units[i];
+    for (let i = 0; i < game.units.length; i++) {
+      const u = game.units[i];
       if (u.kind !== 'carrier' || u.job || u.carry || u.phase !== 'idle') continue;
       if (!game.connectedLand(u.x, u.y, pp.x, pp.y)) continue;
-      var d = (u.x - pp.x) * (u.x - pp.x) + (u.y - pp.y) * (u.y - pp.y);
+      const d = (u.x - pp.x) * (u.x - pp.x) + (u.y - pp.y) * (u.y - pp.y);
       if (d < bd) {
         bd = d;
         best = u;
@@ -1370,9 +1370,9 @@ export function createEconomy(
     return best;
   }
   function startJob(u: Unit, j: Job) {
-    var pp = pickupPosOf(j);
+    const pp = pickupPosOf(j);
     if (!pp) return;
-    var p1 = game.findPath(Math.floor(u.x), Math.floor(u.y), pp.x, pp.y);
+    const p1 = game.findPath(Math.floor(u.x), Math.floor(u.y), pp.x, pp.y);
     if (!p1) return;
     j.state = 't';
     u.job = j;
@@ -1388,11 +1388,11 @@ export function createEconomy(
     game.jobs.sort(function (a, b) {
       return jobPriority(b) - jobPriority(a);
     });
-    for (var i = 0; i < game.jobs.length; i++) {
-      var j = game.jobs[i];
+    for (let i = 0; i < game.jobs.length; i++) {
+      const j = game.jobs[i];
       if (j.state !== 'p') continue;
       if (j.kind === 'soldier') {
-        var g = byId(j.to),
+        const g = byId(j.to),
           s = g ? nearestStoragePos(g.x, g.y) : null;
         if (!s || !g) {
           game.soldierPool++;
@@ -1400,7 +1400,7 @@ export function createEconomy(
           i--;
           continue;
         }
-        var p = game.findPath(s.x, s.y, g.x, g.y);
+        const p = game.findPath(s.x, s.y, g.x, g.y);
         if (!p) {
           game.soldierPool++;
           game.jobs.splice(i, 1);
@@ -1426,13 +1426,13 @@ export function createEconomy(
         });
         continue;
       }
-      var u = nearestIdleCarrier(j);
+      const u = nearestIdleCarrier(j);
       if (!u) continue;
       startJob(u, j);
     }
   }
   function spawnCarrier(s: Building) {
-    var u: Unit = {
+    const u: Unit = {
       id: game.nextId++,
       kind: 'carrier',
       x: s.x + 0.5,
@@ -1454,7 +1454,7 @@ export function createEconomy(
     game.serfPool = Math.max(0, game.serfPool - 1);
   }
   function stepUnit(u: Unit, dt: number) {
-    var remaining = dt,
+    let remaining = dt,
       guard = 0;
     u.moving = false;
     // Spend time per segment, rather than dropping distance at each waypoint. Using the
@@ -1469,17 +1469,17 @@ export function createEconomy(
         // Resolve that arrival on the next iteration before reading a waypoint.
         if (u.pi >= u.path.length) continue;
       }
-      var n = u.path[u.pi],
+      const n = u.path[u.pi],
         tx = (n % game.W) + 0.5 + (u.lx || 0),
         ty = ((n / game.W) | 0) + 0.5 + (u.ly || 0);
-      var dx = tx - u.x,
+      const dx = tx - u.x,
         dy = ty - u.y,
         dl = Math.hypot(dx, dy);
       if (dl < 1e-10) {
         u.pi++;
         continue;
       }
-      var speed = speedOn(u, n),
+      const speed = speedOn(u, n),
         travel = Math.min(dl, speed * remaining);
       u.faceDX = dx / dl;
       u.faceDY = dy / dl;
@@ -1502,24 +1502,24 @@ export function createEconomy(
     }
   }
   function speedOn(u: Pick<Unit, 'x' | 'y'>, destination?: number) {
-    var i =
+    const i =
       destination === undefined
         ? game.idx(
             Math.min(game.W - 1, Math.max(0, Math.floor(u.x))),
             Math.min(game.H - 1, Math.max(0, Math.floor(u.y))),
           )
         : destination;
-    var haul = game.state.upgrades ? Math.min(3, game.state.upgrades.haul || 0) : 0;
+    const haul = game.state.upgrades ? Math.min(3, game.state.upgrades.haul || 0) : 0;
     return (2.7 / game.moveCost(i)) * (1 + 0.12 * haul);
   }
   function dropFail(u: Unit) {
     // delivery unreachable: unwind the job cleanly. Orphaning a taken job in the queue makes
     // countFetch count it forever, so ensureJobs never recreates the fetch and the site stalls.
     if (u.job) {
-      var ji2 = game.jobs.indexOf(u.job);
+      const ji2 = game.jobs.indexOf(u.job);
       if (ji2 >= 0) game.jobs.splice(ji2, 1);
       if ((u.job.kind === 'fetch' || u.job.kind === 'transfer') && !u.carry) {
-        var source = byId(u.job.s);
+        const source = byId(u.job.s);
         if (source) source.res[u.job.good] = Math.max(0, (source.res[u.job.good] | 0) - 1);
       }
       u.job = null;
@@ -1535,17 +1535,17 @@ export function createEconomy(
     u.dropIsSite = false;
   }
   function goDrop(u: Unit) {
-    var dp = null,
+    let dp = null,
       isSite = false;
     if (u.dropB) {
-      var b = byId(u.dropB);
+      const b = byId(u.dropB);
       if (b) {
         dp = b;
         isSite = u.dropIsSite;
       }
     }
     if (!dp) {
-      var s = nearestStoragePos(u.x, u.y);
+      const s = nearestStoragePos(u.x, u.y);
       if (s) dp = s;
     }
     if (!dp) {
@@ -1553,9 +1553,9 @@ export function createEconomy(
       return;
     }
     u.dropIsSite = isSite;
-    var p = game.findPath(Math.floor(u.x), Math.floor(u.y), dp.x, dp.y);
+    let p = game.findPath(Math.floor(u.x), Math.floor(u.y), dp.x, dp.y);
     if (!p) {
-      var s2 = nearestStoragePos(u.x, u.y);
+      const s2 = nearestStoragePos(u.x, u.y);
       if (s2 && s2 !== dp) {
         dp = s2;
         u.dropIsSite = false;
@@ -1574,7 +1574,7 @@ export function createEconomy(
     if (!b.metrics) b.metrics = productionMetrics();
     ensureProductionHistory(b.metrics);
     b.metrics.delivered[g] = (b.metrics.delivered[g] | 0) + 1;
-    var sp = game.BSPEC[b.type];
+    const sp = game.BSPEC[b.type];
     if (b.done && !sp.store && sp.in && eligibleIngredients(b, sp)[g]) {
       b.metrics.inputDelivered[g] = (b.metrics.inputDelivered[g] || 0) + 1;
       game.recordEconomicFlow('inputArrived', g, 1);
@@ -1585,7 +1585,7 @@ export function createEconomy(
     // The pickup source survives a cancelled delivery job. Never count recovered
     // fetch cargo or warehouse transfers as producer throughput.
     if (!u.carryProducer || u.carryTransfer) return;
-    var source = byId(u.carryProducer);
+    const source = byId(u.carryProducer);
     if (source) {
       if (!source.metrics) source.metrics = productionMetrics();
       ensureProductionHistory(source.metrics);
@@ -1594,12 +1594,12 @@ export function createEconomy(
     game.recordEconomicFlow('outputStored', g, 1);
   }
   function dumpGood(u: Unit, g: Good) {
-    var s = u.dropB && !u.dropIsSite ? byId(u.dropB) : null;
+    let s = u.dropB && !u.dropIsSite ? byId(u.dropB) : null;
     if (!s || !s.done || !game.BSPEC[s.type].store || !game.connectedLand(u.x, u.y, s.x, s.y))
       s = nearestStoragePos(u.x, u.y);
     if (s) {
       s.stock[g] = (s.stock[g] | 0) + 1;
-      var transfer = !!u.carryTransfer || (u.job && u.job.kind === 'transfer');
+      const transfer = !!u.carryTransfer || (u.job && u.job.kind === 'transfer');
       recordDelivery(s, g, transfer);
       if (u.carryWarehouseTransfer) game.recordEconomicFlow('transferred', g, 1);
       recordOutputDelivery(u, g);
@@ -1612,10 +1612,10 @@ export function createEconomy(
     }
   }
   function arrive(u: Unit) {
-    var j = u.job;
+    const j = u.job;
     if (u.phase === 'p' && j) {
       if (j.kind === 'fetch' || j.kind === 'transfer') {
-        var s = byId(j.s);
+        let s = byId(j.s);
         if (!s || (s.stock[j.good] | 0) <= 0) {
           s = nearestStorageWith(u.x, u.y, j.good);
           if (!s || j.kind === 'transfer') {
@@ -1625,7 +1625,7 @@ export function createEconomy(
             u.path = null;
             return;
           }
-          var old = byId(j.s);
+          const old = byId(j.s);
           if (old && old !== s) old.res[j.good] = Math.max(0, (old.res[j.good] | 0) - 1);
           s.res[j.good] = (s.res[j.good] | 0) + 1;
           j.s = s.id;
@@ -1636,7 +1636,7 @@ export function createEconomy(
         u.carryTransfer = true;
         u.carryWarehouseTransfer = j.kind === 'transfer';
         u.carryProducer = null;
-        var tgt = byId(j.to);
+        const tgt = byId(j.to);
         if (tgt) {
           u.dropB = j.to;
           u.dropIsSite = true;
@@ -1648,9 +1648,9 @@ export function createEconomy(
         return;
       }
       if (j.kind === 'deliver') {
-        var b = byId(j.from);
+        const b = byId(j.from);
         if (!b || (b.stock[j.good] | 0) <= 0) {
-          var ji2 = game.jobs.indexOf(j);
+          const ji2 = game.jobs.indexOf(j);
           if (ji2 >= 0) game.jobs.splice(ji2, 1);
           u.job = null;
           u.phase = 'idle';
@@ -1662,7 +1662,7 @@ export function createEconomy(
         u.carry = j.good;
         u.carryTransfer = false;
         u.carryWarehouseTransfer = false;
-        var store = deliveryStorage(j.good, u);
+        const store = deliveryStorage(j.good, u);
         u.dropB = store ? store.id : null;
         u.dropIsSite = false;
         goDrop(u);
@@ -1670,11 +1670,11 @@ export function createEconomy(
       }
     }
     if (u.phase === 'd') {
-      var good = u.carry;
+      const good = u.carry;
       if (good) {
-        var dumped = false;
+        let dumped = false;
         if (u.dropIsSite && j && (j.kind === 'fetch' || j.kind === 'transfer')) {
-          var site = byId(j.to);
+          const site = byId(j.to);
           if (site) {
             if (site.done) site.stock[good] = (site.stock[good] | 0) + 1;
             else {
@@ -1689,7 +1689,7 @@ export function createEconomy(
         if (!dumped) dumpGood(u, good);
       }
       if (j) {
-        var ji = game.jobs.indexOf(j);
+        const ji = game.jobs.indexOf(j);
         if (ji >= 0) game.jobs.splice(ji, 1);
       }
       u.carry = null;
@@ -1709,13 +1709,13 @@ export function createEconomy(
   function arriveSoldier(u: Unit) {
     u.dead = true;
     unitsDirty = true;
-    var j = u.job;
+    const j = u.job;
     if (j) {
-      var ji = game.jobs.indexOf(j);
+      const ji = game.jobs.indexOf(j);
       if (ji >= 0) game.jobs.splice(ji, 1);
       u.job = null;
     }
-    var g = u.dropB ? byId(u.dropB) : null;
+    const g = u.dropB ? byId(u.dropB) : null;
     if (g && !g.man) {
       g.man = true;
       game.recomputeTerritory();
@@ -1726,8 +1726,8 @@ export function createEconomy(
     game.treeGrowthT += dt;
     while (game.treeGrowthT >= 0.1 - 1e-10) {
       game.treeGrowthT = Math.max(0, game.treeGrowthT - 0.1);
-      for (var k = 0; k < 40; k++) {
-        var i = (game.SR() * game.W * game.H) | 0,
+      for (let k = 0; k < 40; k++) {
+        const i = (game.SR() * game.W * game.H) | 0,
           t = game.tiles[i];
         if (t.tree > 0 && t.tree < 4 && game.SR() < 0.5) {
           t.tree++;
@@ -1739,12 +1739,12 @@ export function createEconomy(
   function step(dt: number, planningSuspended = false) {
     if (dt <= 0) return;
     game.state.time += dt;
-    for (var i = 0; i < game.buildings.length; i++) bTick(game.buildings[i], dt);
-    for (var k = 0; k < game.units.length; k++) stepUnit(game.units[k], dt);
+    for (let i = 0; i < game.buildings.length; i++) bTick(game.buildings[i], dt);
+    for (let k = 0; k < game.units.length; k++) stepUnit(game.units[k], dt);
     // End-of-step samples include production AND successful carrier arrivals at
     // this simulation time. No HUD, wall clock, speed setting or RNG is involved.
-    for (i = 0; i < game.buildings.length; i++) {
-      var b = game.buildings[i],
+    for (let i = 0; i < game.buildings.length; i++) {
+      const b = game.buildings[i],
         sp = game.BSPEC[b.type];
       if (b.done && sp.prod && sp.prod !== 'none' && !sp.store && b.metrics)
         sampleProduction(b.metrics);
@@ -1766,11 +1766,11 @@ export function createEconomy(
     game.spawnT -= dt;
     if (game.spawnT <= 0) {
       game.spawnT = 15;
-      var cap = carrierCap();
-      var n = 0;
-      for (k = 0; k < game.units.length; k++) if (game.units[k].kind === 'carrier') n++;
+      const cap = carrierCap();
+      let n = 0;
+      for (let k = 0; k < game.units.length; k++) if (game.units[k].kind === 'carrier') n++;
       if (game.serfPool > 0 && n < cap) {
-        var s = anyStorage();
+        const s = anyStorage();
         if (s) {
           spawnCarrier(s);
           gameEvent('settlerSpawned', {});
@@ -1796,9 +1796,9 @@ export function createEconomy(
     gameEvent('simulationObserved', {});
   }
   function incomingCount(g: Good, bid: number) {
-    var n = 0;
-    for (var i = 0; i < game.jobs.length; i++) {
-      var j = game.jobs[i];
+    let n = 0;
+    for (let i = 0; i < game.jobs.length; i++) {
+      const j = game.jobs[i];
       if (j.kind === 'fetch' && j.good === g && j.to === bid) n++;
     }
     return n;
@@ -1840,13 +1840,13 @@ export function createEconomy(
     );
   }
   function buildingStatus(b: Building): BuildingStatus {
-    var sp = game.BSPEC[b.type],
-      lines = [],
-      g: Good;
+    const sp = game.BSPEC[b.type],
+      lines = [];
+    let g: Good;
     if (!b.done) {
-      var allIn = true;
+      let allIn = true;
       for (g in b.needs) {
-        var have = b.got[g] | 0,
+        const have = b.got[g] | 0,
           need = b.needs[g],
           inc = incomingCount(g, b.id);
         if (have < need) {
@@ -1913,7 +1913,7 @@ export function createEconomy(
     }
     switch (sp.prod) {
       case 'gather': {
-        var trees = 0;
+        let trees = 0;
         forRadius(b, sp.rad, function (i) {
           if (game.tiles[i].tree >= 3) trees++;
         });
@@ -1929,7 +1929,7 @@ export function createEconomy(
         lines.push({ t: 'Planting saplings for the future', w: false });
         break;
       case 'rock': {
-        var rocks = 0;
+        let rocks = 0;
         forRadius(b, sp.rad, function (i) {
           if (game.tiles[i].rock) rocks++;
         });
@@ -1990,7 +1990,7 @@ export function createEconomy(
           lines.push({ t: 'Beer reserves are plentiful — production paused', w: false });
         if (sp.water && !hasLocalWater(b))
           lines.push({ t: `Needs a working well within ${wellRadius(game)} tiles`, w: true });
-        for (var shortage of ingredientShortages(b, sp)) {
+        for (const shortage of ingredientShortages(b, sp)) {
           const alternatives = sp.prod === 'mine' ? edibleGoods : [shortage.good];
           const stages: DeliveryStages = { queued: 0, assigned: 0, carrying: 0 };
           for (const good of alternatives) {

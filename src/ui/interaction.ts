@@ -10,7 +10,7 @@ import type {
 import { observePresentation } from './domain-feedback.ts';
 import type { GameRuntime } from '../runtime.ts';
 export function createInteraction(game: GameRuntime): InteractionSubsystem {
-  var ORDER = [
+  const ORDER = [
     'lumberjack',
     'forester',
     'sawmill',
@@ -35,7 +35,7 @@ export function createInteraction(game: GameRuntime): InteractionSubsystem {
     'road',
     'demolish',
   ];
-  var selected: Building = null,
+  let selected: Building = null,
     mode: InteractionMode | null = null,
     anchor: TilePoint | null = null,
     ghost: PlacementGhost | null = null,
