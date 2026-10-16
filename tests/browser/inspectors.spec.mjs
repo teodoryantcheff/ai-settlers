@@ -39,7 +39,7 @@ test('inspector shows live stock while preserving native target focus and exact 
   await page.evaluate(() => {
     const g = window.productionArtPreview.game;
     const b = g.newBuilding('warehouse', 51, 48);
-    Object.assign(b, { done: true, prog: 1, stock: { planks: 7, stone: 3 } });
+    Object.assign(b, { done: true, constructionProgress: 1, stock: { planks: 7, stone: 3 } });
     g.buildings.push(b);
     g.inspectContributor(b.id);
     g.updateInfo();
@@ -86,10 +86,10 @@ test('producer, construction and outpost inspectors expose evidence and retain f
   await page.evaluate(() => {
     const g = window.productionArtPreview.game;
     const b = g.newBuilding('bakery', 51, 48);
-    Object.assign(b, { done: true, prog: 1, stock: { flour: 2 }, disabled: false });
+    Object.assign(b, { done: true, constructionProgress: 1, stock: { flour: 2 }, disabled: false });
     g.buildings.push(b);
     const well = g.newBuilding('well', 52, 50);
-    Object.assign(well, { done: true, prog: 1 });
+    Object.assign(well, { done: true, constructionProgress: 1 });
     g.buildings.push(well);
     g.state.paused = false;
     g.step(16);
@@ -129,7 +129,7 @@ test('producer, construction and outpost inspectors expose evidence and retain f
     const g = window.productionArtPreview.game;
     const b = g.newBuilding('farm', 54, 48);
     b.got = { planks: 1, stone: 2, tools: 1 };
-    b.prog = 0.25;
+    b.constructionProgress = 0.25;
     g.buildings.push(b);
     g.inspectContributor(b.id);
     g.updateInfo();
@@ -139,7 +139,7 @@ test('producer, construction and outpost inspectors expose evidence and retain f
   await priority.focus();
   await page.evaluate(() => {
     const g = window.productionArtPreview.game;
-    g.selected.prog = 0.5;
+    g.selected.constructionProgress = 0.5;
     g.updateInfo();
   });
   await expect(priority).toBeFocused();
@@ -168,7 +168,7 @@ test('producer, construction and outpost inspectors expose evidence and retain f
   await page.evaluate(() => {
     const g = window.productionArtPreview.game;
     const b = g.newBuilding('guard', 57, 48);
-    Object.assign(b, { done: true, prog: 1, man: true });
+    Object.assign(b, { done: true, constructionProgress: 1, manned: true });
     g.buildings.push(b);
     g.recomputeTerritory();
     g.inspectContributor(b.id);
@@ -198,7 +198,7 @@ test('demolition hover presents exact recovery before the deliberate Shift short
   const point = await page.evaluate(() => {
     const g = window.productionArtPreview.game;
     const b = g.newBuilding('farm', 51, 48);
-    Object.assign(b, { done: true, prog: 1, stock: { grain: 5 } });
+    Object.assign(b, { done: true, constructionProgress: 1, stock: { grain: 5 } });
     g.buildings.push(b);
     g.activateTool('demolish');
     g.resize();
@@ -232,7 +232,7 @@ test('real producer countdown suspends for a full batch and resumes without losi
     g.units.length = 0;
     g.spawnT = 1e6;
     const b = g.newBuilding('lumberjack', 51, 48);
-    Object.assign(b, { done: true, prog: 1, timer: 3, stock: { logs: 8 } });
+    Object.assign(b, { done: true, constructionProgress: 1, timer: 3, stock: { logs: 8 } });
     g.buildings.push(b);
     g.tiles[g.idx(52, 48)].tree = 4;
     g.step(0.25);
@@ -307,7 +307,7 @@ test('loading a replacement colony discards stale inspector edits and disclosure
   await page.evaluate(() => {
     const g = window.productionArtPreview.game;
     const b = g.newBuilding('warehouse', 51, 48);
-    Object.assign(b, { done: true, prog: 1, targets: { planks: 7 } });
+    Object.assign(b, { done: true, constructionProgress: 1, targets: { planks: 7 } });
     g.buildings.push(b);
     g.inspectContributor(b.id);
     g.updateInfo();
@@ -347,7 +347,7 @@ test('completion preserves a focused construction priority until focus leaves, t
   await priority.focus();
   await page.evaluate(() => {
     const g = window.productionArtPreview.game;
-    Object.assign(g.selected, { done: true, prog: 1 });
+    Object.assign(g.selected, { done: true, constructionProgress: 1 });
     g.updateInfo();
   });
   await expect(priority).toBeFocused();

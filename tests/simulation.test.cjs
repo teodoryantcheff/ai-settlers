@@ -36,7 +36,7 @@ function flatMap(e, size = e.W) {
     t: i % e.W < size && Math.floor(i / e.W) < size ? e.GRASS : e.WATER,
     tree: 0,
     rock: null,
-    res: null,
+    deposit: null,
     road: false,
   }));
   e.owned.fill(1);
@@ -104,12 +104,12 @@ function checkReservations(e) {
       const pending = e.jobs.filter(
         (j) =>
           (j.kind === 'fetch' || j.kind === 'transfer') &&
-          j.s === b.id &&
+          j.sourceId === b.id &&
           j.good === good &&
           !e.units.some((u) => u.job === j && u.carry),
       ).length;
-      assert.equal(b.res[good] || 0, pending, `reservation ${b.id}/${good}`);
-      assert.ok((b.stock[good] || 0) >= (b.res[good] || 0));
+      assert.equal(b.reservedStock[good] || 0, pending, `reservation ${b.id}/${good}`);
+      assert.ok((b.stock[good] || 0) >= (b.reservedStock[good] || 0));
     }
   }
   for (const u of e.units)
@@ -195,8 +195,14 @@ test('a pickup followed by a same-tile drop cannot read an empty route', () => {
   u.y = 5.5;
   u.lx = 0;
   u.ly = 0;
-  const j = { kind: 'fetch', good: 'planks', s: store.id, to: unreachable.id, state: 'p' };
-  store.res.planks = 1;
+  const j = {
+    kind: 'fetch',
+    good: 'planks',
+    sourceId: store.id,
+    to: unreachable.id,
+    status: 'pending',
+  };
+  store.reservedStock.planks = 1;
   e.jobs.push(j);
   e.startJob(u, j);
   e.stepUnit(u, 0.25);
@@ -205,7 +211,7 @@ test('a pickup followed by a same-tile drop cannot read an empty route', () => {
   assert.equal(u.carry, null);
   assert.equal(u.job, null);
   assert.equal(store.stock.planks, 1);
-  assert.equal(store.res.planks, 0);
+  assert.equal(store.reservedStock.planks, 0);
   assert.equal(e.jobs.length, 0);
 });
 
@@ -216,10 +222,10 @@ test('an unowned meadow pocket surrounded by mountains cannot host a mine', () =
   for (let d = 0; d < 4; d++) {
     const t = e.tiles[e.idx(20 + e.DX[d], 20 + e.DY[d])];
     t.t = e.MTN;
-    t.res = { kind: 'gold', amt: 100, amt0: 100 };
+    t.deposit = { kind: 'gold', amt: 100, amt0: 100 };
   }
   assert.equal(e.canPlace('mine_gold', 20, 20)[0], false);
-  assert.equal(e.canPlace('mine_gold', 20, 20)[1], 'Outside your territory');
+  assert.deepEqual(e.canPlace('mine_gold', 20, 20)[1], { code: 'territory' });
 });
 
 test('seed42 coastal expansion fixture retains useful claims and advances the mining route', () => {
@@ -231,7 +237,7 @@ test('seed42 coastal expansion fixture retains useful claims and advances the mi
   building(e, 'hq', e.W >> 1, e.H >> 1);
   const previous = fixture.diagnosticCheckpoint.outposts[0];
   const guard = building(e, 'guard', previous.x, previous.y);
-  guard.man = true;
+  guard.manned = true;
   e.recomputeTerritory();
   const corridor = e.buildCorridor(['gold']);
   assert.ok(corridor && corridor.length);
@@ -249,7 +255,7 @@ test('seed42 coastal expansion fixture retains useful claims and advances the mi
   );
   assert.ok(after > before, 'the manned flood reaches new route tiles');
   const useful = building(e, 'guard', next[0], next[1]);
-  useful.man = true;
+  useful.manned = true;
   e.recomputeTerritory();
   assert.equal(e.guardTerritoryRedundant(useful), false, 'a new essential claim is not recycled');
 });
@@ -414,7 +420,7 @@ test('higher construction priority gets scarce materials first', () => {
   e.ensureJobs();
   assert.ok(e.jobs.filter((j) => j.kind === 'fetch').every((j) => j.to === priority.id));
   checkReservations(e);
-  assert.equal(store.res.planks, 2);
+  assert.equal(store.reservedStock.planks, 2);
 });
 
 test('new construction reclaims pending warehouse transfers before rejecting stored materials', () => {
@@ -424,7 +430,7 @@ test('new construction reclaims pending warehouse transfers before rejecting sto
   const target = building(e, 'warehouse', 11, 5);
   target.targets.planks = 8;
   for (let i = 0; i < 4; i++) e.ensureJobs();
-  assert.equal(source.res.planks, 8);
+  assert.equal(source.reservedStock.planks, 8);
   assert.equal(e.totalGood('planks'), 8);
   assert.equal(e.canPlace('lumberjack', 5, 9)[0], true);
   assert.equal(e.placeBuilding('lumberjack', 5, 9), true);
@@ -459,8 +465,8 @@ test('higher-priority stock requests preserve fetch reservations and collected t
     fetches.every((j) => e.jobs.includes(j)),
     'do not steal existing fetch reservations',
   );
-  assert.equal(source.res.gold, 0);
-  assert.equal(source.res.logs, 3);
+  assert.equal(source.reservedStock.gold, 0);
+  assert.equal(source.reservedStock.logs, 3);
   assert.equal(e.availGood('logs'), 2);
   assert.equal(e.requestStock({ logs: 3 }), false);
   checkReservations(e);
@@ -476,7 +482,7 @@ test('an unaffordable stock request leaves all transfer reservations unchanged',
   const before = [...e.jobs];
   assert.equal(e.requestStock({ planks: 2, tools: 1 }), false);
   assert.deepEqual([...e.jobs], before);
-  assert.equal(source.res.planks, 8);
+  assert.equal(source.reservedStock.planks, 8);
   assert.equal(e.placeBuilding('lumberjack', 5, 9), false);
   assert.deepEqual([...e.jobs], before);
   checkReservations(e);
@@ -518,13 +524,13 @@ test('explicit spending reclaims optional transfers while keeping construction m
   for (let i = 0; i < 13; i++) e.ensureJobs();
   e.state.gold = 25;
   e.state.spentGold = 0;
-  assert.equal(source.res.planks, 12);
-  assert.equal(source.res.gold, 25);
+  assert.equal(source.reservedStock.planks, 12);
+  assert.equal(source.reservedStock.gold, 25);
   assert.equal(e.spendStock({ planks: 8, gold: 15 }), true);
   assert.equal(source.stock.planks, 4);
-  assert.equal(source.res.planks, 4);
+  assert.equal(source.reservedStock.planks, 4);
   assert.equal(source.stock.gold, 10);
-  assert.equal(source.res.gold, 10);
+  assert.equal(source.reservedStock.gold, 10);
   assert.equal(e.state.gold, 10);
   assert.equal(e.state.spentGold, 15);
   assert.equal(e.jobs.filter((j) => j.kind === 'fetch' && j.to === site.id).length, 7);
@@ -546,7 +552,7 @@ test('a nearby carrier across water does not block a reachable carrier', () => {
   reachable.x = 20.5;
   e.assign(1);
   assert.equal(stranded.job, null);
-  assert.equal(reachable.job?.from, farm.id, 'try the carrier that can reach the producer');
+  assert.equal(reachable.job?.sourceId, farm.id, 'try the carrier that can reach the producer');
   for (let i = 0; i < 600; i++) e.stepUnit(reachable, 1 / 60);
   assert.equal(store.stock.grain, 1);
   checkReservations(e);
@@ -562,8 +568,8 @@ test('construction reserves reachable stock instead of a closer disconnected war
   e.buildings.push(site);
   e.ensureJobs();
   assert.ok(e.jobs.length > 0);
-  assert.ok(e.jobs.every((j) => j.s === reachable.id));
-  assert.equal(disconnected.res.planks || 0, 0);
+  assert.ok(e.jobs.every((j) => j.sourceId === reachable.id));
+  assert.equal(disconnected.reservedStock.planks || 0, 0);
   checkReservations(e);
 });
 
@@ -580,8 +586,8 @@ test('lowering a stock target releases uncollected transfers without losing carg
   assert.equal(e.units[0].carry, 'logs');
   target.targets.logs = 0;
   e.ensureJobs();
-  assert.equal(e.jobs.filter((j) => j.kind === 'transfer' && j.state === 'p').length, 0);
-  assert.equal(source.res.logs, 0);
+  assert.equal(e.jobs.filter((j) => j.kind === 'transfer' && j.status === 'pending').length, 0);
+  assert.equal(source.reservedStock.logs, 0);
   for (let i = 0; i < 600; i++) e.stepUnit(e.units[0], 1 / 60);
   assert.equal(totalResources(e, 'logs'), 6);
   checkReservations(e);
@@ -594,10 +600,10 @@ test('raising the source reserve cancels exports that have not been collected', 
   const target = building(e, 'warehouse', 15, 5);
   target.targets.logs = 4;
   e.ensureJobs();
-  assert.equal(source.res.logs, 2);
+  assert.equal(source.reservedStock.logs, 2);
   source.targets.logs = 6;
   e.ensureJobs();
-  assert.equal(source.res.logs, 0);
+  assert.equal(source.reservedStock.logs, 0);
   assert.equal(e.jobs.length, 0);
   checkReservations(e);
 });
@@ -613,7 +619,7 @@ test('warehouse demand and producer drops ignore disconnected destinations', () 
   assert.equal(e.deliveryStorage('food', { x: 11, y: 5 }), reachable);
   e.replenishTargets();
   assert.equal(e.jobs.length, 0, 'do not reserve goods for an impossible transfer');
-  assert.equal(disconnected.res.logs || 0, 0);
+  assert.equal(disconnected.reservedStock.logs || 0, 0);
 });
 
 test('pausing a producer releases ingredient reservations for construction', () => {
@@ -622,11 +628,11 @@ test('pausing a producer releases ingredient reservations for construction', () 
   const store = building(e, 'hq', 5, 5, { planks: 2, stone: 1 });
   const smith = building(e, 'workshop', 12, 5);
   e.ensureJobs();
-  assert.equal(store.res.planks, 2);
+  assert.equal(store.reservedStock.planks, 2);
   smith.disabled = true;
   e.ensureJobs();
-  assert.equal(store.res.planks, 0);
-  assert.equal(store.res.stone, 0);
+  assert.equal(store.reservedStock.planks, 0);
+  assert.equal(store.reservedStock.stone, 0);
   assert.equal(e.jobs.filter((j) => j.kind === 'fetch').length, 0);
   checkReservations(e);
 });
@@ -643,7 +649,7 @@ test('pausing a producer preserves an ingredient already in transit', () => {
   e.stepUnit(u, 0.1);
   mill.disabled = true;
   e.ensureJobs();
-  assert.equal(store.res.logs, 0, 'release every uncollected reservation');
+  assert.equal(store.reservedStock.logs, 0, 'release every uncollected reservation');
   for (let i = 0; i < 600; i++) e.stepUnit(u, 1 / 60);
   assert.equal(mill.stock.logs, 1);
   assert.equal(totalResources(e, 'logs'), 4);
@@ -729,7 +735,7 @@ test('seeded maps fund victory and every upgrade from reachable meadow mining fa
       deposits = 0;
     for (let i = 0; i < e.tiles.length; i++) {
       const t = e.tiles[i];
-      if (!t.res || t.res.kind !== 'gold') continue;
+      if (!t.deposit || t.deposit.kind !== 'gold') continue;
       const x = i % e.W,
         y = Math.floor(i / e.W);
       if (
@@ -741,7 +747,7 @@ test('seeded maps fund victory and every upgrade from reachable meadow mining fa
           );
         })
       ) {
-        gold += t.res.amt;
+        gold += t.deposit.amt;
         deposits++;
       }
     }

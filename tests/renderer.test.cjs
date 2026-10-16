@@ -8,12 +8,15 @@ const {
   installGlobals,
   pinClock,
   DEFAULT_MODULES,
+  fakeStorage,
 } = require('./helpers/game.cjs');
+const { requireCanvas2D } = require('../src/rendering/canvas-context.ts');
+const { paintUtilityArtwork } = require('../src/ui/utility-art.ts');
 
 // Wall-clock reads inside the simulation stay deterministic.
 pinClock(0);
 
-function renderer() {
+function renderer(options = {}) {
   const calls = [];
   const noop = () => {};
   const context = new Proxy(
@@ -30,7 +33,7 @@ function renderer() {
   const canvas = (width = 1, height = 1) => ({
     width,
     height,
-    getContext: () => context,
+    getContext: () => (options.contextFor ? options.contextFor('cache', context) : context),
     style: {},
   });
   // HUD and renderer look elements up by id; every element doubles as a canvas
@@ -41,7 +44,7 @@ function renderer() {
       const node = fakeElement(id);
       node.width = 1;
       node.height = 1;
-      node.getContext = () => context;
+      node.getContext = () => (options.contextFor ? options.contextFor(id, context) : context);
       nodes.set(id, node);
     }
     return nodes.get(id);
@@ -62,16 +65,28 @@ function renderer() {
   installGlobals({ document, window });
   const { game: e } = createGame({
     seed: 2024,
-    modules: [...DEFAULT_MODULES, 'landscape', 'village', 'renderer', 'hud'],
-    presentation: { available: true, invalidate: noop, begin: noop, layer: noop, end: noop },
+    modules: [
+      ...DEFAULT_MODULES,
+      'landscape',
+      'village',
+      'renderer',
+      'hud',
+      ...(options.modules ?? []),
+    ],
+    storage: options.storage,
+    presentation: options.presentation ?? {
+      available: true,
+      invalidate: noop,
+      begin: noop,
+      layer: noop,
+      end: noop,
+    },
     stubs: {
       Acan: canvas,
       rr: noop,
       rgba: (color, alpha) => color + ':' + alpha,
       ART: {
         grass: ['g0', 'g1', 'g2', 'g3'],
-        sand: ['s0', 's1', 's2'],
-        water: ['w0', 'w1'],
       },
       presentationPrefs: {
         reducedMotion: false,
@@ -82,7 +97,6 @@ function renderer() {
       },
       refreshGhost: noop,
       rebuildHighlights: noop,
-      gameEvents: { on: noop, emit: noop, off: noop },
       SND: {
         road: noop,
         ui: noop,
@@ -99,13 +113,13 @@ function renderer() {
     t: e.GRASS,
     tree: 0,
     rock: null,
-    res: null,
+    deposit: null,
     road: false,
   }));
   e.owned.fill(1);
   const hq = e.newBuilding('hq', 48, 48);
   hq.done = true;
-  hq.prog = 1;
+  hq.constructionProgress = 1;
   e.buildings.push(hq);
   e.state.paused = true;
   e.state.upgrades = { haul: 0, production: 0 };
@@ -115,6 +129,94 @@ function renderer() {
   e.context = context;
   return e;
 }
+
+test('missing cached-art contexts report a graphics failure before drawing', () => {
+  const { localStorage, storage } = fakeStorage();
+  const e = renderer({ modules: ['workspace', 'recovery'], storage: localStorage });
+  e.saveCheckpoint('Before graphics failure');
+  const saved = [...storage];
+  const before = JSON.parse(e.exportSave());
+  const buildings = e.buildings;
+  const units = e.units;
+  e.state.paused = false;
+  const failures = [];
+  e.gameEvents.on('rendererFailed', (event) => failures.push(event.reason));
+  e.Acan = () => ({ getContext: () => null });
+  const rng = e.SR.getState();
+  const time = e.state.time;
+  assert.throws(
+    () => e.buildingContour({ img: {}, w: 48, h: 56, ox: -12, oy: -32 }),
+    /Canvas 2D context is unavailable/,
+  );
+  assert.deepEqual(failures, ['Canvas 2D context is unavailable']);
+  assert.equal(e.renderingAvailable, false);
+  assert.equal(e.SR.getState(), rng);
+  assert.equal(e.state.time, time);
+  assert.equal(e.state.paused, true);
+  assert.equal(e.buildings, buildings);
+  assert.equal(e.units, units);
+  const after = JSON.parse(e.exportSave());
+  for (const key of ['b', 'u', 'j', 't', 'rng', 'observations', 'identity'])
+    assert.deepEqual(after[key], before[key]);
+  assert.deepEqual([...storage], saved);
+  assert.equal(e.blockingLayerOpen(), true);
+  assert.match(
+    document.getElementById('recovery-reason').textContent,
+    /Canvas 2D context is unavailable/,
+  );
+});
+
+test('an unavailable minimap context stops renderer assembly through its failure boundary', () => {
+  const failures = [];
+  assert.throws(
+    () =>
+      renderer({
+        contextFor: (name, context) => (name === 'mini' ? null : context),
+        presentation: { reportFailure: (reason) => failures.push(reason) },
+      }),
+    /Canvas 2D context is unavailable/,
+  );
+  assert.deepEqual(failures, ['Canvas 2D context is unavailable']);
+});
+
+test('a throwing context acquisition retains its cause and opens graphics recovery', () => {
+  const e = renderer({ modules: ['workspace', 'recovery'] });
+  const cause = new Error('Canvas allocation rejected');
+  e.Acan = () => ({
+    getContext() {
+      throw cause;
+    },
+  });
+  assert.throws(
+    () => e.buildingContour({ img: {}, w: 48, h: 56, ox: -12, oy: -32 }),
+    (error) => error.cause === cause && /Canvas 2D context is unavailable/.test(error.message),
+  );
+  assert.equal(e.renderingAvailable, false);
+  assert.equal(e.blockingLayerOpen(), true);
+});
+
+test('successful context acquisition preserves the context and requested options', () => {
+  const e = renderer();
+  const requests = [];
+  const settings = { willReadFrequently: true };
+  const canvas = {
+    getContext(...args) {
+      requests.push(args);
+      return e.context;
+    },
+  };
+  assert.equal(requireCanvas2D(canvas, e.reportGraphicsFailure, settings), e.context);
+  assert.deepEqual(requests, [['2d', settings]]);
+  assert.equal(e.renderingAvailable, true);
+});
+
+test('utility artwork cannot silently skip an unavailable context', () => {
+  const e = renderer({ modules: ['workspace', 'recovery'] });
+  document.querySelectorAll = () => [{ dataset: { sessionArt: 'hq' }, getContext: () => null }];
+  assert.throws(() => paintUtilityArtwork(e), /Canvas 2D context is unavailable/);
+  assert.equal(e.renderingAvailable, false);
+  assert.equal(e.blockingLayerOpen(), true);
+});
 
 test('walkers follow the last segment after turning, including zero direction components', () => {
   const e = renderer();
@@ -498,6 +600,29 @@ test('clarity uses distinct working, waiting, paused and construction symbols', 
   assert.deepEqual(tags, ['HQ ·', 'SAW ▶', 'SAW !', 'SAW Ⅱ', 'SAW +']);
 });
 
+test('a producer blocked by colony reserves is drawn idle before its next simulation tick', () => {
+  const e = renderer();
+  e.vw = 1440;
+  e.vh = 900;
+  e.cam = { x: 40 * e.TS, y: 40 * e.TS };
+  e.presentationPrefs.clarity = true;
+  e.context.measureText = (text) => ({ width: text.length * 5 });
+  const mill = e.newBuilding('windmill', 50, 48);
+  Object.assign(mill, { done: true, timer: 4, stock: { grain: 2 }, blockedReason: '' });
+  e.buildings.push(mill);
+  e.anyStorage().stock.flour = 12;
+  const before = e.exportSave();
+  const rng = e.SR.getState();
+  assert.equal(e.productionProgress(mill).reason, 'demand');
+  e.clarityBuildings(e.context);
+  assert.deepEqual(
+    e.calls.filter((call) => call.method === 'fillText').map((call) => call.args[0]),
+    ['HQ ·', 'FLOUR ·'],
+  );
+  assert.equal(e.exportSave(), before, 'drawing idle cannot advance the colony');
+  assert.equal(e.SR.getState(), rng);
+});
+
 test('a paused placement preview refreshes affordability immediately while unchanged frames reuse it', () => {
   const e = renderer();
   e.anyStorage().stock = { planks: 3, stone: 1, tools: 1 };
@@ -509,4 +634,44 @@ test('a paused placement preview refreshes affordability immediately while uncha
   assert.equal(after.checks.ok, true, 'the terrain remains suitable');
   assert.equal(after.canBuild, false, 'spending becomes unavailable without aging simulation time');
   assert.equal(after.spending.materials.find((row) => row.good === 'planks').available, 2);
+});
+
+test('night glow lights domestic windows but leaves mines and open yards dark', () => {
+  const e = renderer();
+  e.vw = 1440;
+  e.vh = 900;
+  e.cam = { x: 40 * e.TS, y: 40 * e.TS };
+  e.ART.glow = 'glow';
+  e.buildings.length = 0;
+  const placed = {};
+  for (const [type, offset] of [
+    ['mine_coal', 0],
+    ['mine_iron', 2],
+    ['mine_gold', 4],
+    ['well', 6],
+    ['pigfarm', 8],
+    ['quarry', 10],
+    ['sawmill', 12],
+    ['warehouse', 14],
+  ]) {
+    const b = e.newBuilding(type, 44 + offset, 48);
+    b.done = true;
+    e.buildings.push(b);
+    placed[type] = b;
+  }
+  const rng = e.SR.getState();
+  e.calls.length = 0;
+  e.glowsDraw(e.context);
+  const lit = new Set(
+    e.calls
+      // The square window aura is centred over its building's tile.
+      .filter((call) => call.method === 'drawImage' && call.args[0] === 'glow')
+      .filter((call) => call.args[3] === call.args[4])
+      .map((call) => Math.floor((call.args[1] + call.args[3] / 2) / e.TS)),
+  );
+  assert.deepEqual(
+    [...lit].sort((a, b) => a - b),
+    [placed.sawmill.x, placed.warehouse.x],
+  );
+  assert.equal(e.SR.getState(), rng, 'cosmetic glow consumes no simulation RNG');
 });

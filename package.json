@@ -16,6 +16,7 @@
     "preview:pages": "npm run build:pages && wrangler pages dev dist --compatibility-date 2026-10-12",
     "typecheck": "node node_modules/typescript/bin/tsc --noEmit",
     "test": "node scripts/validate.mjs --node-tests",
+    "test:soak": "node scripts/validate.mjs --soak",
     "test:browser": "npm run build && playwright test",
     "test:pages": "node scripts/test-pages.mjs",
     "format": "prettier --write src scripts tests index.html tsconfig.json",
@@ -26,6 +27,7 @@
   "devDependencies": {
     "@playwright/test": "1.64.0",
     "esbuild": "0.28.2",
+    "oxlint": "1.86.0",
     "pixi.js": "8.22.0",
     "prettier": "3.9.10",
     "typescript": "7.0.2",

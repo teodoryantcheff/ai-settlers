@@ -1,5 +1,6 @@
 import type { GameRuntime } from '../runtime.ts';
 import type { BuildingType, Sprite } from '../types.ts';
+import { CanvasContextError, requireCanvas2D } from './canvas-context.ts';
 
 interface PaintedRegion {
   sheet: string;
@@ -116,8 +117,7 @@ function makeCanvas(width: number, height: number): HTMLCanvasElement {
 }
 
 function canvasContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
-  const context = canvas.getContext('2d', { willReadFrequently: true });
-  if (!context) throw new Error('Artwork canvas is unavailable.');
+  const context = requireCanvas2D(canvas, undefined, { willReadFrequently: true });
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = 'high';
   return context;
@@ -316,6 +316,10 @@ export async function loadPaintedAssets(game: GameRuntime): Promise<void> {
     game.staticDirty = true;
     document.getElementById('painted-art-status')?.remove();
   } catch (error) {
+    if (error instanceof CanvasContextError) {
+      game.reportGraphicsFailure?.(error.message);
+      throw error;
+    }
     const message = error instanceof Error ? error.message : String(error);
     game.ART.paintedStatus = { state: 'fallback', message };
     showFallback(message);

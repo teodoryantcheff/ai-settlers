@@ -13,16 +13,16 @@ function colony() {
     t: game.GRASS,
     tree: 0,
     rock: null,
-    res: null,
+    deposit: null,
     road: false,
   }));
   const hq = game.newBuilding('hq', 48, 48);
   hq.done = true;
-  hq.prog = 1;
+  hq.constructionProgress = 1;
   hq.stock = { logs: 0, planks: 48, stone: 48, tools: 16, weapons: 6 };
   const consumer = game.newBuilding('workshop', 54, 48);
   consumer.done = true;
-  consumer.prog = 1;
+  consumer.constructionProgress = 1;
   game.buildings.push(hq, consumer);
   game.recomputeTerritory();
   game.spawnT = game.serfT = 1e6;
@@ -147,6 +147,6 @@ test('assignment records without a live carrier have unavailable evidence, not q
   assert.equal(report.rows[0].carrierId, null);
   assert.equal(report.rows[0].route, null);
   assert.equal(report.rows.filter((row) => row.stage === 'queued').length, game.jobs.length - 1);
-  assert.equal(game.jobs[0].state, 't', 'report leaves the assignment record unchanged');
+  assert.equal(game.jobs[0].status, 'assigned', 'report leaves the assignment record unchanged');
   assert.equal(JSON.stringify(game.snapshotGame()), before);
 });

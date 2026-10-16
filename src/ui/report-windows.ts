@@ -1,3 +1,4 @@
+import { requireElement } from './dom.ts';
 import type { GameRuntime } from '../runtime.ts';
 import type { WorkspaceName } from './workspace.ts';
 
@@ -23,17 +24,16 @@ interface ReportWindow {
 export function createReportWindows(game: GameRuntime, close: () => void) {
   const reports = new Map<ReportName, ReportWindow>();
   function bounds() {
-    const nav = document.getElementById('workspace-nav');
+    const nav = requireElement('workspace-nav');
     const expanded = nav && !nav.hidden;
     const left = expanded ? nav.getBoundingClientRect().right + 12 : 12;
-    const top =
-      (document.getElementById('bar')?.getBoundingClientRect().bottom || 0) + (expanded ? 12 : 58);
+    const top = (requireElement('bar')?.getBoundingClientRect().bottom || 0) + (expanded ? 12 : 58);
     const reserve =
       window.innerWidth >= 900
         ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dock-width')) ||
           316
         : 0;
-    const mapControls = document.getElementById('map-controls');
+    const mapControls = requireElement('map-controls');
     const controlsTop =
       mapControls && !mapControls.hidden ? mapControls.getBoundingClientRect().top : 0;
     return {
@@ -58,6 +58,7 @@ export function createReportWindows(game: GameRuntime, close: () => void) {
   function apply(report: ReportWindow) {
     const area = bounds(),
       box = report.geometry;
+    if (!box) return;
     const maxWidth = area.right - area.left,
       maxHeight = Math.max(160, area.bottom - area.top);
     box.width = Math.max(Math.min(520, maxWidth), Math.min(box.width, maxWidth));
@@ -76,7 +77,7 @@ export function createReportWindows(game: GameRuntime, close: () => void) {
   }
   function register(name: ReportName, title: string, focusAttribute = 'data-report-key') {
     if (reports.has(name)) return;
-    const host = document.getElementById('workspace-' + name);
+    const host = requireElement('workspace-' + name);
     if (!host) return;
     const shell = document.createElement('section');
     shell.className = 'report-window';
@@ -88,7 +89,7 @@ export function createReportWindows(game: GameRuntime, close: () => void) {
       game.hoverIn = game.mouseSeen = false;
       game.ghost = null;
       game.ttStr = null;
-      const tooltip = document.getElementById('tt');
+      const tooltip = requireElement('tt');
       if (tooltip) tooltip.style.display = 'none';
     });
     const bar = document.createElement('header');
@@ -160,6 +161,7 @@ export function createReportWindows(game: GameRuntime, close: () => void) {
           return;
         if (resizing) resize.focus({ preventScroll: true });
         else if (event.target === move) move.focus({ preventScroll: true });
+        if (!report.geometry) return;
         pointer = {
           handle,
           id: event.pointerId,
@@ -195,6 +197,7 @@ export function createReportWindows(game: GameRuntime, close: () => void) {
       const horizontal =
         event.key === 'ArrowRight' ? amount : event.key === 'ArrowLeft' ? -amount : 0;
       const vertical = event.key === 'ArrowDown' ? amount : event.key === 'ArrowUp' ? -amount : 0;
+      if (!report.geometry) return;
       if (resizing) {
         report.geometry.width += horizontal;
         report.geometry.height += vertical;
@@ -215,9 +218,13 @@ export function createReportWindows(game: GameRuntime, close: () => void) {
     apply(report);
     report.shell.hidden = report.host.hidden = false;
     const remembered = report.focus;
-    let target = remembered?.element;
+    let target: HTMLElement | null | undefined = remembered?.element;
     if (!target?.isConnected || !report.host.contains(target)) {
-      target = remembered?.id ? document.getElementById(remembered.id) : null;
+      target = remembered?.id
+        ? [...report.host.querySelectorAll<HTMLElement>('[id]')].find(
+            (element) => element.id === remembered.id,
+          )
+        : null;
       if (!target && remembered?.key)
         target = [
           ...report.host.querySelectorAll<HTMLElement>('[' + report.focusAttribute + ']'),
@@ -241,7 +248,7 @@ export function createReportWindows(game: GameRuntime, close: () => void) {
   }
   window.addEventListener('resize', constrain);
   if (typeof ResizeObserver !== 'undefined') {
-    const bar = document.getElementById('bar');
+    const bar = requireElement('bar');
     if (bar) new ResizeObserver(constrain).observe(bar);
   }
   function resetContext() {

@@ -169,7 +169,7 @@ test('shared interaction transitions preserve real map, inspector, road, Journey
     const well = g.buildings.at(-1).id;
     // A nearby impassable endpoint lets actual mouse clicks exercise road rejection.
     const water = g.idx(52, 49);
-    Object.assign(g.tiles[water], { t: g.WATER, tree: 0, rock: null, res: null });
+    Object.assign(g.tiles[water], { t: g.WATER, tree: 0, rock: null, deposit: null });
     g.emitGameEvent('tileChanged', { index: water });
     return { farm, well, hq: g.anyStorage().id };
   });
@@ -268,7 +268,12 @@ test('shared interaction transitions preserve real map, inspector, road, Journey
     const g = window.productionArtPreview.game;
     const b = g.newBuilding('guard', 51, 48);
     const armory = g.newBuilding('armory', 54, 48);
-    Object.assign(armory, { done: true, prog: 1, legacyIndustry: true, stock: { coal: 1 } });
+    Object.assign(armory, {
+      done: true,
+      constructionProgress: 1,
+      legacyIndustry: true,
+      stock: { coal: 1 },
+    });
     armory.metrics.elapsed = 60;
     armory.metrics.inputBlocked = 60;
     g.buildings.push(b, armory);

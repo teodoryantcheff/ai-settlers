@@ -44,11 +44,15 @@ Reference searches buildings, actual recipes, resources, transport and diagnosti
 npm test
 ```
 
-Run only `npm test` for routine validation. It runs typechecking and Node tests, retaining per-step logs and a JSON summary under `output/validation/<run>/`; failures print the log tail and stop the sequence.
+Run only `npm test` for routine validation. It lints with oxlint, then runs typechecking and Node tests, retaining per-step logs and a JSON summary under `output/validation/<run>/`; failures print the log tail and stop the sequence.
 
-Run the slower `npm run check`, browser tests or visual captures only when explicitly requested. The full check adds formatting, the build and browser tests. Browser tests use one worker because software WebGL is load-sensitive; the suite can take about 25 minutes and retains browser failure artifacts alongside its logs.
+`npm test` excludes the economy soak suite in `tests/soak/`, whose full autoplay playthroughs take several minutes. Run `npm run test:soak` after changing simulation, economy, logistics, autoplay or progression balance; it retains logs the same way. `ECONOMY_SEED=<n>`, `ECONOMY_SEEDS=<a,b>`, `ECONOMY_PROFILE=invest` and `ECONOMY_SECONDS=<limit>` narrow or extend a run. CI and `npm run check` also run it; `npm run deploy` does not.
 
-Tests and builds run TypeScript 7 checking through `npm run typecheck`, which invokes the TypeScript 7 compiler explicitly. Browser tests require Playwright Chromium (`npx playwright install chromium` once). If port 8765 is occupied by another server, use `PLAYWRIGHT_PORT=8766 npm run test:browser`. Development scenarios are available at `tests/game.html?uitest&buildrules&seed=2024`, `?saveload&seed=123`, and `?devshot&seed=2024`.
+Lint rules live in `.oxlintrc.json`. `no-var` and `prefer-const` apply to source, scripts and tests without exemptions; use `const` for bindings that are never reassigned and `let` for mutable bindings.
+
+Run the slower `npm run check`, browser tests or visual captures only when explicitly requested. The full check adds formatting, the soak suite, the build and browser tests. Browser tests use one worker because software WebGL is load-sensitive; the suite can take about 25 minutes and retains browser failure artifacts alongside its logs.
+
+Tests and builds run TypeScript 7 checking through `npm run typecheck`, which invokes the TypeScript 7 compiler explicitly. Strict null checks are enabled in the main `tsconfig.json` for all source and compiler contracts. Browser tests require Playwright Chromium (`npx playwright install chromium` once). If port 8765 is occupied by another server, use `PLAYWRIGHT_PORT=8766 npm run test:browser`. Development scenarios are available at `tests/game.html?uitest&buildrules&seed=2024`, `?saveload&seed=123`, and `?devshot&seed=2024`.
 
 `npm run bench:render` is opt-in and not part of `npm test`. It measures CPU and GPU frame time at every zoom on this machine's GPU (headless Chromium, real WebGL) and warns if Chromium falls back to software rendering. Add `-- --zooms 3 --profile 3` to narrow it and keep a CPU profile; `scripts/bench-render.mjs` lists every option. Results go to `output/bench/`; see [performance notes](docs/performance-60fps.md).
 
@@ -66,7 +70,7 @@ npm run deploy                             # Node tests, build, package, publish
 
 The Direct Upload project is `settlers-tribute`, served at https://settlers-tribute.pages.dev/. To recreate it in a new account, first run `npx wrangler pages project create settlers-tribute --production-branch main`. Wrangler 4.149.0 may delegate creation of new projects to Workers in agent environments; add `--force` to that one-time create command to explicitly retain Pages. Existing Pages projects do not need this flag for deployment. Ensure Wrangler targets the intended account; set `CLOUDFLARE_ACCOUNT_ID` when needed.
 
-`npm run deploy` runs `npm test` (typechecking and Node tests), then builds a fresh production package before publishing. Any failed or interrupted command prevents deployment. The full browser suite is an explicit check through `npm run check` or `npm run test:browser`; it is not part of deployment.
+`npm run deploy` runs `npm test` (lint, typechecking and Node tests), then builds a fresh production package before publishing. Any failed or interrupted command prevents deployment. The full browser suite is an explicit check through `npm run check` or `npm run test:browser`; it is not part of deployment.
 
 `npm run build:pages` creates a clean, deploy-only `dist/`: entry HTML, a real 404 page, Pages headers, and content-hashed releases containing the minified game and complete artwork/reference/provenance pack. Code and artwork share a release hash, preserving their relative paths and allowing one-year immutable caching; HTML revalidates. Cloudflare handles compression. Never deploy the repository root or manually add unversioned assets to the immutable release paths.
 
@@ -78,6 +82,6 @@ Soft-launch headers disable search indexing (`X-Robots-Tag: noindex`) and embedd
 
 Source lives in the public [teodoryantcheff/ai-settlers repository](https://github.com/teodoryantcheff/ai-settlers), with `main` as the default branch. Clone it with `gh repo clone teodoryantcheff/ai-settlers`, then follow Run and play above. Commit source, original art/provenance, shared agent skills and lockfiles. Generated bundles, `dist/`, dependencies, captures, scratch notes, caches and credentials are ignored; rebuild after cloning.
 
-GitHub publishing does not deploy the game or configure CI. Future Git CI can run `npm test` for pull requests and retain this Pages project by running the guarded `npm run deploy` on `main`, using protected `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` secrets (token permission: Account / Cloudflare Pages / Edit). Never commit credentials, and do not run the production deploy script from pull requests.
+[CI](.github/workflows/ci.yml) runs on pull requests and pushes to `main`, on Node.js 22.18.0 (the supported minimum): `npm ci`, `npm run format:check` and `npm test`, with `npm run test:soak` in a parallel job. When a step fails, the run uploads the retained `output/validation/` logs as the `validation-logs` (or `soak-validation-logs`) artifact. CI never deploys and uses no secrets; publishing stays a manual `npm run deploy`. Never commit credentials, and do not run the production deploy script from pull requests.
 
 Cloudflare's native Git integration is a different option: a Direct Upload project cannot switch to it. Create a new Git-integrated Pages project when adopting that workflow, with framework preset **None**, build command `npm run build:pages`, output directory `dist`, and Node.js 22.18+; production branch `main`. Plan the domain cutover before retiring the existing site. Changing origins also separates browser-local saves, so export/import saves when moving. See [Direct Upload](https://developers.cloudflare.com/pages/get-started/direct-upload/) and [Git CI with Wrangler](https://developers.cloudflare.com/pages/how-to/use-direct-upload-with-continuous-integration/).

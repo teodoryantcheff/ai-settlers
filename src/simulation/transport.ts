@@ -71,7 +71,7 @@ export function createTransport(game: TransportDependencies): TransportSubsystem
         keys.set(job, key);
       }
       const unit = carriers.find((carrier) => carrier.job === job);
-      const sourceId = job.kind === 'deliver' ? job.from : job.s;
+      const sourceId = job.sourceId;
       const targetId = unit?.carry ? unit.dropB : job.to;
       rows.push({
         key,

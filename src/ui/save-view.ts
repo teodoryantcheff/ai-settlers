@@ -1,18 +1,19 @@
+import { requireElement } from './dom.ts';
 import type { GameRuntime } from '../runtime.ts';
 import { observePresentation } from './domain-feedback.ts';
 import type { SaveMetadata } from '../types.ts';
 
 /** Save workflows keep confirmation, metadata and recovery together; no simulation mutations. */
 export function createSaveView(game: GameRuntime): SaveViewSubsystem {
-  const panel = document.getElementById('savedata');
-  const list = document.getElementById('save-list');
-  const status = document.getElementById('save-status');
-  const health = document.getElementById('save-health');
-  const recovery = document.getElementById('save-recovery');
-  const colonyName = document.getElementById('colony-name') as HTMLInputElement;
-  const checkpointName = document.getElementById('checkpoint-name') as HTMLInputElement;
-  const renameName = document.getElementById('rename-checkpoint') as HTMLInputElement;
-  const code = document.getElementById('savecode') as HTMLTextAreaElement;
+  const panel = requireElement('savedata');
+  const list = requireElement('save-list');
+  const status = requireElement('save-status');
+  const health = requireElement('save-health');
+  const recovery = requireElement('save-recovery');
+  const colonyName = requireElement('colony-name') as HTMLInputElement;
+  const checkpointName = requireElement('checkpoint-name') as HTMLInputElement;
+  const renameName = requireElement('rename-checkpoint') as HTMLInputElement;
+  const code = requireElement('savecode') as HTMLTextAreaElement;
   let pending: (() => void) | null = null;
 
   function showStatus(message: string, failed = false) {
@@ -64,11 +65,11 @@ export function createSaveView(game: GameRuntime): SaveViewSubsystem {
   }
   function confirm(message: string, action: () => void, rename = false) {
     pending = action;
-    document.getElementById('save-confirm-text').textContent = message;
-    document.getElementById('rename-label').classList.toggle('hidden', !rename);
+    requireElement('save-confirm-text').textContent = message;
+    requireElement('rename-label').classList.toggle('hidden', !rename);
     renameName.classList.toggle('hidden', !rename);
     game.openLayer('save-confirm', { blocking: true });
-    (rename ? renameName : document.getElementById('confirm-save-action')).focus();
+    (rename ? renameName : requireElement('confirm-save-action')).focus();
   }
   function button(label: string, action: () => void): HTMLButtonElement {
     const node = document.createElement('button');
@@ -205,7 +206,7 @@ export function createSaveView(game: GameRuntime): SaveViewSubsystem {
     game.closeLayer('save-confirm');
     refreshSaveManager();
     game.openLayer('savedata', { blocking: true });
-    const utility = document.getElementById('utility') as HTMLDetailsElement;
+    const utility = requireElement('utility') as HTMLDetailsElement;
     if (utility) utility.open = false;
   }
   function closeSaveManager() {
@@ -233,19 +234,19 @@ export function createSaveView(game: GameRuntime): SaveViewSubsystem {
       () => game.setColonyName(colonyName.value),
       'Colony name updated; save a checkpoint to retain it.',
     );
-  document.getElementById('create-checkpoint').onclick = () =>
+  requireElement('create-checkpoint').onclick = () =>
     attempt(() => game.saveCheckpoint(checkpointName.value || 'Checkpoint'), 'Checkpoint saved.');
-  document.getElementById('export-file').onclick = () =>
+  requireElement('export-file').onclick = () =>
     attempt(() => download(game.exportSave(), game.colonyName + '-' + game.seed));
-  document.getElementById('confirm-save-action').onclick = () => {
+  requireElement('confirm-save-action').onclick = () => {
     const action = pending;
     if (!action) return;
     cancelConfirmation();
     attempt(action, 'Operation completed.');
   };
-  document.getElementById('cancel-save-action').onclick = cancelConfirmation;
-  document.getElementById('close-saves').onclick = closeSaveManager;
-  document.getElementById('import-file').onchange = async (event) => {
+  requireElement('cancel-save-action').onclick = cancelConfirmation;
+  requireElement('close-saves').onclick = closeSaveManager;
+  requireElement('import-file').onchange = async (event) => {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
@@ -261,7 +262,7 @@ export function createSaveView(game: GameRuntime): SaveViewSubsystem {
       input.value = '';
     }
   };
-  document.getElementById('copycode').onclick = () =>
+  requireElement('copycode').onclick = () =>
     attempt(() => {
       code.value = btoa(unescape(encodeURIComponent(game.exportSave())));
       code.focus();
@@ -273,7 +274,7 @@ export function createSaveView(game: GameRuntime): SaveViewSubsystem {
         );
       else showStatus('Save code shown — copy it manually.');
     });
-  document.getElementById('pastecode').onclick = () =>
+  requireElement('pastecode').onclick = () =>
     attempt(() => {
       const raw = code.value.trim();
       if (!raw) throw new Error('Paste a colony JSON or save code first');

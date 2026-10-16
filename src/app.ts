@@ -6,9 +6,8 @@ import type { GameRuntime } from './runtime.ts';
 /** Assemble before starting: no module starts a frame loop when imported. */
 export function createGame(presentation: RendererPresentation): GameRuntime {
   const search = location.search;
-  const seed = /[?&]seed=(\d+)/.test(search)
-    ? +search.match(/[?&]seed=(\d+)/)[1] | 0
-    : (Math.random() * 1e9) | 0;
+  const seedMatch = search.match(/[?&]seed=(\d+)/);
+  const seed = seedMatch ? +seedMatch[1] | 0 : (Math.random() * 1e9) | 0;
   const game = createEngine({
     seed,
     search: search + (/[?&]seed=/.test(search) ? '' : '&seed=' + seed),

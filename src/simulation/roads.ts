@@ -18,7 +18,7 @@ export function createRoads(game: RoadsDependencies): RoadsSubsystem {
     game.emitGameEvent('tileChanged', { index: i });
   }
   function canPave(i: number) {
-    var tile = game.tiles[i];
+    const tile = game.tiles[i];
     return !!(
       game.owned[i] &&
       !game.buildingAt(i % game.W, (i / game.W) | 0) &&
@@ -27,18 +27,18 @@ export function createRoads(game: RoadsDependencies): RoadsSubsystem {
     );
   }
   function roadRoute(a: TilePoint, b: TilePoint): RoadRoute {
-    var path = game.findPath(a.x, a.y, b.x, b.y);
+    const path = game.findPath(a.x, a.y, b.x, b.y);
     // Preserve rejection precedence, including a blocked start with no route.
     if (!path) return { ok: false, reason: 'no-route' };
     if (!canPave(game.idx(a.x, a.y))) return { ok: false, reason: 'blocked-start' };
     return { ok: true, path };
   }
   function planRoad(a: TilePoint, b: TilePoint): RoadPlan {
-    var route = roadRoute(a, b);
+    const route = roadRoute(a, b);
     if (route.ok === false) return route;
-    var paved: Record<number, boolean> = {},
-      count = 0;
-    for (var i of [game.idx(a.x, a.y), ...route.path]) {
+    const paved: Record<number, boolean> = {};
+    let count = 0;
+    for (const i of [game.idx(a.x, a.y), ...route.path]) {
       if (canPave(i) && !game.tiles[i].road) {
         paved[i] = true;
         count++;
@@ -48,19 +48,19 @@ export function createRoads(game: RoadsDependencies): RoadsSubsystem {
   }
   function commitRoad(a: TilePoint, b2: TilePoint) {
     // Replan from endpoints; a cached display plan cannot authorize construction.
-    var route = roadRoute(a, b2);
+    const route = roadRoute(a, b2);
     if (route.ok === false) {
       game.emitGameEvent('roadRejected', { reason: route.reason });
       return false;
     }
-    var p = route.path;
-    var ai = game.idx(a.x, a.y),
+    const p = route.path;
+    const ai = game.idx(a.x, a.y),
       at = game.tiles[ai];
-    var n = at.road ? 0 : 1;
+    let n = at.road ? 0 : 1;
     at.road = true;
     tileChanged(ai);
-    for (var i = 0; i < p.length; i++) {
-      var t2 = p[i],
+    for (let i = 0; i < p.length; i++) {
+      const t2 = p[i],
         x = t2 % game.W,
         y = (t2 / game.W) | 0,
         tt = game.tiles[t2];
@@ -70,8 +70,8 @@ export function createRoads(game: RoadsDependencies): RoadsSubsystem {
         n++;
         tileChanged(t2);
       }
-      for (var d = 0; d < 4; d++) {
-        var nx = x + game.DX[d],
+      for (let d = 0; d < 4; d++) {
+        const nx = x + game.DX[d],
           ny = y + game.DY[d];
         if (game.inB(nx, ny) && game.tiles[game.idx(nx, ny)].road) tileChanged(game.idx(nx, ny));
       }

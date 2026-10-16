@@ -37,10 +37,11 @@ export function bindDomainFeedback(game: GameRuntime): () => void {
   }
   on('placementRejected', (e) => {
     const advice = game.suggestFor(e.reason);
+    const text = game.placementText(e.reason);
     game.msg(
-      e.stock
-        ? '✖ ' + e.reason + ' — ' + advice
-        : '✖ ' + game.BSPEC[e.type].name + ': ' + e.reason + (advice ? ' — ' + advice : ''),
+      e.reason.code === 'stock'
+        ? '✖ ' + text + ' — ' + advice
+        : '✖ ' + game.BSPEC[e.type].name + ': ' + text + (advice ? ' — ' + advice : ''),
     );
     effect(() => game.FX.ring(e.x + 0.5, e.y + 0.5, '#ff5a4a', 16));
     effect(() => game.SND.fail());

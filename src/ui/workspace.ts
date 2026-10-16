@@ -1,3 +1,4 @@
+import { requireElement } from './dom.ts';
 import type { GameRuntime } from '../runtime.ts';
 import type { BuildingType, TilePoint } from '../types.ts';
 import { createReportWindows, type ReportName } from './report-windows.ts';
@@ -34,8 +35,8 @@ export function createWorkspace(game: GameRuntime): WorkspaceSubsystem {
 
   function setAtlasExpanded(expanded: boolean, persist = true) {
     if (game.presentationPrefs) game.presentationPrefs.atlasExpanded = expanded;
-    const nav = document.getElementById('workspace-nav');
-    const toggle = document.getElementById('atlas-toggle');
+    const nav = requireElement('workspace-nav');
+    const toggle = requireElement('atlas-toggle');
     if (!expanded && nav?.contains(document.activeElement)) toggle?.focus({ preventScroll: true });
     if (nav) nav.hidden = !expanded;
     toggle?.setAttribute('aria-expanded', String(expanded));
@@ -45,15 +46,15 @@ export function createWorkspace(game: GameRuntime): WorkspaceSubsystem {
     if (persist) game.persistPreferences?.();
   }
   function focusWorkspaceNavigation() {
-    const nav = document.getElementById('workspace-nav');
+    const nav = requireElement('workspace-nav');
     const destination =
       nav && !nav.hidden
         ? nav.querySelector<HTMLElement>('[data-workspace][aria-current="page"]')
-        : document.getElementById('atlas-toggle');
+        : requireElement('atlas-toggle');
     destination?.focus({ preventScroll: true });
   }
-  document.getElementById('atlas-toggle')?.addEventListener('click', () => {
-    setAtlasExpanded(document.getElementById('workspace-nav')?.hidden !== false);
+  requireElement('atlas-toggle')?.addEventListener('click', () => {
+    setAtlasExpanded(requireElement('workspace-nav')?.hidden !== false);
   });
   setAtlasExpanded(false, false);
 
@@ -64,7 +65,7 @@ export function createWorkspace(game: GameRuntime): WorkspaceSubsystem {
       game.ghost = null;
       game.hoverIn = game.mouseSeen = false;
       game.ttStr = null;
-      const tooltip = document.getElementById('tt');
+      const tooltip = requireElement('tt');
       if (tooltip) tooltip.style.display = 'none';
       game.keys.l = game.keys.r = game.keys.u = game.keys.d = false;
       game.cancelMapGestures?.();
@@ -76,10 +77,11 @@ export function createWorkspace(game: GameRuntime): WorkspaceSubsystem {
       button.setAttribute('aria-current', button.dataset.workspace === next ? 'page' : 'false');
     });
     for (const name of names) {
-      const panel = document.getElementById('workspace-' + name);
+      if (name === 'map') continue;
+      const panel = requireElement('workspace-' + name);
       if (panel) panel.hidden = name !== next;
     }
-    const colony = document.getElementById('economy');
+    const colony = requireElement('economy');
     if (colony) colony.classList.toggle('hidden', next !== 'colony');
     game.updateInfo?.();
     game.gameplayHUD?.();
@@ -102,7 +104,7 @@ export function createWorkspace(game: GameRuntime): WorkspaceSubsystem {
     const canvas = game.view?.getBoundingClientRect?.();
     if (!canvas?.width || !canvas.height) return { x: game.vw / 2, y: game.vh / 2 };
     function visibleRect(id: string) {
-      const element = document.getElementById(id);
+      const element = requireElement(id);
       if (!element || element.hidden || element.classList.contains('hidden')) return null;
       const style = getComputedStyle(element);
       if (style.display === 'none' || style.visibility === 'hidden') return null;
@@ -160,12 +162,12 @@ export function createWorkspace(game: GameRuntime): WorkspaceSubsystem {
 
   function visibleLayers() {
     return layers.filter((layer) => {
-      const element = document.getElementById(layer.id);
+      const element = requireElement(layer.id);
       return element && !element.hidden && !element.classList.contains('hidden');
     });
   }
   function layerElement(id: string) {
-    return document.getElementById(id);
+    return requireElement(id);
   }
   function focusable(element: HTMLElement) {
     return [...element.querySelectorAll<HTMLElement>(controls)].filter(
@@ -272,7 +274,7 @@ export function createWorkspace(game: GameRuntime): WorkspaceSubsystem {
     const topBlocking = active.at(-1);
     for (const layer of visible)
       updateSimulationLine(layerElement(layer.id), layer.blocking, layer === topBlocking);
-    const backdrop = document.getElementById('layer-backdrop');
+    const backdrop = requireElement('layer-backdrop');
     if (backdrop) {
       backdrop.hidden = active.length === 0;
       const top = active.at(-1);
@@ -301,7 +303,7 @@ export function createWorkspace(game: GameRuntime): WorkspaceSubsystem {
       switchWorkspace(button.dataset.workspace as WorkspaceName),
     );
   });
-  document.getElementById('locate-selected')?.addEventListener('click', () => {
+  requireElement('locate-selected')?.addEventListener('click', () => {
     if (game.selected) locateContributor(game.selected.id);
     else if (removedContributor) locateContributor(removedContributor);
   });

@@ -43,7 +43,7 @@ function landscape() {
     tree: 0,
     rock: null,
     road: false,
-    res: null,
+    deposit: null,
   }));
   e.calls = calls;
   e.ctx = ctx;
@@ -59,14 +59,14 @@ test('cosmetic landscape painting is deterministic and leaves simulation RNG unt
   };
   const i = e.idx(12, 14);
   e.tiles[i].t = e.MTN;
-  e.tiles[i].res = { kind: 'gold', amt: 180, amt0: 240 };
+  e.tiles[i].deposit = { kind: 'gold', amt: 180, amt0: 240 };
   e.paintTileFull(e.ctx, i);
   const first = JSON.stringify(e.calls);
   e.calls.length = 0;
   e.paintTileFull(e.ctx, i);
   assert.equal(JSON.stringify(e.calls), first);
   assert.equal(rolls, 0);
-  assert.equal(e.tiles[i].res.amt, 180);
+  assert.equal(e.tiles[i].deposit.amt, 180);
 });
 
 test('mountain interiors connect without cliff edges and rim endpoints agree across tiles', () => {

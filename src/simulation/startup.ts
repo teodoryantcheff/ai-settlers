@@ -13,7 +13,7 @@ export function createEngineStartup(game: EngineStartupDependencies): EngineSubs
     game.genMap();
     const hq = game.newBuilding('hq', game.W >> 1, game.H >> 1);
     hq.done = true;
-    hq.prog = 1;
+    hq.constructionProgress = 1;
     hq.stock = {
       planks: 48,
       stone: 48,

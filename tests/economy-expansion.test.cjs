@@ -28,12 +28,12 @@ test('mines reserve distinct meals from warehouse without relabeling cargo', () 
     meals.map((j) => j.good),
     ['bread', 'bread', 'bread', 'meat', 'meat', 'meat', 'fish', 'fish', 'fish'],
   );
-  assert.equal(hq.res.bread, 3);
-  assert.equal(hq.res.fish, 3);
+  assert.equal(hq.reservedStock.bread, 3);
+  assert.equal(hq.reservedStock.fish, 3);
   assert.equal(hq.stock.food, undefined);
   hooks.cancelJobs((j) => j.to === mine.id);
-  assert.equal(hq.res.bread, 0);
-  assert.equal(hq.res.fish, 0);
+  assert.equal(hq.reservedStock.bread, 0);
+  assert.equal(hq.reservedStock.fish, 0);
 });
 test('bakery needs a local working well and consumes flour only after service returns', () => {
   const { hooks, building } = setup();
@@ -115,7 +115,7 @@ test('expanded goods, completed contracts and legacy recipes survive validated s
   legacy.b.at(-1).done = true;
   legacy.b.at(-1).stock = { coal: 1 };
   legacy.b[0].stock.iron = 1;
-  legacy.b[0].res.iron = 1;
+  legacy.b[0].reservedStock.iron = 1;
   legacy.j.push({ kind: 'fetch', good: 'iron', to: site.id, s: legacy.b[0].id, state: 'p' });
   const migrated = hooks.prepareLoad(JSON.stringify(legacy));
   assert.equal(migrated.buildings.at(-1).legacyIndustry, true);
@@ -136,7 +136,7 @@ test('food variety accelerates mines while consuming one real meal', () => {
   const mine = building('mine_iron');
   const tile = game.tiles[game.idx(mine.x + 1, mine.y)];
   tile.t = game.MTN;
-  tile.res = { kind: 'iron', amt: 10, amt0: 10 };
+  tile.deposit = { kind: 'iron', amt: 10, amt0: 10 };
   mine.stock = { fish: 1, bread: 1, meat: 1 };
   mine.timer = 1.05;
   hooks.bTick(mine, 1);
@@ -226,7 +226,7 @@ test('mine consumption preserves greatest-stock choice, every tie and empty-food
     const mine = building('mine_iron');
     const tile = game.tiles[game.idx(mine.x + 1, mine.y)];
     tile.t = game.MTN;
-    tile.res = { kind: 'iron', amt: 10, amt0: 10 };
+    tile.deposit = { kind: 'iron', amt: 10, amt0: 10 };
     mine.stock = { ...stock };
     const before = structuredClone(mine);
     const rng = game.SR.getState();
@@ -299,13 +299,13 @@ test('save acceptance retains historical cargo unions separately from current re
     for (const good of ['iron', 'iron_bars', 'coal', 'planks', 'stone', 'grain']) {
       const data = structuredClone(base);
       data.b[0].stock[good] = 1;
-      data.b[0].res[good] = 1;
+      data.b[0].reservedStock[good] = 1;
       data.j = [{ kind: 'fetch', good, to: producer.id, s: hq.id, state: 'p' }];
       const raw = JSON.stringify(data);
       if (accepted.includes(good)) {
         const prepared = internals.persistence.prepareLoad(raw);
         assert.equal(prepared.jobs[0].good, good, 'historical cargo keeps its identity');
-        assert.equal(prepared.buildings[0].res[good], 1);
+        assert.equal(prepared.buildings[0].reservedStock[good], 1);
       } else {
         const buildings = game.buildings;
         assert.throws(() => game.importSave(raw), /Invalid fetch destination/);

@@ -100,8 +100,7 @@ function controls() {
     clear: () => storage.clear(),
   };
   installGlobals({ document: dom.document, window: win.window, localStorage });
-  let game;
-  ({ game } = createGame({
+  const { game } = createGame({
     modules: ['workspace', 'hud'],
     stubs: {
       view: captureElement('view'),
@@ -145,7 +144,7 @@ function controls() {
       inB: () => true,
       initAudio() {},
     },
-  }));
+  });
   // Observe camera jumps; action cancellation is checked through its resulting state.
   let zoomAnim = null;
   Object.defineProperty(game, 'zoomAnim', {

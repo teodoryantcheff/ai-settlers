@@ -38,7 +38,7 @@ export interface IndustrialVoice {
 export interface AudioInternals {
   loadTone?: () => Promise<import('./audio-runtime.ts').ToneApi>;
   readonly audioPhase: 'idle' | 'starting' | 'ready' | 'failed';
-  readonly audioGraph: import('./audio-runtime.ts').AudioGraph;
+  readonly audioGraph: import('./audio-runtime.ts').AudioGraph | null;
 
   themeAt: (bar: number) => MusicTheme;
   scheduleBar: (bar: number, t0: number) => void;
@@ -50,9 +50,9 @@ export interface AudioInternals {
   audioCanPlay: () => boolean;
   musicArrangement: MusicArrangement;
   readonly BAR: number;
-  readonly gAmb: GainNode;
-  readonly gMusic: GainNode;
-  readonly gSfx: GainNode;
+  readonly gAmb: GainNode | undefined;
+  readonly gMusic: GainNode | undefined;
+  readonly gSfx: GainNode | undefined;
   readonly industrialVoices: IndustrialVoice[];
   musicBar: number;
   readonly musicSchedule: number;

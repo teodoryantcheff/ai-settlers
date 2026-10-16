@@ -10,19 +10,19 @@ import type {
   MusicArrangement,
 } from './audio-types.ts';
 export function createMusic(game: GameRuntime, runtime: AudioRuntime, internals?: AudioInternals) {
-  let graph: AudioGraph = null;
+  let graph: AudioGraph | null = null;
   const voices = new Set<Disposable>();
   // ---------- MUSIC ----------
   // Three 48-bar themes form a roughly four-and-a-half minute pastoral suite.
   // Every theme has an introduction, two melodic phrases, an eight-bar stretch of
   // just the landscape, and a quiet return. The arrangement changes only at
   // eight-bar boundaries; a transient delivery shortage cannot chop up a melody.
-  var TEMPO = 96,
+  const TEMPO = 96,
     EI = 60 / TEMPO / 2,
     BAR = EI * 6,
     MUSIC_THEME_BARS = 48,
     MUSIC_PHRASE_BARS = 8;
-  var PROG = [
+  const PROG = [
     { r: 38, pad: [50, 53, 57] },
     { r: 46, pad: [46, 50, 53] },
     { r: 41, pad: [45, 53, 57] },
@@ -40,7 +40,7 @@ export function createMusic(game: GameRuntime, runtime: AudioRuntime, internals?
     { r: 43, pad: [43, 46, 50] },
     { r: 45, pad: [45, 52, 57] },
   ];
-  var MOTIFS = [
+  const MOTIFS = [
     [0, -1, 1, 2, -1, 3],
     [3, 2, 1, 0, -1, -1],
     [0, -1, 2, -1, 1, 3],
@@ -48,8 +48,8 @@ export function createMusic(game: GameRuntime, runtime: AudioRuntime, internals?
     [2, 3, -1, 1, 0, -1],
     [0, 3, -1, 2, 1, -1],
   ];
-  var SCALE = [62, 64, 65, 67, 69, 72, 74, 77, 79];
-  var MUSIC_THEMES = [
+  const SCALE = [62, 64, 65, 67, 69, 72, 74, 77, 79];
+  const MUSIC_THEMES = [
     {
       name: 'Meadow',
       harmony: PROG,
@@ -110,13 +110,13 @@ export function createMusic(game: GameRuntime, runtime: AudioRuntime, internals?
     return MUSIC_THEMES[Math.floor(bar / MUSIC_THEME_BARS) % MUSIC_THEMES.length];
   }
   function chordAt(bar: number): MusicChord {
-    var theme = themeAt(bar);
+    const theme = themeAt(bar);
     return theme.harmony[bar % theme.harmony.length];
   }
   function starvingCount() {
-    var n = 0;
-    for (var i = 0; i < game.buildings.length; i++) {
-      var b = game.buildings[i],
+    let n = 0;
+    for (let i = 0; i < game.buildings.length; i++) {
+      const b = game.buildings[i],
         sp = game.BSPEC[b.type];
       if (!b.done || !sp.in || b.exhausted || b.disabled) continue;
       if (ingredientShortages(b, sp).length) n++;
@@ -124,12 +124,20 @@ export function createMusic(game: GameRuntime, runtime: AudioRuntime, internals?
     return n;
   }
   function musicColony(): MusicColonyState {
-    var active = 0,
+    let active = 0,
       inputCount = 0;
-    for (var i = 0; i < game.buildings.length; i++) {
-      var b = game.buildings[i],
+    for (let i = 0; i < game.buildings.length; i++) {
+      const b = game.buildings[i],
         sp = game.BSPEC[b.type];
-      if (!b.done || sp.store || sp.prod === 'none' || b.exhausted || b.norock || b.disabled)
+      // A reported quarry exhaustion stays silent until successful production clears it.
+      if (
+        !b.done ||
+        sp.store ||
+        sp.prod === 'none' ||
+        b.exhausted ||
+        b.rocksExhaustedNoticeSent ||
+        b.disabled
+      )
         continue;
       if (sp.in) {
         inputCount++;
@@ -146,7 +154,7 @@ export function createMusic(game: GameRuntime, runtime: AudioRuntime, internals?
       gold: Math.min(1, Math.max(0, game.state.gold / game.GOAL)),
     };
   }
-  var musicArrangement: MusicArrangement = {
+  const musicArrangement: MusicArrangement = {
     bass: 0,
     flute: 0,
     drums: 0,
@@ -157,10 +165,10 @@ export function createMusic(game: GameRuntime, runtime: AudioRuntime, internals?
     phrase: 0,
   };
   function updateMusicArrangement(bar: number) {
-    var colony = musicColony(),
+    const colony = musicColony(),
       a = musicArrangement,
       blend = 0.45;
-    var target = {
+    const target = {
       bass: Math.min(1, colony.active / 6),
       flute: Math.max(0, Math.min(1, (colony.active - 2) / 5)),
       drums: Math.max(0, Math.min(1, (colony.active - 6) / 6)),
@@ -168,7 +176,7 @@ export function createMusic(game: GameRuntime, runtime: AudioRuntime, internals?
       night: colony.night,
       gold: colony.gold,
     };
-    for (var key in target)
+    for (const key in target)
       a[key as keyof typeof target] +=
         (target[key as keyof typeof target] - a[key as keyof typeof target]) * blend;
     a.active = colony.active;
@@ -176,15 +184,15 @@ export function createMusic(game: GameRuntime, runtime: AudioRuntime, internals?
   }
   function scheduleBar(bar: number, t0: number) {
     if (bar % MUSIC_PHRASE_BARS === 0) updateMusicArrangement(bar);
-    var local = bar % MUSIC_THEME_BARS,
+    const local = bar % MUSIC_THEME_BARS,
       theme = themeAt(bar),
       ch = chordAt(bar),
       a = musicArrangement;
     // Full musical silence leaves birds, water, rain and wind room to breathe.
     if (local >= 32 && local < 40) return;
-    var returnPhrase = local >= 40,
+    const returnPhrase = local >= 40,
       texture = returnPhrase ? 0.55 : local < 8 ? 0.75 : 1;
-    var rnd = game.mulberry32(bar * 97 + ((game.seed % 1000) | 0)),
+    const rnd = game.mulberry32(bar * 97 + ((game.seed % 1000) | 0)),
       phraseBar = local % 8;
     if (bar % 2 === 0) padChord(t0, ch.pad, BAR * 2 * 0.98, texture);
     if (bar % 2 === 0 && a.gold > 0.45)
@@ -193,12 +201,12 @@ export function createMusic(game: GameRuntime, runtime: AudioRuntime, internals?
       bassNote(t0, ch.r, 0.09 * a.bass * texture);
       if (!returnPhrase && rnd() < 0.4) bassNote(t0 + EI * 3, ch.r, 0.055 * a.bass);
     }
-    var mot = MOTIFS[(rnd() * MOTIFS.length) | 0],
+    const mot = MOTIFS[(rnd() * MOTIFS.length) | 0],
       tones = ch.pad;
-    for (var s = 0; s < 6; s++) {
-      var d = mot[s];
+    for (let s = 0; s < 6; s++) {
+      const d = mot[s];
       if (d < 0 || (returnPhrase && s !== 0 && s !== 3)) continue;
-      var m = tones[d % tones.length] + 12 * (d >= tones.length ? 1 : 0);
+      let m = tones[d % tones.length] + 12 * (d >= tones.length ? 1 : 0);
       if (rnd() < 0.08) m += 12;
       pluck(
         t0 + s * EI + (s === 5 ? EI * 0.06 : 0),
@@ -218,15 +226,15 @@ export function createMusic(game: GameRuntime, runtime: AudioRuntime, internals?
     }
     // The two melodic phrases answer one another and end with an entire rest bar.
     if (local >= 8 && local < 32 && a.flute > 0.08 && phraseBar !== 7) {
-      var melodyIndex = (phraseBar * 2 + (local >= 24 ? 2 : 0)) % theme.melody.length;
-      var fluteLevel = 0.043 * a.flute * (1 - a.hungry * 0.55) * texture;
-      var note = theme.melody[melodyIndex];
+      const melodyIndex = (phraseBar * 2 + (local >= 24 ? 2 : 0)) % theme.melody.length;
+      const fluteLevel = 0.043 * a.flute * (1 - a.hungry * 0.55) * texture;
+      let note = theme.melody[melodyIndex];
       if (note > 0) fluteNote(t0, note, EI * 2.2, fluteLevel, -0.22);
       note = theme.melody[(melodyIndex + 1) % theme.melody.length];
       if (note > 0 && phraseBar % 2 === 0)
         fluteNote(t0 + EI * 3, note, EI * 2.1, fluteLevel * 0.8, 0.22);
     }
-    var percussion = a.drums * (1 - a.night * 0.95);
+    const percussion = a.drums * (1 - a.night * 0.95);
     if (!returnPhrase && local >= 16 && percussion > 0.08) {
       thumpMusic(t0, 0.08 * percussion);
       thumpMusic(t0 + EI * 3, 0.05 * percussion);
@@ -477,7 +485,7 @@ export function createMusic(game: GameRuntime, runtime: AudioRuntime, internals?
     runtime.releaseAt(t0 + 0.1, resources);
   }
   let musicBar = 0;
-  let musicSchedule: number = null;
+  let musicSchedule: number | null = null;
   let scheduleGeneration = 0;
 
   function suspend() {

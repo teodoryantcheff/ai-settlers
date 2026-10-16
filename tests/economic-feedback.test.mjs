@@ -379,7 +379,7 @@ test('real production counters drive feedback without changing economic results 
       t: runtime.GRASS,
       tree: 0,
       rock: null,
-      res: null,
+      deposit: null,
       road: false,
     }));
     runtime.state.paused = false;

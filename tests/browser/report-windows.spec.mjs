@@ -83,7 +83,7 @@ test('pointer and keyboard window geometry survives closing and remains reachabl
   await page.mouse.down();
   await page.mouse.move(title.x + 70, title.y + 40, { steps: 4 });
   await page.mouse.up();
-  let moved = await report.boundingBox();
+  const moved = await report.boundingBox();
   expect(moved.x).toBeGreaterThan(original.x);
   expect(moved.y).toBeGreaterThan(original.y);
   const move = page.getByRole('button', { name: 'Move Economy window', exact: true });
@@ -128,7 +128,7 @@ test('Economy restores edited filters, useful focus, disclosures and scroll afte
   await page.evaluate(() => {
     const g = window.productionArtPreview.game,
       b = g.newBuilding('sawmill', 51, 48);
-    Object.assign(b, { done: true, prog: 1, stock: { logs: 2 } });
+    Object.assign(b, { done: true, constructionProgress: 1, stock: { logs: 2 } });
     g.buildings.push(b);
   });
   await page.locator('#goods [data-good="planks"]').press('Enter');
@@ -177,7 +177,7 @@ test('Inspect retains Economy and its camera; Locate cancels pending zoom and re
   const id = await page.evaluate(() => {
     const g = window.productionArtPreview.game,
       b = g.newBuilding('sawmill', 80, 80);
-    Object.assign(b, { done: true, prog: 1 });
+    Object.assign(b, { done: true, constructionProgress: 1 });
     g.buildings.push(b);
     return b.id;
   });

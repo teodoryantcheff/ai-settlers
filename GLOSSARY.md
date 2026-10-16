@@ -1,6 +1,6 @@
 # Colony
 
-Terms for colony production, goods accounting, road planning, and production feedback.
+Terms for colony production, goods accounting, natural resources, construction, road planning, and production feedback.
 
 ## Language
 
@@ -55,6 +55,22 @@ _Avoid_: Recipe requirements, when describing the selected goods.
 **Edible good**:
 A good that can satisfy a mine's meal requirement: bread, meat, fish, or provisions.
 _Avoid_: Food, when it could mean provisions alone.
+
+**Deposit**:
+A finite mineral seam in a mountain tile containing coal, iron ore, or gold. A neighboring mine removes one unit per successful production cycle.
+_Avoid_: Reserved stock; a producer's collected ore.
+
+**Construction progress**:
+The fraction of a building site's construction work completed after all required materials arrive.
+_Avoid_: Production progress; delivered materials, when describing completed work.
+
+**Manned outpost**:
+A completed outpost that has received its soldier and can claim its full territory radius.
+_Avoid_: Completed outpost, when the soldier has not yet arrived.
+
+**Sent notice**:
+A record that a particular condition has already been reported for a building, used to suppress repeat reports until successful production clears it.
+_Avoid_: Current shortage or resource availability, which may change after the report.
 
 **Legacy armory**:
 An armory retained from an earlier colony that uses iron ore and coal instead of iron bars and coal.

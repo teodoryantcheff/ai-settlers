@@ -70,7 +70,7 @@ function village() {
     t: e.GRASS,
     tree: 0,
     rock: null,
-    res: null,
+    deposit: null,
     road: false,
   }));
   e.context = context;
@@ -85,7 +85,7 @@ test('displayed stockpiles follow physical stock rather than reservations or pro
   b.done = true;
   b.produced = 200;
   b.stock = { logs: 2, planks: 8 };
-  b.res = { planks: 8 };
+  b.reservedStock = { planks: 8 };
   let plan = e.villageStockPlan(b);
   assert.deepEqual(
     Array.from(plan, (s) => [s.good, s.quantity]),

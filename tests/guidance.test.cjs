@@ -44,10 +44,10 @@ test('optional beer contract spends reserved-aware stock once and grants its rew
   const hq = g.anyStorage();
   const index = g.contracts.findIndex((c) => c.cost.beer);
   hq.stock.beer = 10;
-  hq.res.beer = 1;
+  hq.reservedStock.beer = 1;
   g.claimContract(index);
   assert.ok(!g.state.contracts.includes(index));
-  hq.res.beer = 0;
+  hq.reservedStock.beer = 0;
   const before = g.state.gold;
   g.claimContract(index);
   assert.equal(hq.stock.beer, 0);
@@ -138,7 +138,7 @@ test('outpost siting preserves spacing around a narrow live gold mining face', (
     t: g.MTN,
     tree: 0,
     rock: null,
-    res: { kind: 'gold', amt: 240, amt0: 240 },
+    deposit: { kind: 'gold', amt: 240, amt0: 240 },
     road: false,
   };
   for (const [x, y] of [
@@ -154,6 +154,6 @@ test('outpost siting preserves spacing around a narrow live gold mining face', (
   assert.equal(g.isFaceTile(49, 48, ['gold']), true);
   assert.equal(g.isFaceTile(50, 48, ['gold']), true, 'guard would block the face through spacing');
   assert.equal(g.isFaceTile(51, 48, ['gold']), false);
-  g.tiles[deposit].res.amt = 0;
+  g.tiles[deposit].deposit.amt = 0;
   assert.equal(g.isFaceTile(50, 48, ['gold']), false, 'exhausted ore need not reserve space');
 });

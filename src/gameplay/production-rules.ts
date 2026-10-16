@@ -12,7 +12,7 @@ const noIngredients: Readonly<Inventory> = Object.freeze({});
 export function recipeRequirements(
   building: RecipeBuilding,
   spec: BuildingSpec,
-): Readonly<Inventory> {
+): Readonly<Inventory> | undefined {
   return building.type === 'armory' && building.legacyIndustry ? legacyArmory : spec.in;
 }
 
@@ -35,7 +35,7 @@ export function ingredientsConsumedNext(
   spec: BuildingSpec,
 ): Readonly<Inventory> {
   if (spec.prod !== 'mine') return recipeRequirements(building, spec) || noIngredients;
-  let good: Good;
+  let good: Good | undefined;
   for (const meal of edibleGoods)
     if ((building.stock[meal] || 0) > (good ? building.stock[good] || 0 : 0)) good = meal;
   // Preserve the missing-food diagnosis when no meal is stocked.
@@ -51,7 +51,8 @@ export function ingredientShortages(
   const missing: Array<{ good: Good; have: number; need: number }> = [];
   for (const good of Object.keys(inputs) as Good[]) {
     const have = building.stock[good] || 0;
-    if (have < inputs[good]) missing.push({ good, have, need: inputs[good] });
+    const need = inputs[good] || 0;
+    if (have < need) missing.push({ good, have, need });
   }
   return missing;
 }
@@ -62,16 +63,7 @@ export function productionTiming(
   spec: BuildingSpec,
   upgrade = 0,
 ) {
-  const base =
-    spec.prod === 'gather' || spec.prod === 'plant'
-      ? 7
-      : spec.prod === 'rock'
-        ? 8
-        : spec.prod === 'fish'
-          ? 9
-          : spec.prod === 'farm'
-            ? 15
-            : spec.time || 10;
+  const base = spec.time ?? 0;
   const tier = Math.min(3, upgrade || 0);
   const variety = spec.prod === 'mine' ? foodVarietyBonus(building) : 0;
   return { base, tier, variety, upgradeFactor: Math.pow(0.9, tier), foodMultiplier: 1 + variety };
