@@ -44,7 +44,9 @@ Reference searches buildings, actual recipes, resources, transport and diagnosti
 npm test
 ```
 
-Run only `npm test` for routine validation. It runs typechecking, the null-check gate and Node tests, retaining per-step logs and a JSON summary under `output/validation/<run>/`; failures print the log tail and stop the sequence.
+Run only `npm test` for routine validation. It lints with oxlint, then runs typechecking, the null-check gate and Node tests, retaining per-step logs and a JSON summary under `output/validation/<run>/`; failures print the log tail and stop the sequence.
+
+Lint rules live in `.oxlintrc.json`. Its override exempting files from `no-var` and `prefer-const` lists exactly the files that still fail them and may only shrink; remove a file once its declarations are migrated.
 
 Run the slower `npm run check`, browser tests or visual captures only when explicitly requested. The full check adds formatting, the build and browser tests. Browser tests use one worker because software WebGL is load-sensitive; the suite can take about 25 minutes and retains browser failure artifacts alongside its logs.
 
@@ -64,7 +66,7 @@ npm run deploy                             # Node tests, build, package, publish
 
 The Direct Upload project is `settlers-tribute`, served at https://settlers-tribute.pages.dev/. To recreate it in a new account, first run `npx wrangler pages project create settlers-tribute --production-branch main`. Wrangler 4.149.0 may delegate creation of new projects to Workers in agent environments; add `--force` to that one-time create command to explicitly retain Pages. Existing Pages projects do not need this flag for deployment. Ensure Wrangler targets the intended account; set `CLOUDFLARE_ACCOUNT_ID` when needed.
 
-`npm run deploy` runs `npm test` (typechecking and Node tests), then builds a fresh production package before publishing. Any failed or interrupted command prevents deployment. The full browser suite is an explicit check through `npm run check` or `npm run test:browser`; it is not part of deployment.
+`npm run deploy` runs `npm test` (lint, typechecking and Node tests), then builds a fresh production package before publishing. Any failed or interrupted command prevents deployment. The full browser suite is an explicit check through `npm run check` or `npm run test:browser`; it is not part of deployment.
 
 `npm run build:pages` creates a clean, deploy-only `dist/`: entry HTML, a real 404 page, Pages headers, and content-hashed releases containing the minified game and complete artwork/reference/provenance pack. Code and artwork share a release hash, preserving their relative paths and allowing one-year immutable caching; HTML revalidates. Cloudflare handles compression. Never deploy the repository root or manually add unversioned assets to the immutable release paths.
 

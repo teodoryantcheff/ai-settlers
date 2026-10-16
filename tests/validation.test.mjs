@@ -120,15 +120,16 @@ test('the full plan includes every Node test before build and single-worker brow
     .sort();
   assert.deepEqual(
     plan.map((entry) => entry.name),
-    ['format', 'typecheck', 'null-check', ...files, 'build', 'browser'],
+    ['format', 'lint', 'typecheck', 'null-check', ...files, 'build', 'browser'],
   );
   assert.ok(plan.at(-1).args.includes('--workers=1'));
   for (const entry of plan.filter((entry) => files.includes(entry.name)))
     assert.deepEqual(entry.args, ['--test-reporter=spec', path.join('tests', entry.name)]);
   assert.deepEqual(
     (await validationSteps(root, { nodeOnly: true })).map((entry) => entry.name),
-    ['typecheck', 'null-check', ...files],
+    ['lint', 'typecheck', 'null-check', ...files],
   );
+  assert.deepEqual(plan[1].args.slice(-3), ['src', 'scripts', 'tests']);
   const { scripts } = JSON.parse(await fs.readFile(path.join(root, 'package.json')));
   assert.equal(scripts.check, 'node scripts/validate.mjs');
   assert.equal(scripts['build:pages'], 'npm run build && node scripts/package-pages.mjs');
