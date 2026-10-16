@@ -72,6 +72,17 @@ const overlayName: OverlayName = 'routes';
 void layerName;
 void overlayName;
 
+// Node tests run source through type stripping, so syntax must erase to plain JavaScript.
+// @ts-expect-error Enums emit runtime code.
+enum Direction {
+  North,
+}
+void Direction.North;
+// @ts-expect-error Type-only imports must say so, because Node cannot tell them from values.
+import { TilePoint } from '../../src/types.ts';
+const origin: TilePoint = { x: 0, y: 0 };
+void origin;
+
 // Domain ports must not regain presentation dependencies, including type-only imports.
 import type { EconomyDependencies } from '../../src/simulation/economy.ts';
 import type { AutoplayDependencies } from '../../src/simulation/autoplay.ts';

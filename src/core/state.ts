@@ -32,15 +32,17 @@ export interface EventBus<Events extends object> {
 export function createEventBus<
   Events extends object = Record<string, unknown>,
 >(): EventBus<Events> {
-  const listeners = new Map<keyof Events, Set<(payload: Events[keyof Events]) => void>>();
+  // Keyed by event name, so each set only ever receives its own event's payload.
+  const listeners: { [K in keyof Events]?: Set<(payload: Events[K]) => void> } =
+    Object.create(null);
   return {
     on(name, listener) {
-      if (!listeners.has(name)) listeners.set(name, new Set());
-      listeners.get(name).add(listener);
-      return () => listeners.get(name).delete(listener);
+      const named = (listeners[name] ??= new Set());
+      named.add(listener);
+      return () => named.delete(listener);
     },
     emit(name, payload) {
-      for (const listener of listeners.get(name) || []) listener(payload);
+      for (const listener of listeners[name] || []) listener(payload);
     },
   };
 }
