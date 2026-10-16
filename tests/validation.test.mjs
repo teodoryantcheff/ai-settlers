@@ -124,14 +124,14 @@ test('the full plan includes every Node and soak test before build and single-wo
   assert.ok(soak.includes('soak/economy-autoplay.test.cjs'));
   assert.deepEqual(
     plan.map((entry) => entry.name),
-    ['format', 'lint', 'typecheck', 'null-check', ...files, ...soak, 'build', 'browser'],
+    ['format', 'lint', 'typecheck', ...files, ...soak, 'build', 'browser'],
   );
   assert.ok(plan.at(-1).args.includes('--workers=1'));
   for (const entry of plan.filter((entry) => [...files, ...soak].includes(entry.name)))
     assert.deepEqual(entry.args, ['--test-reporter=spec', path.join('tests', entry.name)]);
   assert.deepEqual(
     (await validationSteps(root, { nodeOnly: true })).map((entry) => entry.name),
-    ['lint', 'typecheck', 'null-check', ...files],
+    ['lint', 'typecheck', ...files],
   );
   assert.deepEqual(
     (await validationSteps(root, { soakOnly: true })).map((entry) => entry.name),

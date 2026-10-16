@@ -44,7 +44,7 @@ Reference searches buildings, actual recipes, resources, transport and diagnosti
 npm test
 ```
 
-Run only `npm test` for routine validation. It lints with oxlint, then runs typechecking, the null-check gate and Node tests, retaining per-step logs and a JSON summary under `output/validation/<run>/`; failures print the log tail and stop the sequence.
+Run only `npm test` for routine validation. It lints with oxlint, then runs typechecking and Node tests, retaining per-step logs and a JSON summary under `output/validation/<run>/`; failures print the log tail and stop the sequence.
 
 `npm test` excludes the economy soak suite in `tests/soak/`, whose full autoplay playthroughs take several minutes. Run `npm run test:soak` after changing simulation, economy, logistics, autoplay or progression balance; it retains logs the same way. `ECONOMY_SEED=<n>`, `ECONOMY_SEEDS=<a,b>`, `ECONOMY_PROFILE=invest` and `ECONOMY_SECONDS=<limit>` narrow or extend a run. CI and `npm run check` also run it; `npm run deploy` does not.
 
@@ -52,7 +52,7 @@ Lint rules live in `.oxlintrc.json`. `no-var` and `prefer-const` apply to source
 
 Run the slower `npm run check`, browser tests or visual captures only when explicitly requested. The full check adds formatting, the soak suite, the build and browser tests. Browser tests use one worker because software WebGL is load-sensitive; the suite can take about 25 minutes and retains browser failure artifacts alongside its logs.
 
-Tests and builds run TypeScript 7 checking through `npm run typecheck`, which invokes the TypeScript 7 compiler explicitly. Strict null checks are off in the main configuration; `node scripts/null-check.mjs` checks with them on outside `scripts/null-check-exclusions.json`. Remove files from that list as you fix them; it may only shrink. Browser tests require Playwright Chromium (`npx playwright install chromium` once). If port 8765 is occupied by another server, use `PLAYWRIGHT_PORT=8766 npm run test:browser`. Development scenarios are available at `tests/game.html?uitest&buildrules&seed=2024`, `?saveload&seed=123`, and `?devshot&seed=2024`.
+Tests and builds run TypeScript 7 checking through `npm run typecheck`, which invokes the TypeScript 7 compiler explicitly. Strict null checks are enabled in the main `tsconfig.json` for all source and compiler contracts. Browser tests require Playwright Chromium (`npx playwright install chromium` once). If port 8765 is occupied by another server, use `PLAYWRIGHT_PORT=8766 npm run test:browser`. Development scenarios are available at `tests/game.html?uitest&buildrules&seed=2024`, `?saveload&seed=123`, and `?devshot&seed=2024`.
 
 With the local server running, `npm run capture:production-art` exports images, diagnostics and a particle animation into `output/production-art/`. Capture additionally requires FFmpeg. Headless software-WebGL timings are diagnostics; profile target hardware for performance decisions.
 

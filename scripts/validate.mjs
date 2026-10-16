@@ -53,7 +53,6 @@ export async function validationSteps(directory, { nodeOnly = false, soakOnly = 
       'playwright.config.mjs',
     ),
     node('typecheck', 'node_modules/typescript/bin/tsc', '--noEmit'),
-    node('null-check', 'scripts/null-check.mjs'),
     ...tests.map(testStep),
     ...(!nodeOnly
       ? [

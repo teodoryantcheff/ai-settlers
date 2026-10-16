@@ -8,7 +8,7 @@ type Equal<A, B> =
   (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 type Assert<T extends true> = T;
 
-// The ordinary compiler permits null; these contracts also run under the null-check gate.
+// The main compiler preserves nullable domain contracts.
 export type MissingRoute = Assert<
   Equal<ReturnType<NavigationSubsystem['findPath']>, number[] | null>
 >;
