@@ -58,7 +58,9 @@ try {
   await checkpoint.waitFor({ state: 'visible' });
   const saved = await page.evaluate(() => localStorage.getItem('settlers.saves.v1'));
   assert.ok(saved);
-  const entry = JSON.parse(saved).entries.find((entry) => entry.name === 'Production smoke checkpoint');
+  const entry = JSON.parse(saved).entries.find(
+    (entry) => entry.name === 'Production smoke checkpoint',
+  );
   assert.equal(entry.kind, 'manual');
   assert.equal(entry.data.seed, 2024);
   await page.locator('#colony-name').fill('Unsaved smoke colony');
