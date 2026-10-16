@@ -29,28 +29,28 @@ export interface AdvisorDecision {
 
 export function createAdvisor(game: AdvisorDependencies): AdvisorSubsystem {
   function advTargets() {
-    var counts: Partial<Record<BuildingType, number>> = {},
-      countsSite: Partial<Record<BuildingType, number>> = {},
-      mines = 0,
+    const counts: Partial<Record<BuildingType, number>> = {},
+      countsSite: Partial<Record<BuildingType, number>> = {};
+    let mines = 0,
       foodRate = 0,
       far = false;
-    for (var b of game.buildings) {
+    for (const b of game.buildings) {
       if (b.exhausted || b.norock) continue;
-      var c = b.done ? counts : countsSite;
+      const c = b.done ? counts : countsSite;
       c[b.type] = (c[b.type] || 0) + 1;
       if (b.done && !b.exhausted && game.BSPEC[b.type].prod === 'mine') {
         mines++;
         foodRate += 1 / game.BSPEC[b.type].time;
       }
-      var store = game.nearestStoragePos(b.x, b.y);
+      const store = game.nearestStoragePos(b.x, b.y);
       if (store && Math.hypot(b.x - store.x, b.y - store.y) > 14) far = true;
     }
-    var have = function (bt: BuildingType) {
+    const have = function (bt: BuildingType) {
       return (counts[bt] || 0) + (countsSite[bt] || 0);
     };
-    var coast = false;
+    let coast = false;
     if (!have('fisherman')) {
-      for (var i = 0; i < game.tiles.length && !coast; i++)
+      for (let i = 0; i < game.tiles.length && !coast; i++)
         if (
           game.owned[i] &&
           game.passI(i) &&
@@ -58,41 +58,41 @@ export function createAdvisor(game: AdvisorDependencies): AdvisorSubsystem {
         )
           coast = true;
     } else coast = true;
-    var enoughTimber = have('lumberjack') && have('sawmill');
-    var neededFood = Math.max(1, Math.ceil(foodRate * 1.3 * (coast ? 9 : 15)));
-    var breadChains = have('well') ? Math.min(have('farm'), have('windmill'), have('bakery')) : 0;
-    var foodCount = have('fisherman') + breadChains + Math.min(have('pigfarm'), have('butcher'));
-    var foundations = enoughTimber && foodCount && have('quarry');
-    var needMetal =
+    const enoughTimber = have('lumberjack') && have('sawmill');
+    const neededFood = Math.max(1, Math.ceil(foodRate * 1.3 * (coast ? 9 : 15)));
+    const breadChains = have('well') ? Math.min(have('farm'), have('windmill'), have('bakery')) : 0;
+    const foodCount = have('fisherman') + breadChains + Math.min(have('pigfarm'), have('butcher'));
+    const foundations = enoughTimber && foodCount && have('quarry');
+    const needMetal =
       foundations &&
       (game.totalGood('tools') < Math.max(10, game.stockTargetTotal('tools')) ||
         game.totalGood('weapons') < Math.max(3, game.stockTargetTotal('weapons')));
-    var breadTarget = coast
+    let breadTarget = coast
       ? foundations || have('bakery') || have('windmill')
         ? 1
         : 0
       : neededFood;
     breadTarget += Math.min(3, Math.ceil(game.stockTargetTotal('bread') / 12));
-    var unwatered = game.buildings.filter(function (b) {
+    const unwatered = game.buildings.filter(function (b) {
       return game.BSPEC[b.type].water && !hasWellCoverage(game, b, 'planned');
     }).length;
-    var breweryTarget = foundations && have('farm') && have('well') ? 1 : have('brewery');
-    var waterTarget = Math.max(
+    const breweryTarget = foundations && have('farm') && have('well') ? 1 : have('brewery');
+    let waterTarget = Math.max(
       have('well') + unwatered,
       Math.ceil((breadTarget + breweryTarget) / 3),
     );
     // A well can serve several producers, but its service neighborhood may
     // fill up before the target is met. Request another service area when no
     // remaining consumer can be placed beside an existing or planned well.
-    var waterConsumer: BuildingType | null =
+    const waterConsumer: BuildingType | null =
       breadTarget > have('bakery') ? 'bakery' : breweryTarget > have('brewery') ? 'brewery' : null;
     if (waterConsumer && have('well') && waterTarget <= have('well')) {
-      var serviceSpace = false,
-        radius = wellRadius(game);
-      for (var well of game.buildings) {
+      let serviceSpace = false;
+      const radius = wellRadius(game);
+      for (const well of game.buildings) {
         if (!countsAsWell(well, 'planned')) continue;
-        for (var wy = well.y - radius; wy <= well.y + radius && !serviceSpace; wy++)
-          for (var wx = well.x - radius; wx <= well.x + radius && !serviceSpace; wx++)
+        for (let wy = well.y - radius; wy <= well.y + radius && !serviceSpace; wy++)
+          for (let wx = well.x - radius; wx <= well.x + radius && !serviceSpace; wx++)
             if (
               game.inB(wx, wy) &&
               wellReaches(game, well, wx, wy) &&
@@ -103,7 +103,7 @@ export function createAdvisor(game: AdvisorDependencies): AdvisorSubsystem {
       }
       if (!serviceSpace) waterTarget = have('well') + 1;
     }
-    var rows: Array<[BuildingType, number, string]> = [
+    const rows: Array<[BuildingType, number, string]> = [
       [
         'lumberjack',
         Math.max(1, Math.ceil((have('sawmill') * 7) / 8)),
@@ -173,9 +173,9 @@ export function createAdvisor(game: AdvisorDependencies): AdvisorSubsystem {
       ],
       ['warehouse', far || mines >= 2 ? 1 : 0, 'Shorten long hauls and add eight carrier places.'],
     ];
-    var list: AdvTarget[] = [];
-    for (var row of rows) {
-      var bt = row[0],
+    const list: AdvTarget[] = [];
+    for (const row of rows) {
+      const bt = row[0],
         target = row[1];
       if (target > 0)
         list.push({
@@ -187,17 +187,17 @@ export function createAdvisor(game: AdvisorDependencies): AdvisorSubsystem {
           def: Math.max(0, target - have(bt)),
         });
     }
-    var wanted = list.filter(function (r) {
+    const wanted = list.filter(function (r) {
       return r.def > 0 && game.BSPEC[r.bt].resKind;
     });
-    var needExpand = false;
-    for (var r of wanted) {
-      var accessible = false;
-      for (var ti = 0; ti < game.tiles.length && !accessible; ti++) {
-        var tile = game.tiles[ti];
+    let needExpand = false;
+    for (const r of wanted) {
+      let accessible = false;
+      for (let ti = 0; ti < game.tiles.length && !accessible; ti++) {
+        const tile = game.tiles[ti];
         if (!tile.res || tile.res.kind !== game.BSPEC[r.bt].resKind || tile.res.amt <= 0) continue;
-        for (var d = 0; d < 8; d++) {
-          var x = (ti % game.W) + game.DX[d],
+        for (let d = 0; d < 8; d++) {
+          const x = (ti % game.W) + game.DX[d],
             y = ((ti / game.W) | 0) + game.DY[d];
           if (game.inB(x, y) && game.canPlace(r.bt, x, y)[0]) {
             accessible = true;
@@ -217,17 +217,17 @@ export function createAdvisor(game: AdvisorDependencies): AdvisorSubsystem {
         def: needExpand && !game.pendingOutpost() ? 1 : 0,
         waiting: needExpand ? game.pendingOutpost() : null,
       });
-    var lesson = game.currentLesson(),
+    const lesson = game.currentLesson(),
       preferred = lesson && lesson.step.building;
     list.sort(function (a, b) {
-      var ap = a.def > 0 ? (a.bt === preferred ? 100 : 20) : 0,
+      const ap = a.def > 0 ? (a.bt === preferred ? 100 : 20) : 0,
         bp = b.def > 0 ? (b.bt === preferred ? 100 : 20) : 0;
       return bp - ap;
     });
     return list;
   }
   function advisorDecision() {
-    var list = advTargets(),
+    const list = advTargets(),
       action = list.find(function (r) {
         return r.def > 0;
       });
@@ -236,15 +236,15 @@ export function createAdvisor(game: AdvisorDependencies): AdvisorSubsystem {
         return b.done && !b.disabled && b.blockedReason === 'water';
       })
     ) {
-      var water = list.find(function (row) {
+      const water = list.find(function (row) {
         return row.bt === 'well' && row.def > 0;
       });
       if (water) return { action: water };
     }
-    var bottleneck: Building | null = null,
+    let bottleneck: Building | null = null,
       missing: Good | null = null;
-    for (var b of game.buildings) {
-      var sp = game.BSPEC[b.type],
+    for (const b of game.buildings) {
+      const sp = game.BSPEC[b.type],
         good = ingredientShortages(b, sp)[0]?.good;
       if (
         b.done &&
@@ -264,23 +264,23 @@ export function createAdvisor(game: AdvisorDependencies): AdvisorSubsystem {
       }
     }
     if (!bottleneck) {
-      var expansion = list.find(function (r) {
+      const expansion = list.find(function (r) {
         return r.waiting;
       });
       return expansion && (!action || game.BSPEC[action.bt].resKind)
         ? { waiting: expansion.waiting }
         : { action: action };
     }
-    var alternatives = ingredientAlternatives(game.BSPEC[bottleneck.type], missing);
-    var ready = alternatives.reduce(function (sum, good) {
+    const alternatives = ingredientAlternatives(game.BSPEC[bottleneck.type], missing);
+    let ready = alternatives.reduce(function (sum, good) {
       return sum + game.totalGood(good);
     }, 0);
-    for (var source of game.buildings)
+    for (const source of game.buildings)
       if (alternatives.includes(game.BSPEC[source.type].out))
         ready += source.stock[game.BSPEC[source.type].out] || 0;
-    for (var u of game.units) if (alternatives.includes(u.carry)) ready++;
+    for (const u of game.units) if (alternatives.includes(u.carry)) ready++;
     if (!ready) {
-      var supplier = list.find(function (r) {
+      const supplier = list.find(function (r) {
         return (
           r.def > 0 &&
           (game.BSPEC[r.bt].out === missing ||
