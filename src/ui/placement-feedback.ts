@@ -1,3 +1,4 @@
+import { html as markup, trusted } from './markup.ts';
 import type { GameRuntime } from '../runtime.ts';
 
 /** Pointer-safe evidence snapshots; rules and live evidence stay with their existing views. */
@@ -45,13 +46,7 @@ export function createPlacementFeedback(game: GameRuntime): PlacementFeedback {
         html = next;
         location = at;
         owner = tool();
-        panel.innerHTML =
-          '<p class="placement-snapshot" hidden>Snapshot from last map position ' +
-          at +
-          ' · observed at ' +
-          game.state.time.toFixed(1) +
-          's. Move back to the map to refresh.</p>' +
-          next;
+        panel.innerHTML = markup`<p class="placement-snapshot" hidden>Snapshot from last map position ${at} · observed at ${game.state.time.toFixed(1)}s. Move back to the map to refresh.</p>${trusted(next)}`;
       }
       panel.hidden = false;
       const note = panel.querySelector<HTMLElement>('.placement-snapshot');

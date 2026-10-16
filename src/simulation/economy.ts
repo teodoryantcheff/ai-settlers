@@ -1500,8 +1500,8 @@ export function createEconomy(
     }
   }
   function dropFail(u: Unit) {
-    // delivery unreachable: unwind the job cleanly. Orphaning a taken job in the queue makes
-    // incomingCount count it forever, so ensureJobs never recreates the fetch and the site stalls.
+    // Unreachable delivery must unwind its job. A taken job left in the queue keeps
+    // the fetch count elevated, so ensureJobs never replaces it and the site stalls.
     if (u.job) {
       const ji2 = game.jobs.indexOf(u.job);
       if (ji2 >= 0) game.jobs.splice(ji2, 1);

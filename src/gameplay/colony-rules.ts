@@ -64,3 +64,64 @@ export function productionOutputBlocked(building: Pick<Building, 'stock'>, spec:
     (building.stock[spec.out] || 0) + (spec.prod === 'gather' ? 2 : 1) > productionOutputLimit
   );
 }
+
+/** Completed territorial buildings, including hypothetical guard states. */
+export type TerritoryClaim = Pick<Building, 'type' | 'x' | 'y' | 'done' | 'man'>;
+
+export interface TerritoryWorld extends Pick<ColonyRulesWorld, 'BSPEC'> {
+  readonly W: number;
+  readonly H: number;
+  readonly DX: readonly number[];
+  readonly DY: readonly number[];
+  buildings: readonly TerritoryClaim[];
+  idx: (x: number, y: number) => number;
+  inB: (x: number, y: number) => boolean;
+  passI: (i: number) => boolean;
+}
+
+const unmannedGuardRadius = 3;
+
+/**
+ * Project the union of orthogonal claims over traversable ground. Replacing the
+ * source list can add, remove or unman guards without changing the live colony.
+ * Wells provide local water service but never claim territory.
+ */
+export function projectTerritory(
+  world: TerritoryWorld,
+  buildings: readonly TerritoryClaim[] = world.buildings,
+) {
+  const projected = new Uint8Array(world.W * world.H);
+  const seen = new Uint32Array(projected.length);
+  let stamp = 0;
+  for (const building of buildings) {
+    if (!building.done || building.type === 'well') continue;
+    const spec = world.BSPEC[building.type];
+    const radius =
+      spec.guard && !building.man ? Math.min(spec.rad || 0, unmannedGuardRadius) : spec.rad || 0;
+    if (!radius) continue;
+    stamp++;
+    const start = world.idx(building.x, building.y);
+    const queue = [start];
+    const distances = [0];
+    seen[start] = stamp;
+    for (let qi = 0; qi < queue.length; qi++) {
+      const current = queue[qi];
+      const distance = distances[qi];
+      projected[current] = 1;
+      if (distance >= radius) continue;
+      const x = current % world.W;
+      const y = (current / world.W) | 0;
+      for (let direction = 0; direction < 4; direction++) {
+        const nx = x + world.DX[direction];
+        const ny = y + world.DY[direction];
+        if (!world.inB(nx, ny)) continue;
+        const next = world.idx(nx, ny);
+        if (seen[next] === stamp || !world.passI(next)) continue;
+        seen[next] = stamp;
+        queue.push(next);
+        distances.push(distance + 1);
+      }
+    }
+  }
+  return projected;
+}

@@ -1,3 +1,4 @@
+import { html as markup, trusted, escapeMarkup, formatGoods } from './markup.ts';
 import { createLiveReportUpdater } from './live-report.ts';
 import { createInspectorView, type InspectorInternals } from './inspector-view.ts';
 import { createPlacementFeedback } from './placement-feedback.ts';
@@ -52,16 +53,14 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
   const inspector = createInspectorView(game, placementFeedback, internals);
   const { updateInfo, tileInfo } = inspector;
   function observedFlows(record: Inventory, elapsed: number, allowed?: Inventory) {
-    if (!elapsed) return '—';
-    const flows = [];
-    for (const g in record)
-      if ((!allowed || allowed[g as Good]) && record[g as Good])
-        flows.push(
-          ((record[g as Good] / elapsed) * 60).toFixed(1) +
-            ' ' +
-            game.GOODS[g as Good].name.toLowerCase(),
-        );
-    return flows.join(', ') || '0';
+    return formatGoods(game.GOODS, record, {
+      elapsed,
+      allowed,
+      omitZero: true,
+      lowerCase: true,
+      separator: ', ',
+      empty: '0',
+    });
   }
   const replaceAdvice = createLiveReportUpdater({
     focusAttribute: 'id',
@@ -75,54 +74,25 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
       bottleneck = decision.bottleneck;
     let h = '';
     if (decision.waiting) {
-      h =
-        '<button type="button" class="ar warn" data-focus="' +
-        decision.waiting.id +
-        '"><div class="l1"><span class="ag warn">→</span><span>Finish the Outpost</span></div><div class="why">' +
-        (decision.waiting.done
+      h = markup`<button type="button" class="ar warn" data-focus="${decision.waiting.id}"><div class="l1"><span class="ag warn">→</span><span>Finish the Outpost</span></div><div class="why">${
+        decision.waiting.done
           ? 'The garrison is pending. Inspect its dispatch or walking soldier; manning extends the border.'
-          : 'Deliver its construction materials before starting another expansion.') +
-        '</div></button>';
+          : 'Deliver its construction materials before starting another expansion.'
+      }</div></button>`;
     } else if (bottleneck && decision.shortage) {
-      h =
-        '<button type="button" class="ar warn" data-focus="' +
-        bottleneck.id +
-        '"><div class="l1"><span class="ag warn">!</span><span>Restore ' +
-        game.GOODS[decision.missing].name.toLowerCase() +
-        ' supply</span></div><div class="why">' +
-        game.BSPEC[bottleneck.type].name +
-        ' needs inputs, but none are ready for delivery. Check its suppliers for exhausted resources or paused work.</div></button>';
+      h = markup`<button type="button" class="ar warn" data-focus="${bottleneck.id}"><div class="l1"><span class="ag warn">!</span><span>Restore ${game.GOODS[decision.missing].name.toLowerCase()} supply</span></div><div class="why">${game.BSPEC[bottleneck.type].name} needs inputs, but none are ready for delivery. Check its suppliers for exhausted resources or paused work.</div></button>`;
     } else if (bottleneck) {
       const pct = Math.round((bottleneck.metrics.inputBlocked / bottleneck.metrics.elapsed) * 100);
-      h =
-        '<button type="button" class="ar warn" data-focus="' +
-        bottleneck.id +
-        '"><div class="l1"><span class="ag warn">!</span><span>Improve ' +
-        game.BSPEC[bottleneck.type].name +
-        ' deliveries</span></div><div class="why">Waiting for inputs during ' +
-        pct +
-        '% of its observed time. Inspect its route and nearby suppliers.</div></button>';
+      h = markup`<button type="button" class="ar warn" data-focus="${bottleneck.id}"><div class="l1"><span class="ag warn">!</span><span>Improve ${game.BSPEC[bottleneck.type].name} deliveries</span></div><div class="why">Waiting for inputs during ${pct}% of its observed time. Inspect its route and nearby suppliers.</div></button>`;
     } else if (action)
-      h =
-        '<button type="button" class="ar warn" data-b="' +
-        action.bt +
-        '"><div class="l1"><span class="ag warn">→</span><span>' +
-        game.BSPEC[action.bt].name +
-        '</span><span class="st">' +
-        action.have +
-        (action.site ? ' + ' + action.site : '') +
-        ' / ' +
-        action.target +
-        '</span></div><div class="why">' +
-        action.why +
-        '</div></button>';
+      h = markup`<button type="button" class="ar warn" data-b="${action.bt}"><div class="l1"><span class="ag warn">→</span><span>${game.BSPEC[action.bt].name}</span><span class="st">${action.have}${action.site ? ' + ' + action.site : ''} / ${action.target}</span></div><div class="why">${action.why}</div></button>`;
     else
       h =
         '<div class="ar ok"><div class="l1"><span class="ag ok">✓</span><span>The core economy is supplied</span></div><div class="why">Inspect long routes, fulfill a contract, or grow the treasury.</div></div>';
     const key = decision.waiting?.id || bottleneck?.id;
     h = h.replace(
       '<button ',
-      '<button id="advisor-' + (key ? 'focus-' + key : 'build-' + action?.bt) + '" ',
+      markup`<button id="advisor-${key ? 'focus-' + key : 'build-' + action?.bt}" `,
     );
     if (h !== lastAdvHTML) {
       replaceAdvice(document.getElementById('advrows'), h);
@@ -136,45 +106,22 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
       const elapsed = (m && m.elapsed) || 0,
         rate = elapsed > 0 ? (((m.produced[sp.out] || 0) / elapsed) * 60).toFixed(1) : '—',
         waiting = elapsed > 0 ? Math.round((m.inputBlocked / elapsed) * 100) : 0;
-      details +=
-        '<div>' +
-        sp.name +
-        ': ' +
-        rate +
-        ' ' +
-        game.GOODS[sp.out].name.toLowerCase() +
-        '/min · waiting ' +
-        waiting +
-        '%' +
-        (sp.in
-          ? '<small>Consumes ' +
-            observedFlows(
+      details += markup`<div>${sp.name}: ${rate} ${game.GOODS[sp.out].name.toLowerCase()}/min · waiting ${waiting}%${trusted(
+        sp.in
+          ? markup`<small>Consumes ${observedFlows(
               m.consumed,
               elapsed,
               sp.prod === 'mine' ? undefined : recipeRequirements(b, sp),
-            ) +
-            '/min · Arrivals ' +
-            observedFlows(
+            )}/min · Arrivals ${observedFlows(
               m.delivered,
               elapsed,
               sp.prod === 'mine' ? undefined : recipeRequirements(b, sp),
-            ) +
-            '/min</small>'
-          : '') +
-        '</div>';
+            )}/min</small>`
+          : '',
+      )}</div>`;
     }
     document.getElementById('advmetrics').innerHTML =
       details || 'Production rates appear after buildings begin working.';
-  }
-  function escapeMarkup(text: string) {
-    return String(text).replace(/[&<>"']/g, function (c) {
-      return (
-        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<
-          string,
-          string
-        >
-      )[c];
-    });
   }
   let hudT = 0,
     lastGoodsHTML: string | null = null,
@@ -196,20 +143,14 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
       resourceHelp.clear();
       document.getElementById('goods').innerHTML = RESOURCE_GROUPS.map(
         (group) =>
-          '<div class="resource-group" role="group" aria-label="' +
-          group.name +
-          '">' +
-          group.goods
-            .map(
-              (g) =>
-                '<span class="gd" tabindex="0" data-good="' +
-                g +
-                '" role="button">' +
-                resourceIcon(g) +
-                '<b>0</b></span>',
-            )
-            .join('') +
-          '</div>',
+          markup`<div class="resource-group" role="group" aria-label="${group.name}">${trusted(
+            group.goods
+              .map(
+                (g) =>
+                  markup`<span class="gd" tabindex="0" data-good="${g}" role="button">${trusted(resourceIcon(g))}<b>0</b></span>`,
+              )
+              .join(''),
+          )}</div>`,
       ).join('');
       document.querySelectorAll<HTMLElement>('#goods [data-good]').forEach((trigger) => {
         const good = trigger.dataset.good as Good;
@@ -299,7 +240,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
       let node = messageNodes.get(message);
       if (!node) {
         node = document.createElement('div');
-        node.innerHTML = escapeMarkup(message.t);
+        node.textContent = message.t;
         if (message.context) {
           const context = message.context;
           const link = document.createElement('button');
@@ -427,16 +368,12 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     const sp = game.BSPEC[type as BuildingType];
     if (type === 'road') return 'free';
     if (type === 'demolish') return '';
-    const parts = [];
-    for (const g in sp.cost)
-      parts.push(sp.cost[g as Good] + ' ' + game.GOODS[g as Good].name.toLowerCase());
-    return parts.join(', ');
+    return formatGoods(game.GOODS, sp.cost, { lowerCase: true, separator: ', ' });
   }
   function costStr2(o: Inventory) {
-    const parts = [];
-    for (const g in o) parts.push(o[g as Good] + ' ' + game.GOODS[g as Good].name.toLowerCase());
-    return parts.join(' + ');
+    return formatGoods(game.GOODS, o, { lowerCase: true });
   }
+
   let hlTiles: number[] | null = null,
     hlSpots: number[] | null = null;
   function refreshGhost() {
