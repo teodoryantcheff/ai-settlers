@@ -44,7 +44,16 @@ Reference searches buildings, actual recipes, resources, transport and diagnosti
 npm test
 ```
 
-Run only `npm test` for routine validation. It lints with oxlint, then runs typechecking and Node tests, retaining per-step logs and a JSON summary under `output/validation/<run>/`; failures print the log tail and stop the sequence.
+Use `npm test` for routine validation. It lints with oxlint, then runs typechecking and Node tests, retaining per-step logs and a JSON summary under `output/validation/<run>/`; failures print the log tail and stop the sequence.
+
+During iteration, select affected Node test files while keeping repository-wide lint, typechecking and the same logs:
+
+```sh
+npm test -- --file tests/validation.test.mjs
+npm test -- --file tests/validation.test.mjs --file tests/typecheck.test.mjs
+```
+
+Pass exact paths to routine files in `tests/`; repeated selections run once in the suite's usual order. Missing files, globs, helper files, browser tests and soak tests are rejected before validation starts. Run plain `npm test` once at the end, before committing, to cover the full routine suite.
 
 `npm test` excludes the economy soak suite in `tests/soak/`, whose full autoplay playthroughs take several minutes. Run `npm run test:soak` after changing simulation, economy, logistics, autoplay or progression balance; it retains logs the same way. `ECONOMY_SEED=<n>`, `ECONOMY_SEEDS=<a,b>`, `ECONOMY_PROFILE=invest` and `ECONOMY_SECONDS=<limit>` narrow or extend a run. CI and `npm run check` also run it; `npm run deploy` does not.
 
