@@ -836,3 +836,93 @@ test('an unavailable shadow context reports through the graphics failure boundar
   );
   assert.deepEqual(failures, ['Canvas 2D context is unavailable']);
 });
+
+function pausedScene(paintForeground = false) {
+  const flashes = [];
+  const e = renderer({
+    presentation: {
+      available: true,
+      invalidate() {},
+      begin() {},
+      end() {},
+      layer(name, ctx, paint) {
+        if (!paintForeground || name !== 'foreground-effects') return;
+        const fill = ctx.fillRect;
+        ctx.fillRect = (...args) => {
+          if (String(ctx.fillStyle).startsWith('rgba(255,255,255,')) flashes.push(ctx.fillStyle);
+          fill(...args);
+        };
+        try {
+          paint();
+        } finally {
+          ctx.fillRect = fill;
+        }
+      },
+    },
+  });
+  e.staticDirty = false;
+  e.borderDirty = false;
+  e.buildings = [];
+  e.mode = null;
+  e.ghost = null;
+  e.presentationPrefs.weather = false;
+  e.vw = 800;
+  e.vh = 600;
+  e.cam = { x: 40 * e.TS, y: 40 * e.TS };
+  e.SND.thunder = () => {};
+  return { e, flashes };
+}
+
+test('paused feedback starts on the current wall clock and still completes', (t) => {
+  const clock = pinClock(1000);
+  t.after(() => clock.restore());
+  const { e } = pausedScene(true);
+  e.draw();
+  clock.set(3000);
+  e.draw();
+  e.FX.ring(48, 48, '#ffd23f', 16);
+  e.draw();
+  assert.equal(e.FXL.length, 1, 'new feedback survives its first paused frame');
+  clock.tick(700);
+  e.draw();
+  assert.equal(e.FXL.length, 0, 'brief feedback finishes while paused');
+});
+
+test('paused camera movement still refreshes the minimap viewport', (t) => {
+  const clock = pinClock(1000);
+  t.after(() => clock.restore());
+  const { e } = pausedScene();
+  e.draw();
+  e.drawMini();
+  e.calls.length = 0;
+  clock.tick(1000);
+  e.cam.x += e.TS;
+  e.draw();
+  e.drawMini();
+  assert.ok(
+    e.calls.some((call) => call.method === 'strokeRect'),
+    'viewport redraw is not frozen with decorative time',
+  );
+});
+
+test('lightning during pause expires on wall time', (t) => {
+  const clock = pinClock(1000);
+  t.after(() => clock.restore());
+  const random = Math.random;
+  t.after(() => {
+    Math.random = random;
+  });
+  const { e, flashes } = pausedScene(true);
+  e.draw();
+  e.presentationPrefs.weather = true;
+  e._rain = 1;
+  Math.random = () => 0;
+  clock.tick(1000);
+  e.draw();
+  assert.equal(flashes.length, 1, 'the thunderstorm produces a flash');
+  flashes.length = 0;
+  Math.random = () => 0.5;
+  clock.tick(500);
+  e.draw();
+  assert.equal(flashes.length, 0, 'the flash is gone after 180 ms even while paused');
+});

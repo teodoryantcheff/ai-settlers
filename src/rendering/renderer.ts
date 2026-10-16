@@ -2732,7 +2732,8 @@ export function createRenderer(
     const wallNow = performance.now();
     if (game.state.paused) _pausedNow ??= wallNow;
     else _pausedNow = null;
-    NOW = _pausedNow ?? wallNow;
+    NOW = wallNow;
+    const decorativeNow = _pausedNow ?? wallNow;
     initRenderEvents();
     stepZoom(wallNow);
     weatherTick(wallNow, Math.min(0.1, (wallNow - _lastNow) / 1000) || 0.016);
@@ -2795,25 +2796,25 @@ export function createRenderer(
         castOpacity < 0.02 / 0.17 ? 0 : castOpacity,
         renderPrefs().clarity ? 0.62 : 1,
       );
-      waterAnim(ctx, NOW);
-      highlights(ctx, NOW);
-      guardPreview(ctx, NOW);
+      waterAnim(ctx, decorativeNow);
+      highlights(ctx, decorativeNow);
+      guardPreview(ctx, decorativeNow);
       demoMarkers(ctx);
       clarityRoads(ctx);
-      if (!renderPrefs().clarity) cloudsShadowDraw(ctx, NOW);
+      if (!renderPrefs().clarity) cloudsShadowDraw(ctx, decorativeNow);
     });
-    drawObjects(ctx, NOW);
+    drawObjects(ctx, decorativeNow);
     layer('foreground-effects', function () {
       fxDraw(ctx, wallNow);
-      meadowParticles(ctx, NOW);
+      meadowParticles(ctx, decorativeNow);
       clarityBuildings(ctx);
-      selection(ctx, NOW);
-      anchorDraw(ctx, NOW);
+      selection(ctx, decorativeNow);
+      anchorDraw(ctx, decorativeNow);
       ghostDraw(ctx);
       logisticsDraw(ctx);
       if (!renderPrefs().clarity) {
-        cloudsDraw(ctx, NOW);
-        birdsDraw(ctx, NOW);
+        cloudsDraw(ctx, decorativeNow);
+        birdsDraw(ctx, decorativeNow);
       }
       // day/night + weather tint (screen space)
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -2846,7 +2847,7 @@ export function createRenderer(
         glowsDraw(ctx);
       }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      if (!renderPrefs().clarity && _rain > 0.02) rainDraw(ctx, NOW);
+      if (!renderPrefs().clarity && _rain > 0.02) rainDraw(ctx, decorativeNow);
       logisticsCaption(ctx);
     });
     presentation.end(ctx);

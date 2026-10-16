@@ -82,6 +82,8 @@ Acceptance on the reference laptop, at every zoom with the simulation running at
 
 ### Phase 1: quick wins in the current adapter (days)
 
+Items 1–4 are implemented in #37; see the same-session measurements below.
+
 Each item lands independently and is measurable with `npm run bench:render`.
 
 1. **Shared sub-textures.** In `image()`, look up one cached `Texture` per (source, frame) and assign it to the slot sprite, instead of mutating a per-slot dynamic texture's `source` and `frame`. Give the camera-cropped terrain and border blits dedicated sprites. Measured: −45–60% while running.
@@ -171,3 +173,6 @@ Art textures are shared by source/crop. Camera crops use dedicated per-source-ti
 The shadow layer uses one quad with two cached planes rather than fading contacts together with sunlight. This preserves root-contact opacity through night/rain and retains the existing clarity multiplier. Only affected 8×8-tile chunks repaint/upload for tree-stage and completed-building changes; loads rebuild everything. No simulation RNG or time is consumed. Full and incremental shadow frames are compared using actual WebGL pixels, including a forced 2048-pixel texture limit.
 
 Controlled captures use hardware WebGL, 1440×900, seed 2024, installed painted assets, paused simulation and a fixed cosmetic clock. The matrix covers zooms 0.55, 1.0 and 2.2 in day, midnight, rain, Visual clarity, Reduced Motion and quality 0.75. The screenshot harness verifies the actual night/rain values (midnight approximately 1; rain approximately 0.97), because `devshot` alone pins daylight. Captures and their scripts are retained in `output/issue37/`. Cached resampling and discretized flag poses are raster changes rather than pixel-identical screenshots; geometry, entrances, tree roots and camera positions are checked visually.
+
+
+Final review found and corrected a split-clock regression: shared presentation time remains wall time for lightning expiry, new feedback effects, the minimap throttle and diagnostics. Only decorative painter inputs freeze while paused. Real-subsystem regressions cover a paused thunderstorm, feedback created during pause and minimap viewport movement.
