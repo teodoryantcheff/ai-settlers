@@ -314,7 +314,7 @@ export function createInspectorView(
     lastInfoHTML: string | null = null;
   // Markup each section last received; browsers serialize it back differently.
   let rendered = new WeakMap<Element, string>();
-  function section(selector: string, html: string) {
+  function rememberRendered(selector: string, html: string | undefined) {
     const node = infoBody.querySelector(selector);
     if (node && html !== undefined) rendered.set(node, html);
   }
@@ -467,15 +467,10 @@ export function createInspectorView(
     ) {
       render(liveNode, liveHTML);
       const stats = infoBody.querySelector('[data-production-stats]');
-      if (
-        stats &&
-        productionHTML &&
-        !stats.contains(document.activeElement) &&
-        rendered.get(stats) !== productionHTML
-      ) {
+      if (stats && productionHTML && !stats.contains(document.activeElement)) {
         const open = stats.querySelector('details')?.open;
-        render(stats, productionHTML);
-        if (open && stats.querySelector('details')) stats.querySelector('details').open = true;
+        if (render(stats, productionHTML) && open && stats.querySelector('details'))
+          stats.querySelector('details').open = true;
       }
       const reference = infoBody.querySelector('[data-inspector-reference]');
       if (reference) render(reference, referenceHTML);
@@ -499,10 +494,10 @@ export function createInspectorView(
       infoBody.innerHTML = h;
       lastInfoHTML = h;
       inspectorKey = key;
-      section('[data-inspector-live]', liveHTML);
-      section('[data-production-stats]', productionHTML);
-      section('[data-inspector-reference]', referenceHTML);
-      section('[data-demolition-quote]', quoteHTML);
+      rememberRendered('[data-inspector-live]', liveHTML);
+      rememberRendered('[data-production-stats]', productionHTML);
+      rememberRendered('[data-inspector-reference]', referenceHTML);
+      rememberRendered('[data-demolition-quote]', quoteHTML);
       const details = infoBody.querySelector('details');
       if (details && wasOpen) details.open = true;
     }

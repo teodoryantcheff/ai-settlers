@@ -60,6 +60,8 @@ test('the building table radius drives production, the advisor and autoplay', ()
   assert.ok(Math.hypot(wellSpot[0] - bakery.x, wellSpot[1] - bakery.y) <= 3);
   well.done = true;
   assert.equal(game.hasLocalWater(bakery), false, 'production loses its water service');
+  assert.match(game.advTargets().find((row) => row.bt === 'well').why, /within 3 tiles/);
+  assert.ok(game.buildingStatus(bakery).lines.some((line) => /within 3 tiles/.test(line.t)));
   const bakerySpot = findSpot('bakery');
   assert.ok(bakerySpot);
   assert.ok(Math.hypot(bakerySpot[0] - well.x, bakerySpot[1] - well.y) <= 3);

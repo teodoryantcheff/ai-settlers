@@ -1,4 +1,4 @@
-import { hasWellCoverage } from '../gameplay/colony-rules.ts';
+import { hasWellCoverage, wellRadius } from '../gameplay/colony-rules.ts';
 import { deliveryStage } from './delivery-stage.ts';
 import type { ObservationSubsystem } from './observations.ts';
 import {
@@ -849,7 +849,7 @@ export function createEconomy(
       output: `Output blocked: the next batch needs space for ${output} ${sp.out ? game.GOODS[sp.out].name.toLowerCase() : 'goods'}; ${b.stock[sp.out] || 0} of 8 local output slots are occupied. Waiting for collection.`,
       demand: 'Production suspended: colony demand is satisfied by current reserves.',
       reserve: 'Production suspended by the colony stock reserve policy.',
-      water: 'Production suspended: no working connected local well within 6 tiles.',
+      water: `Production suspended: no working connected local well within ${wellRadius(game)} tiles.`,
       inputs: 'Production suspended: required ingredients are missing locally.',
       resources:
         'Natural resource availability will be checked at the next attempt; the retry countdown continues.',
@@ -1989,7 +1989,7 @@ export function createEconomy(
         if (sp.out === 'beer' && totalGood('beer') >= Math.max(12, stockTargetTotal('beer')))
           lines.push({ t: 'Beer reserves are plentiful — production paused', w: false });
         if (sp.water && !hasLocalWater(b))
-          lines.push({ t: 'Needs a working well within 6 tiles', w: true });
+          lines.push({ t: `Needs a working well within ${wellRadius(game)} tiles`, w: true });
         for (var shortage of ingredientShortages(b, sp)) {
           const alternatives = sp.prod === 'mine' ? edibleGoods : [shortage.good];
           const stages: DeliveryStages = { queued: 0, assigned: 0, carrying: 0 };

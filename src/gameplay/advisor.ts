@@ -132,7 +132,11 @@ export function createAdvisor(game: AdvisorDependencies): AdvisorSubsystem {
         'Grain supplies windmills, pig farms and breweries; grain itself does not feed mines.',
       ],
       ['windmill', Math.max(breadTarget, have('bakery')), 'Mill grain into flour for the bakery.'],
-      ['well', waterTarget, 'Bakery and brewery need an enabled well within six tiles.'],
+      [
+        'well',
+        waterTarget,
+        `Bakery and brewery need an enabled well within ${wellRadius(game)} tiles.`,
+      ],
       ['bakery', breadTarget, 'Bake flour into bread with nearby well service to feed mines.'],
       [
         'brewery',
