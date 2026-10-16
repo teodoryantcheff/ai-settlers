@@ -15,6 +15,7 @@ import type {
 } from '../types.ts';
 import { observePresentation } from '../ui/domain-feedback.ts';
 import type { GameRuntime } from '../runtime.ts';
+import { requireCanvas2D } from './canvas-context.ts';
 
 /** Live display pose of one walker, keyed by unit id across frames. */
 export interface UnitPose {
@@ -120,6 +121,13 @@ export function createRenderer(
   internals?: RendererInternals,
 ): RendererSubsystem {
   const presentation = scenePresentation;
+  function reportGraphicsFailure(reason: string) {
+    if (presentation.reportFailure) presentation.reportFailure(reason);
+    else {
+      presentation.available = false;
+      game.emitGameEvent('rendererFailed', { reason });
+    }
+  }
   let staticDirty = true;
   function layer(name: LayerName, paint: () => void) {
     presentation.layer(name, ctx, paint);
@@ -131,9 +139,9 @@ export function createRenderer(
   //   per-frame — animated water, y-sorted buildings/trees/rocks/units, effects, ghost
 
   const scan = game.Acan(game.W * game.TS * game.ST, game.H * game.TS * game.ST),
-    sctx = scan.getContext('2d', { willReadFrequently: true });
+    sctx = requireCanvas2D(scan, reportGraphicsFailure, { willReadFrequently: true });
   const bcan = game.Acan(game.W * game.TS, game.H * game.TS),
-    bctx = bcan.getContext('2d', { willReadFrequently: true });
+    bctx = requireCanvas2D(bcan, reportGraphicsFailure, { willReadFrequently: true });
   let borderDirty = true;
   const borderSegs: LineSeg[] = [];
   const FXL: FXEffect[] = [];
@@ -238,7 +246,7 @@ export function createRenderer(
   let macroCan: HTMLCanvasElement | null = null;
   function buildMacro() {
     macroCan = game.Acan(game.W, game.H);
-    const g = macroCan.getContext('2d'),
+    const g = requireCanvas2D(macroCan, reportGraphicsFailure),
       n1 = game.fbm(game.seed + 777),
       n2 = game.fbm(game.seed + 555),
       img = g.createImageData(game.W, game.H);
@@ -271,8 +279,10 @@ export function createRenderer(
         img.data[o + 3] = Math.round(a * 255);
       }
     g.putImageData(img, 0, 0);
+    return macroCan;
   }
   function paintMacroTile(g: CanvasRenderingContext2D, i: number) {
+    if (!macroCan) return;
     // Include surrounding source pixels in the resampling footprint. Enlarging only
     // the centre pixel changes a smooth wash into a conspicuous flat square.
     const x = i % game.W,
@@ -335,9 +345,9 @@ export function createRenderer(
     sctx.imageSmoothingEnabled = true;
     for (let y = 0; y < game.H; y++)
       for (let x = 0; x < game.W; x++) paintTileFull(sctx, game.idx(x, y));
-    if (!macroCan) buildMacro();
+    const macro = macroCan || buildMacro();
     sctx.imageSmoothingEnabled = true;
-    sctx.drawImage(macroCan, 0, 0, game.W * game.TS * game.ST, game.H * game.TS * game.ST);
+    sctx.drawImage(macro, 0, 0, game.W * game.TS * game.ST, game.H * game.TS * game.ST);
     drawBorders();
     game.staticDirty = false;
     presentation?.invalidate(scan);
@@ -345,9 +355,9 @@ export function createRenderer(
 
   // ---------- camera ----------
   const view = document.getElementById('view') as HTMLCanvasElement,
-    ctx = game.Acan(1, 1).getContext('2d');
+    ctx = requireCanvas2D(game.Acan(1, 1), reportGraphicsFailure);
   const mini = document.getElementById('mini') as HTMLCanvasElement,
-    mctx = mini.getContext('2d');
+    mctx = requireCanvas2D(mini, reportGraphicsFailure);
   let dpr = window.devicePixelRatio || 1,
     z = 1;
   const zooms = [0.55, 0.7, 0.85, 1, 1.3, 1.7, 2.2];
@@ -448,9 +458,10 @@ export function createRenderer(
 
   // ---------- objects ----------
   function bldImg(b: Building): Sprite {
-    if (game.ART.bld2[b.type])
-      return ((b.id * 2654435761) >>> 0) % 2 ? game.ART.bld2[b.type] : game.ART.bld[b.type];
-    return game.ART.bld[b.type];
+    const variant = game.ART.bld2[b.type];
+    const image = variant && ((b.id * 2654435761) >>> 0) % 2 ? variant : game.ART.bld[b.type];
+    if (!image) throw new Error('Missing building artwork: ' + b.type);
+    return image;
   }
   // Two small, reusable artwork variants per source. Only the alpha contour is
   // extended; the original pixels, entrance anchor and gameplay footprint stay put.
@@ -466,9 +477,9 @@ export function createRenderer(
     }
     if (variants[clarity]) return variants[clarity];
     const mask = game.Acan((img.w + pad * 2) * scale, (img.h + pad * 2) * scale),
-      mg = mask.getContext('2d'),
+      mg = requireCanvas2D(mask, reportGraphicsFailure),
       canvas = game.Acan(mask.width, mask.height),
-      cg = canvas.getContext('2d');
+      cg = requireCanvas2D(canvas, reportGraphicsFailure);
     mg.drawImage(img.img, pad * scale, pad * scale, img.w * scale, img.h * scale);
     mg.globalCompositeOperation = 'source-in';
     mg.fillStyle = clarity ? '#f1e4b9' : '#233b2c';
@@ -681,7 +692,7 @@ export function createRenderer(
             now,
             b.id,
           );
-        else if (b.type === 'guard')
+        else if (b.type === 'guard' && anc.flag)
           drawFlag(g, b.x * game.TS + anc.flag.x, b.y * game.TS + anc.flag.y, '#8f8f8f', now, b.id);
         if (anc.chim && active)
           for (let ci = 0; ci < anc.chim.length; ci++)
@@ -798,7 +809,8 @@ export function createRenderer(
       const cx = x - 3 + anim * 0.9;
       g.fillStyle = '#6f6a61';
       g.fillRect(cx, y - 3.2, 6, 2.8);
-      g.fillStyle = game.GOODS[game.BSPEC[b.type].out].c;
+      const output = game.BSPEC[b.type].out;
+      if (output) g.fillStyle = game.GOODS[output].c;
       g.fillRect(cx + 0.6, y - 4.2, 4.8, 1.8);
       g.fillStyle = '#403b35';
       g.beginPath();
@@ -806,7 +818,7 @@ export function createRenderer(
       g.arc(cx + 5, y, 0.8, 0, 7);
       g.fill();
     }
-    game.drawVillageWorkEffects(g, b, work, now);
+    if (work) game.drawVillageWorkEffects(g, b, work, now);
     if (work === 'fish' && !game.state.paused && !renderPrefs().reducedMotion) {
       // Cast-line rings only where there really is water beside this fishery.
       for (let side = 0; side < 4; side++) {
@@ -899,8 +911,8 @@ export function createRenderer(
     pose.y = u.y;
     // A zero component is an authoritative horizontal/vertical heading. Falling
     // back to displacement there can turn a walker back toward an earlier segment.
-    const fx = Number.isFinite(u.faceDX) ? u.faceDX : dx,
-      fy = Number.isFinite(u.faceDY) ? u.faceDY : dy;
+    const fx = u.faceDX !== undefined && Number.isFinite(u.faceDX) ? u.faceDX : dx,
+      fy = u.faceDY !== undefined && Number.isFinite(u.faceDY) ? u.faceDY : dy;
     if (Math.abs(fx) + Math.abs(fy) > 0.001) pose.dir = unitDirection(fx, fy);
     g.drawImage(game.ART.shadowSoft, px - 9, py - 2, 18, 9);
     const distance = u.walkDistance === undefined ? pose.distance : u.walkDistance;
@@ -922,8 +934,9 @@ export function createRenderer(
         pushFX({ k: 'stepDust', x: u.x, y: u.y, t: now, i: u.id });
     }
     pose.dustStep = dustStep;
-    const dirset = game.ART.unitDirections[u.kind][pose.dir],
-      fr = Math.floor(distance * 4) % dirset.walk.length;
+    const dirset = game.ART.unitDirections[u.kind]?.[pose.dir];
+    if (!dirset) throw new Error('Missing settler artwork: ' + u.kind + '/' + pose.dir);
+    const fr = Math.floor(distance * 4) % dirset.walk.length;
     const spr = moving && !renderPrefs().reducedMotion ? dirset.walk[fr] : dirset.idle;
     g.save();
     g.translate(
@@ -935,11 +948,12 @@ export function createRenderer(
         1,
     );
     g.drawImage(spr, -7.5, -18, 15, 19);
-    if (u.carry && game.ART.cargo && game.ART.cargo[u.carry]) {
+    const cargo = u.carry && game.ART.cargo?.[u.carry];
+    if (cargo) {
       const rightFacing = pose.dir === 'e' || pose.dir === 'ne' || pose.dir === 'se';
       let cargoX = rightFacing ? 0.4 : -9.2;
       if (pose.dir === 'n' || pose.dir === 's') cargoX = -5;
-      g.drawImage(game.ART.cargo[u.carry], cargoX, -14, 10, 7.5);
+      g.drawImage(cargo, cargoX, -14, 10, 7.5);
     } else if (u.carry) {
       const c = game.GOODS[u.carry].c;
       g.fillStyle = 'rgba(0,0,0,0.28)';
@@ -1022,8 +1036,9 @@ export function createRenderer(
         const q = objPool[i];
         g.beginPath();
         if (q.t === 0) drawBuilding(g, q.o as Building);
-        else if (q.t === 1) drawTree(g, q.x, q.y, q.tl, now);
-        else if (q.t === 2) drawRock(g, q.x, q.y);
+        else if (q.t === 1) {
+          if (q.tl) drawTree(g, q.x, q.y, q.tl, now);
+        } else if (q.t === 2) drawRock(g, q.x, q.y);
         else drawUnit(g, q.o as Unit, now);
       }
     });
@@ -1202,7 +1217,7 @@ export function createRenderer(
           continue;
         }
         p = age / life;
-        g.strokeStyle = game.rgba(f.c, 0.55 * (1 - p));
+        g.strokeStyle = game.rgba(f.c ?? '#ffd23f', 0.55 * (1 - p));
         g.lineWidth = 2.4 - 1.8 * p;
         g.beginPath();
         g.arc(f.x * game.TS, f.y * game.TS + 3, 4 + p * (f.r || 20), 0, 7);
@@ -1214,7 +1229,7 @@ export function createRenderer(
           continue;
         }
         p = age / life;
-        cxp = f.x * game.TS + 2 + (f.i - 2.5) * 7 * p * 0.9;
+        cxp = f.x * game.TS + 2 + ((f.i ?? 0) - 2.5) * 7 * p * 0.9;
         cyp = f.y * game.TS - 4 - 30 * Math.sin(Math.PI * Math.min(1, p * 1.05)) * 0.9 + 14 * p * p;
         const r2 = 2.1 * (1 - p * 0.25);
         g.globalAlpha = Math.max(0, 1 - p * p);
@@ -1236,10 +1251,10 @@ export function createRenderer(
           continue;
         }
         p = age / life;
-        g.strokeStyle = game.rgba(f.c, (1 - p) * 0.9);
+        g.strokeStyle = game.rgba(f.c ?? '#ffd23f', (1 - p) * 0.9);
         g.lineWidth = 1.2;
         for (let k = 0; k < (f.n || 6); k++) {
-          const a2 = k * 2.39996 + f.i,
+          const a2 = k * 2.39996 + (f.i ?? 0),
             sp2 = 14 + ((k * 53) % 9);
           cxp = f.x * game.TS + Math.cos(a2) * sp2 * p;
           cyp = f.y * game.TS + 3 + Math.sin(a2) * sp2 * p + p * 10;
@@ -1256,7 +1271,7 @@ export function createRenderer(
         }
         p = age / life;
         for (let k = 0; k < 6; k++) {
-          const a3 = k * 1.047 + rnd0(f.i);
+          const a3 = k * 1.047 + rnd0(f.i ?? 0);
           g.fillStyle = 'rgba(184,162,118,' + ((1 - p) * 0.22).toFixed(3) + ')';
           g.beginPath();
           g.arc(
@@ -1574,14 +1589,14 @@ export function createRenderer(
         else if (sp.prod === 'fish')
           hit = tl.t === game.WATER && Math.max(Math.abs(dx), Math.abs(dy)) <= 2;
         else if (sp.resKind)
-          hit = tl.deposit && tl.deposit.kind === sp.resKind && tl.deposit.amt > 0;
+          hit = !!tl.deposit && tl.deposit.kind === sp.resKind && tl.deposit.amt > 0;
         else if (sp.prod === 'plant')
           hit =
             tl.t === game.GRASS &&
             !tl.tree &&
             !tl.rock &&
             !tl.road &&
-            game.owned[i] &&
+            !!game.owned[i] &&
             !game.buildingAt(xx, yy);
         if (hit) found.push(i);
       }
@@ -1602,7 +1617,7 @@ export function createRenderer(
           ',' +
           (store.reservedStock[good] || 0);
     for (const job of game.jobs)
-      if (job.kind === 'transfer' && goods.includes(job.good))
+      if (job.kind === 'transfer' && job.good && goods.includes(job.good))
         key += ':' + job.s + ',' + job.to + ',' + job.good + ',' + job.state;
     for (const unit of game.units)
       if (unit.job?.kind === 'transfer' && unit.carry) key += ':cargo' + unit.id + ',' + unit.carry;
@@ -1633,20 +1648,21 @@ export function createRenderer(
       storage && game.passI(game.idx(game.ghost.x, game.ghost.y))
         ? game.findPath(storage.x, storage.y, game.ghost.x, game.ghost.y)
         : null;
-    const haul = path ? pathSeconds(path, storage.x, storage.y) : null;
+    const haul = path && storage ? pathSeconds(path, storage.x, storage.y) : null;
     let supply = '';
     if (sp.prod === 'gather') supply = resources.length + ' mature trees';
     else if (sp.prod === 'rock') supply = resources.length + ' rock tiles';
     else if (sp.resKind) {
       let amount = 0;
-      for (let i = 0; i < resources.length; i++) amount += game.tiles[resources[i]].deposit.amt;
+      for (let i = 0; i < resources.length; i++)
+        amount += game.tiles[resources[i]].deposit?.amt ?? 0;
       supply = amount + ' ' + game.GOODS[sp.resKind].name.toLowerCase() + ' in reach';
     } else if (sp.prod === 'fish')
       supply = resources.length ? 'Shore in reach' : 'No shore in reach';
     else if (sp.prod === 'plant') supply = resources.length + ' clear nursery tiles';
     const summary =
       (supply ? supply + ' · ' : '') +
-      (haul === null
+      (haul === null || !storage
         ? 'No storage route'
         : 'Estimated one-way walk: ~' +
           haul.toFixed(1) +
@@ -2114,7 +2130,7 @@ export function createRenderer(
           placement.y,
           placement.resources,
         );
-      if (placement.path)
+      if (placement.path && placement.storage)
         traceRoute(
           g,
           placement.storage.x + 0.5,
@@ -2138,7 +2154,7 @@ export function createRenderer(
     }
     const road = getRoadPreview();
     if (road) {
-      if (road.path)
+      if (road.path && game.anchor)
         traceRoute(g, game.anchor.x + 0.5, game.anchor.y + 0.5, road.path, 0, '#e6d49d', true);
       worldLabel(
         g,
@@ -2442,12 +2458,7 @@ export function createRenderer(
       },
       (error) => {
         const reason = error instanceof Error ? error.message : 'Terrain update failed';
-        if (presentation.reportFailure) presentation.reportFailure(reason);
-        else {
-          presentation.available = false;
-          game.emitGameEvent('rendererFailed', { reason });
-          console.error('Terrain update failed', error);
-        }
+        reportGraphicsFailure(reason);
       },
     );
   }
@@ -2654,7 +2665,7 @@ export function createRenderer(
 
   // ---------- minimap ----------
   const mscan = game.Acan(192, 192),
-    msctx = mscan.getContext('2d');
+    msctx = requireCanvas2D(mscan, reportGraphicsFailure);
   let miniDirty = true;
   let _miniRendered = 0;
   function drawMiniStatic() {
@@ -2844,6 +2855,7 @@ export function createRenderer(
 
   // Live bindings preserve replacement of arrays and mutable subsystem state.
   return {
+    reportGraphicsFailure,
     get staticDirty() {
       return staticDirty;
     },
@@ -3010,6 +3022,7 @@ export function createRenderer(
 }
 
 export interface RendererSubsystem {
+  reportGraphicsFailure: (reason: string) => void;
   staticDirty: boolean;
   readonly renderingAvailable: boolean;
   readonly sctx: CanvasRenderingContext2D;

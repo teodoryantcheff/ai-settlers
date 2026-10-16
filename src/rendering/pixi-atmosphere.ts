@@ -142,7 +142,7 @@ export function createProductionAtmosphere(scene: Container) {
     },
     destroy() {
       scene.filters = null;
-      scene.filterArea = null;
+      scene.filterArea = undefined;
       filter.destroy();
     },
   };

@@ -1,3 +1,4 @@
+import { requireCanvas2D } from '../rendering/canvas-context.ts';
 import { territoryClaimRadius } from '../gameplay/colony-rules.ts';
 import { html as markup, trusted, formatGoods } from './markup.ts';
 import type { PlacementFeedback } from './placement-feedback.ts';
@@ -255,7 +256,7 @@ export function createInspectorView(
     if (illustration) {
       illustration.hidden = !type;
       if (type && type !== illustratedType && game.drawSpriteIcon) {
-        const context = illustration.getContext('2d');
+        const context = requireCanvas2D(illustration, game.reportGraphicsFailure);
         context.clearRect(0, 0, illustration.width, illustration.height);
         game.drawSpriteIcon(context, type, illustration.width / 2, illustration.height / 2, 192);
         illustratedType = type;

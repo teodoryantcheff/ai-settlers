@@ -1,3 +1,4 @@
+import { requireCanvas2D } from '../rendering/canvas-context.ts';
 import { html as markup, trusted, formatGoods } from './markup.ts';
 import { recipeRequirements } from '../gameplay/production-rules.ts';
 import type { TransientHelp } from './transient-help.ts';
@@ -167,7 +168,7 @@ export function createCatalogView(
       icon.style.width = '64px';
       icon.style.height = '64px';
       icon.setAttribute('aria-hidden', 'true');
-      const context = icon.getContext('2d');
+      const context = requireCanvas2D(icon, game.reportGraphicsFailure);
       context.scale(2, 2);
       context.imageSmoothingEnabled = true;
       if (type === 'road') context.drawImage(game.ART.road, 10, 10, 44, 44);

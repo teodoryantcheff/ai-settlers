@@ -520,7 +520,7 @@ export function createLandscape(
       landscapeCragMap.seed === game.seed &&
       landscapeCragMap.painted === (game.ART.paintedMountains || null)
     )
-      return;
+      return landscapeCragMap;
     const perTile: LandscapeCragFeature[][] = new Array(game.W * game.H),
       step = 4;
     for (let by = 0; by < game.H; by += step)
@@ -624,6 +624,7 @@ export function createLandscape(
       painted: game.ART.paintedMountains || null,
       perTile: perTile,
     };
+    return landscapeCragMap;
   }
   function traceWorldFacet(
     g: CanvasRenderingContext2D,
@@ -637,8 +638,8 @@ export function createLandscape(
     g.closePath();
   }
   function paintLandscapeCrags(g: CanvasRenderingContext2D, x: number, y: number): void {
-    prepareLandscapeCrags();
-    const list = landscapeCragMap.perTile[game.idx(x, y)] || [],
+    const crags = prepareLandscapeCrags();
+    const list = crags.perTile[game.idx(x, y)] || [],
       wx = x * game.TS,
       wy = y * game.TS;
     function facet(points: number[][], color: string | CanvasGradient | CanvasPattern): void {
@@ -894,7 +895,7 @@ export function createLandscape(
   }
   function paintOreSeams(
     g: CanvasRenderingContext2D,
-    deposit: Tile['deposit'],
+    deposit: NonNullable<Tile['deposit']>,
     x: number,
     y: number,
   ): void {

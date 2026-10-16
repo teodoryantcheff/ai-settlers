@@ -1,3 +1,4 @@
+import { requireCanvas2D } from '../rendering/canvas-context.ts';
 import { html as markup, trusted, escapeMarkup, formatGoods } from './markup.ts';
 import { createLiveReportUpdater } from './live-report.ts';
 import { createInspectorView, type InspectorInternals } from './inspector-view.ts';
@@ -710,7 +711,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
       game.presentationPrefs.showFps;
     const atlasArt = document.getElementById('atlas-art') as HTMLCanvasElement;
     if (atlasArt && game.drawSpriteIcon) {
-      const context = atlasArt.getContext('2d');
+      const context = requireCanvas2D(atlasArt, game.reportGraphicsFailure);
       context.clearRect(0, 0, atlasArt.width, atlasArt.height);
       game.drawSpriteIcon(context, 'hq', atlasArt.width / 2, atlasArt.height / 2, 64);
     }

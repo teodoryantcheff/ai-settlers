@@ -1,3 +1,4 @@
+import { requireCanvas2D } from '../rendering/canvas-context.ts';
 import type { GameRuntime } from '../runtime.ts';
 import type { BuildingType } from '../types.ts';
 
@@ -5,8 +6,8 @@ import type { BuildingType } from '../types.ts';
 export function paintUtilityArtwork(game: GameRuntime) {
   for (const canvas of document.querySelectorAll<HTMLCanvasElement>('[data-session-art]')) {
     const type = canvas.dataset.sessionArt as BuildingType;
-    const context = canvas.getContext('2d');
-    if (!context || !game.ART.bld[type]) continue;
+    const context = requireCanvas2D(canvas, game.reportGraphicsFailure);
+    if (!game.ART.bld[type]) continue;
     game.drawSpriteIcon(context, type, canvas.width / 2, canvas.height / 2, 64);
   }
 }

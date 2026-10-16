@@ -8,12 +8,15 @@ const {
   installGlobals,
   pinClock,
   DEFAULT_MODULES,
+  fakeStorage,
 } = require('./helpers/game.cjs');
+const { requireCanvas2D } = require('../src/rendering/canvas-context.ts');
+const { paintUtilityArtwork } = require('../src/ui/utility-art.ts');
 
 // Wall-clock reads inside the simulation stay deterministic.
 pinClock(0);
 
-function renderer() {
+function renderer(options = {}) {
   const calls = [];
   const noop = () => {};
   const context = new Proxy(
@@ -30,7 +33,7 @@ function renderer() {
   const canvas = (width = 1, height = 1) => ({
     width,
     height,
-    getContext: () => context,
+    getContext: () => (options.contextFor ? options.contextFor('cache', context) : context),
     style: {},
   });
   // HUD and renderer look elements up by id; every element doubles as a canvas
@@ -41,7 +44,7 @@ function renderer() {
       const node = fakeElement(id);
       node.width = 1;
       node.height = 1;
-      node.getContext = () => context;
+      node.getContext = () => (options.contextFor ? options.contextFor(id, context) : context);
       nodes.set(id, node);
     }
     return nodes.get(id);
@@ -62,8 +65,22 @@ function renderer() {
   installGlobals({ document, window });
   const { game: e } = createGame({
     seed: 2024,
-    modules: [...DEFAULT_MODULES, 'landscape', 'village', 'renderer', 'hud'],
-    presentation: { available: true, invalidate: noop, begin: noop, layer: noop, end: noop },
+    modules: [
+      ...DEFAULT_MODULES,
+      'landscape',
+      'village',
+      'renderer',
+      'hud',
+      ...(options.modules ?? []),
+    ],
+    storage: options.storage,
+    presentation: options.presentation ?? {
+      available: true,
+      invalidate: noop,
+      begin: noop,
+      layer: noop,
+      end: noop,
+    },
     stubs: {
       Acan: canvas,
       rr: noop,
@@ -80,7 +97,6 @@ function renderer() {
       },
       refreshGhost: noop,
       rebuildHighlights: noop,
-      gameEvents: { on: noop, emit: noop, off: noop },
       SND: {
         road: noop,
         ui: noop,
@@ -113,6 +129,94 @@ function renderer() {
   e.context = context;
   return e;
 }
+
+test('missing cached-art contexts report a graphics failure before drawing', () => {
+  const { localStorage, storage } = fakeStorage();
+  const e = renderer({ modules: ['workspace', 'recovery'], storage: localStorage });
+  e.saveCheckpoint('Before graphics failure');
+  const saved = [...storage];
+  const before = JSON.parse(e.exportSave());
+  const buildings = e.buildings;
+  const units = e.units;
+  e.state.paused = false;
+  const failures = [];
+  e.gameEvents.on('rendererFailed', (event) => failures.push(event.reason));
+  e.Acan = () => ({ getContext: () => null });
+  const rng = e.SR.getState();
+  const time = e.state.time;
+  assert.throws(
+    () => e.buildingContour({ img: {}, w: 48, h: 56, ox: -12, oy: -32 }),
+    /Canvas 2D context is unavailable/,
+  );
+  assert.deepEqual(failures, ['Canvas 2D context is unavailable']);
+  assert.equal(e.renderingAvailable, false);
+  assert.equal(e.SR.getState(), rng);
+  assert.equal(e.state.time, time);
+  assert.equal(e.state.paused, true);
+  assert.equal(e.buildings, buildings);
+  assert.equal(e.units, units);
+  const after = JSON.parse(e.exportSave());
+  for (const key of ['b', 'u', 'j', 't', 'rng', 'observations', 'identity'])
+    assert.deepEqual(after[key], before[key]);
+  assert.deepEqual([...storage], saved);
+  assert.equal(e.blockingLayerOpen(), true);
+  assert.match(
+    document.getElementById('recovery-reason').textContent,
+    /Canvas 2D context is unavailable/,
+  );
+});
+
+test('an unavailable minimap context stops renderer assembly through its failure boundary', () => {
+  const failures = [];
+  assert.throws(
+    () =>
+      renderer({
+        contextFor: (name, context) => (name === 'mini' ? null : context),
+        presentation: { reportFailure: (reason) => failures.push(reason) },
+      }),
+    /Canvas 2D context is unavailable/,
+  );
+  assert.deepEqual(failures, ['Canvas 2D context is unavailable']);
+});
+
+test('a throwing context acquisition retains its cause and opens graphics recovery', () => {
+  const e = renderer({ modules: ['workspace', 'recovery'] });
+  const cause = new Error('Canvas allocation rejected');
+  e.Acan = () => ({
+    getContext() {
+      throw cause;
+    },
+  });
+  assert.throws(
+    () => e.buildingContour({ img: {}, w: 48, h: 56, ox: -12, oy: -32 }),
+    (error) => error.cause === cause && /Canvas 2D context is unavailable/.test(error.message),
+  );
+  assert.equal(e.renderingAvailable, false);
+  assert.equal(e.blockingLayerOpen(), true);
+});
+
+test('successful context acquisition preserves the context and requested options', () => {
+  const e = renderer();
+  const requests = [];
+  const settings = { willReadFrequently: true };
+  const canvas = {
+    getContext(...args) {
+      requests.push(args);
+      return e.context;
+    },
+  };
+  assert.equal(requireCanvas2D(canvas, e.reportGraphicsFailure, settings), e.context);
+  assert.deepEqual(requests, [['2d', settings]]);
+  assert.equal(e.renderingAvailable, true);
+});
+
+test('utility artwork cannot silently skip an unavailable context', () => {
+  const e = renderer({ modules: ['workspace', 'recovery'] });
+  document.querySelectorAll = () => [{ dataset: { sessionArt: 'hq' }, getContext: () => null }];
+  assert.throws(() => paintUtilityArtwork(e), /Canvas 2D context is unavailable/);
+  assert.equal(e.renderingAvailable, false);
+  assert.equal(e.blockingLayerOpen(), true);
+});
 
 test('walkers follow the last segment after turning, including zero direction components', () => {
   const e = renderer();

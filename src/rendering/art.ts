@@ -1,3 +1,4 @@
+import { requireCanvas2D } from './canvas-context.ts';
 import type { GameRuntime } from '../runtime.ts';
 import type { ArtAtlas, BuildingType, Good, Sprite } from '../types.ts';
 
@@ -31,7 +32,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     c.height = Math.max(1, Math.round(h));
     // Offscreen art is prepared once and sampled/uploaded later. CPU backing
     // avoids synchronizing thousands of tiny paint commands through the GPU.
-    c.getContext('2d', { willReadFrequently: true });
+    requireCanvas2D(c, game.reportGraphicsFailure, { willReadFrequently: true });
     return c;
   }
   function prs(c: string): number[] {
@@ -131,7 +132,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
   // checkerboard across the tile grid. Flat base + world-space macro variation instead.
   function texGrass(v: number): HTMLCanvasElement {
     const c = Acan(48, 48),
-      g = c.getContext('2d'),
+      g = requireCanvas2D(c, game.reportGraphicsFailure),
       rnd = game.mulberry32(1234 + v * 77);
     // Every variant shares the edge/base hue. Wrapped microstrokes avoid tile seams;
     // large meadow patches are supplied by the world-space landscape painter.
@@ -192,7 +193,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
   // Crossroad icon for the building menu. World roads use the landscape painter.
   function texRoad(): HTMLCanvasElement {
     const c = Acan(48, 48),
-      g = c.getContext('2d'),
+      g = requireCanvas2D(c, game.reportGraphicsFailure),
       rnd = game.mulberry32(895);
     const cx = 24,
       cy = 24;
@@ -264,7 +265,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
   function texTree(st: number, v: number, f: number): HTMLCanvasElement {
     // The same seed in both sway frames keeps leaves attached to their branches.
     const c = Acan(36 * SS, 42 * SS),
-      g = c.getContext('2d'),
+      g = requireCanvas2D(c, game.reportGraphicsFailure),
       rnd = game.mulberry32(3719 + st * 137 + v * 997),
       mature = st === 4,
       scale = st === 1 ? 0.34 : st === 2 ? 0.49 : st === 3 ? 0.72 : 1,
@@ -415,7 +416,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
 
   function texRock(v: number): HTMLCanvasElement {
     const c = Acan(32 * SS, 24 * SS),
-      g = c.getContext('2d'),
+      g = requireCanvas2D(c, game.reportGraphicsFailure),
       rnd = game.mulberry32(8191 + v * 313);
     g.scale(SS, SS);
     g.lineJoin = 'round';
@@ -515,7 +516,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     const w = opts.w || 34,
       h = opts.h || 44;
     const c = Acan(w * SS, h * SS),
-      g = c.getContext('2d');
+      g = requireCanvas2D(c, game.reportGraphicsFailure);
     g.scale(SS, SS);
     g.lineJoin = 'round';
     g.lineCap = 'round';
@@ -2180,7 +2181,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     frame: number,
   ): HTMLCanvasElement {
     const c = Acan(15 * SS, 19 * SS),
-      g = c.getContext('2d');
+      g = requireCanvas2D(c, game.reportGraphicsFailure);
     g.scale(SS, SS);
     g.lineCap = 'round';
     g.lineJoin = 'round';
@@ -2275,7 +2276,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
   // Cargo keeps each good recognizable both on a carrier and in a loading yard.
   function texCargo(good: Good): HTMLCanvasElement {
     const c = Acan(16 * SS, 12 * SS),
-      g = c.getContext('2d');
+      g = requireCanvas2D(c, game.reportGraphicsFailure);
     g.scale(SS, SS);
     g.lineJoin = 'round';
     g.lineCap = 'round';
@@ -2475,7 +2476,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
   // ---------- saw blade ----------
   function texBlade(): HTMLCanvasElement {
     const c = Acan(9 * SS, 9 * SS),
-      g = c.getContext('2d');
+      g = requireCanvas2D(c, game.reportGraphicsFailure);
     g.scale(SS, SS);
     g.fillStyle = '#c8ccd2';
     g.beginPath();
@@ -2547,7 +2548,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     }
     // soft shadows
     const sc = Acan(64, 32),
-      sg = sc.getContext('2d');
+      sg = requireCanvas2D(sc, game.reportGraphicsFailure);
     sg.save();
     sg.scale(1, 0.5);
     const grd = sg.createRadialGradient(32, 32, 2, 32, 32, 30);
@@ -2562,7 +2563,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     ART.shadowSoft = sc;
     // cloud blob
     const cc = Acan(340, 220),
-      cg = cc.getContext('2d');
+      cg = requireCanvas2D(cc, game.reportGraphicsFailure);
     const cg2 = cg.createRadialGradient(170, 110, 10, 170, 110, 160);
     cg2.addColorStop(0, 'rgba(10,14,20,0.04)');
     cg2.addColorStop(0.55, 'rgba(10,14,20,0.025)');
@@ -2574,7 +2575,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     ART.cloud = cc;
     // stronger ground shadow for the terrain-level cloud pass (drawn SE of the sky blob)
     const csh = Acan(340, 220),
-      csg = csh.getContext('2d');
+      csg = requireCanvas2D(csh, game.reportGraphicsFailure);
     const cg3 = csg.createRadialGradient(170, 110, 10, 170, 110, 160);
     cg3.addColorStop(0, 'rgba(8,12,18,0.14)');
     cg3.addColorStop(0.55, 'rgba(8,12,18,0.065)');
@@ -2586,7 +2587,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     ART.cloudShadow = csh;
     // warm lantern glow for night windows (drawn above the night tint)
     const gl1 = Acan(64, 64),
-      glg = gl1.getContext('2d');
+      glg = requireCanvas2D(gl1, game.reportGraphicsFailure);
     const gr2 = glg.createRadialGradient(32, 32, 2, 32, 32, 31);
     gr2.addColorStop(0, 'rgba(255,196,110,0.85)');
     gr2.addColorStop(0.35, 'rgba(255,170,80,0.32)');
@@ -2598,7 +2599,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     ART.glow = gl1;
     // film grain for the DOM overlay
     const gc = Acan(96, 96),
-      gg = gc.getContext('2d'),
+      gg = requireCanvas2D(gc, game.reportGraphicsFailure),
       img = gg.createImageData(96, 96);
     for (let i = 0; i < img.data.length; i += 4) {
       const n2 = (Math.random() * 255) | 0;

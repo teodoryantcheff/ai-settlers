@@ -1,3 +1,4 @@
+import { requireCanvas2D } from './canvas-context.ts';
 import type { GameRuntime } from '../runtime.ts';
 import type { Building, BuildingType, Good, Sprite } from '../types.ts';
 
@@ -64,7 +65,7 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
     paint: (g: CanvasRenderingContext2D) => void,
   ): HTMLCanvasElement {
     const c = game.Acan(w * game.SS, h * game.SS),
-      g = c.getContext('2d');
+      g = requireCanvas2D(c, game.reportGraphicsFailure);
     g.scale(game.SS, game.SS);
     g.lineCap = 'round';
     g.lineJoin = 'round';
@@ -358,7 +359,7 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
       villageStockViews.set(b, view);
     }
     for (let count = 0; count < villageGoods.length; count++) {
-      const quantity = physical[villageGoods[count]] | 0;
+      const quantity = (physical[villageGoods[count]] ?? 0) | 0;
       if (view.quantities[count] !== quantity) changed = true;
       view.quantities[count] = quantity;
     }
@@ -369,7 +370,7 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
     slots.length = 0;
     if (!b.done) {
       (['planks', 'stone', 'tools', 'weapons'] as Good[]).forEach(function (good) {
-        const quantity = b.got[good] | 0;
+        const quantity = (b.got[good] ?? 0) | 0;
         if (quantity > 0) slots.push({ good: good, quantity: quantity });
       });
       return slots;
@@ -377,7 +378,7 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
     if (sp.store) {
       for (let goodIndex = 0; goodIndex < villageGoods.length; goodIndex++) {
         const good = villageGoods[goodIndex],
-          stored = b.stock[good] | 0;
+          stored = (b.stock[good] ?? 0) | 0;
         if (stored > 0) slots.push({ good: good, quantity: stored });
       }
       slots.sort(function (a, b2) {
@@ -388,14 +389,14 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
     }
     if (sp.in) {
       for (const input in sp.in) {
-        if ((b.stock[input as Good] | 0) > 0) {
-          slots.push({ good: input as Good, quantity: b.stock[input as Good] | 0 });
+        if (((b.stock[input as Good] ?? 0) | 0) > 0) {
+          slots.push({ good: input as Good, quantity: (b.stock[input as Good] ?? 0) | 0 });
           break;
         }
       }
     }
-    if (sp.out && (b.stock[sp.out] | 0) > 0)
-      slots.push({ good: sp.out, quantity: b.stock[sp.out] | 0, output: true });
+    if (sp.out && ((b.stock[sp.out] ?? 0) | 0) > 0)
+      slots.push({ good: sp.out, quantity: (b.stock[sp.out] ?? 0) | 0, output: true });
     return slots;
   }
   function drawVillageGood(
@@ -540,11 +541,11 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
       return game.ART.site;
     const key = type + ':' + stage;
     if (villageSites[key]) return villageSites[key];
-    const art = game.ART.bld[type],
-      width = Math.min(28, Math.max(18, art.w * 0.7)),
-      body = Math.min(24, Math.max(13, art.h * 0.4)),
-      site: Sprite = { img: null, w: 40, h: 50, ox: -8, oy: -26 };
-    site.img = villageCanvas(site.w, site.h, function (g) {
+    const art = game.ART.bld[type];
+    if (!art) throw new Error('Missing building artwork: ' + type);
+    const width = Math.min(28, Math.max(18, art.w * 0.7)),
+      body = Math.min(24, Math.max(13, art.h * 0.4));
+    const img = villageCanvas(40, 50, function (g) {
       g.translate(8, 26);
       const left = 12 - width / 2,
         right = 12 + width / 2,
@@ -621,6 +622,7 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
         }
       }
     });
+    const site: Sprite = { img, w: 40, h: 50, ox: -8, oy: -26 };
     villageSites[key] = site;
     return site;
   }

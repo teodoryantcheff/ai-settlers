@@ -13,6 +13,7 @@ import type { GameRuntime } from '../runtime.ts';
 import type { RendererPresentation } from './renderer.ts';
 import { createPixiContext, type CapturedTextStyle, type DrawingState } from './pixi-context.ts';
 import { createProductionAtmosphere } from './pixi-atmosphere.ts';
+import { CanvasContextError, requireCanvas2D } from './canvas-context.ts';
 
 interface ImagePart {
   texture: Texture;
@@ -164,9 +165,17 @@ export async function createPixiRenderer() {
           const part = document.createElement('canvas');
           part.width = Math.min(tileSize, width - x);
           part.height = Math.min(tileSize, height - y);
-          part
-            .getContext('2d')
-            .drawImage(source, x, y, part.width, part.height, 0, 0, part.width, part.height);
+          requireCanvas2D(part, loseGpu).drawImage(
+            source,
+            x,
+            y,
+            part.width,
+            part.height,
+            0,
+            0,
+            part.width,
+            part.height,
+          );
           const texture = Texture.from(part, true);
           texture.source.scaleMode = 'linear';
           entry.parts.push({ texture, x, y, width: part.width, height: part.height, canvas: part });
@@ -491,8 +500,7 @@ export async function createPixiRenderer() {
         return false;
       if (!scratchUploadCanvas || !scratchUploadCtx) {
         scratchUploadCanvas = document.createElement('canvas');
-        scratchUploadCtx = scratchUploadCanvas.getContext('2d');
-        if (!scratchUploadCtx) return false;
+        scratchUploadCtx = requireCanvas2D(scratchUploadCanvas, loseGpu);
       }
       const scratch = scratchUploadCanvas;
       const g = scratchUploadCtx;
@@ -527,7 +535,8 @@ export async function createPixiRenderer() {
       );
       partialTextureUpdates++;
       return true;
-    } catch {
+    } catch (error) {
+      if (error instanceof CanvasContextError) throw error;
       return false;
     }
   }
@@ -553,7 +562,17 @@ export async function createPixiRenderer() {
             if (part.canvas) {
               // Tiled path (huge canvases on old GPUs): repaint the sub-region,
               // then re-upload that whole tile.
-              part.canvas.getContext('2d').drawImage(source, left, top, iw, ih, ix, iy, iw, ih);
+              requireCanvas2D(part.canvas, loseGpu).drawImage(
+                source,
+                left,
+                top,
+                iw,
+                ih,
+                ix,
+                iy,
+                iw,
+                ih,
+              );
               part.texture.source.update();
               textureUpdates++;
             } else if (!partialUpload(part, source, ix, iy, iw, ih)) {
@@ -563,7 +582,7 @@ export async function createPixiRenderer() {
             continue;
           }
           if (part.canvas) {
-            const g = part.canvas.getContext('2d');
+            const g = requireCanvas2D(part.canvas, loseGpu);
             g.clearRect(0, 0, part.width, part.height);
             g.drawImage(
               source,

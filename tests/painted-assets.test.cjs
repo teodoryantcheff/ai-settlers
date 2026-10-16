@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const painted = require('../src/rendering/painted-assets.ts');
-const { installGlobals, fakeElement, fakeWindow } = require('./helpers/game.cjs');
+const { createGame, installGlobals, fakeElement, fakeWindow } = require('./helpers/game.cjs');
 
 const types = [
   'hq',
@@ -187,6 +187,21 @@ test('incomplete artwork falls back atomically and visibly', async () => {
   assert.equal(api.game.ART.paintedTerrain, undefined);
   assert.equal(api.game.ART.paintedStatus.state, 'fallback');
   assert.match(api.warnings[0].textContent, /Standard artwork is active/);
+});
+
+test('unavailable artwork contexts propagate to boot without partially installing the pack', async () => {
+  const api = harness();
+  const { game } = createGame({ modules: ['world'], stubs: { ART: api.game.ART } });
+  const before = { ...game.ART };
+  const createElement = document.createElement;
+  document.createElement = (name) => {
+    const node = createElement(name);
+    if (name === 'canvas') node.getContext = () => null;
+    return node;
+  };
+  await assert.rejects(() => api.loadPaintedAssets(game), /Canvas 2D context is unavailable/);
+  for (const key of Object.keys(before)) assert.equal(game.ART[key], before[key], key);
+  assert.equal(api.warnings.length, 0, 'an unavailable context cannot offer playable fallback art');
 });
 
 function mountainManifest() {
