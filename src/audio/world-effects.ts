@@ -11,11 +11,11 @@ export function createWorldEffects(
   runtime: AudioRuntime,
   internals?: AudioInternals,
 ) {
-  let graph: AudioGraph = null;
+  let graph: AudioGraph | null = null;
   let audioWorkBound = false;
   const sfxCanPlay = () => runtime.canPlay('effects');
   function panOf(wx: number) {
-    if (!runtime.graph) return 0;
+    if (!graph) return 0;
     const cx = game.cam.x + game.vw / 2 / game.z,
       half = game.vw / 2 / game.z;
     const p = (wx * game.TS - cx) / half;
@@ -35,11 +35,12 @@ export function createWorldEffects(
   }
   function play(pan: number, build: (cue: Cue) => void, at?: number) {
     if (!graph || !sfxCanPlay()) return;
+    const owner = graph;
     runtime.guard(() => {
       const time = at ?? runtime.immediate();
-      const output = runtime.own(new graph.tone.Panner({ context: graph.context, pan }));
-      const cue: Cue = { graph, time, output, resources: [output], until: time };
-      output.connect(graph.channels.effects);
+      const output = runtime.own(new owner.tone.Panner({ context: owner.context, pan }));
+      const cue: Cue = { graph: owner, time, output, resources: [output], until: time };
+      output.connect(owner.channels.effects);
       build(cue);
       runtime.releaseAt(cue.until, cue.resources);
     });

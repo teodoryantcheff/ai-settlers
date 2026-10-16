@@ -1,3 +1,4 @@
+import { requireElement } from '../ui/dom.ts';
 import type { GameRuntime } from '../runtime.ts';
 import type { Building, BuildingType, Good } from '../types.ts';
 
@@ -11,6 +12,7 @@ export function runScenarios(game: GameRuntime) {
     // A legacy producer with no suppliers isolates the real persistent-notice path.
     game.closeLayer('start');
     const hq = game.anyStorage();
+    if (!hq) throw new Error('Scenario requires colony storage');
     const x = hq.x + 4,
       y = hq.y;
     for (let ty = y - 2; ty <= y + 2; ty++)
@@ -100,7 +102,7 @@ export function runScenarios(game: GameRuntime) {
           siteAt = [rx2, ry2];
         }
       }
-    let nb2: Building;
+    let nb2: Building | undefined;
     if (siteAt) {
       nb2 = game.newBuilding('lumberjack', siteAt[0], siteAt[1]);
       nb2.constructionProgress = 0.4;
@@ -108,7 +110,9 @@ export function runScenarios(game: GameRuntime) {
       game.buildings.push(nb2);
     }
     game.recomputeTerritory();
-    for (let si = 0; si < 6; si++) game.spawnCarrier(game.anyStorage());
+    const storage = game.anyStorage();
+    if (!storage) throw new Error('Scenario requires colony storage');
+    for (let si = 0; si < 6; si++) game.spawnCarrier(storage);
     if (/[?&]detail(?:&|$)/.test(location.search)) {
       // Explicit art fixture: show physical stocks and every construction stage.
       // This branch belongs only to the development bundle, never saved real play.
@@ -160,7 +164,7 @@ export function runScenarios(game: GameRuntime) {
     }
     game.clampCam();
     game.state.paused = true;
-    if (/[?&]adv=0/.test(location.search)) document.getElementById('adv').style.display = 'none';
+    if (/[?&]adv=0/.test(location.search)) requireElement('adv').style.display = 'none';
     const dv = document.createElement('div');
     dv.id = 'devres';
     dv.textContent = 'DEVSHOT placed=' + placed + ' site=' + (siteAt ? siteAt.join(',') : 'none');
@@ -211,15 +215,16 @@ export function runScenarios(game: GameRuntime) {
     game.cam.x = (centerX + 0.5) * game.TS - game.vw / game.z / 2;
     game.cam.y = (centerY - 1) * game.TS - game.vh / game.z / 2;
     game.clampCam();
-    document.getElementById('adv').style.display = 'none';
-    game.selected = game.buildings.find((building) => building.type === 'smelter');
+    requireElement('adv').style.display = 'none';
+    game.selected = game.buildings.find((building) => building.type === 'smelter') ?? null;
     game.updateInfo();
   }
 
   if (/uitest/.test(location.search)) {
     game.closeLayer('start');
     const uit: string[] = [];
-    function tap(el: Element) {
+    function tap(el: Element | null) {
+      if (!el) throw new Error('Scenario control is missing');
       el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
       el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
       el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -300,7 +305,7 @@ export function runScenarios(game: GameRuntime) {
             tap(document.querySelector('.pb[data-b=demolish]'));
             viewTap(lj.x, lj.y);
             const armedOk = game.buildings.length >= n1;
-            tap(document.getElementById('demolition-confirm'));
+            tap(requireElement('demolition-confirm'));
             uit.push('demol=' + (armedOk && game.buildings.length < n1 ? 'ok' : 'BAD'));
           }
           tap(document.querySelector('.pb[data-b=forester]'));
@@ -470,7 +475,8 @@ export function runScenarios(game: GameRuntime) {
                 const cp = game.canPlace(bt, x, y);
                 if (cp[0]) legal++;
                 else {
-                  const r3 = cp[1].code;
+                  const r3 = cp[1]?.code;
+                  if (!r3) throw new Error('Rejected placement is missing its reason');
                   rej[r3] = (rej[r3] | 0) + 1;
                   if (r3 === 'territory' || r3 === 'meadow' || r3 === 'shore-land') contr++;
                 }
@@ -542,7 +548,8 @@ export function runScenarios(game: GameRuntime) {
       Object.assign(s, { th });
       let st = 0;
       for (let i2 = 0; i2 < game.buildings.length; i2++)
-        for (const k9 in game.buildings[i2].stock) st += game.buildings[i2].stock[k9 as Good] | 0;
+        for (const k9 in game.buildings[i2].stock)
+          st += (game.buildings[i2].stock[k9 as Good] ?? 0) | 0;
       Object.assign(s, { st });
       return JSON.stringify(s);
     }

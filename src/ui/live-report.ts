@@ -15,22 +15,25 @@ export function createLiveReportUpdater(policy: LiveReportPolicy) {
       (node) => node.getAttribute(attribute) === key,
     );
   }
-  function update(element: HTMLElement, html: string) {
+  function update(element: HTMLElement | null, html: string) {
     if (!element || rendered.get(element) === html) return;
-    const active = document.activeElement as HTMLElement;
+    const active = document.activeElement as HTMLElement | null;
     const hadFocus = element.contains(active);
-    const key = hadFocus ? active.getAttribute(policy.focusAttribute) : null;
+    const key = hadFocus && active ? active.getAttribute(policy.focusAttribute) : null;
     for (const details of element.querySelectorAll<HTMLDetailsElement>(
       `details[${policy.disclosureAttribute}]`,
-    ))
-      expanded.set(details.getAttribute(policy.disclosureAttribute), details.open);
+    )) {
+      const key = details.getAttribute(policy.disclosureAttribute);
+      if (key !== null) expanded.set(key, details.open);
+    }
     element.innerHTML = html;
     rendered.set(element, html);
     for (const details of element.querySelectorAll<HTMLDetailsElement>(
       `details[${policy.disclosureAttribute}]`,
     )) {
       const key = details.getAttribute(policy.disclosureAttribute);
-      if (expanded.has(key)) details.open = expanded.get(key);
+      const remembered = key === null ? undefined : expanded.get(key);
+      if (remembered !== undefined) details.open = remembered;
       else if (policy.disclosureDefault === 'closed') details.open = false;
     }
     if (!hadFocus) return;

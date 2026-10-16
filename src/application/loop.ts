@@ -1,3 +1,4 @@
+import { requireElement } from '../ui/dom.ts';
 import type { GameRuntime } from '../runtime.ts';
 import { observePresentation } from '../ui/domain-feedback.ts';
 export function createLoop(game: GameRuntime, internals?: LoopInternals): LoopSubsystem {
@@ -68,19 +69,19 @@ export function createLoop(game: GameRuntime, internals?: LoopInternals): LoopSu
     game.clampCam();
     window.addEventListener('resize', game.resize);
     const sizing = new ResizeObserver(game.resize);
-    sizing.observe(document.getElementById('bar'));
-    const mapHost = document.getElementById('main');
+    sizing.observe(requireElement('bar'));
+    const mapHost = requireElement('main');
     if (mapHost) sizing.observe(mapHost);
-    const grain = document.getElementById('grain');
+    const grain = requireElement('grain');
     if (grain && game.ART.grainURL) grain.style.backgroundImage = 'url(' + game.ART.grainURL + ')';
     game.loadPrefs();
     game.resize();
-    const mb = document.getElementById('musicb');
+    const mb = requireElement('musicb');
     if (mb) mb.classList.toggle('off', !game.musicOn);
-    document.getElementById('mute').style.opacity = game.muted ? '0.4' : '1';
+    requireElement('mute').style.opacity = game.muted ? '0.4' : '1';
     game.buildPalette();
     game.updateHint();
-    const boot = document.getElementById('boot');
+    const boot = requireElement('boot');
     if (boot) boot.remove();
     requestAnimationFrame(frame);
   }

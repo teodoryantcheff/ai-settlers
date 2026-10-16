@@ -1,3 +1,4 @@
+import { requireElement } from '../ui/dom.ts';
 import { prototypeStyles } from './ui-prototype.styles.ts';
 import { resourceIcon } from '../ui/resource-icons.ts';
 import type { Good } from '../types.ts';
@@ -258,7 +259,8 @@ const icon = (name: string) =>
 const escape = (value: string) =>
   value.replace(
     /[&<>"']/g,
-    (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char],
+    (char) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char] ?? char,
   );
 const signed = (value: number) =>
   (value > 0 ? '+' : value < 0 ? '−' : '') + Math.abs(value).toFixed(1);
@@ -269,7 +271,7 @@ const spark = (negative = false, key = 0) =>
 
 export function mountUIPrototype() {
   const params = new URLSearchParams(location.search);
-  let variant: Variant = ['A', 'B', 'C'].includes(params.get('variant'))
+  let variant: Variant = ['A', 'B', 'C'].includes(params.get('variant') ?? '')
     ? (params.get('variant') as Variant)
     : 'A';
   const views: View[] = ['workspace', 'economy', 'logistics', 'welcome', 'reference', 'about'];
@@ -339,7 +341,12 @@ export function mountUIPrototype() {
       return (Math.round(value * 0.65 * (2060 / 60)) / (2060 / 60)).toFixed(1);
     return value.toFixed(1);
   };
-  const current = () => resources.find((resource) => resource.id === selected);
+  function resource(id: Good): Resource {
+    const found = resources.find((entry) => entry.id === id);
+    if (!found) throw new Error('Missing prototype resource: ' + id);
+    return found;
+  }
+  const current = () => resource(selected);
 
   function header() {
     return `<header class="study-header"><div class="brand"><span class="brandmark">${icon('leaf')}</span>SETTLERS<span class="seed">ECONOMY SIMULATION</span></div><div class="session-name"><b>${escape(saves[0].name)}</b><span class="seed mono">SEED 2024</span>${icon('chevron')}</div><div class="grow"></div><div class="time-controls"><div class="clock"><b class="mono" data-clock>${clock()}</b><small> sim time</small></div>${btn(paused ? 'Resume' : 'Pause', 'pause', '', paused ? '' : 'active', paused ? 'play' : 'pause')}${[1, 2, 4, 8].map((value) => btn(`${value}×`, 'speed', String(value), value === speed ? 'active' : '')).join('')}</div><span class="badge header-extra">ILLUSTRATIVE DATA</span>${btn('Session', 'dialog', 'saves', '', 'save')}</header>`;
@@ -376,7 +383,7 @@ export function mountUIPrototype() {
       'gold',
     ]
       .map((id, index) => {
-        const r = resources.find((item) => item.id === id);
+        const r = resource(id as Good);
         return `<div class="mini-resource"><div class="resource-name">${resourceIcon(r.id)}${btn(r.name, 'resource', r.id, 'text-link')}</div><div class="between"><div class="big">${r.stored - r.reserved}<small> available</small></div><small class="${r.delta < 0 ? 'down' : 'up'}">${signed(r.delta)}/m</small></div>${spark(r.delta < 0, index)}</div>`;
       })
       .join('')}</div></section>`;
@@ -613,7 +620,7 @@ export function mountUIPrototype() {
       if (loading) loading.hidden = true;
     }
     root.querySelectorAll<HTMLElement>('[data-map-pin]').forEach((pin) => {
-      const [x, y] = pin.dataset.mapPin.split(',').map(Number);
+      const [x, y] = (pin.dataset.mapPin ?? '').split(',').map(Number);
       pin.style.left = ((x + 0.5) * game.TS - game.cam.x) * game.z + 'px';
       pin.style.top = ((y - 0.9) * game.TS - game.cam.y) * game.z + 'px';
     });
@@ -727,7 +734,7 @@ export function mountUIPrototype() {
         syncMap();
       }
     } else if (action === 'save-checkpoint') {
-      const name = root.querySelector<HTMLInputElement>('#checkpoint-name').value.trim();
+      const name = requireElement<HTMLInputElement>('checkpoint-name', root).value.trim();
       if (name) {
         saves.push({ name: name.slice(0, 60), type: 'Checkpoint', time: clock(), gold: 84 });
         toast('Checkpoint added to the in-memory preview.');
@@ -774,7 +781,7 @@ export function mountUIPrototype() {
         `${value} selected. This study previews selection; placement and economy changes belong to implementation.`,
       );
     } else if (action === 'new-colony') {
-      const name = root.querySelector<HTMLInputElement>('#colony-name').value.trim() || 'Eastmere';
+      const name = requireElement<HTMLInputElement>('colony-name', root).value.trim() || 'Eastmere';
       saves.unshift({ name: name.slice(0, 60), type: 'Preview', time: '00:00', gold: 0 });
       view = 'workspace';
       dialog = '';
@@ -783,7 +790,7 @@ export function mountUIPrototype() {
         'Setup preview complete. The map and economic figures remain the shared comparison fixture.',
       );
     } else if (action === 'import') {
-      const code = root.querySelector<HTMLTextAreaElement>('#import-code').value.trim();
+      const code = requireElement<HTMLTextAreaElement>('import-code', root).value.trim();
       toast(
         code
           ? 'Import flow preview complete. No colony was replaced.'
@@ -794,7 +801,7 @@ export function mountUIPrototype() {
   root.addEventListener('click', (event) => {
     const target = event.target as HTMLElement;
     const button = target.closest<HTMLElement>('[data-action]');
-    if (button) act(button.dataset.action, button.dataset.value || '');
+    if (button?.dataset.action) act(button.dataset.action, button.dataset.value || '');
     else if (target.hasAttribute('data-scrim')) act('close', '');
   });
   root.addEventListener('input', (event) => {
@@ -802,7 +809,7 @@ export function mountUIPrototype() {
     if (input.id === 'resource-search') {
       filter = input.value;
       const table = root.querySelector('table[data-compact]') as HTMLTableElement;
-      root.querySelector('#resource-rows').innerHTML = rows(table.dataset.compact === 'true');
+      requireElement('resource-rows', root).innerHTML = rows(table.dataset.compact === 'true');
     }
     if (input.id === 'sound-setting') sound = Number(input.value);
   });
@@ -852,7 +859,7 @@ export function mountUIPrototype() {
       act('variant-step', event.key === 'ArrowLeft' ? '-1' : '1');
     }
     if (event.key === 'Enter' && target.matches('tr[data-action]'))
-      act(target.dataset.action, target.dataset.value);
+      act(target.dataset.action ?? '', target.dataset.value ?? '');
   });
   window.addEventListener('resize', syncMap);
   // Presentation-only timer: the embedded colony never steps or saves.

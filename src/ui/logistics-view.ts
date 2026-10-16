@@ -1,3 +1,4 @@
+import { requireElement } from './dom.ts';
 import { html as markup, trusted } from './markup.ts';
 import { createLiveReportUpdater } from './live-report.ts';
 import { revealReportHeading } from './report-navigation.ts';
@@ -11,7 +12,7 @@ import type { RemovedContributor } from './workspace.ts';
 
 /** Logistics displays recorded arrivals and current routes without assigning jobs or predicting travel. */
 export function createLogisticsView(game: GameRuntime): LogisticsViewSubsystem {
-  const host = document.getElementById('workspace-logistics');
+  const host = requireElement('workspace-logistics');
   let window: ProductionRateWindow = 30;
   let selected: TransportRow | null = null;
   let inspected: RemovedContributor | null = null;
@@ -72,19 +73,21 @@ export function createLogisticsView(game: GameRuntime): LogisticsViewSubsystem {
     const plot = points.map(
       (point) => `${left + (point.x - minX) * scale},${top + (point.y - minY) * scale}`,
     );
-    return markup`<figure class="logistics-route"><figcaption>Actual current carrier path · ${remaining.length} remaining recorded tiles</figcaption><svg viewBox="0 0 300 180" role="img" aria-label="Actual current carrier path from its observed position to the active path endpoint"><title>Carrier #${row.carrierId}: current position (${row.position.x.toFixed(1)}, ${row.position.y.toFixed(1)}), ${remaining.length} recorded remaining tiles</title><polyline points="${plot.join(' ')}" fill="none" stroke="var(--forest)" stroke-width="3"/><circle cx="${plot[0].split(',')[0]}" cy="${plot[0].split(',')[1]}" r="5" fill="var(--brass)"/><circle cx="${plot.at(-1).split(',')[0]}" cy="${plot.at(-1).split(',')[1]}" r="5" fill="var(--forest)"/></svg><p class="logistics-muted">Brass: observed carrier position. Green: active path endpoint. Tile coordinates, not a history of earlier routes.</p></figure><details data-logistics-explanation="route-${row.key}"><summary data-logistics-key="route-${row.key}">Recorded path coordinates</summary><p>${remaining.length ? remaining.map((point) => `(${point.x}, ${point.y})`).join(' → ') : 'The carrier is at the end of this recorded path.'}</p></details>`;
+    const end = plot.at(-1);
+    if (!end) return '';
+    return markup`<figure class="logistics-route"><figcaption>Actual current carrier path · ${remaining.length} remaining recorded tiles</figcaption><svg viewBox="0 0 300 180" role="img" aria-label="Actual current carrier path from its observed position to the active path endpoint"><title>Carrier #${row.carrierId}: current position (${row.position.x.toFixed(1)}, ${row.position.y.toFixed(1)}), ${remaining.length} recorded remaining tiles</title><polyline points="${plot.join(' ')}" fill="none" stroke="var(--forest)" stroke-width="3"/><circle cx="${plot[0].split(',')[0]}" cy="${plot[0].split(',')[1]}" r="5" fill="var(--brass)"/><circle cx="${end.split(',')[0]}" cy="${end.split(',')[1]}" r="5" fill="var(--forest)"/></svg><p class="logistics-muted">Brass: observed carrier position. Green: active path endpoint. Tile coordinates, not a history of earlier routes.</p></figure><details data-logistics-explanation="route-${row.key}"><summary data-logistics-key="route-${row.key}">Recorded path coordinates</summary><p>${remaining.length ? remaining.map((point) => `(${point.x}, ${point.y})`).join(' → ') : 'The carrier is at the end of this recorded path.'}</p></details>`;
   }
   function selection(rows: TransportRow[]) {
     if (!selected)
       return '<p class="empty-state">Choose a delivery to inspect its actual cargo, endpoints and current route. Inspect opens details; Locate explicitly moves to the map.</p>';
     const current =
-      rows.find((row) => row.key === selected.key) ||
+      rows.find((row) => row.key === selected?.key) ||
       rows.find(
         (row) =>
           row.kind === 'recovered' &&
-          selected.stage === 'carrying' &&
-          row.carrierId === selected.carrierId &&
-          row.good === selected.good,
+          selected?.stage === 'carrying' &&
+          row.carrierId === selected?.carrierId &&
+          row.good === selected?.good,
       );
     if (current) selected = current;
     const removed =
@@ -148,10 +151,8 @@ export function createLogisticsView(game: GameRuntime): LogisticsViewSubsystem {
   function updateLogisticsView() {
     if (!host || game.workspace !== 'logistics') return;
     const snapshot = game.currentTransport();
-    const stage = (host.querySelector('#logistics-stage') as HTMLSelectElement).value;
-    const query = (host.querySelector('#logistics-query') as HTMLInputElement).value
-      .trim()
-      .toLowerCase();
+    const stage = requireElement<HTMLSelectElement>('logistics-stage').value;
+    const query = requireElement<HTMLInputElement>('logistics-query').value.trim().toLowerCase();
     const filtered = snapshot.rows.filter(
       (row) =>
         (stage === 'all' || row.stage === stage) &&
@@ -182,7 +183,7 @@ export function createLogisticsView(game: GameRuntime): LogisticsViewSubsystem {
                 .filter((good) => arrival.totals[good])
                 .map(
                   (good) =>
-                    markup`<tr><th scope="row">${game.GOODS[good].name}</th><td>${arrival.totals[good]}</td><td>${arrival.rates[good].toFixed(1)}</td></tr>`,
+                    markup`<tr><th scope="row">${game.GOODS[good].name}</th><td>${arrival.totals[good]}</td><td>${(arrival.rates[good] ?? 0).toFixed(1)}</td></tr>`,
                 )
                 .join(''),
             )}</tbody></table>${trusted(Object.values(arrival.totals).some((value) => value > 0) ? '' : '<p>No completed goods arrivals observed during this covered interval.</p>')}`
@@ -191,24 +192,25 @@ export function createLogisticsView(game: GameRuntime): LogisticsViewSubsystem {
     );
     replace(
       'logistics-workload',
-      markup`<h2>Carrier workload</h2>${trusted(snapshot.carriers.length ? markup`<div class="logistics-carriers">${trusted(snapshot.carriers.map((carrier) => markup`<article><strong>Carrier #${carrier.id}</strong> · ${carrier.state === 'pickup' ? 'Assigned before pickup' : carrier.state === 'carrying' ? 'Physically carrying ' + game.GOODS[carrier.cargo].name : carrier.state === 'idle' ? 'Idle' : 'Moving without cargo'}<small>Position (${carrier.position.x.toFixed(1)}, ${carrier.position.y.toFixed(1)}) · ${carrier.route ? Math.max(0, carrier.route.points.length - carrier.route.next) + ' current path tiles remaining' : 'No current path recorded'}</small></article>`).join(''))}</div>` : '<p>No carriers are currently present.</p>')}<p class="logistics-muted">${snapshot.deployments} active soldier deployments are separate from carrier cargo. Historical route workload and measured travel times are unavailable.</p>`,
+      markup`<h2>Carrier workload</h2>${trusted(snapshot.carriers.length ? markup`<div class="logistics-carriers">${trusted(snapshot.carriers.map((carrier) => markup`<article><strong>Carrier #${carrier.id}</strong> · ${carrier.state === 'pickup' ? 'Assigned before pickup' : carrier.state === 'carrying' && carrier.cargo ? 'Physically carrying ' + game.GOODS[carrier.cargo].name : carrier.state === 'idle' ? 'Idle' : 'Moving without cargo'}<small>Position (${carrier.position.x.toFixed(1)}, ${carrier.position.y.toFixed(1)}) · ${carrier.route ? Math.max(0, carrier.route.points.length - carrier.route.next) + ' current path tiles remaining' : 'No current path recorded'}</small></article>`).join(''))}</div>` : '<p>No carriers are currently present.</p>')}<p class="logistics-muted">${snapshot.deployments} active soldier deployments are separate from carrier cargo. Historical route workload and measured travel times are unavailable.</p>`,
     );
     replace('logistics-waiting', waiting(snapshot.rows));
   }
   if (host) {
     host.innerHTML = `<h1 id="logistics-heading" class="report-content-heading">Deliveries and carrier workload</h1><p class="logistics-intro">Separate promised work from collected cargo and completed arrivals. Follow current carrier paths and goods waiting for collection.</p><div class="logistics-map-actions"><button id="logistics-routes" aria-controls="map-modes">Show routes on map</button><span class="logistics-muted">Highlight current carrier routes on the live map.</span></div><div class="logistics-controls"><label>Arrival reporting window <select id="logistics-window"><option value="30">30 seconds</option><option value="120">2 minutes</option><option value="600">10 minutes</option><option value="lifetime">Lifetime</option></select></label><label>Live stage <select id="logistics-stage"><option value="all">All stages</option><option value="queued">Queued · unassigned</option><option value="assigned">Assigned · before pickup</option><option value="carrying">Physically carrying</option><option value="unknown">Assignment evidence unavailable</option></select></label><label>Find resource / building / carrier <input id="logistics-query" type="search"></label></div><div id="logistics-live"></div><section id="logistics-detail"></section><section id="logistics-completions"></section><section id="logistics-workload"></section><section id="logistics-waiting"></section>`;
-    host
-      .querySelector('#logistics-routes')
-      .addEventListener('click', () => game.setMapOverlay('routes'));
-    host.querySelector('#logistics-window').addEventListener('change', (event) => {
+    requireElement('logistics-routes').addEventListener('click', () =>
+      game.setMapOverlay('routes'),
+    );
+    requireElement('logistics-window').addEventListener('change', (event) => {
       const value = (event.target as HTMLSelectElement).value;
       window = value === 'lifetime' ? value : (+value as 30 | 120 | 600);
       updateLogisticsView();
     });
     for (const id of ['logistics-stage', 'logistics-query'])
-      host
-        .querySelector('#' + id)
-        .addEventListener(id === 'logistics-query' ? 'input' : 'change', updateLogisticsView);
+      requireElement(id).addEventListener(
+        id === 'logistics-query' ? 'input' : 'change',
+        updateLogisticsView,
+      );
     host.addEventListener('click', (event) => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
       if (!button) return;

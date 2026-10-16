@@ -1,3 +1,4 @@
+import { requireElement } from './dom.ts';
 import { requireCanvas2D } from '../rendering/canvas-context.ts';
 import type { GameRuntime } from '../runtime.ts';
 import type { PresentationPreferences } from '../types.ts';
@@ -8,12 +9,11 @@ const overlays: MapOverlay[] = ['none', 'routes', 'workload', 'reach', 'stalls']
 /** Shared map choice and persistent navigation controls; no world state or rendering decisions. */
 export function createMapControls(game: GameRuntime, stopMinimapDrag: () => void) {
   const buttons = [
-    ...(document
-      .getElementById('map-modes')
-      ?.querySelectorAll<HTMLButtonElement>('[data-map-overlay]') || []),
+    ...(requireElement('map-modes')?.querySelectorAll<HTMLButtonElement>('[data-map-overlay]') ||
+      []),
   ];
-  const toggle = document.getElementById('minimap-toggle');
-  const mini = document.getElementById('mini');
+  const toggle = requireElement('minimap-toggle');
+  const mini = requireElement('mini');
   const painted = new WeakSet<HTMLCanvasElement>();
   function update() {
     for (const button of buttons) {

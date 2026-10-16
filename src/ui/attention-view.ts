@@ -1,3 +1,4 @@
+import { requireElement } from './dom.ts';
 import { html as markup, trusted } from './markup.ts';
 import { createLiveReportUpdater } from './live-report.ts';
 import { revealReportHeading } from './report-navigation.ts';
@@ -8,8 +9,8 @@ import { observePresentation } from './domain-feedback.ts';
 
 /** Two live reports over passive, durable observations; controls never rebuild on a tick. */
 export function createAttentionView(game: GameRuntime): AttentionViewSubsystem {
-  const host = document.getElementById('workspace-attention'),
-    historyHost = document.getElementById('workspace-activity');
+  const host = requireElement('workspace-attention'),
+    historyHost = requireElement('workspace-activity');
   let selected: AttentionIssue | null = null,
     inspected: EntityReference | null = null;
   let lastStamp = '';
@@ -53,7 +54,7 @@ export function createAttentionView(game: GameRuntime): AttentionViewSubsystem {
   function detail(issues: AttentionIssue[]) {
     if (!selected)
       return markup`<h2 tabindex="-1" data-attention-key="detail-heading">Issue evidence</h2><p>Choose a persistent issue to see its actual input, output or local-resource evidence. Inspect opens building details; Locate explicitly moves to the map.</p>${trusted(inspected && !game.byId(inspected.id) ? removedContext() : '')}`;
-    const current = issues.find((issue) => issue.key === selected.key);
+    const current = issues.find((issue) => issue.key === selected?.key);
     if (current) selected = current;
     const issue = selected;
     return markup`<h2 tabindex="-1" data-attention-key="detail-heading">${issue.title}</h2>${trusted(!current ? '<p class="attention-muted">This issue is no longer active. Its last evidence is retained here as context; this does not assert that production has resumed. See Activity for the recorded transition.</p>' : markup`<p><strong>Persistent bottleneck</strong> · observed for ${age(issue.since)}</p>`)}${trusted(referenceActions(issue.entity, 'affected'))}<details data-attention-expand="evidence-${issue.entity.id}" open><summary data-attention-key="evidence-${issue.entity.id}">Evidence and next steps</summary><ul>${trusted(issue.evidence.map((line) => markup`<li>${line}</li>`).join(''))}</ul><p>${issue.advice}</p></details><div class="attention-actions">${trusted(issue.goods.map((good) => markup`<button data-attention-good="${good}" data-attention-key="good-${good}">Economy: ${game.GOODS[good].name}</button>`).join(''))}<button data-attention-logistics data-attention-key="logistics">Open Logistics</button><button data-attention-reference data-attention-key="reference">Diagnosis reference</button></div>${trusted(issue.contributors.length ? markup`<h3>Current suppliers</h3><p>These surviving producers make an eligible ingredient. Their existence does not establish available stock or an active delivery.</p>${trusted(issue.contributors.map((ref) => referenceActions(ref, 'supplier-' + ref.id)).join(''))}` : issue.reason === 'inputs' ? '<p>No completed eligible supplier is currently present. Stored stock may still supply the recipe; inspect Economy before choosing another producer.</p>' : '')}${trusted(inspected && !game.byId(inspected.id) ? removedContext() : '')}`;
@@ -69,7 +70,7 @@ export function createAttentionView(game: GameRuntime): AttentionViewSubsystem {
       graphicsFailed = game.renderingAvailable === false,
       urgent = Number(storageFailed) + Number(graphicsFailed),
       count = issues.length + urgent;
-    const badge = document.getElementById('atlas-attention-count');
+    const badge = requireElement('atlas-attention-count');
     if (badge) {
       const label = count + ' active Attention issue' + (count === 1 ? '' : 's');
       if (badge.textContent !== String(count)) badge.textContent = String(count);
@@ -103,10 +104,8 @@ export function createAttentionView(game: GameRuntime): AttentionViewSubsystem {
         ? '<article class="attention-card urgent"><h2>Urgent · Graphics unavailable</h2><p>The renderer failed and the colony is paused. Follow the visible graphics recovery panel to reload. Stored checkpoints remain available.</p><button data-attention-save>Open saves and export recovery</button></article>'
         : '',
     ].filter(Boolean);
-    const query = (
-        host.querySelector<HTMLInputElement>('#attention-query').value || ''
-      ).toLowerCase(),
-      severity = host.querySelector<HTMLSelectElement>('#attention-severity').value;
+    const query = (requireElement<HTMLInputElement>('attention-query').value || '').toLowerCase(),
+      severity = requireElement<HTMLSelectElement>('attention-severity').value;
     const filtered = issues.filter(
       (issue) =>
         severity !== 'urgent' &&
@@ -122,7 +121,7 @@ export function createAttentionView(game: GameRuntime): AttentionViewSubsystem {
       ' persistent bottlenecks · ' +
       filtered.length +
       ' bottlenecks match filters.';
-    const status = host.querySelector('#attention-status');
+    const status = requireElement('attention-status');
     if (status.textContent !== statusText) status.textContent = statusText;
     const visibleFailures =
       severity !== 'bottleneck'
@@ -146,15 +145,15 @@ export function createAttentionView(game: GameRuntime): AttentionViewSubsystem {
     );
     replace(host, 'attention-detail', detail(issues));
     const journal = game.activityHistory(),
-      filter = historyHost.querySelector<HTMLInputElement>('#activity-query').value.toLowerCase(),
-      priority = historyHost.querySelector<HTMLSelectElement>('#activity-severity').value,
-      window = historyHost.querySelector<HTMLSelectElement>('#activity-window').value;
+      filter = requireElement<HTMLInputElement>('activity-query').value.toLowerCase(),
+      priority = requireElement<HTMLSelectElement>('activity-severity').value,
+      window = requireElement<HTMLSelectElement>('activity-window').value;
     const from =
       window === 'all'
         ? journal.started
         : Math.max(journal.started, game.state.time - Number(window));
     const retainedFrom = journal.events[0]?.time ?? journal.started;
-    historyHost.querySelector('#activity-coverage').textContent =
+    requireElement('activity-coverage').textContent =
       `Observation coverage began at ${at(journal.started)} simulation age. ${window === 'all' ? 'Retained history' : 'Requested interval'}: ${at(from)}–${at(game.state.time)}. ${journal.events.length} retained significant events${journal.events.length === 200 ? '; older events may have been dropped' : ''}. Earliest retained event: ${at(retainedFrom)}. Earlier unrecorded activity is unavailable. This is a significant-event journal, not a complete delivery or route log.`;
     const events = journal.events
       .filter(
@@ -196,10 +195,9 @@ export function createAttentionView(game: GameRuntime): AttentionViewSubsystem {
     }
     update(true);
     const heading =
-      document
-        .getElementById(history ? 'activity-heading' : 'attention-detail')
-        ?.querySelector<HTMLElement>('h2') ||
-      document.getElementById(history ? 'activity-heading' : 'attention-heading');
+      requireElement(history ? 'activity-heading' : 'attention-detail')?.querySelector<HTMLElement>(
+        'h2',
+      ) || requireElement(history ? 'activity-heading' : 'attention-heading');
     if (heading) {
       heading.tabIndex = -1;
       revealReportHeading(history ? historyHost : host, heading);
@@ -213,7 +211,7 @@ export function createAttentionView(game: GameRuntime): AttentionViewSubsystem {
       if (!button) return;
       if (button.dataset.attentionIssue) showAttentionEntity(+button.dataset.attentionIssue);
       else if (button.dataset.attentionInspect) {
-        inspected = refs.get(+button.dataset.attentionInspect);
+        inspected = refs.get(+button.dataset.attentionInspect) ?? null;
         if (inspected) {
           if (!game.inspectContributor(inspected.id)) game.showRemovedContributor(inspected);
           update(true);

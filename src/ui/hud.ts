@@ -1,3 +1,4 @@
+import { requireElement } from './dom.ts';
 import { requireCanvas2D } from '../rendering/canvas-context.ts';
 import { html as markup, trusted, escapeMarkup, formatGoods } from './markup.ts';
 import { createLiveReportUpdater } from './live-report.ts';
@@ -34,8 +35,8 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
   const transientHelp = createTransientHelp({ canShow: () => !game.blockingLayerOpen?.() });
   const resourceHelp = new Map<Good, HTMLElement>();
   const resourceHelpCleanup: Array<() => void> = [];
-  const populationControl = document.getElementById('ppl');
-  const populationHelp = document.getElementById('population-help');
+  const populationControl = requireElement('ppl');
+  const populationHelp = requireElement('population-help');
   if (populationControl && populationHelp && populationControl !== populationHelp)
     transientHelp.bind(populationControl, populationHelp);
   let preferencesHealth: PreferencesHealth = {
@@ -67,7 +68,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     focusAttribute: 'id',
     disclosureAttribute: 'id',
     disclosureDefault: 'markup',
-    fallback: () => document.getElementById('advtoggle'),
+    fallback: () => requireElement('advtoggle'),
   });
   function advTick() {
     const decision = game.advisorDecision(),
@@ -80,7 +81,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
           ? 'The garrison is pending. Inspect its dispatch or walking soldier; manning extends the border.'
           : 'Deliver its construction materials before starting another expansion.'
       }</div></button>`;
-    } else if (bottleneck && decision.shortage) {
+    } else if (bottleneck && decision.shortage && decision.missing) {
       h = markup`<button type="button" class="ar warn" data-focus="${bottleneck.id}"><div class="l1"><span class="ag warn">!</span><span>Restore ${game.GOODS[decision.missing].name.toLowerCase()} supply</span></div><div class="why">${game.BSPEC[bottleneck.type].name} needs inputs, but none are ready for delivery. Check its suppliers for exhausted resources or paused work.</div></button>`;
     } else if (bottleneck) {
       const pct = Math.round((bottleneck.metrics.inputBlocked / bottleneck.metrics.elapsed) * 100);
@@ -96,7 +97,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
       markup`<button id="advisor-${key ? 'focus-' + key : 'build-' + action?.bt}" `,
     );
     if (h !== lastAdvHTML) {
-      replaceAdvice(document.getElementById('advrows'), h);
+      replaceAdvice(requireElement('advrows'), h);
       lastAdvHTML = h;
     }
     let details = '';
@@ -121,7 +122,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
           : '',
       )}</div>`;
     }
-    document.getElementById('advmetrics').innerHTML =
+    requireElement('advmetrics').innerHTML =
       details || 'Production rates appear after buildings begin working.';
   }
   let hudT = 0,
@@ -142,7 +143,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     if (lastGoodsHTML === null) {
       resourceHelpCleanup.splice(0).forEach((cleanup) => cleanup());
       resourceHelp.clear();
-      document.getElementById('goods').innerHTML = RESOURCE_GROUPS.map(
+      requireElement('goods').innerHTML = RESOURCE_GROUPS.map(
         (group) =>
           markup`<div class="resource-group" role="group" aria-label="${group.name}">${trusted(
             group.goods
@@ -181,7 +182,8 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
           ? '\nBanked objective progress is shown separately in the gold goal.'
           : '');
       if (popup && popup.textContent !== explanation) popup.textContent = explanation;
-      node.querySelector('b').textContent = String(count);
+      const countNode = node.querySelector('b');
+      if (countNode) countNode.textContent = String(count);
       node.setAttribute(
         'aria-label',
         game.GOODS[good].name + ': ' + count + ' stored stock. Open resource accounting',
@@ -196,7 +198,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
       populationControl.setAttribute('aria-label', n + ' active carriers. Population details');
       lastPpl = pplTxt;
     }
-    const populationCopy = document.getElementById('population-help-copy');
+    const populationCopy = requireElement('population-help-copy');
     const populationText =
       'Active carriers: ' +
       n +
@@ -212,7 +214,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
       ? '✓ Goal achieved · ' + game.state.gold + ' banked'
       : 'Banked gold ' + game.state.gold + ' / ' + game.GOAL;
     if (gt !== lastGoal) {
-      document.getElementById('goaltxt').textContent = gt;
+      requireElement('goaltxt').textContent = gt;
       lastGoal = gt;
     }
     const pct =
@@ -220,19 +222,17 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
         ? 100
         : Math.min(100, Math.round((game.state.gold / game.GOAL) * 1000) / 10)) + '%';
     if (pct !== lastGoalFill) {
-      document.getElementById('goalfill').style.width = pct;
+      requireElement('goalfill').style.width = pct;
       lastGoalFill = pct;
     }
     if (game.state.won && !_prevWon) {
       _prevWon = true;
       game.SND.fanfare();
-      game.FX.pop(
-        game.anyStorage() ? game.anyStorage().x + 0.5 : game.W / 2,
-        game.anyStorage() ? game.anyStorage().y + 0.5 : game.H / 2,
-      );
+      const storage = game.anyStorage();
+      game.FX.pop(storage ? storage.x + 0.5 : game.W / 2, storage ? storage.y + 0.5 : game.H / 2);
     }
     const liveMessages = new Set<object>(),
-      feed = document.getElementById('msgs');
+      feed = requireElement('msgs');
     for (let i = 0; i < game.msgs.length; i++) {
       const message = game.msgs[i],
         age = (now - message.at) / 1000;
@@ -280,10 +280,10 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     const speedKey = cur + ':' + suspended + ':' + game.state.paused + ':' + game.state.speed;
     if (speedKey !== lastSpeedBtn) {
       ['sp0', 'sp1', 'sp2', 'sp4', 'sp8'].forEach(function (id) {
-        document.getElementById(id).className = '';
+        requireElement(id).className = '';
       });
-      document.getElementById(cur).className = 'on';
-      const indicator = document.getElementById('spd');
+      requireElement(cur).className = 'on';
+      const indicator = requireElement('spd');
       indicator.textContent = suspended
         ? 'SUSPENDED · ' + game.state.speed + '\u00d7'
         : game.state.paused
@@ -306,9 +306,10 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
   function updateHint() {
     catalog.updatePlacement();
     inspector.tick();
-    const h = document.getElementById('hint');
+    const h = requireElement('hint');
     let t = '';
     if (game.mode && game.mode.type === 'build') {
+      const deposit = game.BSPEC[game.mode.bt].resKind;
       if (game.ghost && !game.ghost.ok)
         t =
           '\u2716 ' +
@@ -318,14 +319,14 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
           (game.suggestFor(game.ghost.reason)
             ? ' \u2192 ' + game.suggestFor(game.ghost.reason)
             : '');
-      else if (hlTiles && hlTiles.length)
+      else if (hlTiles && hlTiles.length && deposit)
         t =
           'Placing: ' +
           game.BSPEC[game.mode.bt].name +
           ' (' +
           costStr(game.mode.bt) +
           ') \u2014 glowing tiles are ' +
-          game.GOODS[game.BSPEC[game.mode.bt].resKind].name.toLowerCase() +
+          game.GOODS[deposit].name.toLowerCase() +
           ' deposits; build on the grass beside them';
       else {
         t =
@@ -358,10 +359,10 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
           ? 'Road · choose ' + (game.anchor ? 'end point' : 'start point')
           : 'Demolish · review before confirming'
       : '';
-    const toolLabel = document.getElementById('tool-label');
+    const toolLabel = requireElement('tool-label');
     if (toolLabel.textContent !== label) toolLabel.textContent = label;
     if (t !== lastHint) {
-      document.getElementById('map-help-copy').textContent = t;
+      requireElement('map-help-copy').textContent = t;
       lastHint = t;
     }
   }
@@ -448,13 +449,13 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     for (let i = 0; i < ps.length; i++)
       ps[i].classList.toggle(
         'on',
-        game.mode &&
+        !!game.mode &&
           ps[i].dataset.b === (game.mode.type === 'build' ? game.mode.bt : game.mode.type),
       );
     for (const btn of ps)
       btn.setAttribute('aria-pressed', btn.classList.contains('on') ? 'true' : 'false');
     const active = game.mode && (game.mode.type === 'build' ? game.mode.bt : game.mode.type);
-    document.getElementById('palettestatus').textContent = active
+    requireElement('palettestatus').textContent = active
       ? active === 'road'
         ? 'Road selected'
         : active === 'demolish'
@@ -547,7 +548,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
         game.msg(
           '\u2716 No building there to raze \u2014 click directly on one (raze-able buildings are marked with a red \u2715)',
         );
-      } else if (action === 'armed') {
+      } else if (action === 'armed' && tgt) {
         game.msg(
           'Review the demolition consequences for ' +
             game.BSPEC[tgt.type].name +
@@ -635,7 +636,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     game.clampCam();
   }
   function tooltipTick(now: number) {
-    const tt = document.getElementById('tt');
+    const tt = requireElement('tt');
     const show =
       (!game.workspace || game.workspace === 'map') &&
       game.hoverIn &&
@@ -691,8 +692,8 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
         game.presentationPrefs.overlay = p.overlay;
       if (p.adv === false) {
         advOn = false;
-        (document.getElementById('colony-guidance') as HTMLDetailsElement).open = false;
-        document.getElementById('advb').className = '';
+        (requireElement('colony-guidance') as HTMLDetailsElement).open = false;
+        requireElement('advb').className = '';
       }
     } catch (e) {
       reportPreferences(
@@ -706,10 +707,9 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
   }
   function applyPresentationPrefs() {
     game.setAtlasExpanded?.(game.presentationPrefs.atlasExpanded, false);
-    document.getElementById('fps').hidden = !game.presentationPrefs.showFps;
-    (document.getElementById('fpspref') as HTMLInputElement).checked =
-      game.presentationPrefs.showFps;
-    const atlasArt = document.getElementById('atlas-art') as HTMLCanvasElement;
+    requireElement('fps').hidden = !game.presentationPrefs.showFps;
+    (requireElement('fpspref') as HTMLInputElement).checked = game.presentationPrefs.showFps;
+    const atlasArt = requireElement('atlas-art') as HTMLCanvasElement;
     if (atlasArt && game.drawSpriteIcon) {
       const context = requireCanvas2D(atlasArt, game.reportGraphicsFailure);
       context.clearRect(0, 0, atlasArt.width, atlasArt.height);
@@ -717,13 +717,11 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     }
     document.body.classList.toggle('reduced-motion', game.presentationPrefs.reducedMotion);
     document.body.classList.toggle('clarity-view', game.presentationPrefs.clarity);
-    (document.getElementById('motionpref') as HTMLInputElement).checked =
+    (requireElement('motionpref') as HTMLInputElement).checked =
       game.presentationPrefs.reducedMotion;
-    (document.getElementById('weatherpref') as HTMLInputElement).checked =
-      game.presentationPrefs.weather;
-    (document.getElementById('claritypref') as HTMLInputElement).checked =
-      game.presentationPrefs.clarity;
-    (document.getElementById('qualitypref') as HTMLSelectElement).value = String(
+    (requireElement('weatherpref') as HTMLInputElement).checked = game.presentationPrefs.weather;
+    (requireElement('claritypref') as HTMLInputElement).checked = game.presentationPrefs.clarity;
+    (requireElement('qualitypref') as HTMLSelectElement).value = String(
       game.presentationPrefs.quality,
     );
     mapControls.update();
@@ -797,11 +795,11 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
         game.switchWorkspace('map');
         game.focusWorkspaceNavigation?.();
       } else {
-        if (!document.getElementById('paletteitems').classList.contains('hidden')) {
+        if (!requireElement('paletteitems').classList.contains('hidden')) {
           setPaletteExpanded(false);
-          document.getElementById('paletteb').focus();
+          requireElement('paletteb').focus();
         } else if (!e.repeat) cancelMode();
-        (document.getElementById('utility') as HTMLDetailsElement).open = false;
+        (requireElement('utility') as HTMLDetailsElement).open = false;
       }
       e.preventDefault();
       return;
@@ -865,20 +863,20 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
   }
   function toggleMute() {
     game.setMuted(!game.muted);
-    document.getElementById('mute').style.opacity = game.muted ? '0.4' : '1';
+    requireElement('mute').style.opacity = game.muted ? '0.4' : '1';
     savePrefs();
     game.SND.ui();
   }
   function toggleMusic() {
     game.setMusicVol(!game.musicOn);
-    const b = document.getElementById('musicb');
+    const b = requireElement('musicb');
     if (b) b.classList.toggle('off', !game.musicOn);
-    document.getElementById('mute').style.opacity = game.muted ? '0.4' : '1';
+    requireElement('mute').style.opacity = game.muted ? '0.4' : '1';
     savePrefs();
     if (!game.muted && game.musicOn) game.SND.ui();
   }
   function toggleHelp() {
-    const help = document.getElementById('help');
+    const help = requireElement('help');
     if (help.classList.contains('hidden')) {
       if (game.openReference) game.openReference();
       else game.openLayer('help');
@@ -886,53 +884,53 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
   }
   function setAdvisorVisible(visible: boolean) {
     advOn = visible;
-    (document.getElementById('colony-guidance') as HTMLDetailsElement).open = advOn;
-    document.getElementById('advb').className = advOn ? 'on' : '';
+    (requireElement('colony-guidance') as HTMLDetailsElement).open = advOn;
+    requireElement('advb').className = advOn ? 'on' : '';
     savePrefs();
   }
   function toggleAdv() {
     const opening = game.workspace !== 'colony';
     setAdvisorVisible(opening || !advOn);
     if (opening) game.switchWorkspace('colony');
-    const guidance = document.getElementById('colony-guidance');
+    const guidance = requireElement('colony-guidance');
     if (advOn && !guidance.contains(document.activeElement)) {
-      const summary = document.getElementById('colony-guidance-summary');
+      const summary = requireElement('colony-guidance-summary');
       summary.focus({ preventScroll: true });
       summary.scrollIntoView({ block: 'nearest' });
     }
     if (!advOn && guidance.contains(document.activeElement))
-      document.getElementById('colony-guidance-summary').focus({ preventScroll: true });
-    (document.getElementById('utility') as HTMLDetailsElement).open = false;
+      requireElement('colony-guidance-summary').focus({ preventScroll: true });
+    (requireElement('utility') as HTMLDetailsElement).open = false;
   }
   function toggleAdvisorDetails() {
-    const compact = document.getElementById('adv').classList.toggle('compact');
-    const button = document.getElementById('advtoggle');
+    const compact = requireElement('adv').classList.toggle('compact');
+    const button = requireElement('advtoggle');
     button.setAttribute('aria-expanded', compact ? 'false' : 'true');
     button.title = compact ? 'Show advisor details' : 'Compact advisor';
   }
   function toggleAuto() {
     game.state.auto = !game.state.auto;
-    document.getElementById('autob').className = game.state.auto ? 'on' : '';
-    document.getElementById('autob').textContent = game.state.auto ? 'AUTO ON' : 'AUTO OFF';
-    document.getElementById('autob').setAttribute('aria-pressed', String(game.state.auto));
+    requireElement('autob').className = game.state.auto ? 'on' : '';
+    requireElement('autob').textContent = game.state.auto ? 'AUTO ON' : 'AUTO OFF';
+    requireElement('autob').setAttribute('aria-pressed', String(game.state.auto));
     if (game.state.auto) {
       game.state.paused = false;
       game.autoT = 0;
       game.msg('AUTO-PLAY: the colonists build for you \u2014 P to stop');
     } else game.msg('Auto-play off');
   }
-  document.getElementById('autob').onclick = toggleAuto;
-  document.getElementById('musicb').onclick = toggleMusic;
-  document.getElementById('advb').onclick = toggleAdv;
-  document.getElementById('advtoggle').onclick = toggleAdvisorDetails;
+  requireElement('autob').onclick = toggleAuto;
+  requireElement('musicb').onclick = toggleMusic;
+  requireElement('advb').onclick = toggleAdv;
+  requireElement('advtoggle').onclick = toggleAdvisorDetails;
   function openPanel(id: string) {
     if (id === 'economy') {
       game.switchWorkspace('colony');
       return;
     }
-    if (document.getElementById(id).classList.contains('hidden')) game.openLayer(id);
+    if (requireElement(id).classList.contains('hidden')) game.openLayer(id);
     else game.closeLayer(id);
-    (document.getElementById('utility') as HTMLDetailsElement).open = false;
+    (requireElement('utility') as HTMLDetailsElement).open = false;
     if (id === 'mix') {
       game.initAudio();
       for (const data of [
@@ -940,27 +938,23 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
         ['sfxvol', game.sfxVol],
         ['ambvol', game.ambVol],
       ] as [string, number][]) {
-        (document.getElementById(data[0]) as HTMLInputElement).value = String(
-          Math.round(data[1] * 100),
-        );
+        (requireElement(data[0]) as HTMLInputElement).value = String(Math.round(data[1] * 100));
         volLbl(data[0] + 'v', data[1]);
       }
     }
     if (id === 'economy') game.gameplayHUD();
   }
-  document
-    .getElementById('settings-help')
-    ?.addEventListener('click', () =>
-      game.openReference ? game.openReference('settings') : toggleHelp(),
-    );
-  document.getElementById('mixb').onclick = function () {
+  requireElement('settings-help')?.addEventListener('click', () =>
+    game.openReference ? game.openReference('settings') : toggleHelp(),
+  );
+  requireElement('mixb').onclick = function () {
     if (game.openSettings) game.openSettings();
     else openPanel('mix');
   };
-  document.getElementById('savepanelb').onclick = function () {
+  requireElement('savepanelb').onclick = function () {
     game.openSaveManager?.();
   };
-  document.getElementById('economyb').onclick = function () {
+  requireElement('economyb').onclick = function () {
     openPanel('economy');
   };
   document.querySelectorAll<HTMLElement>('[data-close]').forEach(function (btn) {
@@ -971,58 +965,58 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     };
   });
   function volLbl(id: string, v: number) {
-    document.getElementById(id).textContent = Math.round(v * 100) + '%';
+    requireElement(id).textContent = Math.round(v * 100) + '%';
   }
-  const musicVolume = document.getElementById('musvol') as HTMLInputElement;
+  const musicVolume = requireElement('musvol') as HTMLInputElement;
   musicVolume.oninput = function () {
     game.setMusVol(+musicVolume.value / 100);
     volLbl('musvolv', +musicVolume.value / 100);
     savePrefsSoon();
   };
-  const sfxVolume = document.getElementById('sfxvol') as HTMLInputElement;
+  const sfxVolume = requireElement('sfxvol') as HTMLInputElement;
   sfxVolume.oninput = function () {
     game.setSfxVol(+sfxVolume.value / 100);
     volLbl('sfxvolv', +sfxVolume.value / 100);
     savePrefsSoon();
   };
-  const ambienceVolume = document.getElementById('ambvol') as HTMLInputElement;
+  const ambienceVolume = requireElement('ambvol') as HTMLInputElement;
   ambienceVolume.oninput = function () {
     game.setAmbVol(+ambienceVolume.value / 100);
     volLbl('ambvolv', +ambienceVolume.value / 100);
     savePrefsSoon();
   };
-  const motionPref = document.getElementById('motionpref') as HTMLInputElement;
+  const motionPref = requireElement('motionpref') as HTMLInputElement;
   motionPref.onchange = function () {
     game.presentationPrefs.reducedMotion = motionPref.checked;
     applyPresentationPrefs();
     savePrefs();
   };
-  const fpsPref = document.getElementById('fpspref') as HTMLInputElement;
+  const fpsPref = requireElement('fpspref') as HTMLInputElement;
   fpsPref.onchange = function () {
     game.presentationPrefs.showFps = fpsPref.checked;
-    document.getElementById('fps').hidden = !fpsPref.checked;
+    requireElement('fps').hidden = !fpsPref.checked;
     game.resize?.();
     savePrefs();
   };
-  const weatherPref = document.getElementById('weatherpref') as HTMLInputElement;
+  const weatherPref = requireElement('weatherpref') as HTMLInputElement;
   weatherPref.onchange = function () {
     game.presentationPrefs.weather = weatherPref.checked;
     savePrefs();
   };
-  const qualityPref = document.getElementById('qualitypref') as HTMLSelectElement;
+  const qualityPref = requireElement('qualitypref') as HTMLSelectElement;
   qualityPref.onchange = function () {
     if (+qualityPref.value !== 1 && +qualityPref.value !== 0.75) return;
     game.presentationPrefs.quality = +qualityPref.value as 1 | 0.75;
     game.resize();
     savePrefs();
   };
-  const clarityPref = document.getElementById('claritypref') as HTMLInputElement;
+  const clarityPref = requireElement('claritypref') as HTMLInputElement;
   clarityPref.onchange = function () {
     game.presentationPrefs.clarity = clarityPref.checked;
     applyPresentationPrefs();
     savePrefs();
   };
-  document.getElementById('economybody').onclick = function (e) {
+  requireElement('economybody').onclick = function (e) {
     const btn = (e.target as HTMLInputElement).closest('button');
     if (!btn) return;
     if (btn.dataset.upgrade === 'haul' || btn.dataset.upgrade === 'production')
@@ -1030,13 +1024,13 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     if (btn.dataset.contract !== undefined) game.claimContract(+btn.dataset.contract);
     game.gameplayHUD();
   };
-  document.getElementById('colony-guidance').addEventListener('toggle', () => {
-    const open = (document.getElementById('colony-guidance') as HTMLDetailsElement).open;
+  requireElement('colony-guidance').addEventListener('toggle', () => {
+    const open = (requireElement('colony-guidance') as HTMLDetailsElement).open;
     if (open !== advOn) setAdvisorVisible(open);
   });
-  document.getElementById('advb').className = 'on';
-  document.getElementById('adv').addEventListener('click', function (e) {
-    let el = e.target as HTMLElement;
+  requireElement('advb').className = 'on';
+  requireElement('adv').addEventListener('click', function (e) {
+    let el = e.target as HTMLElement | null;
     while (el && el.id !== 'adv' && !el.classList.contains('ar')) el = el.parentElement;
     if (!el || !el.classList.contains('ar')) return;
     if (el.dataset.focus) {
@@ -1051,41 +1045,41 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
       return;
     }
     const bt = el.dataset.b as BuildingType | undefined;
-    if (!game.BSPEC[bt]) return;
+    if (!bt || !game.BSPEC[bt]) return;
     game.switchWorkspace('map');
     game.activateTool('build', bt);
   });
-  document.getElementById('sp0').onclick = function () {
+  requireElement('sp0').onclick = function () {
     game.state.paused = true;
   };
-  document.getElementById('sp1').onclick = function () {
+  requireElement('sp1').onclick = function () {
     game.state.paused = false;
     game.state.speed = 1;
   };
-  document.getElementById('sp2').onclick = function () {
+  requireElement('sp2').onclick = function () {
     game.state.paused = false;
     game.state.speed = 2;
   };
-  document.getElementById('sp4').onclick = function () {
+  requireElement('sp4').onclick = function () {
     game.state.paused = false;
     game.state.speed = 4;
   };
-  document.getElementById('sp8').onclick = function () {
+  requireElement('sp8').onclick = function () {
     game.state.paused = false;
     game.state.speed = 8;
   };
-  document.getElementById('saveb').onclick = function () {
+  requireElement('saveb').onclick = function () {
     game.initAudio();
     game.openSaveManager?.();
   };
-  document.getElementById('loadb').onclick = function () {
+  requireElement('loadb').onclick = function () {
     game.initAudio();
     game.openSaveManager?.();
   };
-  document.getElementById('mute').onclick = toggleMute;
-  document.getElementById('helpb').onclick = toggleHelp;
-  document.getElementById('helpx').onclick = toggleHelp;
-  document.getElementById('startb').onclick = function () {
+  requireElement('mute').onclick = toggleMute;
+  requireElement('helpb').onclick = toggleHelp;
+  requireElement('helpx').onclick = toggleHelp;
+  requireElement('startb').onclick = function () {
     if (game.startNewColonyFromForm) {
       game.startNewColonyFromForm();
       return;
@@ -1098,13 +1092,10 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
   };
   function setPaletteExpanded(expanded: boolean) {
     transientHelp.dismiss();
-    (document.getElementById('palette') as HTMLDetailsElement).classList.toggle(
-      'compact',
-      !expanded,
-    );
-    document.getElementById('paletteitems').classList.toggle('hidden', !expanded);
-    document.getElementById('catalog-controls')?.classList.toggle('hidden', !expanded);
-    const button = document.getElementById('paletteb');
+    (requireElement('palette') as HTMLDetailsElement).classList.toggle('compact', !expanded);
+    requireElement('paletteitems').classList.toggle('hidden', !expanded);
+    requireElement('catalog-controls')?.classList.toggle('hidden', !expanded);
+    const button = requireElement('paletteb');
     button.setAttribute('aria-expanded', expanded ? 'true' : 'false');
     button.title = expanded ? 'Close building palette' : 'Open building palette';
   }
@@ -1116,36 +1107,36 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
       setPaletteExpanded(false);
       if (game.mode && game.mode.type === 'build' && game.mode.bt === type) {
         cancelMode();
-        document.getElementById('paletteb').focus({ preventScroll: true });
+        requireElement('paletteb').focus({ preventScroll: true });
         return;
       }
       game.activateTool(
         type === 'road' ? 'road' : type === 'demolish' ? 'demolish' : 'build',
         type === 'road' || type === 'demolish' ? null : type,
       );
-      document.getElementById('paletteb').focus({ preventScroll: true });
+      requireElement('paletteb').focus({ preventScroll: true });
     },
     placementFeedback,
     transientHelp,
   );
-  document.getElementById('tool-cancel').onclick = () => {
+  requireElement('tool-cancel').onclick = () => {
     transientHelp.dismiss();
     cancelMode();
     updateHint();
-    document.getElementById('paletteb').focus({ preventScroll: true });
+    requireElement('paletteb').focus({ preventScroll: true });
   };
-  const mapHelp = document.getElementById('map-help');
-  const mapHelpPopup = document.getElementById('map-help-popup');
+  const mapHelp = requireElement('map-help');
+  const mapHelpPopup = requireElement('map-help-popup');
   if (mapHelp && mapHelpPopup && mapHelp !== mapHelpPopup)
     transientHelp.bind(mapHelp, mapHelpPopup);
   mapHelp.onclick = () => game.openReference('controls');
   function buildPalette() {
     catalog.build();
-    document.getElementById('paletteb').onclick = function () {
-      setPaletteExpanded(document.getElementById('paletteitems').classList.contains('hidden'));
+    requireElement('paletteb').onclick = function () {
+      setPaletteExpanded(requireElement('paletteitems').classList.contains('hidden'));
     };
   }
-  const fpsElement = document.getElementById('fps');
+  const fpsElement = requireElement('fps');
   let fpsSampleStart: number | null = null,
     fpsFrames = 0;
   function resetFps() {
@@ -1186,7 +1177,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     game.lastJourneyHTML = '';
     game.lastEconomyHTML = '';
     lastSpeedBtn = null;
-    document.getElementById('autob').className = game.state.auto ? 'on' : '';
+    requireElement('autob').className = game.state.auto ? 'on' : '';
     started = true;
     centerHQ();
     updateInfo();

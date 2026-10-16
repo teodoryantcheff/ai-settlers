@@ -1,3 +1,4 @@
+import { requireElement } from './dom.ts';
 import { html as markup, trusted } from './markup.ts';
 import { createLiveReportUpdater } from './live-report.ts';
 import { revealReportHeading } from './report-navigation.ts';
@@ -16,7 +17,7 @@ import type { RemovedContributor } from './workspace.ts';
 
 /** Live reports keep their controls mounted and read only passive economic observations. */
 export function createEconomyView(game: GameRuntime): EconomyViewSubsystem {
-  const host = document.getElementById('workspace-economy');
+  const host = requireElement('workspace-economy');
   let window: ProductionRateWindow = 30;
   let selectedGood: Good | null = null;
   let inspected: RemovedContributor | null = null;
@@ -40,19 +41,20 @@ export function createEconomyView(game: GameRuntime): EconomyViewSubsystem {
     host.innerHTML = markup`<h1 id="economy-heading" class="report-content-heading">Stock and production</h1>
       <p class="economy-intro">Physical stock, supply chains and completed deliveries · rates in goods per simulation minute.</p>
       <div class="economy-controls"><label>Reporting window <select id="economy-window"><option value="30">30 seconds</option><option value="120">2 minutes</option><option value="600">10 minutes</option><option value="lifetime">Lifetime</option></select></label>
-      <label>Production chain <select id="economy-chain"><option value="all">All chains</option>${trusted(RESOURCE_GROUPS.map((group, i) => markup`<option value="${i}">${group.name}</option>`).join(''))}</select></label>
+      <label>Production chain <select id="economy-chain"><option value="all">All chains</option>${trusted(RESOURCE_GROUPS.map((group, i) => markup`<option value="${i}">${group?.name ?? ''}</option>`).join(''))}</select></label>
       <label>Find a resource <input id="economy-query" type="search" placeholder="Name or supply chain"></label></div>
       <p id="economy-coverage" class="economy-coverage" aria-live="polite"></p>
       <div id="economy-balances"></div><div id="economy-detail"></div>`;
-    host.querySelector('#economy-window').addEventListener('change', (event) => {
+    requireElement('economy-window').addEventListener('change', (event) => {
       const value = (event.target as HTMLSelectElement).value;
       window = value === 'lifetime' ? value : (+value as 30 | 120 | 600);
       updateEconomyView();
     });
     for (const id of ['economy-chain', 'economy-query'])
-      host
-        .querySelector('#' + id)
-        .addEventListener(id === 'economy-query' ? 'input' : 'change', updateEconomyView);
+      requireElement(id).addEventListener(
+        id === 'economy-query' ? 'input' : 'change',
+        updateEconomyView,
+      );
     host.addEventListener('click', (event) => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
       if (!button) return;
@@ -87,7 +89,7 @@ export function createEconomyView(game: GameRuntime): EconomyViewSubsystem {
     const heading = host?.querySelector<HTMLElement>('#economy-detail h2');
     revealReportHeading(host, heading);
   }
-  const stockBar = document.getElementById('goods');
+  const stockBar = requireElement('goods');
   function openStock(event: Event) {
     const target = (event.target as HTMLElement).closest<HTMLElement>('[data-good]');
     if (
@@ -126,11 +128,13 @@ export function createEconomyView(game: GameRuntime): EconomyViewSubsystem {
       })),
     }));
     const max = Math.max(1, ...series.flatMap((entry) => entry.points.map((point) => point.value)));
+    const last = samples.at(-1);
+    if (!last) return '';
     const first = samples[0].time,
-      elapsed = samples.at(-1).time - first;
+      elapsed = last.time - first;
     return markup`<figure class="economy-history"><figcaption>Recorded recent flow · ${number(elapsed)} simulation seconds · goods/min${window === 'lifetime' ? ' (latest ten minutes only)' : ''}</figcaption>
-      <svg viewBox="0 0 600 146" role="img" aria-label="Measured ${game.GOODS[good].name} flow history: production, consumption and output delivered to storage"><title>Observed rates from ${number(first)} to ${number(samples.at(-1).time)} simulation seconds, maximum ${number(max)} goods per minute</title>
-      <text x="24" y="13" fill="var(--ink-dim)" font-size="12">${number(max)}</text><text x="2" y="108" fill="var(--ink-dim)" font-size="12">0</text><text x="24" y="137" fill="var(--ink-dim)" font-size="12">${number(first)}s</text><text x="592" y="137" text-anchor="end" fill="var(--ink-dim)" font-size="12">${number(samples.at(-1).time)}s</text><path d="M24 18V108H592" fill="none" stroke="var(--brass-dim)"/>${trusted(series.map(({ flow, points }) => markup`<path class="economy-flow-${flow}" fill="none" stroke-width="2" d="${points.map((point, i) => `${i ? 'V' : `M${24 + ((point.from - first) / elapsed) * 568},`}${108 - (point.value / max) * 82} H${24 + ((point.time - first) / elapsed) * 568}`).join(' ')}"/>`).join(''))}</svg>
+      <svg viewBox="0 0 600 146" role="img" aria-label="Measured ${game.GOODS[good].name} flow history: production, consumption and output delivered to storage"><title>Observed rates from ${number(first)} to ${number(last.time)} simulation seconds, maximum ${number(max)} goods per minute</title>
+      <text x="24" y="13" fill="var(--ink-dim)" font-size="12">${number(max)}</text><text x="2" y="108" fill="var(--ink-dim)" font-size="12">0</text><text x="24" y="137" fill="var(--ink-dim)" font-size="12">${number(first)}s</text><text x="592" y="137" text-anchor="end" fill="var(--ink-dim)" font-size="12">${number(last.time)}s</text><path d="M24 18V108H592" fill="none" stroke="var(--brass-dim)"/>${trusted(series.map(({ flow, points }) => markup`<path class="economy-flow-${flow}" fill="none" stroke-width="2" d="${points.map((point, i) => `${i ? 'V' : `M${24 + ((point.from - first) / elapsed) * 568},`}${108 - (point.value / max) * 82} H${24 + ((point.time - first) / elapsed) * 568}`).join(' ')}"/>`).join(''))}</svg>
       <div class="economy-chart-key"><span class="economy-flow-produced">● Production</span><span class="economy-flow-consumed">● Consumption</span><span class="economy-flow-outputStored">● Delivered to storage</span></div>
       <p class="economy-muted">Two-second observations; no estimates between samples. Paused and offline time add no history. Exact totals are below.</p></figure>`;
   }
@@ -150,7 +154,7 @@ export function createEconomyView(game: GameRuntime): EconomyViewSubsystem {
       inputs: 'Waiting for ingredients',
       resources: 'No natural resource in working range',
     };
-    return `${number(theoretical)} goods/min nominal · ${output} per ${cycle}s base cycle · production upgrade ${tier}/3${variety ? ` · current meal variety +${Math.round(variety * 100)}%` : ''}. ${!building.done ? 'Construction unfinished.' : reasons[game.productionProgress(building)?.reason] || 'No current production constraint.'} Requires sustained ingredients, resource access, local well support where applicable and collection. Capacity is a theoretical ceiling, not a forecast.`;
+    return `${number(theoretical)} goods/min nominal · ${output} per ${cycle}s base cycle · production upgrade ${tier}/3${variety ? ` · current meal variety +${Math.round(variety * 100)}%` : ''}. ${!building.done ? 'Construction unfinished.' : reasons[game.productionProgress(building)?.reason ?? ''] || 'No current production constraint.'} Requires sustained ingredients, resource access, local well support where applicable and collection. Capacity is a theoretical ceiling, not a forecast.`;
   }
   function recipe(building: Building) {
     const spec = game.BSPEC[building.type];
@@ -206,20 +210,18 @@ export function createEconomyView(game: GameRuntime): EconomyViewSubsystem {
   function updateEconomyView() {
     if (!host || game.workspace !== 'economy') return;
     const measured = game.economicWindow(window);
-    const coverage = host.querySelector('#economy-coverage');
+    const coverage = requireElement('economy-coverage');
     const text = measured.available
       ? `Observed ${number(measured.elapsed)} simulation seconds (${number(measured.from)}–${number(measured.to)}). ${window === 'lifetime' ? 'Lifetime means recorded coverage; older unrecorded history is unavailable.' : 'Two-second samples; partial windows show only actual coverage.'}`
       : 'History unavailable — gathering observations. Current stock remains available; missing measurements are not zero.';
     if (coverage.textContent !== text) coverage.textContent = text;
-    const query = (host.querySelector('#economy-query') as HTMLInputElement).value
-      .trim()
-      .toLowerCase();
-    const chain = (host.querySelector('#economy-chain') as HTMLSelectElement).value;
+    const query = requireElement<HTMLInputElement>('economy-query').value.trim().toLowerCase();
+    const chain = requireElement<HTMLSelectElement>('economy-chain').value;
     const filtered = goods.filter((good) => {
       const group = RESOURCE_GROUPS.find((entry) => entry.goods.includes(good));
       return (
         (chain === 'all' || group === RESOURCE_GROUPS[+chain]) &&
-        `${game.GOODS[good].name} ${group.name}`.toLowerCase().includes(query)
+        `${game.GOODS[good].name} ${group?.name ?? ''}`.toLowerCase().includes(query)
       );
     });
     replaceReport(
@@ -229,7 +231,7 @@ export function createEconomyView(game: GameRuntime): EconomyViewSubsystem {
           .map((good) => {
             const stock = game.resourceAccounting(good);
             const group = RESOURCE_GROUPS.find((entry) => entry.goods.includes(good));
-            return markup`<tr data-economy-good="${good}"><th scope="row"><button data-economy-resource="${good}" data-economy-key="resource-${good}" aria-expanded="${selectedGood === good}">${trusted(resourceIcon(good))}${game.GOODS[good].name}</button><small>${group.name}</small></th><td>${stock.stored}</td><td>${stock.reserved}</td><td>${stock.available}</td><td>${stock.inTransit}</td><td>${measured.available ? number(measured.rates.produced[good] || 0) : '—'}</td><td>${measured.available ? number(measured.rates.consumed[good] || 0) : '—'}</td></tr>`;
+            return markup`<tr data-economy-good="${good}"><th scope="row"><button data-economy-resource="${good}" data-economy-key="resource-${good}" aria-expanded="${selectedGood === good}">${trusted(resourceIcon(good))}${game.GOODS[good].name}</button><small>${group?.name ?? ''}</small></th><td>${stock.stored}</td><td>${stock.reserved}</td><td>${stock.available}</td><td>${stock.inTransit}</td><td>${measured.available ? number(measured.rates.produced[good] || 0) : '—'}</td><td>${measured.available ? number(measured.rates.consumed[good] || 0) : '—'}</td></tr>`;
           })
           .join(''),
       )}</tbody></table></div>${trusted(filtered.length ? '' : '<p class="empty-state">No resources match these filters. Clear the search or choose another chain.</p>')}`,

@@ -10,7 +10,7 @@ import type {
   MusicArrangement,
 } from './audio-types.ts';
 export function createMusic(game: GameRuntime, runtime: AudioRuntime, internals?: AudioInternals) {
-  let graph: AudioGraph = null;
+  let graph: AudioGraph | null = null;
   const voices = new Set<Disposable>();
   // ---------- MUSIC ----------
   // Three 48-bar themes form a roughly four-and-a-half minute pastoral suite.
@@ -485,7 +485,7 @@ export function createMusic(game: GameRuntime, runtime: AudioRuntime, internals?
     runtime.releaseAt(t0 + 0.1, resources);
   }
   let musicBar = 0;
-  let musicSchedule: number = null;
+  let musicSchedule: number | null = null;
   let scheduleGeneration = 0;
 
   function suspend() {

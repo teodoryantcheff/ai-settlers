@@ -1,3 +1,4 @@
+import { requireElement } from './dom.ts';
 import { requireCanvas2D } from '../rendering/canvas-context.ts';
 import { territoryClaimRadius } from '../gameplay/colony-rules.ts';
 import { html as markup, trusted, formatGoods } from './markup.ts';
@@ -100,14 +101,11 @@ export function createInspectorView(
     updateConfirmation();
   }
   function updateConfirmation() {
-    if (
-      confirmationId === null ||
-      document.getElementById('demolition-dialog').classList.contains('hidden')
-    )
+    if (confirmationId === null || requireElement('demolition-dialog').classList.contains('hidden'))
       return;
     const b = game.byId(confirmationId);
-    const content = document.getElementById('demolition-evidence');
-    const confirm = document.getElementById('demolition-confirm') as HTMLButtonElement;
+    const content = requireElement('demolition-evidence');
+    const confirm = requireElement('demolition-confirm') as HTMLButtonElement;
     if (!b) {
       content.textContent = 'This building no longer exists.';
       confirm.disabled = true;
@@ -118,12 +116,12 @@ export function createInspectorView(
     if (content.innerHTML !== html) content.innerHTML = html;
     confirm.disabled = !quote.allowed;
   }
-  document.getElementById('demolition-cancel').onclick = () => {
+  requireElement('demolition-cancel').onclick = () => {
     game.demoArm = null;
     game.closeLayer('demolition-dialog');
     confirmationId = null;
   };
-  document.getElementById('demolition-confirm').onclick = () => {
+  requireElement('demolition-confirm').onclick = () => {
     const b = confirmationId === null ? null : game.byId(confirmationId);
     if (!b || !game.demolitionQuote(b).allowed) {
       updateConfirmation();
@@ -159,11 +157,13 @@ export function createInspectorView(
   }
   function observedProduction(b: Building) {
     const sp = game.BSPEC[b.type];
+    if (!sp.out) return '';
+    const output = sp.out;
     const rates = game.productionWindow(b.metrics, productionRateWindow);
     const rate = (record: Inventory, good: Good, elapsed: number) =>
       elapsed > 0 ? (((record[good] || 0) / elapsed) * 60).toFixed(1) : '—';
-    const produced = rate(rates.produced, sp.out, rates.elapsed);
-    const delivered = rate(rates.outputDelivered, sp.out, rates.deliveryElapsed);
+    const produced = rate(rates.produced, output, rates.elapsed);
+    const delivered = rate(rates.outputDelivered, output, rates.deliveryElapsed);
     const waiting =
       rates.elapsed > 0
         ? Math.max(0, Math.min(100, Math.round((rates.inputBlocked / rates.elapsed) * 100)))
@@ -178,12 +178,12 @@ export function createInspectorView(
         : 'Share of observed time without required supplies'
     }</span></div>`;
     if (game.economicWindow && game.resourceAccounting) {
-      const stock = game.resourceAccounting(sp.out);
+      const stock = game.resourceAccounting(output);
       const colony = game.economicWindow('lifetime');
       h += markup`<details class="production-accounting"><summary>Colony resource accounting</summary><p>Stored ${stock.stored} · Reserved ${stock.reserved} (part of stored) · Available ${stock.available}<br>In transit ${stock.inTransit} · Producer input stock ${stock.producerInputs} · Output awaiting collection ${stock.awaitingCollection}</p><p>${
         colony.available
           ? 'Recorded colony production: ' +
-            (colony.totals.produced[sp.out] || 0) +
+            (colony.totals.produced[output] || 0) +
             ' over ' +
             colony.elapsed.toFixed(1) +
             ' simulation seconds'
@@ -231,7 +231,7 @@ export function createInspectorView(
     )}</footer></section>`;
     return h;
   }
-  const infoBody = document.getElementById('infobody');
+  const infoBody = requireElement('infobody');
   let lastInfoHTML: string | null = null;
   // Markup each section last received; browsers serialize it back differently.
   let rendered = new WeakMap<Element, string>();
@@ -247,11 +247,11 @@ export function createInspectorView(
   }
   function updateInfo() {
     game.updateReferenceContext?.();
-    const el = document.getElementById('info');
+    const el = requireElement('info');
     const b = game.selected;
-    const dock = document.getElementById('inspectordock');
+    const dock = requireElement('inspectordock');
     if (dock) dock.hidden = !b && !game.selInfo && !game.removedContributor;
-    const illustration = document.getElementById('inspector-art') as HTMLCanvasElement;
+    const illustration = requireElement('inspector-art') as HTMLCanvasElement;
     const type = b?.type || game.removedContributor?.type;
     if (illustration) {
       illustration.hidden = !type;
@@ -272,7 +272,7 @@ export function createInspectorView(
         ', ' +
         former.y +
         '.';
-      document.getElementById('dz').style.display = 'none';
+      requireElement('dz').style.display = 'none';
       lastInfoHTML = null;
       return;
     }
@@ -284,11 +284,11 @@ export function createInspectorView(
     el.style.display = 'block';
     game.clearRemovedContributor?.();
     let h = '';
-    let liveHTML: string,
-      quote: DemolitionQuote,
-      quoteHTML: string,
-      referenceHTML: string,
-      productionHTML: string;
+    let liveHTML = '',
+      quote: DemolitionQuote | undefined,
+      quoteHTML = '',
+      referenceHTML = '',
+      productionHTML = '';
     if (b) {
       const sp = game.BSPEC[b.type];
       const work = game.productionProgress?.(b);
@@ -303,14 +303,14 @@ export function createInspectorView(
             ? 'This established armory retains its original iron ore and coal recipe.'
             : buildingHelp[b.type]
         }</p>`;
-      if (sp.prod === 'craft' || sp.prod === 'mine')
+      if (sp.out && (sp.prod === 'craft' || sp.prod === 'mine'))
         h += markup`<span style="color:#c8b890">Input ${
           sp.prod === 'mine'
             ? '1 fish, bread, meat or provisions'
             : formatGoods(game.GOODS, recipeRequirements(b, sp), { lowerCase: true })
         } → ${game.GOODS[sp.out].name} / ${(
           work?.duration ??
-          sp.time *
+          (sp.time ?? 0) *
             Math.pow(0.9, Math.min(3, (game.state.upgrades && game.state.upgrades.production) || 0))
         )
           .toFixed(1)
@@ -336,10 +336,10 @@ export function createInspectorView(
         productionHTML = observedProduction(b);
         h += markup`</div><div data-production-stats>${trusted(productionHTML)}</div>`;
       } else h += '</div>';
-      if (game.demolitionQuote)
+      if (quote)
         h += markup`<div class="inspector-demolition" data-demolition-quote>${trusted(quoteHTML)}</div>`;
     } else {
-      h = markup`<b style="color:#ffd23f">TERRAIN</b><br><span style="color:#c8b890">${tileInfo(game.selInfo)}</span>`;
+      h = markup`<b style="color:#ffd23f">TERRAIN</b><br><span style="color:#c8b890">${game.selInfo ? tileInfo(game.selInfo) : ''}</span>`;
     }
     const editing = infoBody.contains(document.activeElement);
     const key = b ? b.id + ':' + b.type + ':' + b.done : 'terrain';
@@ -353,8 +353,10 @@ export function createInspectorView(
       const stats = infoBody.querySelector('[data-production-stats]');
       if (stats && productionHTML && !stats.contains(document.activeElement)) {
         const open = stats.querySelector('details')?.open;
-        if (render(stats, productionHTML) && open && stats.querySelector('details'))
-          stats.querySelector('details').open = true;
+        if (render(stats, productionHTML) && open) {
+          const details = stats.querySelector('details');
+          if (details) details.open = true;
+        }
       }
       const reference = infoBody.querySelector('[data-inspector-reference]');
       if (reference) render(reference, referenceHTML);
@@ -367,7 +369,7 @@ export function createInspectorView(
       if (priority && priority !== document.activeElement) priority.value = String(b.priority || 0);
       const toggle = infoBody.querySelector('[data-production]');
       if (toggle) toggle.textContent = b.disabled ? 'Resume production' : 'Pause production';
-    } else if (editing && productionHTML && document.activeElement.matches('[data-rate-window]')) {
+    } else if (editing && productionHTML && document.activeElement?.matches('[data-rate-window]')) {
       const stats = infoBody.querySelector('[data-production-stats]');
       if (stats) render(stats, productionHTML);
     } else if (
@@ -385,7 +387,7 @@ export function createInspectorView(
       const details = infoBody.querySelector('details');
       if (details && wasOpen) details.open = true;
     }
-    document.getElementById('dz').style.display = b ? '' : 'none';
+    requireElement('dz').style.display = b ? '' : 'none';
     updateDzBtn(quote);
   }
   infoBody.addEventListener('change', function (e) {
@@ -414,7 +416,7 @@ export function createInspectorView(
   });
   function updateDzBtn(quote = game.selected && game.demolitionQuote?.(game.selected)) {
     // the panel raze button arms like map clicks: confirm before razing
-    const dz = document.getElementById('dz'),
+    const dz = requireElement('dz'),
       armed = game.demoArm && game.selected && game.demoArm === game.selected;
     dz.textContent =
       quote && !quote.allowed ? 'Demolition unavailable' : armed ? 'Review demolition' : 'Demolish';
@@ -423,7 +425,7 @@ export function createInspectorView(
       'Review exact recovery and territory consequences. Shift+click confirms immediately.';
     dz.style.borderColor = armed ? '#ffd23f' : '';
   }
-  document.getElementById('dz').onclick = function (e) {
+  requireElement('dz').onclick = function (e) {
     if (!game.selected) return;
     if (game.demolitionInput(game.selected, e.shiftKey) === 'armed') {
       game.msg(
@@ -435,7 +437,7 @@ export function createInspectorView(
     updateDzBtn();
   };
   infoBody.addEventListener('focusout', () => queueMicrotask(updateInfo));
-  document.getElementById('ic').onclick = function () {
+  requireElement('ic').onclick = function () {
     game.dismissInspector();
   };
   function tileInfo(ht: TilePoint) {

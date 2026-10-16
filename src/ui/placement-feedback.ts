@@ -1,9 +1,10 @@
+import { requireElement } from './dom.ts';
 import { html as markup, trusted } from './markup.ts';
 import type { GameRuntime } from '../runtime.ts';
 
 /** Pointer-safe evidence snapshots; rules and live evidence stay with their existing views. */
 export function createPlacementFeedback(game: GameRuntime): PlacementFeedback {
-  const panel = document.getElementById('placement-feedback');
+  const panel = requireElement('placement-feedback');
   let reading = false;
   let html = '';
   let location = '';

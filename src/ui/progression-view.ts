@@ -1,3 +1,4 @@
+import { requireElement } from './dom.ts';
 import { html as markup, trusted } from './markup.ts';
 import { createLiveReportUpdater } from './live-report.ts';
 import { observePresentation } from './domain-feedback.ts';
@@ -100,26 +101,26 @@ export function createProgressionView(game: GameRuntime): ProgressionViewSubsyst
     }
     const journey = journeyHTML('colony-lesson-build', true);
     if (journey !== lastJourneyHTML) {
-      replaceView(document.getElementById('colony-journey-body'), journey);
+      replaceView(requireElement('colony-journey-body'), journey);
       lastJourneyHTML = journey;
     }
-    const colonyLesson = document.getElementById('colony-lesson-build');
+    const colonyLesson = document.querySelector<HTMLButtonElement>('#colony-lesson-build');
     if (colonyLesson) colonyLesson.onclick = journeyAction;
-    const auto = document.getElementById('colony-auto-status');
+    const auto = requireElement('colony-auto-status');
     if (auto)
       auto.textContent = game.state.auto
         ? 'Enabled · colonists make building and road decisions. Manual placement temporarily holds planning; pause and utility screens suspend simulation.'
         : 'Off · you choose construction and roads. Press P or use Enable autoplay.';
-    const autoButton = document.getElementById('colony-autoplay');
+    const autoButton = requireElement('colony-autoplay');
     if (autoButton) {
       autoButton.textContent = game.state.auto ? 'Disable autoplay' : 'Enable autoplay';
       autoButton.setAttribute('aria-pressed', String(game.state.auto));
     }
-    const toolbar = document.getElementById('autob');
+    const toolbar = requireElement('autob');
     toolbar.textContent = game.state.auto ? 'AUTO ON' : 'AUTO OFF';
     toolbar.className = game.state.auto ? 'on' : '';
     toolbar.setAttribute('aria-pressed', String(game.state.auto));
-    const objective = document.getElementById('colony-objective');
+    const objective = requireElement('colony-objective');
     if (objective)
       objective.textContent = game.state.won
         ? '✓ 200-gold objective achieved. Current treasury: ' +
@@ -132,7 +133,7 @@ export function createProgressionView(game: GameRuntime): ProgressionViewSubsyst
           ' Gold · Gold spent on upgrades: ' +
           game.state.spentGold +
           '.';
-    document.getElementById('colony-achievement')?.classList.toggle('hidden', !game.state.won);
+    requireElement('colony-achievement')?.classList.toggle('hidden', !game.state.won);
     let html =
       '<section class="progression-upgrades"><h2 tabindex="-1">Colony improvements</h2><p>Gold spent here leaves the treasury instead of advancing the banked-gold objective. Improvements affect nominal cycles or movement; shortages, output reserves and routes still matter.</p>';
     for (const kind of ['haul', 'production'] as const) {
@@ -160,14 +161,14 @@ export function createProgressionView(game: GameRuntime): ProgressionViewSubsyst
     });
     html += '</section>';
     if (html !== lastEconomyHTML) {
-      replaceView(document.getElementById('economybody'), html);
+      replaceView(requireElement('economybody'), html);
       lastEconomyHTML = html;
     }
     const working = game.units.filter(
       (unit) => unit.kind === 'carrier' && unit.phase !== 'idle',
     ).length;
     const carriers = game.units.filter((unit) => unit.kind === 'carrier').length;
-    const perf = document.getElementById('perftext');
+    const perf = requireElement('perftext');
     if (perf && typeof game.renderStats !== 'undefined')
       perf.textContent =
         'Frame ' +
@@ -200,26 +201,24 @@ export function createProgressionView(game: GameRuntime): ProgressionViewSubsyst
     } else
       html +=
         '<p>Economic measurements unavailable: no covered simulation time has been recorded. Historical achievement quantities are not inferred.</p>';
-    replaceView(document.getElementById('winstats'), html);
+    replaceView(requireElement('winstats'), html);
   }
   function showVictory() {
     if (!game.state.won) return;
     renderVictory();
     game.openLayer?.('win', { blocking: true });
   }
-  document.getElementById('colony-autoplay')?.addEventListener('click', () => {
+  requireElement('colony-autoplay')?.addEventListener('click', () => {
     game.toggleAutoplay();
     gameplayHUD();
   });
-  document.getElementById('colony-achievement')?.addEventListener('click', showVictory);
-  document
-    .getElementById('colony-map')
-    ?.addEventListener('click', () => game.switchWorkspace('map'));
-  document.getElementById('wingo').onclick = () => {
+  requireElement('colony-achievement')?.addEventListener('click', showVictory);
+  requireElement('colony-map')?.addEventListener('click', () => game.switchWorkspace('map'));
+  requireElement('wingo').onclick = () => {
     if (game.continueColony) game.continueColony();
     else game.closeLayer?.('win');
   };
-  document.getElementById('winhome')?.addEventListener('click', () => game.returnHome());
+  requireElement('winhome')?.addEventListener('click', () => game.returnHome());
   observePresentation(game, 'victory', showVictory);
   observePresentation(game, 'worldLoaded', () => {
     lastJourneyHTML = '';

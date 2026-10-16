@@ -1,3 +1,4 @@
+import { requireElement } from './dom.ts';
 import { territoryClaimRadius } from '../gameplay/colony-rules.ts';
 import { html as markup, trusted, formatGoods } from './markup.ts';
 import { artworkAssetURL } from '../rendering/painted-assets.ts';
@@ -16,16 +17,16 @@ interface Article {
 
 /** Search and contextual copy read the same specs and recipe rules as simulation. */
 export function createReferenceView(game: GameRuntime): ReferenceViewSubsystem {
-  const search = document.getElementById('reference-search') as HTMLInputElement;
-  const topic = document.getElementById('reference-topic') as HTMLSelectElement;
-  const results = document.getElementById('reference-results');
+  const search = requireElement('reference-search') as HTMLInputElement;
+  const topic = requireElement('reference-topic') as HTMLSelectElement;
+  const results = requireElement('reference-results');
   let articles: Article[] = [];
   function buildingArticle(type: BuildingType): Article {
     const spec = game.BSPEC[type];
     const recipe =
-      spec.prod === 'mine'
+      spec.prod === 'mine' && spec.out
         ? `Fish, bread, meat or provisions: consume 1 of any → 1 ${game.GOODS[spec.out].name}. The best-stocked meal is chosen; grain, flour, pigs and beer are not mine meals.`
-        : spec.in
+        : spec.in && spec.out
           ? `${formatGoods(game.GOODS, recipeRequirements({ type }, spec), { empty: 'None' })} → 1 ${game.GOODS[spec.out].name}.`
           : spec.out
             ? `${spec.prod === 'gather' ? '2' : '1'} ${game.GOODS[spec.out].name} per successful local work cycle.`
@@ -151,12 +152,12 @@ export function createReferenceView(game: GameRuntime): ReferenceViewSubsystem {
         )
         .join('') ||
       '<p class="empty-state">No matching reference articles. Try a building, ingredient, delivery stage or another topic.</p>';
-    document.getElementById('reference-count').textContent = visible.length + ' reference articles';
+    requireElement('reference-count').textContent = visible.length + ' reference articles';
   }
   function renderReference(article?: string) {
     articles = collect();
     if (article) {
-      document.getElementById('help').scrollTop = 0;
+      requireElement('help').scrollTop = 0;
       topic.value = article.startsWith('building-')
         ? 'buildings'
         : article.startsWith('resource-')
@@ -173,7 +174,7 @@ export function createReferenceView(game: GameRuntime): ReferenceViewSubsystem {
   function renderAbout() {
     const provenance = artworkAssetURL('prompts.md').href,
       manifest = artworkAssetURL().href;
-    document.getElementById('about-body').innerHTML =
+    requireElement('about-body').innerHTML =
       markup`<p class="reference-lead">The Settlers — browser tribute · <strong>Version 2.0.0</strong></p><p>A peaceful settlement game about production chains, carriers, roads and the 200-gold objective. An independent browser tribute inspired by The Settlers (1993), Blue Byte; this project is not an official release of the original game.</p><h3>Credits and acknowledgments</h3><p>Game code, procedural source artwork, sound and music are provided by this project. The native WebGL renderer uses PixiJS v8. Painted building, foliage, meadow and mountain artwork was generated with the built-in image generation tool.</p><h3>Artwork provenance</h3><p>The original generated images, style references and exact prompts are included with the project. Crop definitions live in the manifest; runtime installation preserves gameplay footprints and sprite anchors.</p><p><a href="${provenance}" target="_blank" rel="noopener">Read the artwork prompts and provenance</a> · <a href="${manifest}" target="_blank" rel="noopener">Artwork crop manifest</a></p><p>Named colonies are stored in this browser. Export JSON to keep an independent copy.</p>`;
   }
   function updateReferenceContext() {
@@ -191,6 +192,7 @@ export function createReferenceView(game: GameRuntime): ReferenceViewSubsystem {
               : b
                 ? 'building-' + b.type
                 : 'controls';
+    const output = b ? game.BSPEC[b.type].out : undefined;
     const explanation =
       article === 'resources'
         ? 'Stored includes reserved goods; available subtracts promises. Collected cargo and producer stocks are separate physical locations.'
@@ -208,18 +210,18 @@ export function createReferenceView(game: GameRuntime): ReferenceViewSubsystem {
                   }</p><p>${
                     game.BSPEC[b.type].prod === 'mine'
                       ? 'Mine meals: fish, bread, meat or provisions; one of any.'
-                      : game.BSPEC[b.type].in
+                      : game.BSPEC[b.type].in && output
                         ? 'Actual recipe: ' +
                           formatGoods(game.GOODS, recipeRequirements(b, game.BSPEC[b.type]), {
                             empty: 'None',
                           }) +
                           ' → ' +
-                          game.GOODS[game.BSPEC[b.type].out].name +
+                          game.GOODS[output].name +
                           '.'
                         : 'Inspect actual stock, current status and consequences before acting.'
                   }</p>`
                 : 'Map and compact explanations remain live. Full utility screens suspend simulation and preserve your manual pause choice.';
-    const node = document.getElementById('reference-context-copy');
+    const node = requireElement('reference-context-copy');
     const html = markup`${trusted(b && article.startsWith('building-') ? explanation : markup`<p>${explanation}</p>`)}<button type="button" data-reference="${article}">Read the full reference</button>`;
     if (node.innerHTML !== html && !node.contains(document.activeElement)) node.innerHTML = html;
   }
@@ -232,7 +234,7 @@ export function createReferenceView(game: GameRuntime): ReferenceViewSubsystem {
       game.openReference(button.dataset.reference);
     }
   });
-  document.getElementById('helpx').onclick = () => game.closeLayer('help');
+  requireElement('helpx').onclick = () => game.closeLayer('help');
   return { renderReference, renderAbout, updateReferenceContext };
 }
 export interface ReferenceViewSubsystem {

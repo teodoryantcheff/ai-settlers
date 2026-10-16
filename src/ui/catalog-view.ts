@@ -1,3 +1,4 @@
+import { requireElement } from './dom.ts';
 import { requireCanvas2D } from '../rendering/canvas-context.ts';
 import { html as markup, trusted, formatGoods } from './markup.ts';
 import { recipeRequirements } from '../gameplay/production-rules.ts';
@@ -57,9 +58,9 @@ function toolDetails(game: GameRuntime, type: CatalogTool) {
     };
   const sp = game.BSPEC[type];
   let recipe =
-    sp.prod === 'mine'
+    sp.prod === 'mine' && sp.out
       ? 'Fish, bread, meat or provisions (1 of any) → 1 ' + game.GOODS[sp.out].name
-      : sp.in
+      : sp.in && sp.out
         ? formatGoods(game.GOODS, recipeRequirements({ type }, sp)) +
           ' → 1 ' +
           game.GOODS[sp.out].name
@@ -119,8 +120,8 @@ export function createCatalogView(
     element: HTMLButtonElement;
   }> = [];
   const helpCleanup: Array<() => void> = [];
-  const search = document.getElementById('catalog-search') as HTMLInputElement;
-  const chain = document.getElementById('catalog-chain') as HTMLSelectElement;
+  const search = requireElement('catalog-search') as HTMLInputElement;
+  const chain = requireElement('catalog-chain') as HTMLSelectElement;
   function filter() {
     help.dismiss();
     const query = (search?.value || '').trim().toLowerCase();
@@ -133,22 +134,22 @@ export function createCatalogView(
       );
       if (!card.element.hidden) count++;
     }
-    const output = document.getElementById('catalog-count');
+    const output = requireElement('catalog-count');
     if (output) output.textContent = count + ' of ' + cards.length + ' buildings and tools';
-    const empty = document.getElementById('catalog-empty');
+    const empty = requireElement('catalog-empty');
     if (empty) empty.hidden = count > 0;
   }
   search?.addEventListener('input', filter);
   chain?.addEventListener('change', filter);
-  document.getElementById('catalog-clear')?.addEventListener('click', () => {
+  requireElement('catalog-clear')?.addEventListener('click', () => {
     search.value = '';
     chain.value = 'all';
     filter();
     search.focus();
   });
   function build() {
-    const palette = document.getElementById('paletteitems');
-    const helpHost = document.getElementById('catalog-help-host');
+    const palette = requireElement('paletteitems');
+    const helpHost = requireElement('catalog-help-host');
     for (const cleanup of helpCleanup.splice(0)) cleanup();
     helpHost.innerHTML = '';
     palette.innerHTML = '';
@@ -295,7 +296,7 @@ export function createCatalogView(
           placement.operatingSupport.reason,
         );
       html += markup`<p class="placement-note">${placement.summary}</p>`;
-    } else {
+    } else if (road) {
       html = markup`<h3>Road plan · ${road.ok ? road.count + ' new tiles' : 'Cannot pave this route'}</h3>`;
       html += row('Resource cost', true, '0 goods — roads consume no resources');
       html += row(

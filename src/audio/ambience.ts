@@ -8,11 +8,11 @@ export function createAmbience(
   runtime: AudioRuntime,
   internals?: AudioInternals,
 ) {
-  let active: AudioGraph = null;
+  let active: AudioGraph | null = null;
   // ---------- AMBIENCE ----------
-  let rainG: AudioGraph['channels']['ambience'] = null,
+  let rainG: AudioGraph['channels']['ambience'] | null = null,
     birdT = 0,
-    waterG: AudioGraph['channels']['ambience'] = null,
+    waterG: AudioGraph['channels']['ambience'] | null = null,
     ambT = 0;
   function startAmbience(graph: AudioGraph) {
     const { tone, context, channels } = graph;

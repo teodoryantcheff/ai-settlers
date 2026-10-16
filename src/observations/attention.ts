@@ -283,7 +283,7 @@ export function createAttention(game: AttentionDependencies): AttentionSubsystem
     const transport = game.currentTransport();
     return data.conditions.flatMap((entry) => {
       const b = game.byId(entry.entity.id);
-      if (!entry.active || !b || currentReason(b) !== entry.reason) return [];
+      if (!entry.active || !entry.reason || !b || currentReason(b) !== entry.reason) return [];
       const sp = game.BSPEC[b.type],
         goods: Good[] = [],
         evidence: string[] = [],
@@ -344,9 +344,11 @@ export function createAttention(game: AttentionDependencies): AttentionSubsystem
                 ' reachable available stored units; no delivery request is currently recorded. Scheduling/route cause is unavailable.',
             );
           }
-          for (const other of game.buildings)
-            if (other.done && alternatives.includes(game.BSPEC[other.type].out))
+          for (const other of game.buildings) {
+            const output = game.BSPEC[other.type].out;
+            if (other.done && output && alternatives.includes(output))
               contributors.push(reference(other));
+          }
         }
         title =
           hasMissing && hasDelayed
@@ -356,7 +358,7 @@ export function createAttention(game: AttentionDependencies): AttentionSubsystem
               : 'Waiting for input delivery';
         advice =
           'Inspect the affected recipe and suppliers. Use Economy to check stock and creation; Logistics shows current delivery stages. No measured ETA is recorded.';
-      } else if (entry.reason === 'output') {
+      } else if (entry.reason === 'output' && sp.out) {
         if (sp.out) goods.push(sp.out);
         const rows = transport.rows.filter(
           (row) => row.sourceId === b.id && row.kind === 'deliver',
