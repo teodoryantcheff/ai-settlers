@@ -1,6 +1,6 @@
 # Reaching 60 fps at every zoom
 
-Measured on 2026-10-16 on the reference laptop: Intel Core i7-8550U (4C/8T, 15 W), Intel UHD Graphics 620, 1920×1080, Chromium with ANGLE on the hardware GPU. This is a diagnosis and plan, not an adoption decision; no runtime behavior changed. The work is tracked in [#35](https://github.com/teodoryantcheff/ai-settlers/issues/35) and its sub-issues.
+Measured on 2026-10-16 on the reference laptop: Intel Core i7-8550U (4C/8T, 15 W), Intel UHD Graphics 620, 1920×1080, Chromium with ANGLE on the hardware GPU. The initial diagnosis and follow-up plan below are retained as the baseline; the implementation measurements record the shipped changes. The work is tracked in [#35](https://github.com/teodoryantcheff/ai-settlers/issues/35) and its sub-issues.
 
 **Verdict.** The frame is CPU-bound in rendering. The simulation, HUD and minimap together cost about 1 ms per frame at 1× speed. The world renderer re-describes every visible object each frame through intercepted Canvas2D calls, maps them onto a positional pool of PixiJS objects, and makes PixiJS re-batch the whole scene. That work grows with the number of visible objects (∝ 1/zoom²) and roughly doubles while the colony is running. Three cheap fixes halve the cost, but 60 fps at every zoom needs a retained world scene. A prototype of that scene on this machine costs 2–5 ms per frame.
 
@@ -143,3 +143,31 @@ Mean additional cost is **3.780 ms**, below the 5 ms budget. This is a measured 
 At 8× speed the ordinary render benchmark records **0.2 ms per frame for the minimap**, below the 0.5 ms budget, over a 15-second window (10.4 fps; total CPU 92.7 ms/frame). The remaining world-rendering work still dominates. Raw results are in `output/bench/2026-10-16T18-17-19-283Z/results.json`.
 
 Pixel tests compare incremental caches with full rebuilds on both ordinary and forced-tiled textures. They cover holes/restoration, map edges, disjoint changes, batched notifications, chunk boundaries, felled trees, roads, deposits and ownership; territory changes also compare actual GPU readback bytes. A single interior tile uploads one 192² chunk instead of the 2304² border image. Neighbouring chunks share an upload; separate regions do not cause a map-sized upload. CPU-backed staging and replacement of transparent pixels apply to both ordinary and tiled textures. Unchanged frames and unchanged projections reuse their caches.
+
+
+## Captured scene without per-frame churn (#37)
+
+Measured in one session on 2026-10-16, on the same i7-8550U / UHD 620 hardware WebGL configuration, 1920×1080, quality 1, seed 2024, 20-minute autoplay colony, 1× running speed. Both builds use the existing benchmark with five-second windows and one-second warmup per zoom/mode:
+
+```sh
+npm ci
+npm run build
+node scripts/bench-render.mjs --minutes 20 --zooms 0,3 --modes running,paused --ms 5000 --port 8817
+```
+
+The baseline is PR #49 at `9c533597a3a88cce8bc2c3088a03b00a167ef978`. Raw JSON is retained under `output/bench/2026-10-16T19-10-49-800Z/` (before) and `output/bench/2026-10-16T19-19-15-695Z/` (after).
+
+| Zoom / state | CPU before | CPU after | Reduction | Vector shapes after | Vertex upload after |
+|---|---:|---:|---:|---:|---:|
+| 0.55 running | 108.9 ms | 27.8 ms | 74.5% | 223 | 636 KB/frame |
+| 0.55 paused | 52.3 ms | 24.7 ms | 52.8% | 230 | 615 KB/frame |
+| 1.0 running | 59.0 ms | 25.0 ms | 57.6% | 430 | 526 KB/frame |
+| 1.0 paused | 28.2 ms | 22.6 ms | 19.9% | 422 | 544 KB/frame |
+
+At far zoom the baseline used 2,483 vector shapes and 5,122 KB/frame. Paused geometry builds fall to **zero** at both zooms; running builds fall from 524.5 to 33.1 per frame at 0.55 and from 322.3 to 111.3 at 1.0. Remaining builds include actual changing worker poses and progress, and positional command changes within a layer. GPU medians remain about 8 ms. The capture adapter remains CPU-bound and does not yet achieve 60 fps; that is the retained-scene follow-up's scope.
+
+Art textures are shared by source/crop. Camera crops use dedicated per-source-tile sprites, and panning every zoom across the map twice creates no more textures on the second sweep. Ordered layer pools prevent a terrain crop or distant effect from shifting every other layer's slots. Solid paint opacity stays in display state. Animated details use local geometry; distant rocks and flag frames are cached artwork.
+
+The shadow layer uses one quad with two cached planes rather than fading contacts together with sunlight. This preserves root-contact opacity through night/rain and retains the existing clarity multiplier. Only affected 8×8-tile chunks repaint/upload for tree-stage and completed-building changes; loads rebuild everything. No simulation RNG or time is consumed. Full and incremental shadow frames are compared using actual WebGL pixels, including a forced 2048-pixel texture limit.
+
+Controlled captures use hardware WebGL, 1440×900, seed 2024, installed painted assets, paused simulation and a fixed cosmetic clock. The matrix covers zooms 0.55, 1.0 and 2.2 in day, midnight, rain, Visual clarity, Reduced Motion and quality 0.75. The screenshot harness verifies the actual night/rain values (midnight approximately 1; rain approximately 0.97), because `devshot` alone pins daylight. Captures and their scripts are retained in `output/issue37/`. Cached resampling and discretized flag poses are raster changes rather than pixel-identical screenshots; geometry, entrances, tree roots and camera positions are checked visually.

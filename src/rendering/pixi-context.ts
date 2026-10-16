@@ -191,6 +191,17 @@ export function createPixiContext(sink: PixiContextSink) {
     sink.clip?.(item, current.clip);
     return { item, current };
   }
+  function material(style: string | FillGradient, item: Graphics) {
+    // Opacity is display state. Fading an otherwise unchanged solid paint must
+    // never change its geometry/material cache key.
+    if (typeof style !== 'string') return style;
+    const rgba = /^rgba\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*\)$/.exec(
+      style,
+    );
+    if (!rgba) return style;
+    item.alpha *= Number(rgba[4]);
+    return `rgb(${rgba[1]},${rgba[2]},${rgba[3]})`;
+  }
   function geometry(item: Graphics, key: unknown[], draw: () => void) {
     if (keyEquals(geometryKeys.get(item), key)) return;
     item.clear();
@@ -508,7 +519,7 @@ export function createPixiContext(sink: PixiContextSink) {
     intercept('fill', () => {
       if (!path.length || ctx.globalAlpha <= 0) return;
       const { item, current } = graphic(ctx);
-      const style = paintStyle(ctx.fillStyle, current.transform);
+      const style = material(paintStyle(ctx.fillStyle, current.transform), item);
       geometry(item, ['fill', pathKey(path, current.transform), styleKey(style)], () => {
         replay(item, path, current.transform);
         item.fill(style);
@@ -548,7 +559,7 @@ export function createPixiContext(sink: PixiContextSink) {
       const strokes = dash.length
         ? dashed(path, current.transform, dash, ctx.lineDashOffset)
         : path;
-      const style = paintStyle(ctx.strokeStyle, current.transform);
+      const style = material(paintStyle(ctx.strokeStyle, current.transform), item);
       const options = {
         ...(typeof style === 'string' ? { color: style } : { fill: style }),
         width: ctx.lineWidth,
@@ -576,14 +587,14 @@ export function createPixiContext(sink: PixiContextSink) {
     intercept('fillRect', (x, y, width, height) => {
       if (!width || !height || ctx.globalAlpha <= 0) return;
       const { item, current } = graphic(ctx);
-      const style = paintStyle(ctx.fillStyle, current.transform);
+      const style = material(paintStyle(ctx.fillStyle, current.transform), item);
       geometry(item, ['fillRect', x, y, width, height, styleKey(style)], () => {
         item.rect(x, y, width, height).fill(style);
       });
     });
     intercept('strokeRect', (x, y, width, height) => {
       const { item, current } = graphic(ctx);
-      const style = paintStyle(ctx.strokeStyle, current.transform);
+      const style = material(paintStyle(ctx.strokeStyle, current.transform), item);
       geometry(item, ['strokeRect', x, y, width, height, styleKey(style), ctx.lineWidth], () => {
         item.rect(x, y, width, height).stroke({
           ...(typeof style === 'string' ? { color: style } : { fill: style }),

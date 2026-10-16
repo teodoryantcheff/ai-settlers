@@ -697,7 +697,10 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
           ? '#ef9f45'
           : '#f8da87'
         : 'rgba(215,193,148,' + (0.6 * (1 - travel)).toFixed(2) + ')';
-      g.fillRect(px, py, forge ? 0.8 : 1.1, forge ? 1.5 : 0.7);
+      g.save();
+      g.translate(px, py);
+      g.fillRect(0, 0, forge ? 0.8 : 1.1, forge ? 1.5 : 0.7);
+      g.restore();
     }
   }
 

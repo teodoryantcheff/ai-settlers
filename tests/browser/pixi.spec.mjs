@@ -892,3 +892,154 @@ for (const tiled of [false, true])
     expect(result[2].changedUploads.every(([, , w, h]) => w <= 192 && h <= 192)).toBe(true);
     expect(errors).toEqual([]);
   });
+
+test('paused cameras retain vector geometry as wall time advances', async ({ page }) => {
+  await frozenGame(page);
+  const result = await page.evaluate(() => {
+    const game = window.productionArtPreview.game;
+    game.presentationPrefs.reducedMotion = false;
+    game.presentationPrefs.weather = false;
+    game.state.paused = true;
+    let now = 5000;
+    performance.now = () => now;
+    game.draw();
+    game.draw();
+    const before = { ...window.productionRendererStats };
+    const rng = game.SR.getState();
+    for (let frame = 0; frame < 5; frame++) {
+      now += 317;
+      game.draw();
+    }
+    return {
+      before,
+      after: { ...window.productionRendererStats },
+      rng,
+      nextRng: game.SR.getState(),
+    };
+  });
+  expect(result.after.backend).toBe('PixiJS WebGL');
+  expect(result.after.graphicsBuilds).toBe(result.before.graphicsBuilds);
+  expect(result.after.textureUploads).toBe(result.before.textureUploads);
+  expect(result.after.textureUpdates).toBe(result.before.textureUpdates);
+  expect(result.nextRng).toBe(result.rng);
+});
+
+test('art views stay bounded while every zoom pans across the map', async ({ page }) => {
+  test.setTimeout(180000);
+  const errors = captureErrors(page);
+  await frozenGame(page);
+  const result = await page.evaluate(() => {
+    const game = window.productionArtPreview.game;
+    performance.now = () => 5000;
+    const sweep = () => {
+      for (const z of game.zooms) {
+        game.z = z;
+        for (const fy of [0, 0.5, 1])
+          for (const fx of [0, 0.5, 1]) {
+            game.cam.x = fx * (game.W * game.TS - game.vw / z);
+            game.cam.y = fy * (game.H * game.TS - game.vh / z);
+            game.clampCam();
+            game.draw();
+          }
+      }
+      return { ...window.productionRendererStats };
+    };
+    return { first: sweep(), second: sweep() };
+  });
+  expect(result.second.backend).toBe('PixiJS WebGL');
+  expect(result.first.cachedFrames).toBeGreaterThan(0);
+  expect(result.second.cachedFrames).toBe(result.first.cachedFrames);
+  expect(result.second.cachedTextures).toBe(result.first.cachedTextures);
+  expect(result.second.textureUploads).toBe(result.first.textureUploads);
+  expect(errors).toEqual([]);
+});
+
+for (const tiled of [false, true])
+  test(`shadow patches match full shadow rebuilds (${tiled ? 'tiled' : 'single'} textures)`, async ({
+    page,
+  }) => {
+    test.setTimeout(180000);
+    const errors = captureErrors(page);
+    if (tiled)
+      await page.addInitScript(() => {
+        const original = WebGL2RenderingContext.prototype.getParameter;
+        WebGL2RenderingContext.prototype.getParameter = function (parameter) {
+          const value = original.call(this, parameter);
+          return parameter === this.MAX_TEXTURE_SIZE ? Math.min(value, 2048) : value;
+        };
+      });
+    await frozenGame(page);
+    const result = await page.evaluate(() => {
+      const game = window.productionArtPreview.game;
+      performance.now = () => 5000;
+      game.state.paused = true;
+      const gl = document.getElementById('pixi-view').getContext('webgl2');
+      const uploads = [];
+      const original = gl.texSubImage2D;
+      gl.texSubImage2D = function (...args) {
+        const source = args.at(-1);
+        if (source instanceof HTMLCanvasElement) uploads.push([source.width, source.height]);
+        return original.apply(this, args);
+      };
+      const pixels = () => {
+        const data = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
+        gl.readPixels(
+          0,
+          0,
+          gl.drawingBufferWidth,
+          gl.drawingBufferHeight,
+          gl.RGBA,
+          gl.UNSIGNED_BYTE,
+          data,
+        );
+        return data;
+      };
+      const cases = [];
+      const check = (name, mutate) => {
+        mutate();
+        uploads.length = 0;
+        const rng = game.SR.getState(),
+          time = game.state.time;
+        game.draw();
+        const patched = pixels(),
+          changedUploads = uploads.slice();
+        game.resetPresentation();
+        game.draw();
+        const rebuilt = pixels();
+        cases.push({
+          name,
+          differences: patched.reduce((n, v, i) => n + (v !== rebuilt[i]), 0),
+          changedUploads,
+          unchanged: rng === game.SR.getState() && time === game.state.time,
+        });
+      };
+      // Roots beside chunk seams exercise projections entering neighbouring chunks.
+      const i = game.idx(47, 47);
+      for (const stage of [4, 0, 1, 2, 4])
+        check(`tree stage ${stage}`, () => {
+          game.tiles[i].tree = stage;
+          game.emitGameEvent('tileChanged', { index: i });
+        });
+      const b = game.newBuilding('sawmill', 50, 50);
+      game.buildings.push(b);
+      check('building completed', () => {
+        b.done = true;
+      });
+      check('building removed', () => {
+        game.demolish(b);
+      });
+      gl.texSubImage2D = original;
+      return { cases, backend: window.productionRendererStats.backend };
+    });
+    expect(result.backend).toBe('PixiJS WebGL');
+    for (const entry of result.cases) {
+      expect(entry.differences, entry.name).toBe(0);
+      expect(entry.unchanged, entry.name).toBe(true);
+      expect(entry.changedUploads.length, entry.name).toBeGreaterThan(0);
+      expect(
+        entry.changedUploads.every(([w, h]) => w <= 192 && h <= 192),
+        entry.name,
+      ).toBe(true);
+    }
+    expect(errors).toEqual([]);
+  });

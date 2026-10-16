@@ -744,3 +744,95 @@ test('minimap deduplicates changed cells and loads discard pending patches', () 
   e.drawMiniStatic();
   assert.ok(e.calls.some((call) => call.method === 'fillRect' && call.args[2] === 192));
 });
+
+test('shadow caches retain unchanged frames and patch felled, planted and grown trees locally', () => {
+  const uploads = [];
+  const e = renderer({
+    presentation: {
+      available: true,
+      invalidate: (canvas, rect) => uploads.push({ canvas, rect }),
+      begin() {},
+      layer() {},
+      end() {},
+    },
+  });
+  const art = { img: { width: 0 }, w: 48, h: 56, ox: -12, oy: -32 };
+  e.bldImg = () => art;
+  e.ART.tree = Array.from({ length: 4 }, () => Array.from({ length: 3 }, () => ['tree', 'tree']));
+  e.ART.shadowSoft = 'root';
+  const i = e.idx(50, 50);
+  e.tiles[i].tree = 4;
+  const rng = e.SR.getState(),
+    time = e.state.time;
+  const cache = e.shadowCache;
+  cache.refresh();
+  assert.equal(uploads.length, 2);
+  assert.ok(uploads.every((u) => u.rect === undefined));
+  const paints = cache.paints;
+  uploads.length = 0;
+  cache.refresh();
+  e.emitGameEvent('tileChanged', { index: i });
+  cache.refresh();
+  assert.equal(cache.paints, paints);
+  assert.equal(uploads.length, 0, 'unchanged tree notifications do no shadow work');
+  for (const tree of [0, 1, 2, 4]) {
+    e.tiles[i].tree = tree;
+    e.emitGameEvent('tileChanged', { index: i });
+    e.emitGameEvent('tileChanged', { index: i });
+    cache.refresh();
+    assert.ok(uploads.length > 0);
+    assert.ok(
+      uploads.every((u) => u.rect && u.rect.width <= 8 * e.TS && u.rect.height <= 8 * e.TS),
+    );
+    assert.ok(uploads.every((u) => u.rect.x <= 50 * e.TS && u.rect.x + u.rect.width > 50 * e.TS));
+    uploads.length = 0;
+  }
+  assert.equal(e.SR.getState(), rng);
+  assert.equal(e.state.time, time);
+  e.emitGameEvent('worldLoaded', { reason: 'load' });
+  cache.refresh();
+  assert.equal(uploads.length, 2);
+  assert.ok(uploads.every((u) => u.rect === undefined));
+});
+
+test('shadow caches reconcile completion, removal and replacement of the live building array', () => {
+  const uploads = [];
+  const e = renderer({
+    presentation: {
+      available: true,
+      invalidate: (canvas, rect) => uploads.push(rect),
+      begin() {},
+      layer() {},
+      end() {},
+    },
+  });
+  const art = { img: { width: 0 }, w: 48, h: 56, ox: -12, oy: -32 };
+  e.bldImg = () => art;
+  e.shadowCache.refresh();
+  const site = e.newBuilding('sawmill', 50, 50);
+  e.buildings.push(site);
+  uploads.length = 0;
+  e.shadowCache.refresh();
+  assert.equal(uploads.length, 0, 'construction has no projected finished-building shadow');
+  site.done = true;
+  e.shadowCache.refresh();
+  assert.ok(uploads.length > 0 && uploads.every((rect) => rect && rect.width <= 8 * e.TS));
+  uploads.length = 0;
+  e.buildings = e.buildings.filter((b) => b.id !== site.id);
+  e.shadowCache.refresh();
+  assert.ok(uploads.length > 0 && uploads.every((rect) => rect && rect.width <= 8 * e.TS));
+});
+
+test('an unavailable shadow context reports through the graphics failure boundary', () => {
+  let caches = 0;
+  const failures = [];
+  assert.throws(
+    () =>
+      renderer({
+        contextFor: (name, context) => (name === 'cache' && ++caches === 3 ? null : context),
+        presentation: { reportFailure: (reason) => failures.push(reason) },
+      }),
+    /Canvas 2D context is unavailable/,
+  );
+  assert.deepEqual(failures, ['Canvas 2D context is unavailable']);
+});
