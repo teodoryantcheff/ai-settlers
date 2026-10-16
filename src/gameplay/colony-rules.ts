@@ -21,7 +21,7 @@ type Site = Pick<Building, 'x' | 'y'>;
 
 /** The building table's well service radius, in tiles. */
 export function wellRadius(world: Pick<ColonyRulesWorld, 'BSPEC'>) {
-  return world.BSPEC.well.rad;
+  return world.BSPEC.well.rad ?? 0;
 }
 
 /** Whether a building is a well counted under the given meaning of coverage. */
