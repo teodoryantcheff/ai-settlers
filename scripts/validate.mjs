@@ -3,6 +3,7 @@ import { openSync, closeSync } from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
 
 const root = path.resolve(import.meta.dirname, '..');
 
@@ -14,9 +15,16 @@ const testFiles = async (directory) =>
 /**
  * Each test file gets its own process and reports its actual tests and assertions.
  * `nodeOnly` is routine validation and omits the slow soak suite in `tests/soak/`;
- * `soakOnly` runs just that suite.
+ * `soakOnly` runs just that suite. `files` narrows routine Node tests while
+ * preserving the repository-wide lint and typecheck steps.
  */
-export async function validationSteps(directory, { nodeOnly = false, soakOnly = false } = {}) {
+export async function validationSteps(
+  directory,
+  { nodeOnly = false, soakOnly = false, files = [] } = {},
+) {
+  if (nodeOnly && soakOnly) throw new Error('--node-tests and --soak are mutually exclusive');
+  if (files.length && !nodeOnly)
+    throw new Error('--file requires --node-tests (use npm test -- --file tests/<name>.test.cjs)');
   const node = (name, ...args) => ({ name, command: process.execPath, args });
   const testStep = (name) => node(name, '--test-reporter=spec', path.join('tests', name));
   const tests = await testFiles(path.join(directory, 'tests'));
@@ -28,6 +36,13 @@ export async function validationSteps(directory, { nodeOnly = false, soakOnly = 
     if (!soak.length) throw new Error('No soak test files found');
     return soak.map(testStep);
   }
+  const selected = new Set();
+  for (const file of files) {
+    const name = path.relative(path.join(directory, 'tests'), path.resolve(directory, file));
+    if (!tests.includes(name)) throw new Error(`Not a routine Node test file: ${file}`);
+    selected.add(name);
+  }
+  const routine = files.length ? tests.filter((name) => selected.has(name)) : tests;
   return [
     ...(!nodeOnly
       ? [
@@ -54,7 +69,7 @@ export async function validationSteps(directory, { nodeOnly = false, soakOnly = 
     ),
     // Plain diagnostics: TypeScript 7 picks pretty output from the terminal otherwise.
     node('typecheck', 'node_modules/typescript/bin/tsc', '--noEmit', '--pretty', 'false'),
-    ...tests.map(testStep),
+    ...routine.map(testStep),
     ...(!nodeOnly
       ? [
           ...soak.map(testStep),
@@ -158,19 +173,23 @@ export async function runSteps(steps, { directory, logDirectory, output = proces
 }
 
 async function main() {
-  const args = process.argv.slice(2);
-  const modes = ['--node-tests', '--soak'];
-  if (args.length && (args.length !== 1 || !modes.includes(args[0])))
-    throw new Error('Usage: node scripts/validate.mjs [--node-tests | --soak]');
+  const { values } = parseArgs({
+    options: {
+      'node-tests': { type: 'boolean', default: false },
+      soak: { type: 'boolean', default: false },
+      file: { type: 'string', multiple: true, default: [] },
+    },
+  });
+  const steps = await validationSteps(root, {
+    nodeOnly: values['node-tests'],
+    soakOnly: values.soak,
+    files: values.file,
+  });
   const base = path.join(root, 'output/validation');
   await fs.mkdir(base, { recursive: true });
   const logDirectory = await fs.mkdtemp(
     path.join(base, new Date().toISOString().replace(/[:.]/g, '-') + '-'),
   );
-  const steps = await validationSteps(root, {
-    nodeOnly: args[0] === '--node-tests',
-    soakOnly: args[0] === '--soak',
-  });
   const browser = steps.find((step) => step.name === 'browser');
   if (browser) browser.args.push(`--output=${path.join(logDirectory, 'browser-artifacts')}`);
   await runSteps(steps, { directory: root, logDirectory });

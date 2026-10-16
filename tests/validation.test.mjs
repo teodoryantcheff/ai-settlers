@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { spawnSync } from 'node:child_process';
 import { runSteps, validationSteps } from '../scripts/validate.mjs';
 
 async function workspace(t) {
@@ -168,4 +169,148 @@ test('pull-request CI validates on the supported Node and never publishes', asyn
   assert.match(workflow, /^ {10}path: output\/validation\/$/m);
   assert.match(workflow, /^permissions:\n {2}contents: read\n/m);
   assert.doesNotMatch(workflow, /secrets[.:]|deploy|wrangler|build:pages|CLOUDFLARE/i);
+});
+
+test('focused validation keeps lint and types, selects exact routine files and removes duplicates', async () => {
+  const root = path.resolve(import.meta.dirname, '..');
+  const plan = await validationSteps(root, {
+    nodeOnly: true,
+    files: [
+      'tests/validation.test.mjs',
+      path.join(root, 'tests/typecheck.test.mjs'),
+      'tests/validation.test.mjs',
+    ],
+  });
+  assert.deepEqual(
+    plan.map((entry) => entry.name),
+    ['lint', 'typecheck', 'typecheck.test.mjs', 'validation.test.mjs'],
+  );
+  assert.deepEqual(plan.at(-1).args, [
+    '--test-reporter=spec',
+    path.join('tests', 'validation.test.mjs'),
+  ]);
+});
+
+test('focused validation rejects unknown or non-routine files and incompatible modes', async () => {
+  const root = path.resolve(import.meta.dirname, '..');
+  for (const file of [
+    '',
+    'tests/missing.test.mjs',
+    'tests/*.test.mjs',
+    'tests/helpers/game.cjs',
+    'tests/browser/pixi.spec.mjs',
+    'tests/soak/economy-autoplay.test.cjs',
+    'scripts/validate.mjs',
+    '../validation.test.mjs',
+  ]) {
+    await assert.rejects(
+      validationSteps(root, { nodeOnly: true, files: ['tests/validation.test.mjs', file] }),
+      /Not a routine Node test file/,
+    );
+  }
+  for (const options of [{}, { soakOnly: true }])
+    await assert.rejects(
+      validationSteps(root, { ...options, files: ['tests/validation.test.mjs'] }),
+      /--file requires --node-tests/,
+    );
+  await assert.rejects(
+    validationSteps(root, { nodeOnly: true, soakOnly: true }),
+    /mutually exclusive/,
+  );
+});
+
+test('the CLI rejects malformed options before starting validation', () => {
+  const script = path.resolve(import.meta.dirname, '../scripts/validate.mjs');
+  for (const args of [
+    ['--node-tests', '--file'],
+    ['--node-tests', '--unknown'],
+    ['--node-tests', 'tests/validation.test.mjs'],
+    ['--node-tests', '--soak'],
+    ['--file', 'tests/validation.test.mjs'],
+    ['--node-tests', '--file='],
+  ]) {
+    const result = spawnSync(process.execPath, [script, ...args], {
+      encoding: 'utf8',
+      timeout: 5000,
+    });
+    assert.equal(result.status, 1, result.stderr);
+    assert.doesNotMatch(result.stdout, /Validation logs:/);
+    assert.match(
+      result.stderr,
+      /--file|--unknown|Unexpected argument|mutually exclusive|Not a routine Node test file/,
+    );
+  }
+});
+
+test('focused CLI runs real checks, retains selected-test logs and stops at a failure', async (t) => {
+  const root = path.resolve(import.meta.dirname, '..');
+  const { directory } = await workspace(t);
+  for (const name of ['scripts', 'src', 'tests']) await fs.mkdir(path.join(directory, name));
+  await fs.copyFile(
+    path.join(root, 'scripts/validate.mjs'),
+    path.join(directory, 'scripts/validate.mjs'),
+  );
+  await fs.symlink(
+    path.join(root, 'node_modules'),
+    path.join(directory, 'node_modules'),
+    'junction',
+  );
+  await fs.writeFile(path.join(directory, 'src/index.ts'), 'export const ready = true;\n');
+  await fs.writeFile(path.join(directory, 'playwright.config.mjs'), 'export default {};\n');
+  await fs.writeFile(
+    path.join(directory, 'tsconfig.json'),
+    JSON.stringify({ compilerOptions: { types: [] }, files: ['src/index.ts'] }),
+  );
+  await fs.writeFile(
+    path.join(directory, 'tests/excluded.test.mjs'),
+    'throw new Error("unselected test ran");\n',
+  );
+  await fs.writeFile(
+    path.join(directory, 'tests/success.test.mjs'),
+    'console.log("selected success");\n',
+  );
+  await fs.writeFile(
+    path.join(directory, 'tests/failure.test.mjs'),
+    'console.error("selected diagnostic"); process.exitCode = 1;\n',
+  );
+  await fs.writeFile(
+    path.join(directory, 'tests/later.test.mjs'),
+    'import fs from "node:fs"; fs.writeFileSync("later-ran", "bad");\n',
+  );
+  const run = async (files) => {
+    const result = spawnSync(
+      process.execPath,
+      ['scripts/validate.mjs', '--node-tests', ...files.flatMap((file) => ['--file', file])],
+      { cwd: directory, encoding: 'utf8', timeout: 30000 },
+    );
+    assert.ifError(result.error);
+    const logDirectory = result.stdout.match(/Validation logs: (.+)/)?.[1];
+    assert.ok(logDirectory, result.stdout + result.stderr);
+    const summary = JSON.parse(await fs.readFile(path.join(logDirectory, 'summary.json')));
+    return { result, summary };
+  };
+  const success = await run(['tests/success.test.mjs']);
+  assert.equal(success.result.status, 0, success.result.stdout + success.result.stderr);
+  assert.equal(success.summary.complete, true);
+  assert.equal(success.summary.passed, true);
+  assert.deepEqual(
+    success.summary.results.map((entry) => entry.name),
+    ['lint', 'typecheck', 'success.test.mjs'],
+  );
+  assert.match(await fs.readFile(success.summary.results.at(-1).log, 'utf8'), /selected success/);
+
+  const failure = await run(['tests/later.test.mjs', 'tests/failure.test.mjs']);
+  assert.equal(failure.result.status, 1);
+  assert.equal(failure.summary.complete, false);
+  assert.equal(failure.summary.passed, false);
+  assert.deepEqual(
+    failure.summary.results.map((entry) => entry.name),
+    ['lint', 'typecheck', 'failure.test.mjs'],
+  );
+  assert.match(
+    await fs.readFile(failure.summary.results.at(-1).log, 'utf8'),
+    /selected diagnostic/,
+  );
+  assert.match(failure.result.stdout, /selected diagnostic/);
+  await assert.rejects(fs.access(path.join(directory, 'later-ran')));
 });
