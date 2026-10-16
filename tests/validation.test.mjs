@@ -132,8 +132,5 @@ test('the full plan includes every Node test before build and single-worker brow
   const { scripts } = JSON.parse(await fs.readFile(path.join(root, 'package.json')));
   assert.equal(scripts.check, 'node scripts/validate.mjs');
   assert.equal(scripts['build:pages'], 'npm run build && node scripts/package-pages.mjs');
-  assert.match(
-    scripts.deploy,
-    /^npm test && npm run build:pages && wrangler pages deploy /,
-  );
+  assert.match(scripts.deploy, /^npm test && npm run build:pages && wrangler pages deploy /);
 });
