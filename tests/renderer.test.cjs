@@ -675,3 +675,341 @@ test('night glow lights domestic windows but leaves mines and open yards dark', 
   );
   assert.equal(e.SR.getState(), rng, 'cosmetic glow consumes no simulation RNG');
 });
+
+test('territory caches upload only changed bounds and skip unchanged projections', () => {
+  const uploads = [];
+  const e = renderer({
+    presentation: {
+      available: true,
+      invalidate: (canvas, rect) => uploads.push({ canvas, rect }),
+      begin() {},
+      layer() {},
+      end() {},
+    },
+  });
+  e.drawBorders();
+  assert.equal(uploads.length, 1);
+  assert.equal(uploads[0].rect, undefined, 'first paint refreshes everything');
+  uploads.length = 0;
+  const before = e.SR.getState();
+  e.owned[e.idx(50, 50)] = 0;
+  e.emitGameEvent('territoryChanged', {});
+  e.drawBorders();
+  assert.deepEqual(
+    uploads.map(({ rect }) => rect),
+    [
+      {
+        x: 48 * e.TS,
+        y: 48 * e.TS,
+        width: 8 * e.TS,
+        height: 8 * e.TS,
+      },
+    ],
+  );
+  uploads.length = 0;
+  e.emitGameEvent('territoryChanged', {});
+  e.drawBorders();
+  assert.equal(uploads.length, 0, 'unchanged projection does not upload');
+  assert.equal(e.borderDirty, false);
+  assert.equal(e.SR.getState(), before);
+  e.emitGameEvent('worldLoaded', { reason: 'load' });
+  e.drawBorders();
+  assert.equal(uploads.length, 1);
+  assert.equal(uploads[0].rect, undefined, 'loads repaint everything');
+});
+
+test('minimap deduplicates changed cells and loads discard pending patches', () => {
+  const e = renderer();
+  e.drawBorders();
+  e.drawMiniStatic();
+  e.staticDirty = false;
+  e.calls.length = 0;
+  const i = e.idx(50, 50);
+  e.emitGameEvent('tileChanged', { index: i });
+  e.emitGameEvent('tileChanged', { index: i });
+  e.calls.length = 0;
+  e.drawMiniStatic();
+  const fills = e.calls.filter((call) => call.method === 'fillRect');
+  assert.equal(fills.length, 3, 'one cell gets base, ownership and vignette');
+  assert.ok(fills.every((call) => JSON.stringify(call.args) === JSON.stringify([100, 100, 2, 2])));
+  e.calls.length = 0;
+  e.drawMiniStatic();
+  assert.equal(e.calls.length, 0, 'unchanged cells are reused');
+  e.owned[i] = 0;
+  e.emitGameEvent('territoryChanged', {});
+  e.drawMiniStatic();
+  assert.equal(e.calls.filter((call) => call.method === 'fillRect').length, 2);
+  e.emitGameEvent('worldLoaded', { reason: 'load' });
+  e.calls.length = 0;
+  e.drawMiniStatic();
+  assert.ok(e.calls.some((call) => call.method === 'fillRect' && call.args[2] === 192));
+});
+
+test('shadow caches retain unchanged frames and patch felled, planted and grown trees locally', () => {
+  const uploads = [];
+  const e = renderer({
+    presentation: {
+      available: true,
+      invalidate: (canvas, rect) => uploads.push({ canvas, rect }),
+      begin() {},
+      layer() {},
+      end() {},
+    },
+  });
+  const art = { img: { width: 0 }, w: 48, h: 56, ox: -12, oy: -32 };
+  e.bldImg = () => art;
+  e.ART.tree = Array.from({ length: 4 }, () => Array.from({ length: 3 }, () => ['tree', 'tree']));
+  e.ART.shadowSoft = 'root';
+  const i = e.idx(50, 50);
+  e.tiles[i].tree = 4;
+  const rng = e.SR.getState(),
+    time = e.state.time;
+  const cache = e.shadowCache;
+  cache.refresh();
+  assert.equal(uploads.length, 2);
+  assert.ok(uploads.every((u) => u.rect === undefined));
+  const paints = cache.paints;
+  uploads.length = 0;
+  cache.refresh();
+  e.emitGameEvent('tileChanged', { index: i });
+  cache.refresh();
+  assert.equal(cache.paints, paints);
+  assert.equal(uploads.length, 0, 'unchanged tree notifications do no shadow work');
+  for (const tree of [0, 1, 2, 4]) {
+    e.tiles[i].tree = tree;
+    e.emitGameEvent('tileChanged', { index: i });
+    e.emitGameEvent('tileChanged', { index: i });
+    cache.refresh();
+    assert.ok(uploads.length > 0);
+    assert.ok(
+      uploads.every((u) => u.rect && u.rect.width <= 8 * e.TS && u.rect.height <= 8 * e.TS),
+    );
+    assert.ok(uploads.every((u) => u.rect.x <= 50 * e.TS && u.rect.x + u.rect.width > 50 * e.TS));
+    uploads.length = 0;
+  }
+  assert.equal(e.SR.getState(), rng);
+  assert.equal(e.state.time, time);
+  e.emitGameEvent('worldLoaded', { reason: 'load' });
+  cache.refresh();
+  assert.equal(uploads.length, 2);
+  assert.ok(uploads.every((u) => u.rect === undefined));
+});
+
+test('shadow caches reconcile completion, removal and replacement of the live building array', () => {
+  const uploads = [];
+  const e = renderer({
+    presentation: {
+      available: true,
+      invalidate: (canvas, rect) => uploads.push(rect),
+      begin() {},
+      layer() {},
+      end() {},
+    },
+  });
+  const art = { img: { width: 0 }, w: 48, h: 56, ox: -12, oy: -32 };
+  e.bldImg = () => art;
+  e.shadowCache.refresh();
+  const site = e.newBuilding('sawmill', 50, 50);
+  e.buildings.push(site);
+  uploads.length = 0;
+  e.shadowCache.refresh();
+  assert.equal(uploads.length, 0, 'construction has no projected finished-building shadow');
+  site.done = true;
+  e.shadowCache.refresh();
+  assert.ok(uploads.length > 0 && uploads.every((rect) => rect && rect.width <= 8 * e.TS));
+  uploads.length = 0;
+  e.buildings = e.buildings.filter((b) => b.id !== site.id);
+  e.shadowCache.refresh();
+  assert.ok(uploads.length > 0 && uploads.every((rect) => rect && rect.width <= 8 * e.TS));
+});
+
+test('an unavailable shadow context reports through the graphics failure boundary', () => {
+  let caches = 0;
+  const failures = [];
+  assert.throws(
+    () =>
+      renderer({
+        contextFor: (name, context) => (name === 'cache' && ++caches === 3 ? null : context),
+        presentation: { reportFailure: (reason) => failures.push(reason) },
+      }),
+    /Canvas 2D context is unavailable/,
+  );
+  assert.deepEqual(failures, ['Canvas 2D context is unavailable']);
+});
+
+function pausedScene(paintForeground = false) {
+  const viewportFills = [],
+    tints = [];
+  const e = renderer({
+    presentation: {
+      available: true,
+      invalidate() {},
+      begin() {},
+      end() {},
+      screenTint: (tint) => tints.push([...tint]),
+      layer(name, ctx, paint) {
+        if (!paintForeground || (name !== 'foreground-effects' && name !== 'above-atmosphere'))
+          return;
+        const fill = ctx.fillRect;
+        ctx.fillRect = (...args) => {
+          if (args[2] >= e.vw && args[3] >= e.vh) viewportFills.push(ctx.fillStyle);
+          fill(...args);
+        };
+        try {
+          paint();
+        } finally {
+          ctx.fillRect = fill;
+        }
+      },
+    },
+  });
+  e.staticDirty = false;
+  e.borderDirty = false;
+  e.buildings = [];
+  e.mode = null;
+  e.ghost = null;
+  e.presentationPrefs.weather = false;
+  e.vw = 800;
+  e.vh = 600;
+  e.cam = { x: 40 * e.TS, y: 40 * e.TS };
+  e.SND.thunder = () => {};
+  return { e, tints, viewportFills };
+}
+
+test('paused feedback starts on the current wall clock and still completes', (t) => {
+  const clock = pinClock(1000);
+  t.after(() => clock.restore());
+  const { e } = pausedScene(true);
+  e.draw();
+  clock.set(3000);
+  e.draw();
+  e.FX.ring(48, 48, '#ffd23f', 16);
+  e.draw();
+  assert.equal(e.FXL.length, 1, 'new feedback survives its first paused frame');
+  clock.tick(700);
+  e.draw();
+  assert.equal(e.FXL.length, 0, 'brief feedback finishes while paused');
+});
+
+test('paused camera movement still refreshes the minimap viewport', (t) => {
+  const clock = pinClock(1000);
+  t.after(() => clock.restore());
+  const { e } = pausedScene();
+  e.draw();
+  e.drawMini();
+  e.calls.length = 0;
+  clock.tick(1000);
+  e.cam.x += e.TS;
+  e.draw();
+  e.drawMini();
+  assert.ok(
+    e.calls.some((call) => call.method === 'strokeRect'),
+    'viewport redraw is not frozen with decorative time',
+  );
+});
+
+test('lightning during pause expires on wall time', (t) => {
+  const clock = pinClock(1000);
+  t.after(() => clock.restore());
+  const random = Math.random;
+  t.after(() => {
+    Math.random = random;
+  });
+  const { e, tints, viewportFills } = pausedScene(true);
+  const close = (actual, expected, message) =>
+    assert.ok(
+      actual.length === 4 && actual.every((v, i) => Math.abs(v - expected[i]) < 1e-4),
+      `${message}: ${actual}`,
+    );
+  e.draw();
+  e.presentationPrefs.weather = true;
+  e._rain = 1;
+  Math.random = () => 0;
+  clock.tick(1000);
+  tints.length = 0;
+  e.draw();
+  // A white 0.26 flash over the 0.16 rain veil, premultiplied.
+  close(tints.at(-1), [0.27718, 0.284144, 0.289716, 0.3784], 'the thunderstorm produces a flash');
+  Math.random = () => 0.5;
+  clock.tick(500);
+  e.draw();
+  close(tints.at(-1), [0.023216, 0.032627, 0.040157, 0.16], 'only the rain veil remains');
+  assert.deepEqual(
+    viewportFills,
+    [],
+    'veils are applied by the atmosphere pass, not viewport fills',
+  );
+});
+
+test('the backdrop and map shadows fill only viewport area the map leaves uncovered', (t) => {
+  const clock = pinClock(1000);
+  t.after(() => clock.restore());
+  const fills = [];
+  const e = renderer({
+    presentation: {
+      available: true,
+      invalidate() {},
+      begin() {},
+      end() {},
+      layer(name, ctx, paint) {
+        if (name !== 'backdrop') return;
+        const fill = ctx.fillRect;
+        ctx.fillRect = (...args) => {
+          fills.push({ style: ctx.fillStyle, rect: args });
+          fill(...args);
+        };
+        try {
+          paint();
+        } finally {
+          ctx.fillRect = fill;
+        }
+      },
+    },
+  });
+  e.staticDirty = false;
+  e.borderDirty = false;
+  e.vw = 800;
+  e.vh = 600;
+  e.cam = { x: 40 * e.TS, y: 40 * e.TS };
+  e.draw();
+  assert.deepEqual(fills, [], 'a covering map needs no backdrop');
+  const mapW = e.W * e.TS,
+    mapH = e.H * e.TS;
+  e.cam = { x: mapW - 700, y: 40 * e.TS };
+  e.draw();
+  const gradient = fills.filter((f) => typeof f.style !== 'string');
+  assert.deepEqual(
+    gradient.map((f) => f.rect),
+    [[700, 0, 100, 600]],
+    'only the band east of the map',
+  );
+  const shadows = fills.filter((f) => typeof f.style === 'string');
+  assert.ok(shadows.length > 0, 'the map still casts its drop shadow');
+  for (const { rect } of shadows) {
+    const [x, y, w, h] = rect;
+    assert.ok(x >= mapW || y >= mapH, `shadow ${rect} stays outside the map`);
+    assert.ok(x + w <= mapW + 4 && y + h <= mapH + 5);
+  }
+});
+
+test('the layer above the atmosphere follows the screen veil', (t) => {
+  const clock = pinClock(1000);
+  t.after(() => clock.restore());
+  const sequence = [];
+  const e = renderer({
+    presentation: {
+      available: true,
+      invalidate() {},
+      begin() {},
+      end() {},
+      screenTint: () => sequence.push('veil'),
+      layer: (name) => sequence.push(name),
+    },
+  });
+  e.staticDirty = false;
+  e.borderDirty = false;
+  e.vw = 800;
+  e.vh = 600;
+  e.draw();
+  assert.deepEqual(sequence.slice(-3), ['foreground-effects', 'veil', 'above-atmosphere']);
+});

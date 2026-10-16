@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame } from './helpers/game.cjs';
+import { plainSave } from './helpers/saves.mjs';
 
 function colony() {
   const { game } = createGame({
@@ -98,7 +99,7 @@ test('invalid arrival histories cannot replace live or stored data', () => {
     (cargo) => (cargo.recent = Array.from({ length: 302 }, () => cargo.recent[0])),
     (cargo) => delete cargo.totals,
   ]) {
-    const bad = JSON.parse(valid);
+    const bad = plainSave(valid);
     corrupt(bad.observations.cargo);
     assert.throws(() => game.importSave(JSON.stringify(bad)), /cargo|resource/i);
     assert.equal(game.exportSave(), valid);

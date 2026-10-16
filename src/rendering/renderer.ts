@@ -16,6 +16,7 @@ import type {
 import { observePresentation } from '../ui/domain-feedback.ts';
 import type { GameRuntime } from '../runtime.ts';
 import { requireCanvas2D } from './canvas-context.ts';
+import { createShadowCache } from './shadow-cache.ts';
 
 /** Live display pose of one walker, keyed by unit id across frames. */
 export interface UnitPose {
@@ -100,6 +101,9 @@ interface SortEntry {
 type LineSeg = [number, number, number, number];
 
 /** Ordered scene commands consumed by the PixiJS world renderer. */
+/** Premultiplied [r, g, b, alpha], each 0..1. */
+export type PremultipliedTint = readonly [number, number, number, number];
+
 export interface RendererPresentation {
   available: boolean;
   /** Surface observer/cache failures through the same visible GPU failure boundary. */
@@ -113,6 +117,15 @@ export interface RendererPresentation {
   begin: (ctx: CanvasRenderingContext2D) => void;
   layer: (name: LayerName, ctx: CanvasRenderingContext2D, paint: () => void) => void;
   end: (ctx: CanvasRenderingContext2D) => void;
+  shadowLayer?: (
+    cast: HTMLCanvasElement,
+    contacts: HTMLCanvasElement,
+    ctx: CanvasRenderingContext2D,
+    castOpacity: number,
+    contactOpacity: number,
+  ) => void;
+  /** Premultiplied screen-space veil the atmosphere pass applies before grading. */
+  screenTint?: (tint: PremultipliedTint) => void;
 }
 
 export function createRenderer(
@@ -142,8 +155,10 @@ export function createRenderer(
     sctx = requireCanvas2D(scan, reportGraphicsFailure, { willReadFrequently: true });
   const bcan = game.Acan(game.W * game.TS, game.H * game.TS),
     bctx = requireCanvas2D(bcan, reportGraphicsFailure, { willReadFrequently: true });
+  const shadowCache = createShadowCache(game, presentation, reportGraphicsFailure);
   let borderDirty = true;
-  const borderSegs: LineSeg[] = [];
+  const borderOwned = new Uint8Array(game.W * game.H);
+  let borderReady = false;
   const FXL: FXEffect[] = [];
   let NOW = 0,
     BAR_H = 44,
@@ -230,10 +245,11 @@ export function createRenderer(
     g.restore();
   }
   function drawTile(g: CanvasRenderingContext2D, i: number) {
+    shadowCache.tileChanged(i);
     terrainRevision++;
     paintTileFull(g, i);
     if (macroCan) paintMacroTile(g, i);
-    miniDirty = true;
+    miniTiles.add(i);
     // Both painters clip to the tile, so the upload can be limited to its rect.
     const tss = game.TS * game.ST;
     presentation?.invalidate(g.canvas, {
@@ -296,13 +312,31 @@ export function createRenderer(
     g.drawImage(macroCan, x - 1, y - 1, 3, 3, (x - 1) * size, (y - 1) * size, 3 * size, 3 * size);
     g.restore();
   }
-  function drawBorders() {
+  const borderChunkTiles = 8,
+    borderChunkSize = borderChunkTiles * game.TS,
+    borderColumns = Math.ceil(game.W / borderChunkTiles),
+    borderRows = Math.ceil(game.H / borderChunkTiles);
+  function paintBorderChunk(cx: number, cy: number) {
+    const rect = {
+      x: cx * borderChunkSize,
+      y: cy * borderChunkSize,
+      width: Math.min(borderChunkSize, bcan.width - cx * borderChunkSize),
+      height: Math.min(borderChunkSize, bcan.height - cy * borderChunkSize),
+    };
     const g = bctx;
+    g.save();
     g.setTransform(1, 0, 0, 1, 0, 0);
-    g.clearRect(0, 0, game.W * game.TS, game.H * game.TS);
-    borderSegs.length = 0;
-    for (let y2 = 0; y2 < game.H; y2++)
-      for (let x2 = 0; x2 < game.W; x2++) {
+    g.beginPath();
+    g.rect(rect.x, rect.y, rect.width, rect.height);
+    g.clip();
+    g.clearRect(rect.x, rect.y, rect.width, rect.height);
+    const borderSegs: LineSeg[] = [];
+    const minX = Math.max(0, cx * borderChunkTiles - 1),
+      minY = Math.max(0, cy * borderChunkTiles - 1),
+      maxX = Math.min(game.W - 1, (cx + 1) * borderChunkTiles),
+      maxY = Math.min(game.H - 1, (cy + 1) * borderChunkTiles);
+    for (let y2 = minY; y2 <= maxY; y2++)
+      for (let x2 = minX; x2 <= maxX; x2++) {
         const i2 = game.idx(x2, y2);
         if (!game.owned[i2]) continue;
         const px = x2 * game.TS,
@@ -335,11 +369,77 @@ export function createRenderer(
     strokeAll('rgba(49,52,27,0.30)', 3.4);
     strokeAll('rgba(244,218,144,0.50)', 1.6);
     strokeAll('rgba(255,239,186,0.72)', 0.65);
+    g.restore();
+    return rect;
+  }
+  function drawBorders(full = false) {
+    full ||= !borderReady;
+    const chunks = new Set<number>();
+    if (full) {
+      for (let i = 0; i < borderColumns * borderRows; i++) chunks.add(i);
+    } else {
+      for (let i = 0; i < game.owned.length; i++) {
+        if (game.owned[i] === borderOwned[i]) continue;
+        miniTiles.add(i);
+        const x = (i % game.W) * game.TS,
+          y = ((i / game.W) | 0) * game.TS;
+        // Include round caps and antialiasing on either side of a chunk edge.
+        const x0 = Math.floor(Math.max(0, x - 3) / borderChunkSize),
+          y0 = Math.floor(Math.max(0, y - 3) / borderChunkSize),
+          x1 = Math.floor(Math.min(bcan.width - 1, x + game.TS + 2) / borderChunkSize),
+          y1 = Math.floor(Math.min(bcan.height - 1, y + game.TS + 2) / borderChunkSize);
+        for (let cy = y0; cy <= y1; cy++)
+          for (let cx = x0; cx <= x1; cx++) chunks.add(cy * borderColumns + cx);
+      }
+    }
+    // Fixed integer clips and identical neighbouring paths make partial paints
+    // byte-identical to a full rebuild, including Canvas round-cap rasterization.
+    // Separate chunks also keep distant changes from uploading the whole map.
+    for (const chunk of chunks) {
+      paintBorderChunk(chunk % borderColumns, (chunk / borderColumns) | 0);
+    }
+    borderOwned.set(game.owned);
+    borderReady = true;
     borderDirty = false;
-    miniDirty = true;
-    presentation?.invalidate(bcan);
+    if (full) presentation.invalidate(bcan);
+    else {
+      // One upload per connected region avoids repeated driver synchronization
+      // for neighbouring chunks while keeping distant changes separate.
+      for (const first of chunks) {
+        const pending = [first];
+        chunks.delete(first);
+        let x0 = first % borderColumns,
+          x1 = x0,
+          y0 = (first / borderColumns) | 0,
+          y1 = y0;
+        while (pending.length) {
+          const chunk = pending.pop();
+          if (chunk === undefined) break;
+          const x = chunk % borderColumns,
+            y = (chunk / borderColumns) | 0;
+          x0 = Math.min(x0, x);
+          x1 = Math.max(x1, x);
+          y0 = Math.min(y0, y);
+          y1 = Math.max(y1, y);
+          for (let d = 0; d < 4; d++) {
+            const nx = x + game.DX[d],
+              ny = y + game.DY[d];
+            if (nx < 0 || ny < 0 || nx >= borderColumns || ny >= borderRows) continue;
+            const next = ny * borderColumns + nx;
+            if (chunks.delete(next)) pending.push(next);
+          }
+        }
+        presentation.invalidate(bcan, {
+          x: x0 * borderChunkSize,
+          y: y0 * borderChunkSize,
+          width: Math.min(bcan.width, (x1 + 1) * borderChunkSize) - x0 * borderChunkSize,
+          height: Math.min(bcan.height, (y1 + 1) * borderChunkSize) - y0 * borderChunkSize,
+        });
+      }
+    }
   }
   function drawStatic() {
+    shadowCache.reset();
     terrainRevision++;
     sctx.setTransform(1, 0, 0, 1, 0, 0);
     sctx.imageSmoothingEnabled = true;
@@ -348,7 +448,9 @@ export function createRenderer(
     const macro = macroCan || buildMacro();
     sctx.imageSmoothingEnabled = true;
     sctx.drawImage(macro, 0, 0, game.W * game.TS * game.ST, game.H * game.TS * game.ST);
-    drawBorders();
+    drawBorders(true);
+    miniDirty = true;
+    miniTiles.clear();
     game.staticDirty = false;
     presentation?.invalidate(scan);
   }
@@ -514,6 +616,7 @@ export function createRenderer(
       dh = img.h * s;
     g.drawImage(img.img, cx - dw / 2, cy - dh / 2, dw, dh);
   }
+  const flagSheets = new Map<string, HTMLCanvasElement>();
   function drawFlag(
     g: CanvasRenderingContext2D,
     ax: number,
@@ -522,7 +625,44 @@ export function createRenderer(
     now: number,
     ph: number,
   ) {
-    now = motionTime(now);
+    const count = 24,
+      size = 20,
+      resolution = 4;
+    let sheet = flagSheets.get(col);
+    if (!sheet) {
+      sheet = game.Acan(size * resolution * count, size * resolution);
+      const paint = requireCanvas2D(sheet, reportGraphicsFailure);
+      for (let i = 0; i < count; i++) {
+        paint.save();
+        paint.translate(i * size * resolution, 0);
+        paint.scale(resolution, resolution);
+        paintFlag(paint, 2, 3, col, (i / count) * Math.PI * 2 * 240, 0);
+        paint.restore();
+      }
+      flagSheets.set(col, sheet);
+    }
+    const phase = (motionTime(now) / 240 + ph) / (Math.PI * 2);
+    const frame = ((Math.round(phase * count) % count) + count) % count;
+    g.drawImage(
+      sheet,
+      frame * size * resolution,
+      0,
+      size * resolution,
+      size * resolution,
+      ax - 2,
+      ay - 3,
+      size,
+      size,
+    );
+  }
+  function paintFlag(
+    g: CanvasRenderingContext2D,
+    ax: number,
+    ay: number,
+    col: string,
+    now: number,
+    ph: number,
+  ) {
     g.strokeStyle = '#5a3e22';
     g.lineWidth = 1.4;
     g.beginPath();
@@ -561,6 +701,32 @@ export function createRenderer(
     g.closePath();
     g.fill();
   }
+  function localEllipse(
+    g: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    rx: number,
+    ry: number,
+    rotation: number,
+  ) {
+    g.save();
+    g.translate(x, y);
+    g.rotate(rotation);
+    g.scale(rx, ry);
+    g.beginPath();
+    g.ellipse(0, 0, 1, 1, 0, 0, 7);
+    g.fill();
+    g.restore();
+  }
+  function localCircle(g: CanvasRenderingContext2D, x: number, y: number, r: number) {
+    g.save();
+    g.translate(x, y);
+    g.scale(r, r);
+    g.beginPath();
+    g.arc(0, 0, 1, 0, 7);
+    g.fill();
+    g.restore();
+  }
   function drawSmoke(g: CanvasRenderingContext2D, x: number, y: number, now: number, sd: number) {
     if (renderPrefs().clarity || renderPrefs().reducedMotion || game.state.paused) return;
     const count = renderPrefs().quality < 1 ? 3 : 5;
@@ -569,10 +735,11 @@ export function createRenderer(
       const r = 0.9 + ph * 3.4,
         a = 0.19 * Math.sin(Math.PI * ph);
       // Warm translucent smoke catches sunlight, then disperses downwind.
-      g.fillStyle = 'rgba(235,220,189,' + a.toFixed(3) + ')';
-      g.beginPath();
-      g.ellipse(x + ph * 7 + Math.sin(ph * 5 + sd) * 1.6, y - ph * 24, r * 1.35, r, -0.3, 0, 7);
-      g.fill();
+      g.save();
+      g.globalAlpha *= Number(a.toFixed(3));
+      g.fillStyle = '#ebdcbd';
+      localEllipse(g, x + ph * 7 + Math.sin(ph * 5 + sd) * 1.6, y - ph * 24, r * 1.35, r, -0.3);
+      g.restore();
     }
   }
   function drawBadge(g: CanvasRenderingContext2D, cx: number, cy: number) {
@@ -707,8 +874,8 @@ export function createRenderer(
       if (game.bStatus(b).bad) drawBadge(g, b.x * game.TS + game.TS - 5, b.y * game.TS + 5);
       if (active) drawWorker(g, b, now, sp.prod);
       const pulse = workPulses[b.id];
-      if (pulse && NOW - pulse.t < 600 && !renderPrefs().reducedMotion) {
-        const fade = 1 - (NOW - pulse.t) / 600;
+      if (pulse && performance.now() - pulse.t < 600 && !renderPrefs().reducedMotion) {
+        const fade = 1 - (performance.now() - pulse.t) / 600;
         g.globalAlpha = fade;
         chip(g, b.x * game.TS + 26, b.y * game.TS + 12 - fade * 5, game.GOODS[pulse.good].c);
         g.globalAlpha = 1;
@@ -855,32 +1022,32 @@ export function createRenderer(
       th = 46 * scale;
     g.save();
     if (renderPrefs().clarity) g.globalAlpha *= 0.62;
-    // The canopy cast shadow lives in the ground pass; this smaller cached
-    // patch stays attached to the root when sunlight and weather change.
-    g.drawImage(
-      game.ART.shadowSoft,
-      x * game.TS + 10.5 + jx - 9 * scale,
-      y * game.TS + 25.5 + jy,
-      20 * scale,
-      7 * scale,
-    );
     g.drawImage(spr, x * game.TS + 10.5 + jx - tw / 2, y * game.TS + 28.5 + jy - th, tw, th);
     g.restore();
+  }
+  const pebbles: HTMLCanvasElement[] = [];
+  function pebble(variant: number) {
+    if (pebbles[variant]) return pebbles[variant];
+    const canvas = game.Acan(44, 28),
+      g = requireCanvas2D(canvas, reportGraphicsFailure);
+    g.scale(4, 4);
+    g.fillStyle = 'rgba(148,143,128,0.9)';
+    g.beginPath();
+    g.ellipse(5, 3, 2.6 + variant * 0.5, 1.8, 0, 0, 7);
+    g.fill();
+    g.fillStyle = 'rgba(62,58,50,0.3)';
+    g.beginPath();
+    g.ellipse(6, 4, 2, 0.9, 0, 0, 7);
+    g.fill();
+    pebbles[variant] = canvas;
+    return canvas;
   }
   function drawRock(g: CanvasRenderingContext2D, x: number, y: number) {
     const h = tileHash(game.idx(x, y));
     if (z < 0.75) {
-      // LOD: scattered pebbles at far zoom
       const rx2 = ((h >> 2) % 13) - 6,
         ry2 = ((h >> 5) % 11) - 5;
-      g.fillStyle = 'rgba(148,143,128,0.9)';
-      g.beginPath();
-      g.ellipse(x * game.TS + 11 + rx2, y * game.TS + 14 + ry2, 2.6 + (h % 3) * 0.5, 1.8, 0, 0, 7);
-      g.fill();
-      g.fillStyle = 'rgba(62,58,50,0.3)';
-      g.beginPath();
-      g.ellipse(x * game.TS + 12 + rx2, y * game.TS + 15 + ry2, 2, 0.9, 0, 0, 7);
-      g.fill();
+      g.drawImage(pebble(h % 3), x * game.TS + 6 + rx2, y * game.TS + 11 + ry2, 11, 7);
       return;
     }
     g.globalAlpha = 0.96;
@@ -1090,10 +1257,11 @@ export function createRenderer(
           )
             continue;
           count++;
-          g.fillStyle = 'rgba(255,236,171,' + (0.55 * Math.sin(Math.PI * phase)).toFixed(3) + ')';
-          g.beginPath();
-          g.arc(px, py, mote ? 0.7 : 0.95, 0, 7);
-          g.fill();
+          g.save();
+          g.globalAlpha *= Number((0.55 * Math.sin(Math.PI * phase)).toFixed(3));
+          g.fillStyle = '#ffecab';
+          localCircle(g, px, py, mote ? 0.7 : 0.95);
+          g.restore();
         }
         if (renderPrefs().quality < 1 || z < 0.85 || hash % 4 || butterflies >= 3) continue;
         const tile = game.tiles[game.idx(tx, ty)];
@@ -1110,12 +1278,13 @@ export function createRenderer(
         butterflies++;
         const wing = 0.5 + Math.abs(Math.sin(time * 8 + hash)) * 1.6;
         g.fillStyle = hash % 3 ? '#f4cf76' : '#e1dfc2';
-        g.beginPath();
-        g.ellipse(flutterX - wing * 0.6, flutterY, wing, 1.35, -0.4, 0, 7);
-        g.ellipse(flutterX + wing * 0.6, flutterY, wing, 1.35, 0.4, 0, 7);
-        g.fill();
+        localEllipse(g, flutterX - wing * 0.6, flutterY, wing, 1.35, -0.4);
+        localEllipse(g, flutterX + wing * 0.6, flutterY, wing, 1.35, 0.4);
         g.fillStyle = '#715c3e';
-        g.fillRect(flutterX - 0.25, flutterY - 1, 0.5, 2);
+        g.save();
+        g.translate(flutterX, flutterY);
+        g.fillRect(-0.25, -1, 0.5, 2);
+        g.restore();
       }
     atmosphereCount = count + butterflies;
   }
@@ -1196,20 +1365,19 @@ export function createRenderer(
         continue;
       if (f.k === 'stepDust') {
         p = age / duration;
-        g.fillStyle = 'rgba(224,205,151,' + (0.16 * Math.sin(Math.PI * p)).toFixed(3) + ')';
-        for (let puff = 0; puff < 2; puff++) {
-          g.beginPath();
-          g.ellipse(
+        g.save();
+        g.globalAlpha *= Number((0.16 * Math.sin(Math.PI * p)).toFixed(3));
+        g.fillStyle = '#e0cd97';
+        for (let puff = 0; puff < 2; puff++)
+          localEllipse(
+            g,
             f.x * game.TS + puff * 2.4 + p * 2.5,
             f.y * game.TS + 2 - p * 1.5,
             0.7 + p * 2.2,
             0.5 + p,
             0,
-            0,
-            7,
           );
-          g.fill();
-        }
+        g.restore();
       } else if (f.k === 'ring') {
         life = 650;
         if (age > life) {
@@ -1272,16 +1440,16 @@ export function createRenderer(
         p = age / life;
         for (let k = 0; k < 6; k++) {
           const a3 = k * 1.047 + rnd0(f.i ?? 0);
-          g.fillStyle = 'rgba(184,162,118,' + ((1 - p) * 0.22).toFixed(3) + ')';
-          g.beginPath();
-          g.arc(
+          g.save();
+          g.globalAlpha *= Number(((1 - p) * 0.22).toFixed(3));
+          g.fillStyle = '#b8a276';
+          localCircle(
+            g,
             f.x * game.TS + Math.cos(a3) * (3 + p * 11),
             f.y * game.TS + 12 + Math.sin(a3) * (1.5 + p * 4),
             1.6 + p * 3,
-            0,
-            7,
           );
-          g.fill();
+          g.restore();
         }
       } else {
         life = 700;
@@ -1322,11 +1490,15 @@ export function createRenderer(
         const px = x * game.TS + 6,
           py = y * game.TS + 8 + (h % 8);
         const phase = now / 2600 + h * 0.17;
-        g.strokeStyle = 'rgba(222,226,184,' + (0.075 + 0.055 * Math.sin(phase)).toFixed(3) + ')';
+        g.save();
+        g.globalAlpha *= Number((0.075 + 0.055 * Math.sin(phase)).toFixed(3));
+        g.strokeStyle = '#dee2b8';
+        g.translate(px, py);
         g.beginPath();
-        g.moveTo(px, py);
-        g.quadraticCurveTo(px + 4, py - 0.7, px + 9 + (h % 4), py - 0.2);
+        g.moveTo(0, 0);
+        g.quadraticCurveTo(4, -0.7, 9 + (h % 4), -0.2);
         g.stroke();
+        g.restore();
       }
     g.restore();
   }
@@ -2377,6 +2549,29 @@ export function createRenderer(
     g.restore();
   }
 
+  // Premultiplied [r, g, b, alpha] of the screen-space veils stacked source-over.
+  const screenTint: [number, number, number, number] = [0, 0, 0, 0];
+  function veil(r: number, g: number, b: number, alpha: number) {
+    const keep = 1 - alpha;
+    screenTint[0] = (r / 255) * alpha + screenTint[0] * keep;
+    screenTint[1] = (g / 255) * alpha + screenTint[1] * keep;
+    screenTint[2] = (b / 255) * alpha + screenTint[2] * keep;
+    screenTint[3] = alpha + screenTint[3] * keep;
+  }
+  function composeScreenTint(): PremultipliedTint {
+    screenTint.fill(0);
+    // Visual clarity suppresses every veil; Reduced Motion suppresses the flash.
+    if (renderPrefs().clarity) return screenTint;
+    const cool = nightCool(),
+      warm = nightWarm();
+    if (cool > 0.01) veil(20, 34, 66, cool * 0.29);
+    if (warm > 0.01) veil(255, 177, 98, warm * 0.75);
+    if (_rain > 0.01) veil(37, 52, 64, _rain * 0.16);
+    if (!renderPrefs().reducedMotion && renderPrefs().weather && NOW - _flashT < 180)
+      veil(255, 255, 255, (1 - (NOW - _flashT) / 180) * 0.26);
+    return screenTint;
+  }
+
   // ---------- guard-post placement preview (the *actual* new border, not the naive radius) ----------
   function guardPreview(g: CanvasRenderingContext2D, now: number) {
     now = motionTime(now);
@@ -2454,6 +2649,7 @@ export function createRenderer(
       game,
       'tileChanged',
       function (e) {
+        shadowCache.tileChanged(e.index);
         if (game.tiles[e.index] && !game.staticDirty) drawTile(sctx, e.index);
       },
       (error) => {
@@ -2469,12 +2665,16 @@ export function createRenderer(
   });
   observePresentation(game, 'territoryChanged', () => {
     borderDirty = true;
+    for (let i = 0; i < game.owned.length; i++)
+      if (game.owned[i] !== borderOwned[i]) miniTiles.add(i);
     _placementCache = null;
     _roadCache = null;
   });
   // A committed load clears every transient presentation cache through this one
   // sanctioned method; loaders never poke renderer internals field by field.
   function resetPresentation() {
+    shadowCache.reset();
+    _pausedNow = null;
     FXL.length = 0;
     _seen = {};
     _warmup = false;
@@ -2483,6 +2683,10 @@ export function createRenderer(
     _roadCache = null;
     unitPoses = {};
     workPulses = {};
+    borderReady = false;
+    borderDirty = true;
+    miniDirty = true;
+    miniTiles.clear();
   }
   function visibleAt(x: number, y: number) {
     return (
@@ -2547,16 +2751,21 @@ export function createRenderer(
   }
 
   // ---------- frame ----------
-  let _lastNow = 0;
+  let _lastNow = 0,
+    _pausedNow: number | null = null;
   function draw() {
     if (!presentation?.available) return;
     const drawStart = performance.now(),
       frameMs = _lastNow ? drawStart - _lastNow : 0;
-    NOW = performance.now();
+    const wallNow = performance.now();
+    if (game.state.paused) _pausedNow ??= wallNow;
+    else _pausedNow = null;
+    NOW = wallNow;
+    const decorativeNow = _pausedNow ?? wallNow;
     initRenderEvents();
-    stepZoom(NOW);
-    weatherTick(NOW, Math.min(0.1, (NOW - _lastNow) / 1000) || 0.016);
-    _lastNow = NOW;
+    stepZoom(wallNow);
+    weatherTick(wallNow, Math.min(0.1, (wallNow - _lastNow) / 1000) || 0.016);
+    _lastNow = wallNow;
     if (game.staticDirty) drawStatic();
     else if (borderDirty) drawBorders();
     reconcileFx();
@@ -2569,13 +2778,33 @@ export function createRenderer(
         bgGrad.addColorStop(1, '#0a141d');
       }
       ctx.fillStyle = bgGrad;
-      ctx.fillRect(0, 0, vw, vh);
+      // The opaque terrain hides everything beneath it, so fill only the bands
+      // of the viewport the map leaves uncovered.
+      const mapW = game.W * game.TS,
+        mapH = game.H * game.TS;
+      const left = Math.min(vw, Math.max(0, -cam.x * z)),
+        right = Math.min(vw, Math.max(0, (mapW - cam.x) * z)),
+        top = Math.min(vh, Math.max(0, -cam.y * z)),
+        bottom = Math.min(vh, Math.max(0, (mapH - cam.y) * z));
+      if (right <= left || bottom <= top) ctx.fillRect(0, 0, vw, vh);
+      else {
+        if (top > 0) ctx.fillRect(0, 0, vw, top);
+        if (bottom < vh) ctx.fillRect(0, bottom, vw, vh - bottom);
+        if (left > 0) ctx.fillRect(0, top, left, bottom - top);
+        if (right < vw) ctx.fillRect(right, top, vw - right, bottom - top);
+      }
       ctx.setTransform(dpr * z, 0, 0, dpr * z, -cam.x * z * dpr, -cam.y * z * dpr);
       ctx.imageSmoothingEnabled = true;
-      ctx.fillStyle = 'rgba(4,8,12,0.5)';
-      ctx.fillRect(4, 5, game.W * game.TS, game.H * game.TS);
-      ctx.fillStyle = 'rgba(4,8,12,0.35)';
-      ctx.fillRect(2, 2, game.W * game.TS, game.H * game.TS);
+      // Drop shadows offset south-east; only their strips beyond the map show.
+      const mapShadow = (dx: number, dy: number, style: string) => {
+        ctx.fillStyle = style;
+        ctx.fillRect(mapW, dy, dx, mapH);
+        ctx.fillRect(dx, mapH, mapW - dx, dy);
+      };
+      if (right < vw || bottom < vh) {
+        mapShadow(4, 5, 'rgba(4,8,12,0.5)');
+        mapShadow(2, 2, 'rgba(4,8,12,0.35)');
+      }
     });
     layer('terrain', function () {
       // Blit only the visible terrain rectangle instead of submitting the 48 MB atlas.
@@ -2604,58 +2833,48 @@ export function createRenderer(
       }
     });
     layer('ground-effects', function () {
-      waterAnim(ctx, NOW);
-      highlights(ctx, NOW);
-      guardPreview(ctx, NOW);
+      shadowCache.refresh();
+      const castOpacity = renderPrefs().clarity
+        ? 0.06 / 0.17
+        : (1 - nightCool()) * (1 - rainAmt() * 0.8);
+      presentation.shadowLayer?.(
+        shadowCache.cast,
+        shadowCache.contacts,
+        ctx,
+        castOpacity < 0.02 / 0.17 ? 0 : castOpacity,
+        renderPrefs().clarity ? 0.62 : 1,
+      );
+      waterAnim(ctx, decorativeNow);
+      highlights(ctx, decorativeNow);
+      guardPreview(ctx, decorativeNow);
       demoMarkers(ctx);
       clarityRoads(ctx);
-      if (!renderPrefs().clarity) cloudsShadowDraw(ctx, NOW);
+      if (!renderPrefs().clarity) cloudsShadowDraw(ctx, decorativeNow);
     });
-    drawObjects(ctx, NOW);
+    drawObjects(ctx, decorativeNow);
     layer('foreground-effects', function () {
-      fxDraw(ctx, NOW);
-      meadowParticles(ctx, NOW);
+      fxDraw(ctx, wallNow);
+      meadowParticles(ctx, decorativeNow);
       clarityBuildings(ctx);
-      selection(ctx, NOW);
-      anchorDraw(ctx, NOW);
+      selection(ctx, decorativeNow);
+      anchorDraw(ctx, decorativeNow);
       ghostDraw(ctx);
       logisticsDraw(ctx);
       if (!renderPrefs().clarity) {
-        cloudsDraw(ctx, NOW);
-        birdsDraw(ctx, NOW);
+        cloudsDraw(ctx, decorativeNow);
+        birdsDraw(ctx, decorativeNow);
       }
-      // day/night + weather tint (screen space)
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const cool = renderPrefs().clarity ? 0 : nightCool(),
-        warm = renderPrefs().clarity ? 0 : nightWarm();
-      if (cool > 0.01) {
-        ctx.fillStyle = 'rgba(20,34,66,' + (cool * 0.29).toFixed(3) + ')';
-        ctx.fillRect(0, 0, vw, vh);
-      }
-      if (warm > 0.01) {
-        ctx.fillStyle = 'rgba(255,177,98,' + (warm * 0.75).toFixed(3) + ')';
-        ctx.fillRect(0, 0, vw, vh);
-      }
-      if (!renderPrefs().clarity && _rain > 0.01) {
-        ctx.fillStyle = 'rgba(37,52,64,' + (_rain * 0.16).toFixed(3) + ')';
-        ctx.fillRect(0, 0, vw, vh);
-      }
-      if (
-        !renderPrefs().clarity &&
-        !renderPrefs().reducedMotion &&
-        renderPrefs().weather &&
-        NOW - _flashT < 180
-      ) {
-        ctx.fillStyle = 'rgba(255,255,255,' + ((1 - (NOW - _flashT) / 180) * 0.26).toFixed(3) + ')';
-        ctx.fillRect(0, 0, vw, vh);
-      }
-      if (cool > 0.04) {
+    });
+    // Night, dusk, rain and lightning veils reach the atmosphere pass as one tint.
+    presentation.screenTint?.(composeScreenTint());
+    layer('above-atmosphere', function () {
+      if (!renderPrefs().clarity && nightCool() > 0.04) {
         // lantern glows sit above the night tint
         ctx.setTransform(dpr * z, 0, 0, dpr * z, -cam.x * z * dpr, -cam.y * z * dpr);
         glowsDraw(ctx);
       }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      if (!renderPrefs().clarity && _rain > 0.02) rainDraw(ctx, NOW);
+      if (!renderPrefs().clarity && _rain > 0.02) rainDraw(ctx, decorativeNow);
       logisticsCaption(ctx);
     });
     presentation.end(ctx);
@@ -2668,51 +2887,56 @@ export function createRenderer(
     msctx = requireCanvas2D(mscan, reportGraphicsFailure);
   let miniDirty = true;
   let _miniRendered = 0;
-  function drawMiniStatic() {
-    const s = 192 / game.W;
-    msctx.fillStyle = '#101418';
-    msctx.fillRect(0, 0, 192, 192);
-    for (let y = 0; y < game.H; y++)
-      for (let x = 0; x < game.W; x++) {
-        const i = game.idx(x, y),
-          tl = game.tiles[i];
-        let c;
-        if (tl.t === game.WATER) c = '#447b89';
-        else if (tl.t === game.SAND) c = '#d7c39b';
-        else if (tl.t === game.MTN) c = '#aaa79a';
-        else c = tl.tree ? '#4b7040' : '#6b8750';
-        msctx.fillStyle = c;
-        msctx.fillRect(x * s, y * s, s, s);
-        if (tl.deposit && tl.deposit.amt > 0) {
-          msctx.fillStyle =
-            tl.deposit.kind === 'gold'
-              ? '#ffd23f'
-              : tl.deposit.kind === 'iron'
-                ? '#d0763a'
-                : '#565e68';
-          msctx.fillRect(x * s, y * s, s, s);
-          const fr2 = tl.deposit.amt / (tl.deposit.amt0 || tl.deposit.amt);
-          if (fr2 < 0.999) {
-            msctx.fillStyle = 'rgba(0,0,0,' + ((1 - fr2) * 0.55).toFixed(2) + ')';
-            msctx.fillRect(x * s, y * s, s, s);
-          }
-        }
+  const miniTiles = new Set<number>();
+  let miniVignette: CanvasGradient | null = null;
+  function paintMiniTile(i: number, vignette: CanvasGradient) {
+    const s = 192 / game.W,
+      x = (i % game.W) * s,
+      y = ((i / game.W) | 0) * s,
+      tl = game.tiles[i];
+    let c;
+    if (tl.t === game.WATER) c = '#447b89';
+    else if (tl.t === game.SAND) c = '#d7c39b';
+    else if (tl.t === game.MTN) c = '#aaa79a';
+    else c = tl.tree ? '#4b7040' : '#6b8750';
+    msctx.fillStyle = c;
+    msctx.fillRect(x, y, s, s);
+    if (tl.deposit && tl.deposit.amt > 0) {
+      msctx.fillStyle =
+        tl.deposit.kind === 'gold' ? '#ffd23f' : tl.deposit.kind === 'iron' ? '#d0763a' : '#565e68';
+      msctx.fillRect(x, y, s, s);
+      const fraction = tl.deposit.amt / (tl.deposit.amt0 || tl.deposit.amt);
+      if (fraction < 0.999) {
+        msctx.fillStyle = 'rgba(0,0,0,' + ((1 - fraction) * 0.55).toFixed(2) + ')';
+        msctx.fillRect(x, y, s, s);
       }
-    msctx.fillStyle = 'rgba(255,214,110,0.16)';
-    for (let y = 0; y < game.H; y++)
-      for (let x = 0; x < game.W; x++)
-        if (game.owned[game.idx(x, y)]) msctx.fillRect(x * s, y * s, s, s);
-    for (let y = 0; y < game.H; y++)
-      for (let x = 0; x < game.W; x++)
-        if (game.tiles[game.idx(x, y)].road) {
-          msctx.fillStyle = '#c2a878';
-          msctx.fillRect(x * s, y * s, s, s);
-        }
-    const vg = msctx.createRadialGradient(96, 96, 60, 96, 96, 140);
-    vg.addColorStop(0, 'rgba(0,0,0,0)');
-    vg.addColorStop(1, 'rgba(0,0,0,0.22)');
-    msctx.fillStyle = vg;
-    msctx.fillRect(0, 0, 192, 192);
+    }
+    if (game.owned[i]) {
+      msctx.fillStyle = 'rgba(255,214,110,0.16)';
+      msctx.fillRect(x, y, s, s);
+    }
+    if (tl.road) {
+      msctx.fillStyle = '#c2a878';
+      msctx.fillRect(x, y, s, s);
+    }
+    // Use the same world-aligned vignette on both full and incremental paints.
+    msctx.fillStyle = vignette;
+    msctx.fillRect(x, y, s, s);
+  }
+  function drawMiniStatic() {
+    if (!miniVignette) {
+      miniVignette = msctx.createRadialGradient(96, 96, 60, 96, 96, 140);
+      miniVignette.addColorStop(0, 'rgba(0,0,0,0)');
+      miniVignette.addColorStop(1, 'rgba(0,0,0,0.22)');
+    }
+    if (miniDirty) {
+      msctx.fillStyle = '#101418';
+      msctx.fillRect(0, 0, 192, 192);
+      for (let i = 0; i < game.tiles.length; i++) paintMiniTile(i, miniVignette);
+    } else {
+      for (const i of miniTiles) paintMiniTile(i, miniVignette);
+    }
+    miniTiles.clear();
     miniDirty = false;
   }
   function miniDia(
@@ -2738,9 +2962,9 @@ export function createRenderer(
     g.fill();
   }
   function drawMini() {
-    if (!miniDirty && NOW - _miniRendered < 100) return;
+    if (!miniDirty && !miniTiles.size && NOW - _miniRendered < 100) return;
     _miniRendered = NOW;
-    if (miniDirty) drawMiniStatic();
+    if (miniDirty || miniTiles.size) drawMiniStatic();
     mctx.setTransform(1, 0, 0, 1, 0, 0);
     mctx.drawImage(mscan, 0, 0);
     const s = 192 / game.W;
@@ -2809,8 +3033,11 @@ export function createRenderer(
     Object.assign(internals, {
       paintTileFull,
       drawStatic,
+      drawBorders,
+      drawMiniStatic,
       buildingContour,
       drawBuilding,
+      shadowCache,
       drawTree,
       drawSmoke,
       drawUnit,
@@ -3105,8 +3332,11 @@ export const UNLIT_AT_NIGHT: ReadonlySet<BuildingType> = new Set<BuildingType>([
 
 /** Test-only view of closure internals; never merged into the runtime. */
 export interface RendererInternals {
+  shadowCache: ReturnType<typeof createShadowCache>;
   paintTileFull: (g: CanvasRenderingContext2D, i: number) => void;
   drawStatic: () => void;
+  drawBorders: (full?: boolean) => void;
+  drawMiniStatic: () => void;
   buildingContour: (img: Sprite) => HTMLCanvasElement;
   drawBuilding: (g: CanvasRenderingContext2D, b: Building) => void;
   drawTree: (g: CanvasRenderingContext2D, x: number, y: number, tl: Tile, now: number) => void;

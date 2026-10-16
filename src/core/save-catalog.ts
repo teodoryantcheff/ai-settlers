@@ -1,10 +1,16 @@
 import type { ValidatedSave, SaveMetadata } from '../types.ts';
 import type { StoragePort } from './persistence.ts';
+import { saveText } from './save-codec.ts';
 
 export const SAVE_CATALOG_KEY = 'settlers.saves.v1';
+export const AUTOSAVE_KEY = 'settlers.autosave.v1';
 export const MAX_SAVE_TEXT = 32_000_000;
 const MAX_CATALOG_TEXT = 64_000_000;
 const MAX_CHECKPOINTS = 50;
+/** Largest valid Date value; save times beyond it are corrupt. */
+const MAX_SAVED_AT = 8_640_000_000_000_000;
+/** The autosave envelope adds its version and save time around the save text. */
+const MAX_AUTOSAVE_TEXT = MAX_SAVE_TEXT + 100;
 export interface CatalogEntry {
   id: string;
   name: string;
@@ -36,7 +42,11 @@ export function saveMetadata(entry: CatalogEntry): SaveMetadata {
   };
 }
 
-/** One envelope is the atomic storage transaction; the legacy slot is never rewritten. */
+/**
+ * One envelope is the atomic storage transaction for named checkpoints; the legacy slot is
+ * never rewritten. The autosave lives under its own key so writing it never reads, parses or
+ * rewrites the checkpoints. Catalogs written before that split may still hold an autosave entry.
+ */
 export function createSaveCatalog(
   storage: StoragePort | undefined,
   normalize: (data: unknown) => ValidatedSave,
@@ -78,7 +88,7 @@ export function createSaveCatalog(
           (typeof entry.savedAt !== 'number' ||
             !Number.isSafeInteger(entry.savedAt) ||
             entry.savedAt < 0 ||
-            entry.savedAt > 8640000000000000)) ||
+            entry.savedAt > MAX_SAVED_AT)) ||
         (entry.savedAt === null && entry.kind !== 'legacy')
       )
         throw new Error('Invalid save catalog entry');
@@ -118,12 +128,54 @@ export function createSaveCatalog(
         : [],
     };
   }
+  /** The separately stored autosave, or null when none has been written under its own key. */
+  function readAutosave(): CatalogEntry | null {
+    if (!storage) throw new Error('Browser storage is unavailable');
+    const raw = storage.getItem(AUTOSAVE_KEY);
+    if (raw === null) return null;
+    if (raw.length > MAX_AUTOSAVE_TEXT) throw new Error('Save code is too large');
+    const value: unknown = JSON.parse(raw);
+    if (
+      !value ||
+      typeof value !== 'object' ||
+      !('v' in value) ||
+      value.v !== 1 ||
+      !('savedAt' in value) ||
+      typeof value.savedAt !== 'number' ||
+      !Number.isSafeInteger(value.savedAt) ||
+      value.savedAt < 0 ||
+      value.savedAt > MAX_SAVED_AT ||
+      !('data' in value)
+    )
+      throw new Error('Invalid autosave');
+    return {
+      id: 'autosave',
+      name: 'Autosave',
+      kind: 'autosave',
+      savedAt: value.savedAt,
+      data: normalize(value.data),
+    };
+  }
+  /** Store already validated and serialized save text without touching the catalog. */
+  function writeAutosave(text: string, savedAt: number) {
+    if (text.length > MAX_SAVE_TEXT) throw new Error('Save code is too large');
+    if (!storage) throw new Error('Browser storage is unavailable');
+    storage.setItem(AUTOSAVE_KEY, '{"v":1,"savedAt":' + savedAt + ',"data":' + text + '}');
+  }
+  function hasAutosave() {
+    if (!storage) throw new Error('Browser storage is unavailable');
+    return storage.getItem(AUTOSAVE_KEY) !== null;
+  }
+  function removeAutosave() {
+    if (!storage) throw new Error('Browser storage is unavailable');
+    storage.removeItem(AUTOSAVE_KEY);
+  }
   function write(value: SaveCatalog) {
     const clean = validate(value);
-    const raw = JSON.stringify(clean);
+    const raw = saveText(clean);
     if (raw.length > MAX_CATALOG_TEXT) throw new Error('Save catalog is too large');
     if (!storage) throw new Error('Browser storage is unavailable');
     storage.setItem(SAVE_CATALOG_KEY, raw);
   }
-  return { read, write };
+  return { read, write, readAutosave, writeAutosave, hasAutosave, removeAutosave };
 }

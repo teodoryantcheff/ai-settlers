@@ -9,9 +9,11 @@ import {
   WebGLRenderer,
 } from 'pixi.js';
 import type { TextStyleOptions } from 'pixi.js';
+import type { LayerName } from '../types.ts';
 import type { GameRuntime } from '../runtime.ts';
 import type { RendererPresentation } from './renderer.ts';
 import { createPixiContext, type CapturedTextStyle, type DrawingState } from './pixi-context.ts';
+import { createShadowQuad } from './pixi-shadows.ts';
 import { createProductionAtmosphere } from './pixi-atmosphere.ts';
 import { CanvasContextError, requireCanvas2D } from './canvas-context.ts';
 
@@ -22,6 +24,9 @@ interface ImagePart {
   width: number;
   height: number;
   canvas?: HTMLCanvasElement;
+  frames: Map<string, Texture>;
+  viewport?: Texture;
+  slot?: CommandSlot;
 }
 interface ImageEntry {
   width: number;
@@ -30,12 +35,21 @@ interface ImageEntry {
 }
 interface CommandSlot {
   root: Container;
+  frame: number;
   sprite?: Sprite;
   graphics?: Graphics;
   text?: Text;
+  shadow?: ReturnType<typeof createShadowQuad>;
   mask?: Graphics;
   clipKey?: string;
   textKey?: string;
+}
+
+interface CommandLayer {
+  root: Container;
+  slots: CommandSlot[];
+  cursor: number;
+  order: number;
 }
 
 /** Native GPU presentation of the production renderer's ordered draw commands.
@@ -53,7 +67,9 @@ export async function createPixiRenderer() {
       width: 1,
       height: 1,
       resolution: 1,
-      antialias: true,
+      // The scene renders into the atmosphere pass's texture, so multisampling
+      // would only smooth its full-screen quad.
+      antialias: false,
       backgroundAlpha: 0,
       preserveDrawingBuffer: new URLSearchParams(location.search).has('capture'),
       powerPreference: 'high-performance',
@@ -73,10 +89,15 @@ export async function createPixiRenderer() {
   const scene = new Container();
   stage.addChild(scene);
   const atmosphere = createProductionAtmosphere(scene);
+  const screenTint: [number, number, number, number] = [0, 0, 0, 0];
   const images = new Map<CanvasImageSource, ImageEntry>();
   const frames = new Set<Texture>();
+  const cachedCanvases = new WeakSet<CanvasImageSource>();
   const slots: CommandSlot[] = [];
   const ownedSlot = new WeakMap<Container, CommandSlot>();
+  const layers = new Map<LayerName, CommandLayer>();
+  let activeLayer: CommandLayer;
+  let frame = 0;
   let cursor = 0,
     nativeSprites = 0,
     nativeGraphics = 0,
@@ -91,26 +112,27 @@ export async function createPixiRenderer() {
   let renderError = '';
   // Reused per-frame temporaries; none may escape into retained state.
   const scratchM = new Matrix();
-  const scratchShadowM = new Matrix();
-  const scratchShadowCamM = new Matrix();
   const scratchFrame = new Rectangle();
-  const shadowState: DrawingState = {
-    transform: { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 },
-    alpha: 0,
-    blendMode: 'source-over',
-  };
   const fontCache = new Map<string, { fontSize: number; fontFamily: string; fontWeight: string }>();
   const statsObject: Record<string, unknown> = {};
   let scratchUploadCanvas: HTMLCanvasElement | null = null;
   let scratchUploadCtx: CanvasRenderingContext2D | null = null;
 
-  function slot(kind: 'sprite' | 'graphics' | 'text') {
-    let entry = slots[cursor];
+  function slot(kind: 'sprite' | 'graphics' | 'text' | 'shadow', dedicated?: ImagePart) {
+    const index = activeLayer.cursor;
+    let entry = dedicated ? dedicated.slot : activeLayer.slots[index];
     if (!entry) {
-      entry = { root: new Container() };
-      slots[cursor] = entry;
-      scene.addChild(entry.root);
+      entry = { root: new Container(), frame };
+      slots.push(entry);
+      if (dedicated) dedicated.slot = entry;
+      else activeLayer.slots[index] = entry;
+      activeLayer.root.addChild(entry.root);
     }
+    if (!dedicated) activeLayer.cursor++;
+    if (activeLayer.root.children[activeLayer.order] !== entry.root)
+      activeLayer.root.setChildIndex(entry.root, activeLayer.order);
+    activeLayer.order++;
+    entry.frame = frame;
     cursor++;
     entry.root.visible = true;
     entry.root.mask = null;
@@ -118,6 +140,7 @@ export async function createPixiRenderer() {
     if (entry.sprite) entry.sprite.visible = kind === 'sprite';
     if (entry.graphics) entry.graphics.visible = kind === 'graphics';
     if (entry.text) entry.text.visible = kind === 'text';
+    if (entry.shadow) entry.shadow.mesh.visible = kind === 'shadow';
     return entry;
   }
   function clip(node: Container, rect?: { x: number; y: number; width: number; height: number }) {
@@ -178,13 +201,21 @@ export async function createPixiRenderer() {
           );
           const texture = Texture.from(part, true);
           texture.source.scaleMode = 'linear';
-          entry.parts.push({ texture, x, y, width: part.width, height: part.height, canvas: part });
+          entry.parts.push({
+            texture,
+            x,
+            y,
+            width: part.width,
+            height: part.height,
+            canvas: part,
+            frames: new Map(),
+          });
           textureUploads++;
         }
     } else {
       const texture = Texture.from(source as any, true);
       texture.source.scaleMode = 'linear';
-      entry.parts.push({ texture, x: 0, y: 0, width, height });
+      entry.parts.push({ texture, x: 0, y: 0, width, height, frames: new Map() });
       textureUploads++;
     }
     images.set(source, entry);
@@ -214,45 +245,47 @@ export async function createPixiRenderer() {
       const right = Math.min(sx + sw, part.x + part.width),
         bottom = Math.min(sy + sh, part.y + part.height);
       if (right <= left || bottom <= top) continue;
-      const entry = slot('sprite');
+      const entry = slot('sprite', cachedCanvases.has(source) ? part : undefined);
       if (!entry.sprite) {
         entry.sprite = new Sprite(Texture.EMPTY);
         entry.root.addChild(entry.sprite);
         ownedSlot.set(entry.sprite, entry);
       }
       const item = entry.sprite;
-      if (item.texture === Texture.EMPTY) {
-        // The constructor copies the frame, so the scratch rect is safe here.
-        scratchFrame.set(left - part.x, top - part.y, right - left, bottom - top);
-        item.texture = new Texture({
-          source: part.texture.source,
-          frame: scratchFrame,
-          dynamic: true,
-        });
-        frames.add(item.texture);
-      } else {
-        let changed = false;
-        if (item.texture.source !== part.texture.source) {
-          item.texture.source = part.texture.source;
-          changed = true;
-        }
-        if (
-          item.texture.frame.x !== left - part.x ||
-          item.texture.frame.y !== top - part.y ||
-          item.texture.frame.width !== right - left ||
-          item.texture.frame.height !== bottom - top
-        ) {
-          Object.assign(item.texture.frame, {
-            x: left - part.x,
-            y: top - part.y,
-            width: right - left,
-            height: bottom - top,
+      scratchFrame.set(left - part.x, top - part.y, right - left, bottom - top);
+      let texture: Texture;
+      if (cachedCanvases.has(source)) {
+        // These canvases are blitted once per frame. Their bounded, dedicated
+        // views retain one source while the camera changes the crop rectangle.
+        if (!part.viewport) {
+          part.viewport = new Texture({
+            source: part.texture.source,
+            frame: scratchFrame,
+            dynamic: true,
           });
+          frames.add(part.viewport);
+        } else if (
+          part.viewport.frame.x !== scratchFrame.x ||
+          part.viewport.frame.y !== scratchFrame.y ||
+          part.viewport.frame.width !== scratchFrame.width ||
+          part.viewport.frame.height !== scratchFrame.height
+        ) {
+          part.viewport.frame.copyFrom(scratchFrame);
+          part.viewport.update();
           spriteFrameUpdates++;
-          changed = true;
         }
-        if (changed) item.texture.update();
+        texture = part.viewport;
+      } else {
+        const key = `${scratchFrame.x},${scratchFrame.y},${scratchFrame.width},${scratchFrame.height}`;
+        const existing = part.frames.get(key);
+        if (existing) texture = existing;
+        else {
+          texture = new Texture({ source: part.texture.source, frame: scratchFrame });
+          part.frames.set(key, texture);
+          frames.add(texture);
+        }
       }
+      if (item.texture !== texture) item.texture = texture;
       const x = dx + ((left - sx) / sw) * dw,
         y = dy + ((top - sy) / sh) * dh;
       item.setFromMatrix(
@@ -344,80 +377,6 @@ export async function createPixiRenderer() {
   }
   const commands = createPixiContext({ graphics, image, text, clip });
 
-  function shadows(ctx: CanvasRenderingContext2D) {
-    if (!game) return;
-    const night = game.nightAmt();
-    const cool = night < 0.45 ? 0 : (night - 0.45) / 0.55;
-    const alpha = game.renderPrefs().clarity
-      ? 0.06
-      : 0.17 * (1 - cool) * (1 - game.rainAmt() * 0.8);
-    if (alpha < 0.02) return;
-    const t = ctx.getTransform();
-    const x0 = Math.max(0, Math.floor(game.cam.x / game.TS) - 3),
-      x1 = Math.min(game.W - 1, Math.ceil((game.cam.x + game.vw / game.z) / game.TS) + 1),
-      y0 = Math.max(0, Math.floor(game.cam.y / game.TS) - 3),
-      y1 = Math.min(game.H - 1, Math.ceil((game.cam.y + game.vh / game.z) / game.TS) + 1);
-    function project(
-      source: CanvasImageSource,
-      x: number,
-      y: number,
-      dx: number,
-      dy: number,
-      w: number,
-      h: number,
-    ) {
-      const m = scratchShadowM.set(1, 0, -0.64, -0.38, x, y);
-      m.prepend(scratchShadowCamM.set(t.a, t.b, t.c, t.d, t.e, t.f));
-      const st = shadowState.transform;
-      st.a = m.a;
-      st.b = m.b;
-      st.c = m.c;
-      st.d = m.d;
-      st.e = m.tx;
-      st.f = m.ty;
-      shadowState.alpha = alpha;
-      image([source, dx, dy, w, h], shadowState, 0x243c33);
-    }
-    for (let y = y0; y <= y1; y++)
-      for (let x = x0; x <= x1; x++) {
-        const tile = game.tiles[game.idx(x, y)];
-        if (!tile.tree) continue;
-        const hash = game.tileHash(game.idx(x, y));
-        const scale = 0.87 + ((hash >> 3) % 15) / 100;
-        const width = 38 * scale,
-          height = 46 * scale;
-        project(
-          game.ART.tree[tile.tree - 1][hash % 3][0],
-          x * game.TS + 10.5 + ((hash >> 2) % 7) - 3,
-          y * game.TS + 28.5 + ((hash >> 5) % 5) - 2,
-          -width / 2,
-          -height,
-          width,
-          height,
-        );
-      }
-    for (const building of game.buildings) {
-      if (
-        !building.done ||
-        building.x < x0 ||
-        building.x > x1 ||
-        building.y < y0 ||
-        building.y > y1
-      )
-        continue;
-      const art = game.bldImg(building);
-      if (art)
-        project(
-          art.img,
-          building.x * game.TS + 12,
-          building.y * game.TS + 22,
-          art.ox - 12,
-          art.oy - 22,
-          art.w,
-          art.h,
-        );
-    }
-  }
   function stats() {
     statsObject.backend = presentation.available ? 'PixiJS WebGL' : 'unavailable';
     statsObject.error = renderError;
@@ -425,6 +384,7 @@ export async function createPixiRenderer() {
     statsObject.nativeGraphics = nativeGraphics;
     statsObject.nativeTexts = nativeTexts;
     statsObject.cachedTextures = images.size;
+    statsObject.cachedFrames = frames.size;
     statsObject.textureUploads = textureUploads;
     statsObject.textureUpdates = textureUpdates;
     statsObject.partialTextureUpdates = partialTextureUpdates;
@@ -467,6 +427,7 @@ export async function createPixiRenderer() {
     commands.destroy();
     atmosphere.destroy();
     stage.destroy({ children: true });
+    for (const entry of slots) entry.shadow?.destroy();
     for (const frame of frames) frame.destroy(false);
     frames.clear();
     for (const entry of images.values()) for (const part of entry.parts) part.texture.destroy(true);
@@ -481,10 +442,10 @@ export async function createPixiRenderer() {
       loseGpu(error instanceof Error ? error.message : 'WebGL draw failed');
     }
   }
-  /** Upload only a dirty sub-region of a single-part texture straight to the GPU.
+  /** Upload only a dirty sub-region of a cached texture straight to the GPU.
    * Returns false when the fast path is unavailable; the caller then falls back
    * to a full source update. (ix/iy are part-relative, which equals source
-   * coordinates because single parts always start at 0,0.)
+   * coordinates for both single sources and the canvases of tiled sources.)
    */
   function partialUpload(
     part: ImagePart,
@@ -500,7 +461,9 @@ export async function createPixiRenderer() {
         return false;
       if (!scratchUploadCanvas || !scratchUploadCtx) {
         scratchUploadCanvas = document.createElement('canvas');
-        scratchUploadCtx = requireCanvas2D(scratchUploadCanvas, loseGpu);
+        scratchUploadCtx = requireCanvas2D(scratchUploadCanvas, loseGpu, {
+          willReadFrequently: true,
+        });
       }
       const scratch = scratchUploadCanvas;
       const g = scratchUploadCtx;
@@ -508,6 +471,7 @@ export async function createPixiRenderer() {
         h = Math.max(1, Math.round(ih));
       if (scratch.width !== w) scratch.width = w;
       if (scratch.height !== h) scratch.height = h;
+      g.clearRect(0, 0, w, h);
       g.drawImage(source, ix, iy, iw, ih, 0, 0, w, h);
       const sys = renderer.texture as any;
       if (!sys || typeof sys.getGlSource !== 'function') return false;
@@ -542,8 +506,41 @@ export async function createPixiRenderer() {
   }
   const presentation: RendererPresentation = {
     available: true,
+    shadowLayer(cast, contacts, ctx, castOpacity, contactOpacity) {
+      const casts = baseTexture(cast),
+        roots = baseTexture(contacts);
+      if (!casts || !roots) return;
+      const t = ctx.getTransform();
+      casts.parts.forEach((part, i) => {
+        const root = roots.parts[i];
+        if (!root) return;
+        const entry = slot('shadow', part);
+        if (!entry.shadow) {
+          entry.shadow = createShadowQuad(part.texture, root.texture, part.width, part.height);
+          entry.root.addChild(entry.shadow.mesh);
+        }
+        const mesh = entry.shadow.mesh;
+        mesh.visible = true;
+        mesh.setFromMatrix(
+          scratchM.set(
+            t.a,
+            t.b,
+            t.c,
+            t.d,
+            t.e + part.x * t.a + part.y * t.c,
+            t.f + part.x * t.b + part.y * t.d,
+          ),
+        );
+        entry.shadow.update(castOpacity, contactOpacity);
+        nativeSprites++;
+      });
+    },
     reportFailure: loseGpu,
+    screenTint(tint) {
+      for (let i = 0; i < 4; i++) screenTint[i] = tint[i];
+    },
     invalidate(source, rect?: { x: number; y: number; width: number; height: number }) {
+      cachedCanvases.add(source);
       guardGraphics(() => {
         const entry = images.get(source);
         if (!entry) return;
@@ -560,21 +557,15 @@ export async function createPixiRenderer() {
               ix = left - part.x,
               iy = top - part.y;
             if (part.canvas) {
-              // Tiled path (huge canvases on old GPUs): repaint the sub-region,
-              // then re-upload that whole tile.
-              requireCanvas2D(part.canvas, loseGpu).drawImage(
-                source,
-                left,
-                top,
-                iw,
-                ih,
-                ix,
-                iy,
-                iw,
-                ih,
-              );
-              part.texture.source.update();
-              textureUpdates++;
+              // Tiled path (huge canvases on old GPUs): replace transparent
+              // pixels too, then upload only this part's changed region.
+              const g = requireCanvas2D(part.canvas, loseGpu);
+              g.clearRect(ix, iy, iw, ih);
+              g.drawImage(source, left, top, iw, ih, ix, iy, iw, ih);
+              if (!partialUpload(part, part.canvas, ix, iy, iw, ih)) {
+                part.texture.source.update();
+                textureUpdates++;
+              }
             } else if (!partialUpload(part, source, ix, iy, iw, ih)) {
               part.texture.source.update();
               textureUpdates++;
@@ -604,6 +595,8 @@ export async function createPixiRenderer() {
     begin(ctx) {
       guardGraphics(() => {
         cursor = nativeSprites = nativeGraphics = nativeTexts = 0;
+        frame++;
+        for (const layer of layers.values()) layer.cursor = layer.order = 0;
         commands.beginFrame();
         if (ctx.canvas.width > maxRenderSize || ctx.canvas.height > maxRenderSize)
           loseGpu('Viewport exceeds GPU render-target limits');
@@ -616,7 +609,14 @@ export async function createPixiRenderer() {
     },
     layer(name, ctx, paint) {
       guardGraphics(() => {
-        if (name === 'ground-effects') shadows(ctx);
+        let layer = layers.get(name);
+        if (!layer) {
+          layer = { root: new Container(), slots: [], cursor: 0, order: 0 };
+          layers.set(name, layer);
+          // Lantern glows, rain and captions sit above the veiled, graded scene.
+          (name === 'above-atmosphere' ? stage : scene).addChild(layer.root);
+        }
+        activeLayer = layer;
         commands.capture(ctx, paint);
       });
     },
@@ -625,9 +625,9 @@ export async function createPixiRenderer() {
         stats();
         return;
       }
-      for (let i = cursor; i < slots.length; i++) slots[i].root.visible = false;
+      for (const entry of slots) if (entry.frame !== frame) entry.root.visible = false;
       guardGraphics(() => {
-        atmosphere.update(game, renderer.width, renderer.height);
+        atmosphere.update(game, renderer.width, renderer.height, screenTint);
         renderer.render({ container: stage });
         atmosphere.afterRender();
         commands.endFrame();

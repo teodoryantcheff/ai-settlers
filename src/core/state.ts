@@ -1,5 +1,6 @@
 import { validateAttention } from '../observations/validate-attention.ts';
 import { saveName } from './save-catalog.ts';
+import { unpackSaveHistories } from './save-codec.ts';
 import {
   ECONOMIC_FLOWS,
   emptyEconomicTotals,
@@ -50,13 +51,18 @@ export function createEventBus<
   };
 }
 
-/** Validate and normalize a save before changing either the running world or storage. */
+/**
+ * Validate and normalize a save before changing either the running world or storage.
+ * Validation rewrites fields of its input, so it works on a copy unless the caller passes
+ * `detached` for input nothing else references (a fresh snapshot or freshly parsed JSON).
+ */
 export function validateSave(
   input: unknown,
   width: number,
   height: number,
   specs: Record<BuildingType, BuildingSpec>,
   goods: Record<Good, { name: string; c: string }>,
+  detached = false,
 ): ValidatedSave {
   const fail: (message: string) => never = (message) => {
     throw new Error(message);
@@ -83,9 +89,24 @@ export function validateSave(
     }
     return out;
   };
+  // A cumulative sample never exceeds its total nor falls below the previous sample. Checked
+  // records hold only nonnegative amounts, so a good absent from both is 0 and needs no visit.
+  const bounded = (amounts: Inventory, total: Inventory | undefined, before?: Inventory) => {
+    for (const key in amounts) {
+      const good = key as Good;
+      const amount = amounts[good] || 0;
+      if (amount > (total?.[good] || 0) || amount < (before?.[good] || 0)) return false;
+    }
+    if (before)
+      for (const key in before)
+        if (!Object.hasOwn(amounts, key) && before[key as Good]) return false;
+    return true;
+  };
   const size = width * height;
   if (!object(input) || !oneOf(input.v, [1, 2])) fail('Unsupported save version');
-  const d = structuredClone(input);
+  const d = detached ? input : structuredClone(input);
+  // Packed sample histories become plain samples before any rule checks them.
+  unpackSaveHistories(d, fail);
   if (d.economy !== undefined && d.economy !== 2) fail('Unsupported economy version');
   if (!int(d.seed, -2147483648, 2147483647) || !int(d.nextId, 1) || !array(d.t) || d.t.length !== 5)
     fail('Invalid world header');
@@ -216,14 +237,8 @@ export function validateSave(
         for (const key of flowKeys) {
           if (!object(sample[key])) fail('Invalid production history flow');
           clean[key] = record(sample[key]);
-          for (const good of Object.keys(goods) as Good[]) {
-            const amount = clean[key][good] || 0;
-            if (
-              amount > (metrics[key]?.[good] || 0) ||
-              (previous && amount < (previous[key][good] || 0))
-            )
-              fail('Invalid production history totals');
-          }
+          if (!bounded(clean[key], metrics[key], previous?.[key]))
+            fail('Invalid production history totals');
         }
         previous = clean;
         return clean;
@@ -586,14 +601,8 @@ export function validateSave(
         fail('Invalid economic observation coverage');
       const sample: EconomicSample = { time: raw.time, totals: totals(raw.totals) };
       for (const flow of ECONOMIC_FLOWS)
-        for (const good of Object.keys(goods) as Good[]) {
-          const amount = sample.totals[flow][good] || 0;
-          if (
-            amount > (current[flow][good] || 0) ||
-            (previous && amount < (previous.totals[flow][good] || 0))
-          )
-            fail('Invalid economic observation sequence');
-        }
+        if (!bounded(sample.totals[flow], current[flow], previous?.totals[flow]))
+          fail('Invalid economic observation sequence');
       previous = sample;
       return sample;
     });
@@ -621,12 +630,8 @@ export function validateSave(
         )
           fail('Invalid cargo arrival coverage');
         const sample = { time: raw.time, totals: record(raw.totals, 1e9) };
-        for (const good of Object.keys(goods) as Good[])
-          if (
-            (sample.totals[good] || 0) > (cargoTotals[good] || 0) ||
-            (previousCargo && (sample.totals[good] || 0) < (previousCargo.totals[good] || 0))
-          )
-            fail('Invalid cargo arrival sequence');
+        if (!bounded(sample.totals, cargoTotals, previousCargo?.totals))
+          fail('Invalid cargo arrival sequence');
         previousCargo = sample;
         return sample;
       });

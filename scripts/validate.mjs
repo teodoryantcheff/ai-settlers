@@ -52,7 +52,8 @@ export async function validationSteps(directory, { nodeOnly = false, soakOnly = 
       'tests',
       'playwright.config.mjs',
     ),
-    node('typecheck', 'node_modules/typescript/bin/tsc', '--noEmit'),
+    // Plain diagnostics: TypeScript 7 picks pretty output from the terminal otherwise.
+    node('typecheck', 'node_modules/typescript/bin/tsc', '--noEmit', '--pretty', 'false'),
     ...tests.map(testStep),
     ...(!nodeOnly
       ? [

@@ -4,6 +4,7 @@ import {
   MAX_SAVE_TEXT,
   saveMetadata,
   saveName,
+  type CatalogEntry,
   type SaveCatalog,
 } from './save-catalog.ts';
 import type { ObservationSubsystem } from '../simulation/observations.ts';
@@ -13,6 +14,7 @@ import type { AutoplaySubsystem } from '../simulation/autoplay.ts';
 import type { EventsSubsystem } from './events.ts';
 import type { MapSubsystem } from '../simulation/map.ts';
 import { validateSave } from './state.ts';
+import { saveText } from './save-codec.ts';
 import type {
   Building,
   Job,
@@ -37,16 +39,36 @@ export function createPersistence(
   let baseline: string | null = null;
   let baselineId: string | null = null;
   let lastReportedError: unknown;
+  // Catalogs written before the autosave got its own key may still hold one; the first
+  // successful separate autosave drops it from the catalog.
+  let catalogHoldsAutosave = false;
+  // A damaged separate autosave is reported once, not on every listing that skips it.
+  let autosaveDamaged = false;
   const catalog = createSaveCatalog(storage, (data) =>
     validateSave(data, game.W, game.H, game.BSPEC, game.GOODS),
   );
   let saveHealth: SaveHealth = { ok: true, savedAt: null, message: 'No checkpoint saved yet' };
   if (storage) {
     try {
-      const existing = catalog
-        .read()
-        .entries.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0))[0];
-      if (existing)
+      const entries = catalog.read().entries;
+      catalogHoldsAutosave = holdsAutosave(entries);
+      let autosave: CatalogEntry | null = null;
+      try {
+        autosave = catalog.readAutosave();
+      } catch (error) {
+        autosaveDamaged = true;
+        saveHealth = {
+          ok: false,
+          savedAt: null,
+          message:
+            'Stored autosave unavailable: ' +
+            (error instanceof Error ? error.message : String(error)),
+        };
+      }
+      const existing = withAutosave(entries, autosave).sort(
+        (a, b) => (b.savedAt || 0) - (a.savedAt || 0),
+      )[0];
+      if (existing && saveHealth.ok)
         saveHealth = {
           ok: true,
           savedAt: existing.savedAt,
@@ -151,7 +173,8 @@ export function createPersistence(
       b: B,
       j: J,
       u: U,
-      st: Object.assign({}, game.state),
+      // Validation may rewrite invalid upgrade levels; never let that reach live state.
+      st: { ...game.state, upgrades: { ...game.state.upgrades } },
       p: {
         serfPool: game.serfPool,
         soldierPool: game.soldierPool,
@@ -173,36 +196,56 @@ export function createPersistence(
     game.emitGameEvent('saveHealthChanged', { ...saveHealth });
     game.emitGameEvent('storageResult', { operation, ok: false, message });
   }
+  function reportSuccess(message: string, quiet: boolean, savedAt = Date.now()) {
+    saveHealth = { ok: true, savedAt, message };
+    game.emitGameEvent('saveHealthChanged', { ...saveHealth });
+    if (!quiet) game.emitGameEvent('storageResult', { operation: 'save', ok: true, message });
+  }
   function writeCatalog(next: SaveCatalog, message: string, quiet = false) {
     try {
       catalog.write(next);
-      saveHealth = { ok: true, savedAt: Date.now(), message };
-      game.emitGameEvent('saveHealthChanged', { ...saveHealth });
-      if (!quiet) game.emitGameEvent('storageResult', { operation: 'save', ok: true, message });
     } catch (error) {
       reportFailure(error);
       throw error;
     }
+    catalogHoldsAutosave = holdsAutosave(next.entries);
+    reportSuccess(message, quiet);
   }
   function readCatalog(operation: 'save' | 'load' = 'save') {
     try {
-      return catalog.read();
+      const next = catalog.read();
+      catalogHoldsAutosave = holdsAutosave(next.entries);
+      return next;
     } catch (error) {
       reportFailure(error, operation);
       throw error;
     }
   }
+  /** Every stored save: the catalog plus the separate autosave, which supersedes a catalog one. */
+  function readEntries(operation: 'save' | 'load' = 'save'): CatalogEntry[] {
+    const entries = readCatalog(operation).entries;
+    let autosave: CatalogEntry | null = null;
+    try {
+      autosave = catalog.readAutosave();
+      autosaveDamaged = false;
+    } catch (error) {
+      // A damaged autosave is reported but must not hide the named checkpoints.
+      if (!autosaveDamaged) reportFailure(error, operation);
+      autosaveDamaged = true;
+    }
+    return withAutosave(entries, autosave);
+  }
   function setColonyName(name: string) {
     colonyName = saveName(name);
   }
   function listSaves(): SaveMetadata[] {
-    return readCatalog('load')
-      .entries.map(saveMetadata)
+    return readEntries('load')
+      .map(saveMetadata)
       .sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
   }
   function saveCheckpoint(name: string, overwriteId?: string): SaveMetadata {
     const next = readCatalog();
-    const data = validateSave(snapshotGame(), game.W, game.H, game.BSPEC, game.GOODS);
+    const data = validateSave(snapshotGame(), game.W, game.H, game.BSPEC, game.GOODS, true);
     const id = overwriteId || 'save-' + next.nextId++;
     const old = next.entries.find((entry) => entry.id === id);
     if (overwriteId && (!old || old.kind !== 'manual'))
@@ -216,27 +259,31 @@ export function createPersistence(
     };
     next.entries = next.entries.filter((candidate) => candidate.id !== id).concat(entry);
     writeCatalog(next, 'Checkpoint saved: ' + entry.name);
-    baseline = JSON.stringify(data);
+    baseline = saveText(data);
     baselineId = id;
     return saveMetadata(entry);
   }
+  /** Validate and serialize once, then write only the autosave's own storage key. */
   function saveAutosave(): boolean {
     try {
-      const next = readCatalog();
-      const data = validateSave(snapshotGame(), game.W, game.H, game.BSPEC, game.GOODS);
-      const entry = {
-        id: 'autosave',
-        name: 'Autosave',
-        kind: 'autosave' as const,
-        savedAt: Date.now(),
-        data,
-      };
-      next.entries = next.entries
-        .filter((candidate) => candidate.kind !== 'autosave')
-        .concat(entry);
-      writeCatalog(next, 'Autosave saved', true);
-      baseline = JSON.stringify(data);
-      baselineId = entry.id;
+      const data = validateSave(snapshotGame(), game.W, game.H, game.BSPEC, game.GOODS, true);
+      const text = saveText(data);
+      const savedAt = Date.now();
+      try {
+        catalog.writeAutosave(text, savedAt);
+        autosaveDamaged = false;
+      } catch (error) {
+        reportFailure(error);
+        throw error;
+      }
+      baseline = text;
+      baselineId = 'autosave';
+      // One-time migration, only after the new autosave is stored so nothing is lost.
+      if (catalogHoldsAutosave) {
+        const next = readCatalog();
+        next.entries = next.entries.filter((candidate) => candidate.kind !== 'autosave');
+        writeCatalog(next, 'Autosave saved', true);
+      } else reportSuccess('Autosave saved', true, savedAt);
       return true;
     } catch (error) {
       if (lastReportedError !== error) reportFailure(error);
@@ -262,10 +309,24 @@ export function createPersistence(
   }
   function deleteCheckpoint(id: string) {
     const next = readCatalog();
-    if (!next.entries.some((candidate) => candidate.id === id))
-      throw new Error('Checkpoint no longer exists');
-    next.entries = next.entries.filter((candidate) => candidate.id !== id);
-    writeCatalog(next, 'Checkpoint deleted');
+    const inCatalog = next.entries.some((candidate) => candidate.id === id);
+    // Presence is enough: a damaged autosave must remain deletable.
+    const separate = id === 'autosave' && catalog.hasAutosave();
+    if (!inCatalog && !separate) throw new Error('Checkpoint no longer exists');
+    if (inCatalog) {
+      next.entries = next.entries.filter((candidate) => candidate.id !== id);
+      writeCatalog(next, 'Checkpoint deleted', separate);
+    }
+    if (separate) {
+      try {
+        catalog.removeAutosave();
+        autosaveDamaged = false;
+      } catch (error) {
+        reportFailure(error);
+        throw error;
+      }
+      reportSuccess('Checkpoint deleted', false);
+    }
     if (baselineId === id) {
       baseline = null;
       baselineId = null;
@@ -340,7 +401,7 @@ export function createPersistence(
   }
   function loadCheckpoint(id: string) {
     try {
-      const entry = readCatalog('load').entries.find((candidate) => candidate.id === id);
+      const entry = readEntries('load').find((candidate) => candidate.id === id);
       if (!entry) throw new Error('Checkpoint no longer exists');
       const prepared = prepareLoad(JSON.stringify(entry.data));
       commitLoad(prepared);
@@ -369,12 +430,12 @@ export function createPersistence(
   }
   /** Serialize the live colony independently of browser-storage availability. */
   function exportSave(): string {
-    return JSON.stringify(validateSave(snapshotGame(), game.W, game.H, game.BSPEC, game.GOODS));
+    return saveText(validateSave(snapshotGame(), game.W, game.H, game.BSPEC, game.GOODS, true));
   }
   function exportCheckpoint(id: string): string {
-    const entry = readCatalog().entries.find((candidate) => candidate.id === id);
+    const entry = readEntries().find((candidate) => candidate.id === id);
     if (!entry) throw new Error('Checkpoint no longer exists');
-    return JSON.stringify(entry.data);
+    return saveText(entry.data);
   }
   function inspectSave(json: string): SaveMetadata {
     return saveMetadata({
@@ -467,6 +528,21 @@ export interface PersistenceInternals {
 export interface StoragePort {
   getItem: (key: string) => string | null;
   setItem: (key: string, value: string) => void;
+  removeItem: (key: string) => void;
+}
+
+function holdsAutosave(entries: CatalogEntry[]) {
+  return entries.some((entry) => entry.kind === 'autosave');
+}
+
+/**
+ * Combine the catalog with the separate autosave, keeping only the newer autosave: a tab still
+ * running a bundle from before the split may have written a newer one into the catalog.
+ */
+function withAutosave(entries: CatalogEntry[], autosave: CatalogEntry | null): CatalogEntry[] {
+  const older = entries.find((entry) => entry.kind === 'autosave');
+  if (!autosave || (older && (older.savedAt || 0) > (autosave.savedAt || 0))) return entries;
+  return entries.filter((entry) => entry !== older).concat(autosave);
 }
 
 export interface PersistenceDependencies

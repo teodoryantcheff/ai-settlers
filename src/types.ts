@@ -190,7 +190,7 @@ export type InteractionMode =
 export type InteractionModeType = InteractionMode['type'];
 /** Ordered scene layers produced by the renderer and consumed by the presentation. */
 export type LayerName =
-  'objects' | 'backdrop' | 'terrain' | 'ground-effects' | 'foreground-effects';
+  'objects' | 'backdrop' | 'terrain' | 'ground-effects' | 'foreground-effects' | 'above-atmosphere';
 /** Diagnostic map overlays; 'none' (no overlay) is a preference value, not a layer. */
 export type OverlayName = 'routes' | 'workload' | 'reach' | 'stalls';
 export interface TilePoint {

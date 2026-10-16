@@ -14,6 +14,7 @@ export function createGame(presentation: RendererPresentation): GameRuntime {
     storage: {
       getItem: (key) => localStorage.getItem(key),
       setItem: (key, value) => localStorage.setItem(key, value),
+      removeItem: (key) => localStorage.removeItem(key),
     },
   }) as GameRuntime;
   assemblePresentation(game, { presentation });
