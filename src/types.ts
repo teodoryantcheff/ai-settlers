@@ -223,9 +223,6 @@ export interface Sprite {
 }
 export interface ArtAtlas {
   grass: HTMLCanvasElement[];
-  sand: HTMLCanvasElement[];
-  water: HTMLCanvasElement[];
-  shimmer: HTMLCanvasElement[];
   road: HTMLCanvasElement;
   tree: HTMLCanvasElement[][][];
   rock: HTMLCanvasElement[];

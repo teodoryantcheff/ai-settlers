@@ -188,105 +188,6 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     return c;
   }
 
-  function texSand(v: number): HTMLCanvasElement {
-    var c = Acan(48, 48),
-      g = c.getContext('2d'),
-      rnd = game.mulberry32(555 + v * 91);
-    g.fillStyle = ['#d7c39b', '#d4c198', '#d5c29a'][v % 3];
-    g.fillRect(0, 0, 48, 48);
-    for (var i = 0; i < 10; i++) {
-      g.fillStyle = rnd() < 0.5 ? rgba('#c8a870', 0.2) : rgba('#f8e8b8', 0.2);
-      g.beginPath();
-      g.ellipse(rnd() * 48, rnd() * 48, 4 + rnd() * 9, 2.5 + rnd() * 6, rnd() * 3, 0, 7);
-      g.fill();
-    }
-    for (i = 0; i < 36; i++) {
-      g.fillStyle = rnd() < 0.5 ? rgba('#b8a068', 0.22) : rgba('#f8ecc0', 0.22);
-      g.fillRect(rnd() * 48, rnd() * 48, 1.8, 1.2);
-    }
-    for (i = 0; i < 3; i++) {
-      var y = 8 + i * 14 + rnd() * 4;
-      g.strokeStyle = rgba('#c0a870', 0.48);
-      g.lineWidth = 1.3;
-      g.beginPath();
-      g.moveTo(0, y);
-      g.bezierCurveTo(12, y - 3, 30, y + 3, 48, y);
-      g.stroke();
-      g.strokeStyle = rgba('#faf0cc', 0.42);
-      g.beginPath();
-      g.moveTo(0, y + 2);
-      g.bezierCurveTo(14, y - 1, 32, y + 5, 48, y + 2);
-      g.stroke();
-    }
-    for (i = 0; i < 6; i++) {
-      g.fillStyle = rgba('#b09860', 0.65);
-      g.beginPath();
-      g.arc(rnd() * 48, rnd() * 48, 1.4 + rnd() * 0.7, 0, 7);
-      g.fill();
-    }
-    if (v === 1)
-      for (i = 0; i < 2; i++) {
-        // tiny shells
-        var sx = 6 + rnd() * 36,
-          sy = 6 + rnd() * 36;
-        g.fillStyle = rgba('#f8f0e0', 0.9);
-        g.beginPath();
-        g.arc(sx, sy, 1.3, Math.PI, Math.PI * 2);
-        g.fill();
-        g.fillStyle = rgba('#d0a880', 0.8);
-        g.fillRect(sx - 1.3, sy - 0.2, 2.6, 0.5);
-      }
-    return c;
-  }
-  function texWater(v: number): HTMLCanvasElement {
-    var c = Acan(48, 48),
-      g = c.getContext('2d'),
-      rnd = game.mulberry32(404 + v * 23);
-    g.fillStyle = v ? '#447b89' : '#477f8c';
-    g.fillRect(0, 0, 48, 48);
-    for (var i = 0; i < 5; i++) {
-      g.fillStyle = rgba('#78a7b6', 0.15);
-      g.beginPath();
-      g.ellipse(rnd() * 48, rnd() * 48, 7 + rnd() * 9, 3 + rnd() * 6, 0, 0, 7);
-      g.fill();
-    }
-    for (i = 0; i < 2; i++) {
-      g.fillStyle = rgba('#214d64', 0.14);
-      g.beginPath();
-      g.ellipse(rnd() * 48, rnd() * 48, 6 + rnd() * 8, 3 + rnd() * 5, 0, 0, 7);
-      g.fill();
-    }
-    for (i = 0; i < 3; i++) {
-      g.strokeStyle = 'rgba(180,225,255,0.12)';
-      g.lineWidth = 1.5;
-      g.beginPath();
-      g.moveTo(0, 8 + i * 14);
-      g.bezierCurveTo(12, 4 + i * 14, 30, 12 + i * 14, 48, 8 + i * 14);
-      g.stroke();
-    }
-    return c;
-  }
-  // 3 shimmer frames drawn over water per-frame
-  function texShimmer(f: number): HTMLCanvasElement {
-    var c = Acan(48, 48),
-      g = c.getContext('2d');
-    for (var i = 0; i < 4; i++) {
-      var y = (4 + i * 12 + f * 4) % 48;
-      g.strokeStyle = 'rgba(215,240,255,0.18)';
-      g.lineWidth = 1.4;
-      g.beginPath();
-      g.moveTo(-2, y);
-      g.bezierCurveTo(12, y - 3, 30, y + 3, 50, y - 1);
-      g.stroke();
-    }
-    for (i = 0; i < 4; i++) {
-      var sx = 6 + ((f * 17 + i * 19) % 36),
-        sy = (8 + i * 11 + f * 9) % 46;
-      g.fillStyle = 'rgba(240,250,255,0.38)';
-      g.fillRect(sx, sy, 2.8, 1);
-    }
-    return c;
-  }
   // Dirt-and-cobble road menu icon.
   // Crossroad icon for the building menu. World roads use the landscape painter.
   function texRoad(): HTMLCanvasElement {
@@ -2601,16 +2502,10 @@ export function createArt(game: GameRuntime): ArtSubsystem {
   }
   function buildAtlas(): void {
     ART.grass = [];
-    ART.sand = [];
-    ART.water = [];
-    ART.shimmer = [];
     ART.tree = [];
     ART.rock = [];
     var v;
     for (v = 0; v < 4; v++) ART.grass.push(texGrass(v));
-    for (v = 0; v < 3; v++) ART.sand.push(texSand(v));
-    for (v = 0; v < 2; v++) ART.water.push(texWater(v));
-    for (v = 0; v < 3; v++) ART.shimmer.push(texShimmer(v));
     ART.road = texRoad();
     for (var st = 1; st <= 4; st++) {
       var arr = [];

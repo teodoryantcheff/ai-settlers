@@ -1,3 +1,4 @@
+import { hasWellCoverage } from '../gameplay/colony-rules.ts';
 import { deliveryStage } from './delivery-stage.ts';
 import type { ObservationSubsystem } from './observations.ts';
 import {
@@ -180,14 +181,7 @@ export function createEconomy(
     return reserve > 0 && totalGood(good) >= Math.max(reserve, stockTargetTotal(good));
   }
   function hasLocalWater(b: Pick<Building, 'x' | 'y'>) {
-    return game.buildings.some(
-      (well) =>
-        well.type === 'well' &&
-        well.done &&
-        !well.disabled &&
-        (well.x - b.x) ** 2 + (well.y - b.y) ** 2 <= (game.BSPEC.well.rad || 6) ** 2 &&
-        game.connectedLand(b.x, b.y, well.x, well.y),
-    );
+    return hasWellCoverage(game, b, 'active');
   }
   function carrierCap() {
     return 8 + 8 * Math.max(0, storages().length - 1);
@@ -639,6 +633,22 @@ export function createEconomy(
     game.buildings.push(placed);
     buildingVersion++;
     gameEvent('buildingPlaced', { building: placed });
+    return true;
+  }
+  /** Set a building's construction priority level; other values are rejected. */
+  function setBuildingPriority(b: Building, priority: unknown) {
+    if (priority !== 0 && priority !== 1 && priority !== 2) return false;
+    b.priority = priority;
+    gameEvent('productionControlChanged', { building: b });
+    return true;
+  }
+  /** Request a warehouse reserve, clamped to a whole number from 0 to 500. */
+  function setStockTarget(b: Building, good: Good, amount: unknown) {
+    if (typeof amount !== 'number' || !Number.isFinite(amount)) return false;
+    if (!game.BSPEC[b.type].store || !Object.hasOwn(game.GOODS, good)) return false;
+    if (!b.targets) b.targets = {};
+    b.targets[good] = Math.max(0, Math.min(500, Math.floor(amount)));
+    gameEvent('productionControlChanged', { building: b });
     return true;
   }
   function demolitionQuote(b: Building): DemolitionQuote {
@@ -2082,6 +2092,8 @@ export function createEconomy(
     placeBuilding,
     demolish,
     demolitionQuote,
+    setBuildingPriority,
+    setStockTarget,
     incomingDeliveryStages,
     productionProgress,
     forRadius,
@@ -2153,6 +2165,8 @@ export interface EconomySubsystem {
   suggestFor: (reason: string) => PlacementAdvice;
   placeBuilding: (type: BuildingType, x: number, y: number) => boolean;
   demolitionQuote: (b: Building) => DemolitionQuote;
+  setBuildingPriority: (b: Building, priority: unknown) => boolean;
+  setStockTarget: (b: Building, good: Good, amount: unknown) => boolean;
   incomingDeliveryStages: (good: Good, bid: number) => DeliveryStages;
   demolish: (b: Building) => void;
   forRadius: <T>(

@@ -1,3 +1,4 @@
+import { countsAsWell, hasWellCoverage, wellRadius, wellReaches } from './colony-rules.ts';
 import { ingredientAlternatives, ingredientShortages } from './production-rules.ts';
 import type { SimulationStateSubsystem } from '../simulation/state.ts';
 import type { WorldSubsystem } from '../core/world.ts';
@@ -73,38 +74,28 @@ export function createAdvisor(game: AdvisorDependencies): AdvisorSubsystem {
       : neededFood;
     breadTarget += Math.min(3, Math.ceil(game.stockTargetTotal('bread') / 12));
     var unwatered = game.buildings.filter(function (b) {
-      return (
-        game.BSPEC[b.type].water &&
-        !game.buildings.some(function (well) {
-          return (
-            well.type === 'well' &&
-            !well.disabled &&
-            Math.hypot(well.x - b.x, well.y - b.y) <= 6 &&
-            game.connectedLand(well.x, well.y, b.x, b.y)
-          );
-        })
-      );
+      return game.BSPEC[b.type].water && !hasWellCoverage(game, b, 'planned');
     }).length;
     var breweryTarget = foundations && have('farm') && have('well') ? 1 : have('brewery');
     var waterTarget = Math.max(
       have('well') + unwatered,
       Math.ceil((breadTarget + breweryTarget) / 3),
     );
-    // A well can serve several producers, but its six-tile neighborhood may
+    // A well can serve several producers, but its service neighborhood may
     // fill up before the target is met. Request another service area when no
     // remaining consumer can be placed beside an existing or planned well.
     var waterConsumer: BuildingType | null =
       breadTarget > have('bakery') ? 'bakery' : breweryTarget > have('brewery') ? 'brewery' : null;
     if (waterConsumer && have('well') && waterTarget <= have('well')) {
-      var serviceSpace = false;
+      var serviceSpace = false,
+        radius = wellRadius(game);
       for (var well of game.buildings) {
-        if (well.type !== 'well' || well.disabled) continue;
-        for (var wy = well.y - 6; wy <= well.y + 6 && !serviceSpace; wy++)
-          for (var wx = well.x - 6; wx <= well.x + 6 && !serviceSpace; wx++)
+        if (!countsAsWell(well, 'planned')) continue;
+        for (var wy = well.y - radius; wy <= well.y + radius && !serviceSpace; wy++)
+          for (var wx = well.x - radius; wx <= well.x + radius && !serviceSpace; wx++)
             if (
               game.inB(wx, wy) &&
-              Math.hypot(wx - well.x, wy - well.y) <= 6 &&
-              game.connectedLand(wx, wy, well.x, well.y) &&
+              wellReaches(game, well, wx, wy) &&
               game.canPlace(waterConsumer, wx, wy)[0]
             )
               serviceSpace = true;

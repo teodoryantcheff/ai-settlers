@@ -312,6 +312,18 @@ export function createInspectorView(
   }
   var infoBody = document.getElementById('infobody'),
     lastInfoHTML: string | null = null;
+  // Markup each section last received; browsers serialize it back differently.
+  let rendered = new WeakMap<Element, string>();
+  function section(selector: string, html: string) {
+    const node = infoBody.querySelector(selector);
+    if (node && html !== undefined) rendered.set(node, html);
+  }
+  function render(node: Element, html: string) {
+    if (rendered.get(node) === html) return false;
+    node.innerHTML = html;
+    rendered.set(node, html);
+    return true;
+  }
   function updateInfo() {
     game.updateReferenceContext?.();
     var el = document.getElementById('info');
@@ -453,24 +465,22 @@ export function createInspectorView(
       liveNode &&
       (inspectorKey === key || (editing && inspectorKey.startsWith(b.id + ':' + b.type + ':')))
     ) {
-      if (liveNode.innerHTML !== liveHTML) liveNode.innerHTML = liveHTML;
+      render(liveNode, liveHTML);
       const stats = infoBody.querySelector('[data-production-stats]');
       if (
         stats &&
         productionHTML &&
         !stats.contains(document.activeElement) &&
-        stats.innerHTML !== productionHTML
+        rendered.get(stats) !== productionHTML
       ) {
         const open = stats.querySelector('details')?.open;
-        stats.innerHTML = productionHTML;
+        render(stats, productionHTML);
         if (open && stats.querySelector('details')) stats.querySelector('details').open = true;
       }
       const reference = infoBody.querySelector('[data-inspector-reference]');
-      if (reference && reference.innerHTML !== referenceHTML) reference.innerHTML = referenceHTML;
+      if (reference) render(reference, referenceHTML);
       const demolition = infoBody.querySelector('[data-demolition-quote]');
-      if (demolition) {
-        if (demolition.innerHTML !== quoteHTML) demolition.innerHTML = quoteHTML;
-      }
+      if (demolition) render(demolition, quoteHTML);
       for (const input of infoBody.querySelectorAll<HTMLInputElement>('[data-target]'))
         if (input !== document.activeElement)
           input.value = String(b.targets?.[input.dataset.target as Good] || 0);
@@ -480,7 +490,7 @@ export function createInspectorView(
       if (toggle) toggle.textContent = b.disabled ? 'Resume production' : 'Pause production';
     } else if (editing && productionHTML && document.activeElement.matches('[data-rate-window]')) {
       const stats = infoBody.querySelector('[data-production-stats]');
-      if (stats && stats.innerHTML !== productionHTML) stats.innerHTML = productionHTML;
+      if (stats) render(stats, productionHTML);
     } else if (
       h !== lastInfoHTML &&
       (!editing || !b || !inspectorKey.startsWith(b.id + ':' + b.type + ':'))
@@ -489,6 +499,10 @@ export function createInspectorView(
       infoBody.innerHTML = h;
       lastInfoHTML = h;
       inspectorKey = key;
+      section('[data-inspector-live]', liveHTML);
+      section('[data-production-stats]', productionHTML);
+      section('[data-inspector-reference]', referenceHTML);
+      section('[data-demolition-quote]', quoteHTML);
       const details = infoBody.querySelector('details');
       if (details && wasOpen) details.open = true;
     }
@@ -503,17 +517,12 @@ export function createInspectorView(
         productionRateWindow = window === 'lifetime' ? window : (+window as 30 | 120 | 600);
       // Refresh the numbers immediately without replacing the focused select.
       var stats = infoBody.querySelector('[data-production-stats]');
-      if (stats) stats.innerHTML = observedProduction(game.selected);
+      if (stats) render(stats, observedProduction(game.selected));
     }
-    if ((e.target as HTMLInputElement).matches('[data-priority]'))
-      game.selected.priority = +(e.target as HTMLInputElement).value as 0 | 1 | 2;
-    if ((e.target as HTMLInputElement).matches('[data-target]')) {
-      if (!game.selected.targets) game.selected.targets = {};
-      game.selected.targets[(e.target as HTMLInputElement).dataset.target as Good] = Math.max(
-        0,
-        Math.min(500, Math.floor(+(e.target as HTMLInputElement).value) || 0),
-      );
-    }
+    const input = e.target as HTMLInputElement;
+    if (input.matches('[data-priority]')) game.setBuildingPriority(game.selected, +input.value);
+    if (input.matches('[data-target]'))
+      game.setStockTarget(game.selected, input.dataset.target as Good, +input.value);
     lastInfoHTML = null;
   });
   infoBody.addEventListener('click', function (e) {
@@ -571,6 +580,7 @@ export function createInspectorView(
     illustratedType = '';
     inspectorKey = '';
     lastInfoHTML = null;
+    rendered = new WeakMap();
     confirmationId = null;
     infoBody.innerHTML = '';
   }

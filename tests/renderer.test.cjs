@@ -70,8 +70,6 @@ function renderer() {
       rgba: (color, alpha) => color + ':' + alpha,
       ART: {
         grass: ['g0', 'g1', 'g2', 'g3'],
-        sand: ['s0', 's1', 's2'],
-        water: ['w0', 'w1'],
       },
       presentationPrefs: {
         reducedMotion: false,
@@ -509,4 +507,44 @@ test('a paused placement preview refreshes affordability immediately while uncha
   assert.equal(after.checks.ok, true, 'the terrain remains suitable');
   assert.equal(after.canBuild, false, 'spending becomes unavailable without aging simulation time');
   assert.equal(after.spending.materials.find((row) => row.good === 'planks').available, 2);
+});
+
+test('night glow lights domestic windows but leaves mines and open yards dark', () => {
+  const e = renderer();
+  e.vw = 1440;
+  e.vh = 900;
+  e.cam = { x: 40 * e.TS, y: 40 * e.TS };
+  e.ART.glow = 'glow';
+  e.buildings.length = 0;
+  const placed = {};
+  for (const [type, offset] of [
+    ['mine_coal', 0],
+    ['mine_iron', 2],
+    ['mine_gold', 4],
+    ['well', 6],
+    ['pigfarm', 8],
+    ['quarry', 10],
+    ['sawmill', 12],
+    ['warehouse', 14],
+  ]) {
+    const b = e.newBuilding(type, 44 + offset, 48);
+    b.done = true;
+    e.buildings.push(b);
+    placed[type] = b;
+  }
+  const rng = e.SR.getState();
+  e.calls.length = 0;
+  e.glowsDraw(e.context);
+  const lit = new Set(
+    e.calls
+      // The square window aura is centred over its building's tile.
+      .filter((call) => call.method === 'drawImage' && call.args[0] === 'glow')
+      .filter((call) => call.args[3] === call.args[4])
+      .map((call) => Math.floor((call.args[1] + call.args[3] / 2) / e.TS)),
+  );
+  assert.deepEqual(
+    [...lit].sort((a, b) => a - b),
+    [placed.sawmill.x, placed.warehouse.x],
+  );
+  assert.equal(e.SR.getState(), rng, 'cosmetic glow consumes no simulation RNG');
 });

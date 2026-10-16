@@ -2359,9 +2359,7 @@ export function createRenderer(
     for (var bi = 0; bi < game.buildings.length; bi++) {
       var b = game.buildings[bi];
       if (!b.done) continue;
-      // Open yards and mine mouths have no domestic window to illuminate.
-      if (['well', 'pigfarm', 'quarry', 'coalmine', 'ironmine', 'goldmine'].includes(b.type))
-        continue;
+      if (UNLIT_AT_NIGHT.has(b.type)) continue;
       if (b.x < vx0 || b.x > vx1 || b.y < vy0 || b.y > vy1) continue;
       var sc = game.BSPEC[b.type].store ? 34 : 24,
         lx = b.x * game.TS + 12,
@@ -2818,6 +2816,7 @@ export function createRenderer(
       getPlacementPreview,
       getRoadPreview,
       clarityBuildings,
+      glowsDraw,
     });
     Object.defineProperties(internals, {
       terrainRevision: {
@@ -3089,6 +3088,16 @@ export interface RendererSubsystem {
   draw: () => void;
 }
 
+/** Open yards and mine mouths have no domestic window to illuminate at night. */
+export const UNLIT_AT_NIGHT: ReadonlySet<BuildingType> = new Set<BuildingType>([
+  'well',
+  'pigfarm',
+  'quarry',
+  'mine_coal',
+  'mine_iron',
+  'mine_gold',
+]);
+
 /** Test-only view of closure internals; never merged into the runtime. */
 export interface RendererInternals {
   paintTileFull: (g: CanvasRenderingContext2D, i: number) => void;
@@ -3103,6 +3112,7 @@ export interface RendererInternals {
   getPlacementPreview: () => PlacementPreview | null;
   getRoadPreview: () => RoadPreview | null;
   clarityBuildings: (g: CanvasRenderingContext2D) => void;
+  glowsDraw: (g: CanvasRenderingContext2D) => void;
   terrainRevision: number;
   miniDirty: boolean;
   atmosphereCount: number;

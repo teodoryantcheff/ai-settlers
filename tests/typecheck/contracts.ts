@@ -1,5 +1,5 @@
 import { createEventBus } from '../../src/core/state.ts';
-import type { RendererPresentation } from '../../src/rendering/renderer.ts';
+import { UNLIT_AT_NIGHT, type RendererPresentation } from '../../src/rendering/renderer.ts';
 import type { GameRuntime } from '../../src/runtime.ts';
 import type {
   Building,
@@ -61,7 +61,10 @@ presentation.layer('bogus-layer', null as unknown as CanvasRenderingContext2D, (
 game.presentationPrefs.overlay = 'bogus-overlay';
 // @ts-expect-error Implicitly-any parameters are gone: tile hashes take tile indexes.
 game.tileHash('12');
+// @ts-expect-error Night-glow exclusions name real building types.
+const misspelledUnlit: typeof UNLIT_AT_NIGHT = new Set(['coalmine']);
 void unknownGood;
+void misspelledUnlit;
 void deadClauseJob;
 void deadClauseRead;
 void incompleteMode;

@@ -1,3 +1,9 @@
+import {
+  countsAsWell,
+  hasWellCoverage,
+  wellRadius,
+  wellReaches,
+} from '../gameplay/colony-rules.ts';
 import type { SimulationStateSubsystem } from './state.ts';
 import type { WorldSubsystem } from '../core/world.ts';
 import type { AdvisorSubsystem } from '../gameplay/advisor.ts';
@@ -156,26 +162,19 @@ export function createAutoplay(
       // choosing an arbitrary owned tile that leaves the chain stalled.
       var anchors = game.buildings.filter(function (b) {
         return bt === 'well'
-          ? (b.type === 'bakery' || b.type === 'brewery') &&
-              !game.buildings.some(function (w) {
-                return (
-                  w.type === 'well' &&
-                  !w.disabled &&
-                  Math.hypot(w.x - b.x, w.y - b.y) <= 6 &&
-                  game.connectedLand(w.x, w.y, b.x, b.y)
-                );
-              })
-          : b.type === 'well' && b.done && !b.disabled;
+          ? (b.type === 'bakery' || b.type === 'brewery') && !hasWellCoverage(game, b, 'planned')
+          : countsAsWell(b, 'active');
       });
+      // Candidate offsets stay one tile inside the service radius.
+      var reach = wellRadius(game) - 1;
       for (var anchor of anchors)
-        for (var oy = -5; oy <= 5; oy++)
-          for (var ox = -5; ox <= 5; ox++) {
-            if (ox * ox + oy * oy > 36) continue;
+        for (var oy = -reach; oy <= reach; oy++)
+          for (var ox = -reach; ox <= reach; ox++) {
             var wx = anchor.x + ox,
               wy = anchor.y + oy;
             if (
               game.inB(wx, wy) &&
-              game.connectedLand(wx, wy, anchor.x, anchor.y) &&
+              wellReaches(game, anchor, wx, wy) &&
               game.canPlace(bt, wx, wy)[0]
             )
               return [wx, wy];
