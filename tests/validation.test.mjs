@@ -134,3 +134,17 @@ test('the full plan includes every Node test before build and single-worker brow
   assert.equal(scripts['build:pages'], 'npm run build && node scripts/package-pages.mjs');
   assert.match(scripts.deploy, /^npm test && npm run build:pages && wrangler pages deploy /);
 });
+
+test('pull-request CI validates on the supported Node and never publishes', async () => {
+  const root = path.resolve(import.meta.dirname, '..');
+  const workflow = await fs.readFile(path.join(root, '.github/workflows/ci.yml'), 'utf8');
+  const { engines } = JSON.parse(await fs.readFile(path.join(root, 'package.json')));
+  assert.match(workflow, /^on:\n {2}pull_request:\n {2}push:\n {4}branches: \[main\]\n/m);
+  assert.equal(`>=${workflow.match(/node-version: '([\d.]+)'/)[1]}`, engines.node);
+  const commands = [...workflow.matchAll(/^ +run: (.+)$/gm)].map((match) => match[1]);
+  assert.deepEqual(commands, ['npm ci', 'npm run format:check', 'npm test']);
+  assert.match(workflow, /if: failure\(\)\n(?: {8}.+\n)*? {8}uses: actions\/upload-artifact@/);
+  assert.match(workflow, /^ {10}path: output\/validation\/$/m);
+  assert.match(workflow, /^permissions:\n {2}contents: read\n/m);
+  assert.doesNotMatch(workflow, /secrets[.:]|deploy|wrangler|build:pages|CLOUDFLARE/i);
+});
