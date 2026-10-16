@@ -112,22 +112,30 @@ test('failure summaries stay bounded while the full diagnostic log is retained',
   assert.match(context.text(), /Earlier output retained/);
 });
 
-test('the full plan includes every Node test before build and single-worker browsers', async () => {
+test('the full plan includes every Node and soak test before build and single-worker browsers', async () => {
   const root = path.resolve(import.meta.dirname, '..');
   const plan = await validationSteps(root);
-  const files = (await fs.readdir(path.join(root, 'tests')))
-    .filter((name) => /\.test\.(cjs|mjs)$/.test(name))
-    .sort();
+  const testFiles = async (directory) =>
+    (await fs.readdir(path.join(root, directory)))
+      .filter((name) => /\.test\.(cjs|mjs)$/.test(name))
+      .sort();
+  const files = await testFiles('tests');
+  const soak = (await testFiles('tests/soak')).map((name) => `soak/${name}`);
+  assert.ok(soak.includes('soak/economy-autoplay.test.cjs'));
   assert.deepEqual(
     plan.map((entry) => entry.name),
-    ['format', 'lint', 'typecheck', 'null-check', ...files, 'build', 'browser'],
+    ['format', 'lint', 'typecheck', 'null-check', ...files, ...soak, 'build', 'browser'],
   );
   assert.ok(plan.at(-1).args.includes('--workers=1'));
-  for (const entry of plan.filter((entry) => files.includes(entry.name)))
+  for (const entry of plan.filter((entry) => [...files, ...soak].includes(entry.name)))
     assert.deepEqual(entry.args, ['--test-reporter=spec', path.join('tests', entry.name)]);
   assert.deepEqual(
     (await validationSteps(root, { nodeOnly: true })).map((entry) => entry.name),
     ['lint', 'typecheck', 'null-check', ...files],
+  );
+  assert.deepEqual(
+    (await validationSteps(root, { soakOnly: true })).map((entry) => entry.name),
+    soak,
   );
   assert.deepEqual(plan.find((entry) => entry.name === 'lint').args.slice(-4), [
     'src',
@@ -137,8 +145,12 @@ test('the full plan includes every Node test before build and single-worker brow
   ]);
   const { scripts } = JSON.parse(await fs.readFile(path.join(root, 'package.json')));
   assert.equal(scripts.check, 'node scripts/validate.mjs');
+  assert.equal(scripts['test:soak'], 'node scripts/validate.mjs --soak');
   assert.equal(scripts['build:pages'], 'npm run build && node scripts/package-pages.mjs');
-  assert.match(scripts.deploy, /^npm test && npm run build:pages && wrangler pages deploy /);
+  assert.match(
+    scripts.deploy,
+    /^npm test && npm run test:soak && npm run build:pages && wrangler pages deploy /,
+  );
 });
 
 test('pull-request CI validates on the supported Node and never publishes', async () => {
@@ -148,7 +160,13 @@ test('pull-request CI validates on the supported Node and never publishes', asyn
   assert.match(workflow, /^on:\n {2}pull_request:\n {2}push:\n {4}branches: \[main\]\n/m);
   assert.equal(`>=${workflow.match(/node-version: '([\d.]+)'/)[1]}`, engines.node);
   const commands = [...workflow.matchAll(/^ +run: (.+)$/gm)].map((match) => match[1]);
-  assert.deepEqual(commands, ['npm ci', 'npm run format:check', 'npm test']);
+  assert.deepEqual(commands, [
+    'npm ci',
+    'npm run format:check',
+    'npm test',
+    'npm ci',
+    'npm run test:soak',
+  ]);
   assert.match(workflow, /if: failure\(\)\n(?: {8}.+\n)*? {8}uses: actions\/upload-artifact@/);
   assert.match(workflow, /^ {10}path: output\/validation\/$/m);
   assert.match(workflow, /^permissions:\n {2}contents: read\n/m);

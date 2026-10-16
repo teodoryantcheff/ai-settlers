@@ -6,13 +6,28 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(import.meta.dirname, '..');
 
-/** Each test file gets its own process and reports its actual tests and assertions. */
-export async function validationSteps(directory, { nodeOnly = false } = {}) {
-  const node = (name, ...args) => ({ name, command: process.execPath, args });
-  const tests = (await fs.readdir(path.join(directory, 'tests')))
+const testFiles = async (directory) =>
+  (await fs.readdir(directory).catch(() => []))
     .filter((name) => /\.test\.(cjs|mjs)$/.test(name))
     .sort();
+
+/**
+ * Each test file gets its own process and reports its actual tests and assertions.
+ * `nodeOnly` is routine validation and omits the slow soak suite in `tests/soak/`;
+ * `soakOnly` runs just that suite.
+ */
+export async function validationSteps(directory, { nodeOnly = false, soakOnly = false } = {}) {
+  const node = (name, ...args) => ({ name, command: process.execPath, args });
+  const testStep = (name) => node(name, '--test-reporter=spec', path.join('tests', name));
+  const tests = await testFiles(path.join(directory, 'tests'));
+  const soak = (await testFiles(path.join(directory, 'tests', 'soak'))).map((name) =>
+    path.posix.join('soak', name),
+  );
   if (!tests.length) throw new Error('No Node test files found');
+  if (soakOnly) {
+    if (!soak.length) throw new Error('No soak test files found');
+    return soak.map(testStep);
+  }
   return [
     ...(!nodeOnly
       ? [
@@ -39,9 +54,10 @@ export async function validationSteps(directory, { nodeOnly = false } = {}) {
     ),
     node('typecheck', 'node_modules/typescript/bin/tsc', '--noEmit'),
     node('null-check', 'scripts/null-check.mjs'),
-    ...tests.map((name) => node(name, '--test-reporter=spec', path.join('tests', name))),
+    ...tests.map(testStep),
     ...(!nodeOnly
       ? [
+          ...soak.map(testStep),
           node('build', 'scripts/build.mjs'),
           node('browser', 'node_modules/@playwright/test/cli.js', 'test', '--workers=1'),
         ]
@@ -143,14 +159,18 @@ export async function runSteps(steps, { directory, logDirectory, output = proces
 
 async function main() {
   const args = process.argv.slice(2);
-  if (args.length && (args.length !== 1 || args[0] !== '--node-tests'))
-    throw new Error('Usage: node scripts/validate.mjs [--node-tests]');
+  const modes = ['--node-tests', '--soak'];
+  if (args.length && (args.length !== 1 || !modes.includes(args[0])))
+    throw new Error('Usage: node scripts/validate.mjs [--node-tests | --soak]');
   const base = path.join(root, 'output/validation');
   await fs.mkdir(base, { recursive: true });
   const logDirectory = await fs.mkdtemp(
     path.join(base, new Date().toISOString().replace(/[:.]/g, '-') + '-'),
   );
-  const steps = await validationSteps(root, { nodeOnly: args[0] === '--node-tests' });
+  const steps = await validationSteps(root, {
+    nodeOnly: args[0] === '--node-tests',
+    soakOnly: args[0] === '--soak',
+  });
   const browser = steps.find((step) => step.name === 'browser');
   if (browser) browser.args.push(`--output=${path.join(logDirectory, 'browser-artifacts')}`);
   await runSteps(steps, { directory: root, logDirectory });
