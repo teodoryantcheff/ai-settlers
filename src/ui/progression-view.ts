@@ -1,3 +1,4 @@
+import { html as markup, trusted } from './markup.ts';
 import { createLiveReportUpdater } from './live-report.ts';
 import { observePresentation } from './domain-feedback.ts';
 import type { GameRuntime } from '../runtime.ts';
@@ -33,51 +34,33 @@ export function createProgressionView(game: GameRuntime): ProgressionViewSubsyst
   function journeyHTML(actionId: string, full = false) {
     const lesson = game.currentLesson();
     const count = game.state.milestones.length;
-    let html =
-      '<span class="eyebrow">COLONY JOURNEY · ' +
-      count +
-      ' / ' +
-      game.journeySteps.length +
-      ' complete</span>';
+    let html = markup`<span class="eyebrow">COLONY JOURNEY · ${count} / ${game.journeySteps.length} complete</span>`;
     if (lesson) {
       const waiting = lesson.step.building === 'guard' && game.pendingOutpost();
-      html +=
-        '<strong>' +
-        lesson.step.title +
-        '</strong><p>' +
-        lesson.step.text +
-        '</p><button id="' +
-        actionId +
-        '">' +
-        (waiting
+      html += markup`<strong>${lesson.step.title}</strong><p>${lesson.step.text}</p><button id="${actionId}">${
+        waiting
           ? 'Inspect Outpost'
           : lesson.step.building === 'road'
             ? 'Draw a road'
-            : 'Place ' + game.BSPEC[lesson.step.building].name) +
-        '</button>';
+            : 'Place ' + game.BSPEC[lesson.step.building].name
+      }</button>`;
     } else
-      html +=
-        '<strong>Journey complete</strong><p>Balance deliveries, fulfill optional contracts and bank ' +
-        game.GOAL +
-        ' gold. Keep managing after the objective is achieved.</p>';
+      html += markup`<strong>Journey complete</strong><p>Balance deliveries, fulfill optional contracts and bank ${game.GOAL} gold. Keep managing after the objective is achieved.</p>`;
     if (full)
-      html +=
-        '<ol class="journey-milestones">' +
+      html += markup`<ol class="journey-milestones">${trusted(
         game.journeySteps
           .map(
             (step, index) =>
-              '<li><b>' +
-              (game.state.milestones.includes(index)
-                ? '✓ Completed'
-                : lesson?.index === index
-                  ? '→ Next guidance'
-                  : 'Upcoming') +
-              '</b> · ' +
-              step.title +
-              '</li>',
+              markup`<li><b>${
+                game.state.milestones.includes(index)
+                  ? '✓ Completed'
+                  : lesson?.index === index
+                    ? '→ Next guidance'
+                    : 'Upcoming'
+              }</b> · ${step.title}</li>`,
           )
-          .join('') +
-        '</ol>';
+          .join(''),
+      )}</ol>`;
     return html;
   }
   function conditions(cost: Inventory) {
@@ -97,39 +80,18 @@ export function createProgressionView(game: GameRuntime): ProgressionViewSubsyst
             reclaim.join(', ') +
             ' from uncollected optional warehouse transfers.'
           : ''),
-      evidence:
-        '<ul>' +
+      evidence: markup`<ul>${trusted(
         report.materials
           .map(
             (row) =>
-              '<li><b>' +
-              game.GOODS[row.good].name +
-              '</b>: ' +
-              row.required +
-              ' required; ' +
-              row.available +
-              ' available; ' +
-              row.reserved +
-              ' reserved (including ' +
-              (row.spendable - row.available) +
-              ' reclaimable optional transfer promises). ' +
-              row.spendable +
-              ' spendable.</li>',
+              markup`<li><b>${game.GOODS[row.good].name}</b>: ${row.required} required; ${row.available} available; ${row.reserved} reserved (including ${row.spendable - row.available} reclaimable optional transfer promises). ${row.spendable} spendable.</li>`,
           )
-          .join('') +
-        '</ul>',
+          .join(''),
+      )}</ul>`,
     };
   }
   function stockEvidence(key: string, html: string) {
-    return (
-      '<details id="availability-' +
-      key +
-      '" class="progression-availability"><summary id="availability-' +
-      key +
-      '-summary">Stock available to this action</summary>' +
-      html +
-      '</details>'
-    );
+    return markup`<details id="availability-${key}" class="progression-availability"><summary id="availability-${key}-summary">Stock available to this action</summary>${trusted(html)}</details>`;
   }
   function gameplayHUD() {
     if (!registered && game.registerReportWindow) {
@@ -177,64 +139,24 @@ export function createProgressionView(game: GameRuntime): ProgressionViewSubsyst
       const level = game.state.upgrades[kind] || 0,
         price = 15 * (level + 1),
         availability = conditions({ gold: price });
-      html +=
-        '<article class="progression-card" data-progression-card="upgrade-' +
-        kind +
-        '"><h3 tabindex="-1">' +
-        (kind === 'haul' ? 'Carrier training' : 'Workshop methods') +
-        '</h3><p>Level ' +
-        level +
-        ' / 3 · ' +
-        (kind === 'haul'
+      html += markup`<article class="progression-card" data-progression-card="upgrade-${kind}"><h3 tabindex="-1">${kind === 'haul' ? 'Carrier training' : 'Workshop methods'}</h3><p>Level ${level} / 3 · ${
+        kind === 'haul'
           ? '+12% carrier movement speed per level; current increase ' + 12 * level + '%.'
           : 'Cycle duration ×0.9 per level; current duration ' +
             (100 * Math.pow(0.9, level)).toFixed(1) +
-            '% of base.') +
-        '</p><p>' +
-        (level >= 3
+            '% of base.'
+      }</p><p>${
+        level >= 3
           ? 'All three levels purchased.'
-          : 'Spend ' + price + ' Gold from storage. Treasury decreases by ' + price + '.') +
-        '</p><button id="upgrade-' +
-        kind +
-        '" data-upgrade="' +
-        kind +
-        '" ' +
-        (level >= 3 || !availability.affordable ? 'disabled' : '') +
-        '>' +
-        (level >= 3 ? 'Complete' : 'Buy level ' + (level + 1)) +
-        '</button><p class="progression-condition">' +
-        (level >= 3 ? 'Maximum level reached.' : availability.text) +
-        '</p>' +
-        (level < 3 ? stockEvidence('upgrade-' + kind, availability.evidence) : '') +
-        '</article>';
+          : 'Spend ' + price + ' Gold from storage. Treasury decreases by ' + price + '.'
+      }</p><button id="upgrade-${kind}" data-upgrade="${kind}" ${level >= 3 || !availability.affordable ? 'disabled' : ''}>${level >= 3 ? 'Complete' : 'Buy level ' + (level + 1)}</button><p class="progression-condition">${level >= 3 ? 'Maximum level reached.' : availability.text}</p>${trusted(level < 3 ? stockEvidence('upgrade-' + kind, availability.evidence) : '')}</article>`;
     }
     html +=
       '</section><section class="progression-contracts"><h2 tabindex="-1">Optional contracts</h2><p>Each contract spends stored materials once and delivers the listed reward to storage. Set a warehouse stock target if demand limits production before enough goods accumulate.</p>';
     game.contracts.forEach((contract, index) => {
       const done = game.state.contracts.includes(index),
         availability = conditions(contract.cost);
-      html +=
-        '<article class="progression-card" data-progression-card="contract-' +
-        index +
-        '"><h3 tabindex="-1">' +
-        contract.name +
-        '</h3><p><b>Spend:</b> ' +
-        game.costStr2(contract.cost) +
-        '</p><p><b>Receive:</b> ' +
-        game.costStr2(contract.reward) +
-        '</p><button id="contract-' +
-        index +
-        '" data-contract="' +
-        index +
-        '" ' +
-        (done || !availability.affordable ? 'disabled' : '') +
-        '>' +
-        (done ? 'Fulfilled' : 'Fulfill contract') +
-        '</button><p class="progression-condition">' +
-        (done ? 'Reward received. This contract can only be fulfilled once.' : availability.text) +
-        '</p>' +
-        (!done ? stockEvidence('contract-' + index, availability.evidence) : '') +
-        '</article>';
+      html += markup`<article class="progression-card" data-progression-card="contract-${index}"><h3 tabindex="-1">${contract.name}</h3><p><b>Spend:</b> ${game.costStr2(contract.cost)}</p><p><b>Receive:</b> ${game.costStr2(contract.reward)}</p><button id="contract-${index}" data-contract="${index}" ${done || !availability.affordable ? 'disabled' : ''}>${done ? 'Fulfilled' : 'Fulfill contract'}</button><p class="progression-condition">${done ? 'Reward received. This contract can only be fulfilled once.' : availability.text}</p>${trusted(!done ? stockEvidence('contract-' + index, availability.evidence) : '')}</article>`;
     });
     html += '</section>';
     if (html !== lastEconomyHTML) {
@@ -265,38 +187,16 @@ export function createProgressionView(game: GameRuntime): ProgressionViewSubsyst
     const settlers = game.units.filter((unit) => !unit.dead).length;
     const observed = game.economicWindow('lifetime');
     const stat = (label: string, value: string | number) =>
-      '<div><dt>' + label + '</dt><dd>' + value + '</dd></div>';
-    let html =
-      '<h2>Current settlement</h2><dl class="victory-grid">' +
-      stat(
-        'Simulation age',
-        Math.floor(game.state.time / 60) + 'm ' + (game.state.time % 60).toFixed(1) + 's',
-      ) +
-      stat('Current treasury', game.state.gold + ' Gold') +
-      stat('Completed buildings', completed) +
-      stat('Construction sites', game.buildings.length - completed) +
-      stat(
-        'Manned outposts',
-        guards.filter((building) => building.done && building.man).length + ' / ' + guards.length,
-      ) +
-      stat('Road tiles', game.tiles.filter((tile) => tile.road).length) +
-      stat('Mobile settlers', settlers) +
-      stat('Contracts fulfilled', game.state.contracts.length + ' / ' + game.contracts.length) +
-      '</dl><h2>Recorded economic achievements</h2>';
+      markup`<div><dt>${label}</dt><dd>${value}</dd></div>`;
+    let html = markup`<h2>Current settlement</h2><dl class="victory-grid">${stat(
+      'Simulation age',
+      Math.floor(game.state.time / 60) + 'm ' + (game.state.time % 60).toFixed(1) + 's',
+    )}${stat('Current treasury', game.state.gold + ' Gold')}${stat('Completed buildings', completed)}${stat('Construction sites', game.buildings.length - completed)}${stat(
+      'Manned outposts',
+      guards.filter((building) => building.done && building.man).length + ' / ' + guards.length,
+    )}${stat('Road tiles', game.tiles.filter((tile) => tile.road).length)}${stat('Mobile settlers', settlers)}${stat('Contracts fulfilled', game.state.contracts.length + ' / ' + game.contracts.length)}</dl><h2>Recorded economic achievements</h2>`;
     if (observed.available) {
-      html +=
-        '<dl class="victory-grid">' +
-        stat('Gold produced', observed.totals.produced.gold || 0) +
-        stat('Produced gold delivered to storage', observed.totals.outputStored.gold || 0) +
-        stat('Gold received from contracts', observed.totals.contractReward.gold || 0) +
-        stat('Gold spent on upgrades', observed.totals.upgradeSpent.gold || 0) +
-        '</dl><p class="muted">Recorded from ' +
-        observed.from.toFixed(1) +
-        ' to ' +
-        observed.to.toFixed(1) +
-        ' simulation seconds (' +
-        observed.elapsed.toFixed(1) +
-        ' seconds of coverage). Colony totals include demolished producers. These are current recorded totals; the original victory time is not recorded.</p>';
+      html += markup`<dl class="victory-grid">${stat('Gold produced', observed.totals.produced.gold || 0)}${stat('Produced gold delivered to storage', observed.totals.outputStored.gold || 0)}${stat('Gold received from contracts', observed.totals.contractReward.gold || 0)}${stat('Gold spent on upgrades', observed.totals.upgradeSpent.gold || 0)}</dl><p class="muted">Recorded from ${observed.from.toFixed(1)} to ${observed.to.toFixed(1)} simulation seconds (${observed.elapsed.toFixed(1)} seconds of coverage). Colony totals include demolished producers. These are current recorded totals; the original victory time is not recorded.</p>`;
     } else
       html +=
         '<p>Economic measurements unavailable: no covered simulation time has been recorded. Historical achievement quantities are not inferred.</p>';

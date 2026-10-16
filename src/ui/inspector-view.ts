@@ -1,3 +1,4 @@
+import { html as markup, trusted, formatGoods } from './markup.ts';
 import type { PlacementFeedback } from './placement-feedback.ts';
 import type { GameRuntime } from '../runtime.ts';
 import type { Building, Good, Inventory, ProductionRateWindow, TilePoint } from '../types.ts';
@@ -17,82 +18,57 @@ export function createInspectorView(
   let inspectorKey = '';
   let illustratedType = '';
   let confirmationId: number | null = null;
-  const goods = (stock: Inventory) =>
-    Object.entries(stock || {})
-      .filter(([, n]) => n > 0)
-      .map(([good, n]) => `${resourceIcon(good as Good)}${n} ${game.GOODS[good as Good].name}`)
-      .join(' · ') || 'None';
   const receiver = (store: DemolitionQuote['receiver']) =>
     store
       ? `${game.BSPEC[store.type].name} #${store.id} at ${store.x}, ${store.y}`
       : 'No completed storage receiver';
   function consequences(b: Building, q = game.demolitionQuote(b)) {
-    if (!q.allowed) return `<p class="inspector-warning">${q.reason}</p>`;
-    return (
-      `<p><strong>Construction refund</strong><br>${goods(q.refund)}<br><small>${q.completed ? 'Completed cost' : 'Delivered construction goods only'}: each resource is halved and rounded down.</small></p>` +
-      `<p><strong>Local stock salvage</strong><br>${goods(q.salvage)}<br><small>Full local stock, separate from construction refund.</small></p>` +
-      `<p>Refund and salvage receiver: ${receiver(q.receiver)}.</p>` +
-      (q.returnedSoldiers || b.type === 'guard'
-        ? `<p>Soldiers returned to the available pool: ${q.returnedSoldiers}. Equipment returned: ${goods(q.equipment)}${q.equipmentReceiver ? ' to ' + receiver(q.equipmentReceiver) : ''}.</p>`
-        : '') +
-      `<p>Territory lost: ${q.territoryLost} tiles. Other buildings outside the remaining territory: ${q.affectedBuildings.length}${q.affectedBuildings.length ? ' (IDs ' + q.affectedBuildings.join(', ') + ')' : ''}. Existing buildings remain.</p>` +
-      `<p>Delivery work cancelled: ${q.cancelledDeliveries.queued} queued · ${q.cancelledDeliveries.assigned} assigned · ${q.cancelledDeliveries.carrying} carrying${q.cancelledDeliveries.unknown ? ' · ' + q.cancelledDeliveries.unknown + ' assignment records with unavailable carrier evidence' : ''}. Carried goods seek another storage receiver.</p>`
-    );
+    if (!q.allowed) return markup`<p class="inspector-warning">${q.reason}</p>`;
+    return markup`<p><strong>Construction refund</strong><br>${trusted(formatGoods(game.GOODS, q.refund, { positiveOnly: true, separator: ' · ', empty: 'None', icons: true }))}<br><small>${q.completed ? 'Completed cost' : 'Delivered construction goods only'}: each resource is halved and rounded down.</small></p><p><strong>Local stock salvage</strong><br>${trusted(formatGoods(game.GOODS, q.salvage, { positiveOnly: true, separator: ' · ', empty: 'None', icons: true }))}<br><small>Full local stock, separate from construction refund.</small></p><p>Refund and salvage receiver: ${receiver(q.receiver)}.</p>${trusted(
+      q.returnedSoldiers || b.type === 'guard'
+        ? markup`<p>Soldiers returned to the available pool: ${q.returnedSoldiers}. Equipment returned: ${trusted(formatGoods(game.GOODS, q.equipment, { positiveOnly: true, separator: ' · ', empty: 'None', icons: true }))}${q.equipmentReceiver ? ' to ' + receiver(q.equipmentReceiver) : ''}.</p>`
+        : '',
+    )}<p>Territory lost: ${q.territoryLost} tiles. Other buildings outside the remaining territory: ${q.affectedBuildings.length}${q.affectedBuildings.length ? ' (IDs ' + q.affectedBuildings.join(', ') + ')' : ''}. Existing buildings remain.</p><p>Delivery work cancelled: ${q.cancelledDeliveries.queued} queued · ${q.cancelledDeliveries.assigned} assigned · ${q.cancelledDeliveries.carrying} carrying${q.cancelledDeliveries.unknown ? ' · ' + q.cancelledDeliveries.unknown + ' assignment records with unavailable carrier evidence' : ''}. Carried goods seek another storage receiver.</p>`;
   }
   function shortcut(b: Building, q = game.demolitionQuote(b)) {
-    if (!q.allowed) return '<p class="inspector-warning">' + q.reason + '</p>';
-    return (
-      '<p><strong>Shift+click immediately demolishes.</strong><br>Refund: ' +
-      goods(q.refund) +
-      '.<br>Local stock salvage: ' +
-      goods(q.salvage) +
-      '.<br>Receiver: ' +
-      receiver(q.receiver) +
-      '.<br>Territory lost: ' +
-      q.territoryLost +
-      ' tiles; ' +
-      q.affectedBuildings.length +
-      ' other buildings outside remaining territory.' +
-      (q.returnedSoldiers
-        ? '<br>Soldiers returned: ' +
-          q.returnedSoldiers +
-          '; equipment: ' +
-          goods(q.equipment) +
-          '.'
-        : '') +
-      '</p>'
-    );
+    if (!q.allowed) return markup`<p class="inspector-warning">${q.reason}</p>`;
+    return markup`<p><strong>Shift+click immediately demolishes.</strong><br>Refund: ${trusted(formatGoods(game.GOODS, q.refund, { positiveOnly: true, separator: ' · ', empty: 'None', icons: true }))}.<br>Local stock salvage: ${trusted(formatGoods(game.GOODS, q.salvage, { positiveOnly: true, separator: ' · ', empty: 'None', icons: true }))}.<br>Receiver: ${receiver(q.receiver)}.<br>Territory lost: ${q.territoryLost} tiles; ${q.affectedBuildings.length} other buildings outside remaining territory.${trusted(
+      q.returnedSoldiers
+        ? markup`<br>Soldiers returned: ${q.returnedSoldiers}; equipment: ${trusted(formatGoods(game.GOODS, q.equipment, { positiveOnly: true, separator: ' · ', empty: 'None', icons: true }))}.`
+        : '',
+    )}</p>`;
   }
   function live(b: Building, work = game.productionProgress?.(b)) {
     const sp = game.BSPEC[b.type],
       status = game.buildingStatus ? game.buildingStatus(b) : game.bStatus(b);
     const simulationHeld =
       game.state.paused || game.blockingLayerOpen?.() || document.visibilityState === 'hidden';
-    let html =
-      `<h2>${sp.name} <small>#${b.id} · ${b.x}, ${b.y}</small></h2><div class="inspector-status" role="status">` +
-      (work
-        ? `<p class="${work.reason && !['paused', 'demand', 'reserve'].includes(work.reason) ? 'inspector-warning' : 'inspector-evidence'}">${work.explanation}</p>`
-        : '') +
-      (work?.reason
+    let html = markup`<h2>${sp.name} <small>#${b.id} · ${b.x}, ${b.y}</small></h2><div class="inspector-status" role="status">${trusted(
+      work
+        ? markup`<p class="${work.reason && !['paused', 'demand', 'reserve'].includes(work.reason) ? 'inspector-warning' : 'inspector-evidence'}">${work.explanation}</p>`
+        : '',
+    )}${trusted(
+      work?.reason
         ? '<div class="inspector-supporting"><p class="muted">Usual work and supporting building evidence. The current constraint above governs activity.</p>'
-        : '') +
+        : '',
+    )}${trusted(
       status.lines
         .map(
           (line) =>
-            `<p class="${line.w ? 'inspector-warning' : 'inspector-evidence'}">${line.t}</p>`,
+            markup`<p class="${line.w ? 'inspector-warning' : 'inspector-evidence'}">${line.t}</p>`,
         )
-        .join('') +
-      (work?.reason ? '</div>' : '') +
-      '</div>';
+        .join(''),
+    )}${trusted(work?.reason ? '</div>' : '')}</div>`;
     if (!b.done) {
-      html += `<p><strong>Construction ${Math.round(b.prog * 100)}%</strong></p><progress max="1" value="${b.prog}"></progress>`;
+      html += markup`<p><strong>Construction ${Math.round(b.prog * 100)}%</strong></p><progress max="1" value="${b.prog}"></progress>`;
       for (const good of Object.keys(b.needs) as Good[])
-        html += `<p>${resourceIcon(good)}${game.GOODS[good].name}: ${b.got[good] || 0} / ${b.needs[good]} delivered</p>`;
+        html += markup`<p>${trusted(resourceIcon(good))}${game.GOODS[good].name}: ${b.got[good] || 0} / ${b.needs[good]} delivered</p>`;
     } else {
       if (work)
-        html += `<section class="inspector-cycle" aria-label="Current production progress"><h3>Current work countdown</h3><p data-cycle-countdown><strong>${work.remaining.toFixed(1)}s ${work.suspended ? 'remaining · suspended' : simulationHeld ? 'remaining · simulation held' : 'of work remaining at current speed'}</strong></p><p>${work.suspended ? 'The countdown is preserved until the constraint clears.' : simulationHeld ? 'Simulation is paused or suspended. This active-work countdown resumes when play runs.' : 'Time to the next attempt if current conditions continue; output is not guaranteed.'}</p><p class="muted">Normal interval: ${work.duration.toFixed(1)}s (${work.base}s base · upgrade ${work.tier}/3${work.variety ? ' · meal variety +' + Math.round(work.variety * 100) + '%' : ''}). ${sp.prod === 'plant' ? 'Foresters use a 5s base check when the area is sufficiently planted, otherwise a 7s base attempt. ' : ''}Startup and resource retries can use different intervals; elapsed cycle progress is not recorded.</p></section>`;
-      html += `<h3>${sp.store ? 'Stored goods' : 'Local stock'}</h3><p>${goods(b.stock)}</p>`;
-      if (sp.store) html += `<p>Reserved (part of stored): ${goods(b.res)}</p>`;
+        html += markup`<section class="inspector-cycle" aria-label="Current production progress"><h3>Current work countdown</h3><p data-cycle-countdown><strong>${work.remaining.toFixed(1)}s ${work.suspended ? 'remaining · suspended' : simulationHeld ? 'remaining · simulation held' : 'of work remaining at current speed'}</strong></p><p>${work.suspended ? 'The countdown is preserved until the constraint clears.' : simulationHeld ? 'Simulation is paused or suspended. This active-work countdown resumes when play runs.' : 'Time to the next attempt if current conditions continue; output is not guaranteed.'}</p><p class="muted">Normal interval: ${work.duration.toFixed(1)}s (${work.base}s base · upgrade ${work.tier}/3${work.variety ? ' · meal variety +' + Math.round(work.variety * 100) + '%' : ''}). ${sp.prod === 'plant' ? 'Foresters use a 5s base check when the area is sufficiently planted, otherwise a 7s base attempt. ' : ''}Startup and resource retries can use different intervals; elapsed cycle progress is not recorded.</p></section>`;
+      html += markup`<h3>${sp.store ? 'Stored goods' : 'Local stock'}</h3><p>${trusted(formatGoods(game.GOODS, b.stock, { positiveOnly: true, separator: ' · ', empty: 'None', icons: true }))}</p>`;
+      if (sp.store)
+        html += markup`<p>Reserved (part of stored): ${trusted(formatGoods(game.GOODS, b.res, { positiveOnly: true, separator: ' · ', empty: 'None', icons: true }))}</p>`;
       if (game.incomingDeliveryStages) {
         const relevant = sp.store
           ? Object.keys(game.GOODS)
@@ -101,17 +77,17 @@ export function createInspectorView(
           .map((g) => {
             const s = game.incomingDeliveryStages(g as Good, b.id);
             return s.queued + s.assigned + s.carrying + (s.unknown || 0)
-              ? `${game.GOODS[g as Good].name}: ${s.queued} queued · ${s.assigned} assigned · ${s.carrying} carrying${s.unknown ? ' · ' + s.unknown + ' assignments with unavailable carrier evidence' : ''}`
+              ? markup`${game.GOODS[g as Good].name}: ${s.queued} queued · ${s.assigned} assigned · ${s.carrying} carrying${s.unknown ? ' · ' + s.unknown + ' assignments with unavailable carrier evidence' : ''}`
               : '';
           })
           .filter(Boolean);
         if (inbound.length)
-          html += `<h3>Known incoming work</h3><p>${inbound.join('<br>')}</p><p class="muted">Queued work has no carrier. Assigned work has not been picked up. Carrying means the goods have been collected. Arrival times are not guaranteed.</p>`;
+          html += markup`<h3>Known incoming work</h3><p>${trusted(inbound.join('<br>'))}</p><p class="muted">Queued work has no carrier. Assigned work has not been picked up. Carrying means the goods have been collected. Arrival times are not guaranteed.</p>`;
       }
       if (sp.water)
-        html += `<p>Local water: ${game.hasLocalWater?.(b) ? 'working connected well within 6 tiles' : 'no working connected well within 6 tiles'}. Water is local coverage, not transported stock.</p>`;
+        html += markup`<p>Local water: ${game.hasLocalWater?.(b) ? 'working connected well within 6 tiles' : 'no working connected well within 6 tiles'}. Water is local coverage, not transported stock.</p>`;
       if (b.type === 'guard')
-        html += `<p>${b.man ? 'Manned' : 'Unmanned'} outpost · current claim radius ${b.man ? sp.rad : Math.min(sp.rad, 3)} tiles, restricted by traversable land.</p>`;
+        html += markup`<p>${b.man ? 'Manned' : 'Unmanned'} outpost · current claim radius ${b.man ? sp.rad : Math.min(sp.rad, 3)} tiles, restricted by traversable land.</p>`;
     }
     return html;
   }
@@ -136,8 +112,7 @@ export function createInspectorView(
       return;
     }
     const quote = game.demolitionQuote(b);
-    const html =
-      `<h3>${game.BSPEC[b.type].name} #${b.id} at ${b.x}, ${b.y}</h3>` + consequences(b, quote);
+    const html = markup`<h3>${game.BSPEC[b.type].name} #${b.id} at ${b.x}, ${b.y}</h3>${trusted(consequences(b, quote))}`;
     if (content.innerHTML !== html) content.innerHTML = html;
     confirm.disabled = !quote.allowed;
   }
@@ -176,7 +151,7 @@ export function createInspectorView(
     if (!target) feedback.clear();
     else
       feedback.show(
-        `<h3>Demolish ${game.BSPEC[target.type].name} #${target.id}</h3>${shortcut(target)}<p><strong>Click the building to review and confirm. Shift+click immediately applies these consequences.</strong></p>`,
+        markup`<h3>Demolish ${game.BSPEC[target.type].name} #${target.id}</h3>${trusted(shortcut(target))}<p><strong>Click the building to review and confirm. Shift+click immediately applies these consequences.</strong></p>`,
         target.x + ', ' + target.y,
       );
   }
@@ -191,60 +166,27 @@ export function createInspectorView(
       rates.elapsed > 0
         ? Math.max(0, Math.min(100, Math.round((rates.inputBlocked / rates.elapsed) * 100)))
         : null;
-    let h =
-      '<section class="production-dashboard" aria-label="Observed production rates">' +
-      '<div class="production-heading"><span>' +
-      game.GOODS[sp.out].name +
-      ' output</span><span>per minute</span></div><div class="production-cards">' +
-      '<div class="production-card"><span class="production-caption">Produced</span>' +
-      '<strong data-produced-rate>' +
-      produced +
-      '</strong><span class="production-caption">at this building</span></div>' +
-      '<div class="production-card"><span class="production-caption">Delivered out</span>' +
-      '<strong data-delivered-rate>' +
-      delivered +
-      '</strong><span class="production-caption">arrived at storage</span></div></div>' +
-      '<div class="production-wait"><div class="production-heading"><span>Waiting for inputs</span><strong>' +
-      (waiting === null ? '—' : waiting + '%') +
-      '</strong></div>' +
-      (waiting === null
+    let h = markup`<section class="production-dashboard" aria-label="Observed production rates"><div class="production-heading"><span>${game.GOODS[sp.out].name} output</span><span>per minute</span></div><div class="production-cards"><div class="production-card"><span class="production-caption">Produced</span><strong data-produced-rate>${produced}</strong><span class="production-caption">at this building</span></div><div class="production-card"><span class="production-caption">Delivered out</span><strong data-delivered-rate>${delivered}</strong><span class="production-caption">arrived at storage</span></div></div><div class="production-wait"><div class="production-heading"><span>Waiting for inputs</span><strong>${waiting === null ? '—' : waiting + '%'}</strong></div>${trusted(
+      waiting === null
         ? '<div class="production-track production-empty"></div>'
-        : '<div class="production-track" role="meter" aria-label="Time waiting for inputs" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' +
-          waiting +
-          '"><span style="width:' +
-          waiting +
-          '%"></span></div>') +
-      '<span class="production-note">' +
-      (waiting === null
+        : markup`<div class="production-track" role="meter" aria-label="Time waiting for inputs" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${waiting}"><span style="width:${waiting}%"></span></div>`,
+    )}<span class="production-note">${
+      waiting === null
         ? 'Gathering observations…'
-        : 'Share of observed time without required supplies') +
-      '</span></div>';
+        : 'Share of observed time without required supplies'
+    }</span></div>`;
     if (game.economicWindow && game.resourceAccounting) {
       const stock = game.resourceAccounting(sp.out);
       const colony = game.economicWindow('lifetime');
-      h +=
-        '<details class="production-accounting"><summary>Colony resource accounting</summary>' +
-        '<p>Stored ' +
-        stock.stored +
-        ' · Reserved ' +
-        stock.reserved +
-        ' (part of stored) · Available ' +
-        stock.available +
-        '<br>In transit ' +
-        stock.inTransit +
-        ' · Producer input stock ' +
-        stock.producerInputs +
-        ' · Output awaiting collection ' +
-        stock.awaitingCollection +
-        '</p><p>' +
-        (colony.available
+      h += markup`<details class="production-accounting"><summary>Colony resource accounting</summary><p>Stored ${stock.stored} · Reserved ${stock.reserved} (part of stored) · Available ${stock.available}<br>In transit ${stock.inTransit} · Producer input stock ${stock.producerInputs} · Output awaiting collection ${stock.awaitingCollection}</p><p>${
+        colony.available
           ? 'Recorded colony production: ' +
             (colony.totals.produced[sp.out] || 0) +
             ' over ' +
             colony.elapsed.toFixed(1) +
             ' simulation seconds'
-          : 'Colony history unavailable — gathering observations') +
-        '</p></details>';
+          : 'Colony history unavailable — gathering observations'
+      }</p></details>`;
     }
     if (sp.in) {
       const allowed = sp.prod === 'mine' ? undefined : recipeRequirements(b, sp);
@@ -264,34 +206,15 @@ export function createInspectorView(
           perMinute(rates.inputDelivered, g, rates.deliveryElapsed),
         ]),
       );
-      h +=
-        '<div class="production-inputs"><div class="production-heading"><span>Input flow</span><span>per minute</span></div>' +
-        '<div class="production-legend"><span class="flow-arrived">Delivered in</span><span class="flow-used">Consumed</span></div>';
+      h += markup`<div class="production-inputs"><div class="production-heading"><span>Input flow</span><span>per minute</span></div><div class="production-legend"><span class="flow-arrived">Delivered in</span><span class="flow-used">Consumed</span></div>`;
       for (const g of goods) {
-        h +=
-          '<div class="production-resource"><div class="production-resource-name">' +
-          game.GOODS[g].name +
-          '</div>';
+        h += markup`<div class="production-resource"><div class="production-resource-name">${game.GOODS[g].name}</div>`;
         for (const [record, elapsed, kind, label] of [
           [rates.inputDelivered, rates.deliveryElapsed, 'arrived', 'Delivered in'],
           [rates.consumed, rates.elapsed, 'used', 'Consumed'],
         ] as const) {
           const value = rate(record, g, elapsed);
-          h +=
-            '<div class="production-flow flow-' +
-            kind +
-            '" aria-label="' +
-            game.GOODS[g].name +
-            ': ' +
-            label +
-            ' ' +
-            value +
-            ' per minute">' +
-            '<div class="production-track" aria-hidden="true"><span style="width:' +
-            ((perMinute(record, g, elapsed) / max) * 100).toFixed(1) +
-            '%"></span></div><strong>' +
-            value +
-            '</strong></div>';
+          h += markup`<div class="production-flow flow-${kind}" aria-label="${game.GOODS[g].name}: ${label} ${value} per minute"><div class="production-track" aria-hidden="true"><span style="width:${((perMinute(record, g, elapsed) / max) * 100).toFixed(1)}%"></span></div><strong>${value}</strong></div>`;
         }
         h += '</div>';
       }
@@ -299,15 +222,11 @@ export function createInspectorView(
         h += '<p class="production-note">No input deliveries or consumption observed yet.</p>';
       h += '</div>';
     }
-    h +=
-      '<footer class="production-coverage">Observed ' +
-      rates.elapsed.toFixed(1) +
-      's of simulation time' +
-      (rates.sampleInterval ? ' · 2s samples' : '') +
-      (rates.deliveryElapsed < rates.elapsed
-        ? '<br>Deliveries: ' + rates.deliveryElapsed.toFixed(1) + 's observed'
-        : '') +
-      '</footer></section>';
+    h += markup`<footer class="production-coverage">Observed ${rates.elapsed.toFixed(1)}s of simulation time${rates.sampleInterval ? ' · 2s samples' : ''}${trusted(
+      rates.deliveryElapsed < rates.elapsed
+        ? markup`<br>Deliveries: ${rates.deliveryElapsed.toFixed(1)}s observed`
+        : '',
+    )}</footer></section>`;
     return h;
   }
   const infoBody = document.getElementById('infobody');
@@ -374,93 +293,51 @@ export function createInspectorView(
       liveHTML = live(b, work);
       quote = game.demolitionQuote?.(b);
       quoteHTML = quote ? shortcut(b, quote) : '';
-      h = '<div data-inspector-live>' + liveHTML + '</div><div data-inspector-controls>';
+      h = markup`<div data-inspector-live>${trusted(liveHTML)}</div><div data-inspector-controls>`;
       const referenceStart = h.length;
       if (buildingHelp[b.type])
-        h +=
-          '<p class="muted">' +
-          (b.type === 'armory' && b.legacyIndustry
+        h += markup`<p class="muted">${
+          b.type === 'armory' && b.legacyIndustry
             ? 'This established armory retains its original iron ore and coal recipe.'
-            : buildingHelp[b.type]) +
-          '</p>';
+            : buildingHelp[b.type]
+        }</p>`;
       if (sp.prod === 'craft' || sp.prod === 'mine')
-        h +=
-          '<span style="color:#c8b890">Input ' +
-          (sp.prod === 'mine'
+        h += markup`<span style="color:#c8b890">Input ${
+          sp.prod === 'mine'
             ? '1 fish, bread, meat or provisions'
-            : formatCost(recipeRequirements(b, sp))) +
-          ' \u2192 ' +
-          game.GOODS[sp.out].name +
-          ' / ' +
-          (
-            work?.duration ??
-            sp.time *
-              Math.pow(
-                0.9,
-                Math.min(3, (game.state.upgrades && game.state.upgrades.production) || 0),
-              )
-          )
-            .toFixed(1)
-            .replace(/\.0$/, '') +
-          's</span><br>';
+            : formatGoods(game.GOODS, recipeRequirements(b, sp), { lowerCase: true })
+        } → ${game.GOODS[sp.out].name} / ${(
+          work?.duration ??
+          sp.time *
+            Math.pow(0.9, Math.min(3, (game.state.upgrades && game.state.upgrades.production) || 0))
+        )
+          .toFixed(1)
+          .replace(/\.0$/, '')}s</span><br>`;
       else if (sp.cost)
-        h += '<span style="color:#c8b890">Cost: ' + formatCost(sp.cost, ', ') + '</span><br>';
+        h += markup`<span style="color:#c8b890">Cost: ${formatGoods(game.GOODS, sp.cost, { lowerCase: true, separator: ', ' })}</span><br>`;
       referenceHTML = h.substring(referenceStart);
-      h =
-        h.substring(0, referenceStart) +
-        '<div data-inspector-reference>' +
-        referenceHTML +
-        '</div>';
+      h = markup`${trusted(h.substring(0, referenceStart))}<div data-inspector-reference>${trusted(referenceHTML)}</div>`;
       if (!b.done)
-        h +=
-          '<label>Construction priority<select data-priority><option value="0" ' +
-          (!b.priority ? 'selected' : '') +
-          '>Normal</option><option value="1" ' +
-          (b.priority === 1 ? 'selected' : '') +
-          '>High</option><option value="2" ' +
-          (b.priority === 2 ? 'selected' : '') +
-          '>Urgent</option></select></label>';
+        h += markup`<label>Construction priority<select data-priority><option value="0" ${!b.priority ? 'selected' : ''}>Normal</option><option value="1" ${b.priority === 1 ? 'selected' : ''}>High</option><option value="2" ${b.priority === 2 ? 'selected' : ''}>Urgent</option></select></label>`;
       if (b.done && sp.prod && sp.prod !== 'none')
-        h +=
-          '<button data-production>' +
-          (b.disabled ? 'Resume production' : 'Pause production') +
-          '</button>';
+        h += markup`<button data-production>${b.disabled ? 'Resume production' : 'Pause production'}</button>`;
       if (b.done && sp.store) {
         h +=
           '<details><summary>Warehouse stock targets</summary><p class="muted">Carriers replenish targets from other stores. Food, beer, tool, and weapon producers work toward requested reserves. Zero means no request.</p>';
         for (const good in game.GOODS)
-          h +=
-            '<label>' +
-            game.GOODS[good as Good].name +
-            '<input type="number" min="0" max="500" step="1" data-target="' +
-            good +
-            '" value="' +
-            ((b.targets && b.targets[good as Good]) || 0) +
-            '"></label>';
+          h += markup`<label>${game.GOODS[good as Good].name}<input type="number" min="0" max="500" step="1" data-target="${good}" value="${(b.targets && b.targets[good as Good]) || 0}"></label>`;
         h += '</details>';
       }
       const m = b.metrics;
       if (b.done && m && sp.out) {
-        h +=
-          '<label>Rate window<select data-rate-window><option value="30" ' +
-          (productionRateWindow === 30 ? 'selected' : '') +
-          '>Last 30 seconds</option><option value="120" ' +
-          (productionRateWindow === 120 ? 'selected' : '') +
-          '>Last 2 minutes</option><option value="600" ' +
-          (productionRateWindow === 600 ? 'selected' : '') +
-          '>Last 10 minutes</option><option value="lifetime" ' +
-          (productionRateWindow === 'lifetime' ? 'selected' : '') +
-          '>Lifetime</option></select></label>';
+        h += markup`<label>Rate window<select data-rate-window><option value="30" ${productionRateWindow === 30 ? 'selected' : ''}>Last 30 seconds</option><option value="120" ${productionRateWindow === 120 ? 'selected' : ''}>Last 2 minutes</option><option value="600" ${productionRateWindow === 600 ? 'selected' : ''}>Last 10 minutes</option><option value="lifetime" ${productionRateWindow === 'lifetime' ? 'selected' : ''}>Lifetime</option></select></label>`;
         productionHTML = observedProduction(b);
-        h += '</div><div data-production-stats>' + productionHTML + '</div>';
+        h += markup`</div><div data-production-stats>${trusted(productionHTML)}</div>`;
       } else h += '</div>';
       if (game.demolitionQuote)
-        h += '<div class="inspector-demolition" data-demolition-quote>' + quoteHTML + '</div>';
+        h += markup`<div class="inspector-demolition" data-demolition-quote>${trusted(quoteHTML)}</div>`;
     } else {
-      h =
-        '<b style="color:#ffd23f">TERRAIN</b><br><span style="color:#c8b890">' +
-        tileInfo(game.selInfo) +
-        '</span>';
+      h = markup`<b style="color:#ffd23f">TERRAIN</b><br><span style="color:#c8b890">${tileInfo(game.selInfo)}</span>`;
     }
     const editing = infoBody.contains(document.activeElement);
     const key = b ? b.id + ':' + b.type + ':' + b.done : 'terrain';
@@ -594,11 +471,6 @@ export function createInspectorView(
       },
       enumerable: true,
     });
-  }
-  function formatCost(stock: Inventory, separator = ' + ') {
-    return Object.entries(stock)
-      .map(([good, amount]) => amount + ' ' + game.GOODS[good as Good].name.toLowerCase())
-      .join(separator);
   }
   return { updateInfo, request, tick, tileInfo };
 }
