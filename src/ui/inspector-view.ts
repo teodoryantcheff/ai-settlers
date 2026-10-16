@@ -46,7 +46,7 @@ export function createInspectorView(
       game.state.paused || game.blockingLayerOpen?.() || document.visibilityState === 'hidden';
     let html = markup`<h2>${sp.name} <small>#${b.id} · ${b.x}, ${b.y}</small></h2><div class="inspector-status" role="status">${trusted(
       work
-        ? markup`<p class="${work.reason && !['paused', 'demand', 'reserve'].includes(work.reason) ? 'inspector-warning' : 'inspector-evidence'}">${work.explanation}</p>`
+        ? markup`<p class="${work.reason && work.reason !== 'paused' && work.reason !== 'demand' && work.reason !== 'reserve' ? 'inspector-warning' : 'inspector-evidence'}">${work.explanation}</p>`
         : '',
     )}${trusted(
       work?.reason

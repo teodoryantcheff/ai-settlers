@@ -1,5 +1,5 @@
 import { productionOutputLimit } from '../gameplay/colony-rules.ts';
-import type { Building, BuildingType, Good } from '../types.ts';
+import type { Building, BuildingType, Good, ProductionBlockReason } from '../types.ts';
 import type { SimulationStateSubsystem } from '../simulation/state.ts';
 import type { EventsSubsystem } from '../core/events.ts';
 import type { EconomySubsystem } from '../simulation/economy.ts';
@@ -46,7 +46,7 @@ export interface ActivityEvent {
   entity?: EntityReference;
   good?: Good;
 }
-export type AttentionReason = BlockageReason | 'water';
+export type AttentionReason = Extract<ProductionBlockReason, BlockageReason | 'water'>;
 export interface IssueBaseline {
   entity: EntityReference;
   produced: boolean;

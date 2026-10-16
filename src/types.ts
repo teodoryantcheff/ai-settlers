@@ -86,6 +86,9 @@ export interface ProductionWindowMetrics extends ProductionSample {
   /** Recent snapshots are two simulation seconds apart; lifetime counters are exact. */
   sampleInterval: number;
 }
+/** The empty string means no blockage and preserves the existing save representation. */
+export type ProductionBlockReason =
+  '' | 'paused' | 'exhausted' | 'output' | 'demand' | 'reserve' | 'water' | 'inputs' | 'resources';
 export interface Building {
   id: number;
   type: BuildingType;
@@ -102,7 +105,7 @@ export interface Building {
   targets: Inventory;
   disabled: boolean;
   metrics: ProductionMetrics;
-  blockedReason: string;
+  blockedReason: ProductionBlockReason;
   man: boolean;
   exhausted: boolean;
   nofood: boolean;

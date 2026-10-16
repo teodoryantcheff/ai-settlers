@@ -85,6 +85,61 @@ function colony(seed = 2024) {
 
 const snapshot = (e) => JSON.parse(JSON.stringify(e.snapshotGame()));
 
+test('imported unknown production block reasons normalize to no reason', () => {
+  const e = colony();
+  for (const version of [1, 2]) {
+    for (const reason of [
+      undefined,
+      'none',
+      'input',
+      'resouces',
+      'constructor',
+      '__proto__',
+      7,
+      null,
+      {},
+    ]) {
+      const imported = snapshot(e);
+      imported.v = version;
+      imported.b[0].blockedReason = reason;
+      e.importSave(JSON.stringify(imported));
+      assert.equal(e.buildings[0].blockedReason, '', JSON.stringify(reason));
+      assert.equal(JSON.parse(e.exportSave()).b[0].blockedReason, '', JSON.stringify(reason));
+    }
+  }
+});
+
+test('every production block reason round-trips through exported files and checkpoints', () => {
+  const e = colony();
+  const mill = e.newBuilding('sawmill', 51, 48);
+  mill.done = true;
+  mill.prog = 1;
+  e.buildings.push(mill);
+  e.step(1 / 60);
+  for (const reason of [
+    '',
+    'paused',
+    'exhausted',
+    'output',
+    'demand',
+    'reserve',
+    'water',
+    'inputs',
+    'resources',
+  ]) {
+    e.buildings[1].blockedReason = reason;
+    const exported = e.exportSave();
+    e.importSave(exported);
+    assert.equal(e.buildings[1].blockedReason, reason);
+    assert.deepEqual(JSON.parse(e.exportSave()), JSON.parse(exported));
+    const saved = e.saveCheckpoint('Production reason');
+    e.buildings[1].blockedReason = '';
+    e.loadCheckpoint(saved.id);
+    assert.equal(e.buildings[1].blockedReason, reason);
+    assert.deepEqual(JSON.parse(e.exportSave()), JSON.parse(exported));
+  }
+});
+
 test('version-two save continues RNG, timers, cargo and production exactly', () => {
   const e = colony();
   const lumber = e.newBuilding('lumberjack', 51, 48);

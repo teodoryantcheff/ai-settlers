@@ -31,6 +31,7 @@ import type {
   Good,
   Inventory,
   Job,
+  ProductionBlockReason,
   ProductionMetrics,
   ProductionRateWindow,
   ProductionSample,
@@ -782,9 +783,9 @@ export function createEconomy(
     });
   }
   /** Exact scheduling gate; also read by the inspector without mutating recorded reasons. */
-  function productionConstraint(b: Building) {
+  function productionConstraint(b: Building): ProductionBlockReason {
     const sp = game.BSPEC[b.type];
-    let reason = '';
+    let reason: ProductionBlockReason = '';
     if (b.disabled) reason = 'paused';
     else if (b.exhausted) reason = 'exhausted';
     else if (productionOutputBlocked(b, sp)) reason = 'output';
@@ -839,7 +840,7 @@ export function createEconomy(
     )
       reason = 'resources';
     const output = sp.prod === 'gather' ? 2 : 1;
-    const explanations: Record<string, string> = {
+    const explanations: Partial<Record<ProductionBlockReason, string>> = {
       paused: 'Production paused by you.',
       exhausted: 'Deposit exhausted; no further output can be produced here.',
       output: `Output blocked: the next batch needs space for ${output} ${sp.out ? game.GOODS[sp.out].name.toLowerCase() : 'goods'}; ${b.stock[sp.out] || 0} of ${productionOutputLimit} local output slots are occupied. Waiting for collection.`,
@@ -2107,7 +2108,7 @@ export type PlacementAdvice =
   | 'keep about 2 tiles of space between buildings';
 
 export interface ProductionProgress {
-  reason: string;
+  reason: ProductionBlockReason;
   explanation: string;
   suspended: boolean;
   remainingWork: number;

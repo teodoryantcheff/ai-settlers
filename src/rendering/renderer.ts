@@ -7,6 +7,7 @@ import type {
   Inventory,
   LayerName,
   PresentationPreferences,
+  ProductionBlockReason,
   Sprite,
   Tile,
   TilePoint,
@@ -1840,7 +1841,7 @@ export function createRenderer(
       g.stroke();
     }
   }
-  const _reasonNames: Record<string, string> = {
+  const _reasonNames: Partial<Record<ProductionBlockReason, string>> = {
     inputs: 'Waiting for inputs',
     output: 'Waiting for collection',
     reserve: 'Construction reserve',

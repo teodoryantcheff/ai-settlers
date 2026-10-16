@@ -3,6 +3,7 @@ import type { Building, BuildingSpec, BuildingType, Good, SimulationState } from
 import {
   deliberatePause,
   productionBlockage as blockage,
+  type BlockageReason,
 } from '../observations/production-condition.ts';
 
 export const ECONOMIC_BLOCKAGE_DELAY_MS = 12_000;
@@ -12,7 +13,7 @@ const MAX_SAMPLE_GAP_MS = 1_500;
 const MAX_NOTICE_EXAMPLES = 3;
 
 export type EconomicFeedbackKind = 'started' | 'blocked' | 'recovered';
-export type EconomicBlockageReason = 'inputs' | 'output' | 'resources' | 'exhausted';
+export type EconomicBlockageReason = BlockageReason;
 export interface EconomicFeedbackNotice {
   kind: EconomicFeedbackKind;
   reason: EconomicBlockageReason | null;

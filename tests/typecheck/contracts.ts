@@ -63,6 +63,10 @@ game.presentationPrefs.overlay = 'bogus-overlay';
 game.tileHash('12');
 // @ts-expect-error Night-glow exclusions name real building types.
 const misspelledUnlit: typeof UNLIT_AT_NIGHT = new Set(['coalmine']);
+// @ts-expect-error Production block reasons are a closed set, including on live buildings.
+building.blockedReason = 'resouces';
+// @ts-expect-error Misspelled production reason comparisons must be rejected too.
+if (building.blockedReason === 'resouces') game.buildingWorking(building);
 void unknownGood;
 void misspelledUnlit;
 void deadClauseJob;
@@ -92,6 +96,10 @@ import type { AutoplayDependencies } from '../../src/simulation/autoplay.ts';
 import type { MapDependencies } from '../../src/simulation/map.ts';
 import type { ProgressionDependencies } from '../../src/gameplay/progression.ts';
 import type { PersistenceDependencies } from '../../src/core/persistence.ts';
+import type { ProductionProgress } from '../../src/simulation/economy.ts';
+declare const productionProgress: ProductionProgress;
+// @ts-expect-error Production projections retain the same closed reason contract.
+productionProgress.reason = 'resouces';
 declare const economy: EconomyDependencies;
 declare const autoplay: AutoplayDependencies;
 declare const map: MapDependencies;

@@ -5,8 +5,16 @@ import {
   type EntityReference,
   type IssueBaseline,
   type ActivityEvent,
+  type AttentionReason,
 } from './attention.ts';
 import type { BuildingType, Good, Building, BuildingSpec } from '../types.ts';
+const attentionReasons: readonly AttentionReason[] = [
+  'inputs',
+  'output',
+  'resources',
+  'exhausted',
+  'water',
+];
 /** Standalone schema boundary. Historical references need not identify a live entity. */
 export function validateAttention(
   raw: unknown,
@@ -91,10 +99,7 @@ export function validateAttention(
       typeof value.active !== 'boolean' ||
       !num(value.since) ||
       value.since < (raw.started as number) ||
-      (value.reason !== null &&
-        !['inputs', 'output', 'resources', 'exhausted', 'water'].includes(
-          value.reason as string,
-        )) ||
+      (value.reason !== null && !attentionReasons.includes(value.reason as AttentionReason)) ||
       (value.active && value.reason === null) ||
       (value.active && time - (value.since as number) < 12 - 1e-9)
     )

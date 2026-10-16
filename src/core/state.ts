@@ -203,7 +203,20 @@ export function validateSave(
         return clean;
       });
     }
-    b.blockedReason = typeof b.blockedReason === 'string' ? b.blockedReason.slice(0, 160) : '';
+    switch (b.blockedReason) {
+      case '':
+      case 'paused':
+      case 'exhausted':
+      case 'output':
+      case 'demand':
+      case 'reserve':
+      case 'water':
+      case 'inputs':
+      case 'resources':
+        break;
+      default:
+        b.blockedReason = '';
+    }
   }
   if (d.b.filter((b) => b.type === 'hq' && b.done).length !== 1) fail('Missing headquarters');
   const buildings = new Map<number, Building>(d.b.map((b) => [b.id, b]));

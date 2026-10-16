@@ -250,7 +250,9 @@ export function createAdvisor(game: AdvisorDependencies): AdvisorSubsystem {
         b.done &&
         good &&
         !b.disabled &&
-        !['output', 'reserve', 'demand'].includes(b.blockedReason) &&
+        b.blockedReason !== 'output' &&
+        b.blockedReason !== 'reserve' &&
+        b.blockedReason !== 'demand' &&
         b.metrics &&
         b.metrics.elapsed > 30 &&
         b.metrics.inputBlocked / b.metrics.elapsed > 0.35 &&

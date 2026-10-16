@@ -2,7 +2,13 @@ import { html as markup, trusted } from './markup.ts';
 import { createLiveReportUpdater } from './live-report.ts';
 import { revealReportHeading } from './report-navigation.ts';
 import type { GameRuntime } from '../runtime.ts';
-import type { Building, EconomicFlow, Good, ProductionRateWindow } from '../types.ts';
+import type {
+  Building,
+  EconomicFlow,
+  Good,
+  ProductionBlockReason,
+  ProductionRateWindow,
+} from '../types.ts';
 import { eligibleIngredients, productionTiming } from '../gameplay/production-rules.ts';
 import { RESOURCE_GROUPS, resourceIcon } from './resource-icons.ts';
 import { observePresentation } from './domain-feedback.ts';
@@ -134,7 +140,7 @@ export function createEconomyView(game: GameRuntime): EconomyViewSubsystem {
     const { base: cycle, tier, variety } = timing;
     const output = spec.prod === 'gather' ? 2 : 1;
     const theoretical = ((output * 60) / cycle / timing.upgradeFactor) * timing.foodMultiplier;
-    const reasons: Record<string, string> = {
+    const reasons: Partial<Record<ProductionBlockReason, string>> = {
       paused: 'Intentionally paused',
       exhausted: 'Deposit exhausted',
       output: 'Output awaiting collection fills local stock',
