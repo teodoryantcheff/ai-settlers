@@ -10,7 +10,7 @@ export function createAmbience(
 ) {
   let active: AudioGraph = null;
   // ---------- AMBIENCE ----------
-  var rainG: AudioGraph['channels']['ambience'] = null,
+  let rainG: AudioGraph['channels']['ambience'] = null,
     birdT = 0,
     waterG: AudioGraph['channels']['ambience'] = null,
     ambT = 0;
@@ -150,7 +150,7 @@ export function createAmbience(
     if (birdT > 0) birdT -= dt;
     else {
       if (runtime.canPlay('ambience')) {
-        var nA = game.nightAmt(),
+        const nA = game.nightAmt(),
           rA = game.rainAmt();
         if (rA > 0.35) {
         } // storms quiet the songbirds
@@ -165,19 +165,19 @@ export function createAmbience(
     if (ambT > 0) return;
     ambT = 1.5;
     if (!waterG) return;
-    var n = 0,
+    let n = 0,
       samples = 0;
-    var x0 = Math.max(0, Math.floor(game.cam.x / game.TS)),
+    const x0 = Math.max(0, Math.floor(game.cam.x / game.TS)),
       x1 = Math.min(game.W - 1, Math.ceil((game.cam.x + game.vw / game.z) / game.TS));
-    var y0 = Math.max(0, Math.floor(game.cam.y / game.TS)),
+    const y0 = Math.max(0, Math.floor(game.cam.y / game.TS)),
       y1 = Math.min(game.H - 1, Math.ceil((game.cam.y + game.vh / game.z) / game.TS));
-    for (var y = y0; y <= y1; y += 3)
-      for (var x = x0; x <= x1; x += 3) {
+    for (let y = y0; y <= y1; y += 3)
+      for (let x = x0; x <= x1; x += 3) {
         samples++;
         if (game.tiles[game.idx(x, y)].t === game.WATER) n++;
       }
-    var frac = samples ? n / samples : 0;
-    var target = Math.min(0.05, frac * 0.09);
+    const frac = samples ? n / samples : 0;
+    const target = Math.min(0.05, frac * 0.09);
     const t = runtime.immediate();
     waterG.gain.cancelAndHoldAtTime(t);
     waterG.gain.setTargetAtTime(target, t, 0.8);

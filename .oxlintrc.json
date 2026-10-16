@@ -35,19 +35,10 @@
   "overrides": [
     {
       "files": [
-        "src/application/loop.ts",
-        "src/audio/ambience.ts",
-        "src/audio/music.ts",
-        "src/audio/world-effects.ts",
-        "src/dev/scenarios.ts",
         "src/rendering/art.ts",
         "src/rendering/landscape.ts",
         "src/rendering/renderer.ts",
-        "src/rendering/village.ts",
-        "src/ui/economic-notices.ts",
-        "src/ui/hud.ts",
-        "src/ui/inspector-view.ts",
-        "src/ui/interaction.ts"
+        "src/rendering/village.ts"
       ],
       "rules": {
         "no-var": "off",
