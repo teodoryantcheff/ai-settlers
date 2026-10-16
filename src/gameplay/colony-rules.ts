@@ -81,6 +81,12 @@ export interface TerritoryWorld extends Pick<ColonyRulesWorld, 'BSPEC'> {
 
 const unmannedGuardRadius = 3;
 
+/** Land-claim range: unmanned guards are capped, while staffed claims use full range. */
+export function territoryClaimRadius(spec: Pick<BuildingSpec, 'guard' | 'rad'>, man = false) {
+  const radius = spec.rad || 0;
+  return spec.guard && !man ? Math.min(radius, unmannedGuardRadius) : radius;
+}
+
 /**
  * Project the union of orthogonal claims over traversable ground. Replacing the
  * source list can add, remove or unman guards without changing the live colony.
@@ -96,8 +102,7 @@ export function projectTerritory(
   for (const building of buildings) {
     if (!building.done || building.type === 'well') continue;
     const spec = world.BSPEC[building.type];
-    const radius =
-      spec.guard && !building.man ? Math.min(spec.rad || 0, unmannedGuardRadius) : spec.rad || 0;
+    const radius = territoryClaimRadius(spec, building.man);
     if (!radius) continue;
     stamp++;
     const start = world.idx(building.x, building.y);

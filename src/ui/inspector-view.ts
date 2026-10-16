@@ -1,3 +1,4 @@
+import { territoryClaimRadius } from '../gameplay/colony-rules.ts';
 import { html as markup, trusted, formatGoods } from './markup.ts';
 import type { PlacementFeedback } from './placement-feedback.ts';
 import type { GameRuntime } from '../runtime.ts';
@@ -87,7 +88,7 @@ export function createInspectorView(
       if (sp.water)
         html += markup`<p>Local water: ${game.hasLocalWater?.(b) ? 'working connected well within 6 tiles' : 'no working connected well within 6 tiles'}. Water is local coverage, not transported stock.</p>`;
       if (b.type === 'guard')
-        html += markup`<p>${b.man ? 'Manned' : 'Unmanned'} outpost · current claim radius ${b.man ? sp.rad : Math.min(sp.rad, 3)} tiles, restricted by traversable land.</p>`;
+        html += markup`<p>${b.man ? 'Manned' : 'Unmanned'} outpost · current claim radius ${territoryClaimRadius(sp, b.man)} tiles, restricted by traversable land.</p>`;
     }
     return html;
   }

@@ -1,3 +1,4 @@
+import { territoryClaimRadius } from '../gameplay/colony-rules.ts';
 import { html as markup, trusted, formatGoods } from './markup.ts';
 import { artworkAssetURL } from '../rendering/painted-assets.ts';
 import type { GameRuntime } from '../runtime.ts';
@@ -56,7 +57,7 @@ export function createReferenceView(game: GameRuntime): ReferenceViewSubsystem {
       extra +=
         '<p>Legacy provisions remain an eligible meal. Different stocked food types can improve mining speed; inspect actual food variety and measured output separately.</p>';
     if (type === 'guard')
-      extra += markup`<p>Unmanned outposts claim up to ${Math.min(spec.rad, 3)} tiles of land radius. A soldier expands this to ${spec.rad}. Territory follows an orthogonal flood through traversable land; water and mountains restrict it. A queued deployment is not a walking soldier.</p>`;
+      extra += markup`<p>Unmanned outposts claim up to ${territoryClaimRadius(spec)} tiles of land radius. A soldier expands this to ${territoryClaimRadius(spec, true)}. Territory follows an orthogonal flood through traversable land; water and mountains restrict it. A queued deployment is not a walking soldier.</p>`;
     const purpose =
       type === 'hq'
         ? 'Starting storage and colony center. Headquarters demolition is protected.'

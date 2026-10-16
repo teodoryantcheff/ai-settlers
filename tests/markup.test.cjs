@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { territoryClaimRadius } = require('../src/gameplay/colony-rules.ts');
 const {
   createGame,
   DEFAULT_MODULES,
@@ -103,4 +104,77 @@ test('resource balance rows remain markup while goods names are displayed as tex
   assert.match(output, /<svg class="resource-icon"/);
   assert.match(output, /&lt;Logs &amp; &quot;timber&quot;&gt;/);
   assert.doesNotMatch(output, /<Logs/);
+});
+
+test('victory statistics retain structured rows while values stay escaped', (t) => {
+  const { game, dom } = interfaceGame(t);
+  game.step(0.25);
+  game.state.gold = '200 <gold & "coin">';
+  game.renderVictory();
+  const output = dom.node('winstats').innerHTML;
+  assert.match(
+    output,
+    /<dl class="victory-grid"><div><dt>Simulation age<\/dt><dd>0m 0.3s<\/dd><\/div>/,
+  );
+  assert.match(
+    output,
+    /<div><dt>Current treasury<\/dt><dd>200 &lt;gold &amp; &quot;coin&quot;&gt; Gold<\/dd><\/div>/,
+  );
+  assert.match(
+    output,
+    /<h2>Recorded economic achievements<\/h2><dl class="victory-grid"><div><dt>Gold produced<\/dt><dd>0<\/dd><\/div>/,
+  );
+  assert.equal((output.match(/<dt>/g) || []).length, 12);
+  assert.equal((output.match(/<dd>/g) || []).length, 12);
+  assert.doesNotMatch(output, /&lt;(?:div|dt|dd)&gt;|<gold/);
+});
+
+test('outpost descriptions and territory use the shared radius for each staffing state', (t) => {
+  const { game, dom } = interfaceGame(t);
+  const original = game.BSPEC.guard.rad;
+  t.after(() => {
+    game.BSPEC.guard.rad = original;
+  });
+  const guard = game.newBuilding('guard', 70, 70);
+  Object.assign(guard, { done: true, prog: 1 });
+  game.buildings.push(guard);
+  game.tiles = Array.from({ length: game.W * game.H }, () => ({
+    t: game.GRASS,
+    tree: 0,
+    rock: null,
+    res: null,
+    road: false,
+  }));
+  const { game: reference } = createGame({
+    modules: [...DEFAULT_MODULES, 'reference'],
+    stubs: { BSPEC: game.BSPEC },
+  });
+  for (const [configured, man, expected] of [
+    [7, false, 3],
+    [7, true, 7],
+    [2, false, 2],
+  ]) {
+    game.BSPEC.guard.rad = configured;
+    guard.man = man;
+    assert.equal(territoryClaimRadius(game.BSPEC.guard, man), expected);
+    game.recomputeTerritory();
+    assert.equal(game.owned[game.idx(70 + expected, 70)], 1);
+    assert.equal(game.owned[game.idx(71 + expected, 70)], 0);
+    game.selected = guard;
+    game.updateInfo();
+    assert.match(
+      dom.node('infobody').innerHTML,
+      new RegExp('current claim radius ' + expected + ' tiles'),
+    );
+    reference.renderReference('building-guard');
+    assert.match(
+      dom.node('reference-results').innerHTML,
+      new RegExp(
+        'Unmanned outposts claim up to ' +
+          (configured === 7 ? 3 : 2) +
+          ' tiles of land radius. A soldier expands this to ' +
+          configured,
+      ),
+    );
+  }
 });
