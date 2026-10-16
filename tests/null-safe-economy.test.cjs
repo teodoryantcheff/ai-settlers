@@ -81,17 +81,17 @@ test('a cargo job with no good cannot reserve stock or start a carrier pickup', 
     game.initializeColony();
     const store = game.anyStorage();
     const unit = game.units[0];
-    const job = { kind, s: store.id, from: store.id, to: store.id, state: 'p' };
+    const job = { kind, sourceId: store.id, to: store.id, status: 'pending' };
     const before = game.exportSave();
     game.jobs.push(job);
     internals.economy.startJob(unit, job);
-    assert.equal(job.state, 'p');
+    assert.equal(job.status, 'pending');
     assert.equal(unit.job, null);
     assert.equal(unit.path, null);
     assert.deepEqual(store.reservedStock, {});
-    // Also recover an already assigned pickup whose optional good is absent.
+    // Recover malformed untyped input even though typed cargo jobs require a good.
     Object.assign(unit, { job, phase: 'p', path: [] });
-    job.state = 't';
+    job.status = 'assigned';
     internals.economy.stepUnit(unit, 0.25);
     assert.equal(unit.job, null);
     assert.equal(unit.carry, null);
@@ -118,8 +118,8 @@ test('producer arrivals initialize an absent optional delivery counter before re
     source.stock[good] = 1;
     if (input) store.reservedStock.logs = 1;
     const job = input
-      ? { kind: 'fetch', good, s: store.id, to: producer.id, state: 'p' }
-      : { kind: 'deliver', good, from: producer.id, state: 'p' };
+      ? { kind: 'fetch', good, sourceId: store.id, to: producer.id, status: 'pending' }
+      : { kind: 'deliver', good, sourceId: producer.id, status: 'pending' };
     game.jobs.push(job);
     game.spawnCarrier(store);
     const unit = game.units[0];

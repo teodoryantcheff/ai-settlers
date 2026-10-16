@@ -80,8 +80,8 @@ test('input evidence distinguishes queued, assigned and carrying work, including
     kind: 'fetch',
     good: 'logs',
     to: mill.id,
-    from: g.anyStorage().id,
-    state: i ? 't' : 'p',
+    sourceId: g.anyStorage().id,
+    status: i ? 'assigned' : 'pending',
   }));
   g.jobs.push(...jobs);
   g.units.push(
@@ -115,8 +115,8 @@ test('input evidence distinguishes queued, assigned and carrying work, including
     kind: 'fetch',
     good: 'fish',
     to: mine.id,
-    from: g.anyStorage().id,
-    state: 'p',
+    sourceId: g.anyStorage().id,
+    status: 'pending',
   });
   const status = g
     .bStatus(mine)
@@ -131,7 +131,7 @@ test('unmanned outpost evidence distinguishes waiting dispatch from a walking so
   const b = g.newBuilding('guard', 57, 48);
   Object.assign(b, { done: true, constructionProgress: 1 });
   g.buildings.push(b);
-  const job = { kind: 'soldier', to: b.id, state: 'p' };
+  const job = { kind: 'soldier', to: b.id, status: 'pending' };
   g.jobs.push(job);
   assert.match(
     g
@@ -141,7 +141,7 @@ test('unmanned outpost evidence distinguishes waiting dispatch from a walking so
     /1 queued.*0 walking/,
   );
   g.units.push({ id: 911, job, kind: 'soldier', phase: 'd', dead: false });
-  job.state = 't';
+  job.status = 'assigned';
   assert.match(
     g
       .buildingStatus(b)
@@ -156,7 +156,13 @@ test('missing live carriers leave assignment evidence unavailable instead of inv
   const b = g.newBuilding('sawmill', 51, 48);
   Object.assign(b, { done: true, constructionProgress: 1 });
   g.buildings.push(b);
-  g.jobs.push({ kind: 'fetch', good: 'logs', to: b.id, s: g.anyStorage().id, state: 't' });
+  g.jobs.push({
+    kind: 'fetch',
+    good: 'logs',
+    to: b.id,
+    sourceId: g.anyStorage().id,
+    status: 'assigned',
+  });
   assert.deepEqual(g.incomingDeliveryStages('logs', b.id), {
     queued: 0,
     assigned: 0,
@@ -188,8 +194,8 @@ test('all delivery evidence projections agree on live cargo and missing assignme
       kind: 'fetch',
       good: 'logs',
       to: b.id,
-      s: g.anyStorage().id,
-      state: index ? 't' : 'p',
+      sourceId: g.anyStorage().id,
+      status: index ? 'assigned' : 'pending',
     };
     g.jobs.push(job);
     if (stage === 'assigned' || stage === 'carrying')

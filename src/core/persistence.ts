@@ -13,7 +13,14 @@ import type { AutoplaySubsystem } from '../simulation/autoplay.ts';
 import type { EventsSubsystem } from './events.ts';
 import type { MapSubsystem } from '../simulation/map.ts';
 import { validateSave } from './state.ts';
-import type { Building, PreparedSave, SaveData, SavedDeposit, SaveMetadata } from '../types.ts';
+import type {
+  Building,
+  Job,
+  PreparedSave,
+  SaveData,
+  SavedDeposit,
+  SaveMetadata,
+} from '../types.ts';
 
 /**
  * Persistence owns the save wire format: snapshots, validation-driven hydration,
@@ -95,15 +102,14 @@ export function createPersistence(
         disabled: !!b.disabled,
       };
     });
-    const J = game.jobs.map(function (j) {
-      return {
-        kind: j.kind,
-        good: j.good || null,
-        to: j.to || 0,
-        s: j.s || 0,
-        from: j.from || 0,
-        state: j.state,
-      };
+    const J = game.jobs.map((job): Job => {
+      const status = job.status;
+      if (job.kind === 'soldier') return { kind: job.kind, to: job.to, status };
+      const cargo = { good: job.good, sourceId: job.sourceId, status };
+      if (job.kind === 'deliver') return { kind: job.kind, ...cargo };
+      return job.kind === 'fetch'
+        ? { kind: 'fetch', to: job.to, ...cargo }
+        : { kind: 'transfer', to: job.to, ...cargo };
     });
     const U = game.units
       .filter(function (u) {

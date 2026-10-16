@@ -225,7 +225,7 @@ export function createEconomy(
     let n = 0;
     for (let i = 0; i < game.jobs.length; i++) {
       const j = game.jobs[i];
-      if (j.kind === 'deliver' && j.good === g && j.from === bid) n++;
+      if (j.kind === 'deliver' && j.good === g && j.sourceId === bid) n++;
     }
     return n;
   }
@@ -405,7 +405,12 @@ export function createEconomy(
       if (includeTransfers)
         for (let j = 0; j < game.jobs.length; j++) {
           const job = game.jobs[j];
-          if (job.kind === 'transfer' && job.s === store.id && job.good === g && !collectedJob(job))
+          if (
+            job.kind === 'transfer' &&
+            job.sourceId === store.id &&
+            job.good === g &&
+            !collectedJob(job)
+          )
             free++;
         }
       s += Math.max(0, Math.min((store.stock[g] ?? 0) | 0, free));
@@ -453,7 +458,7 @@ export function createEconomy(
     cancelJobs(function (job) {
       if (job.kind !== 'transfer' || !job.good || !shortage[job.good] || collectedJob(job))
         return false;
-      const source = byId(job.s);
+      const source = byId(job.sourceId);
       if (!source || !source.done || !game.BSPEC[source.type].store) return false;
       if (ref && !game.connectedLand(ref.x, ref.y, source.x, source.y)) return false;
       shortage[job.good] = (shortage[job.good] ?? 0) - 1;
@@ -479,7 +484,7 @@ export function createEconomy(
         break;
       }
     if ((j.kind === 'fetch' || j.kind === 'transfer') && j.good && (!assigned || !assigned.carry)) {
-      const s = byId(j.s);
+      const s = byId(j.sourceId);
       if (s) s.reservedStock[j.good] = Math.max(0, ((s.reservedStock[j.good] ?? 0) | 0) - 1);
     }
     if (j.kind === 'soldier') {
@@ -727,9 +732,7 @@ export function createEconomy(
     }
     const equipmentReceiver =
       allowed && b.type === 'guard' && b.manned ? nearestStoragePos(b.x, b.y) : null;
-    const touching = game.jobs.filter(
-      (job) => job.from === b.id || job.to === b.id || job.s === b.id,
-    );
+    const touching = game.jobs.filter((job) => job.sourceId === b.id || job.to === b.id);
     const cancelledDeliveries: DeliveryStages = { queued: 0, assigned: 0, carrying: 0 };
     for (const job of touching) {
       if (job.kind === 'soldier') continue;
@@ -780,9 +783,7 @@ export function createEconomy(
       return;
     }
     // Job cancellation returns dispatched soldiers itself; add only the garrison here.
-    const dispatched = game.jobs.filter(
-      (job) => job.kind === 'soldier' && (job.from === b.id || job.to === b.id || job.s === b.id),
-    ).length;
+    const dispatched = game.jobs.filter((job) => job.kind === 'soldier' && job.to === b.id).length;
     game.soldierPool += quote.returnedSoldiers - dispatched;
     const equipmentStore = quote.equipmentReceiver ? byId(quote.equipmentReceiver.id) : null;
     if (equipmentStore)
@@ -832,7 +833,7 @@ export function createEconomy(
   }
   function deleteJobsFor(id: number) {
     cancelJobs(function (j) {
-      return j.from === id || j.to === id || j.s === id;
+      return j.sourceId === id || j.to === id;
     });
   }
   /** Exact scheduling gate; also read by the inspector without mutating recorded reasons. */
@@ -1176,8 +1177,8 @@ export function createEconomy(
     for (let ji = 0; ji < game.jobs.length; ji++) {
       const pending = game.jobs[ji];
       if (pending.kind !== 'transfer' || !pending.good || collectedJob(pending)) continue;
-      const source = byId(pending.s),
-        sourceKey = pending.s + '/' + pending.good;
+      const source = byId(pending.sourceId),
+        sourceKey = pending.sourceId + '/' + pending.good;
       if (exportBudget[sourceKey] === undefined)
         exportBudget[sourceKey] = source
           ? ((source.stock[pending.good] ?? 0) | 0) -
@@ -1199,9 +1200,9 @@ export function createEconomy(
       if (!job.good) return true;
       if (collectedJob(job)) return false;
       const target = byId(job.to),
-        source = byId(job.s),
+        source = byId(job.sourceId),
         key = job.to + '/' + job.good,
-        sourceKey = job.s + '/' + job.good;
+        sourceKey = job.sourceId + '/' + job.good;
       if (!target || !source || !game.connectedLand(source.x, source.y, target.x, target.y))
         return true;
       const needed = Math.max(
@@ -1239,10 +1240,9 @@ export function createEconomy(
           game.jobs.push({
             kind: 'transfer',
             good: g as Good,
-            from: source.id,
-            s: source.id,
+            sourceId: source.id,
             to: target.id,
-            state: 'p',
+            status: 'pending',
           });
         }
       }
@@ -1253,7 +1253,7 @@ export function createEconomy(
     if (j.kind === 'fetch') return (b && !b.done ? 100 : 20) + 10 * (b ? b.priority || 0 : 0);
     if (j.kind === 'soldier') return 80;
     if (j.kind === 'deliver') {
-      const source = byId(j.from);
+      const source = byId(j.sourceId);
       return 40 + (source && j.good ? (source.stock[j.good] ?? 0) | 0 : 0);
     }
     return 5 + 10 * (b ? b.priority || 0 : 0);
@@ -1297,7 +1297,13 @@ export function createEconomy(
             }
             if (!s) break;
             s.reservedStock[g] = ((s.reservedStock[g] ?? 0) | 0) + 1;
-            game.jobs.push({ kind: 'fetch', good: g as Good, to: b.id, s: s.id, state: 'p' });
+            game.jobs.push({
+              kind: 'fetch',
+              good: g as Good,
+              to: b.id,
+              sourceId: s.id,
+              status: 'pending',
+            });
           }
         }
         continue;
@@ -1322,7 +1328,13 @@ export function createEconomy(
             const s3 = pickStorageFor(g, b);
             if (!s3) break;
             s3.reservedStock[g] = ((s3.reservedStock[g] ?? 0) | 0) + 1;
-            game.jobs.push({ kind: 'fetch', good: g as Good, to: b.id, s: s3.id, state: 'p' });
+            game.jobs.push({
+              kind: 'fetch',
+              good: g as Good,
+              to: b.id,
+              sourceId: s3.id,
+              status: 'pending',
+            });
           }
         }
       } else if (sp.in) {
@@ -1335,7 +1347,7 @@ export function createEconomy(
         (b.type === 'farm' || b.type === 'fisherman') &&
         (b.stock.food || 0) > countDeliver('food', b.id)
       )
-        game.jobs.push({ kind: 'deliver', good: 'food', from: b.id, state: 'p' });
+        game.jobs.push({ kind: 'deliver', good: 'food', sourceId: b.id, status: 'pending' });
       if (sp.out) {
         const outN = (b.stock[sp.out] ?? 0) | 0,
           dlMax = outN >= 4 ? 2 : 1,
@@ -1345,7 +1357,7 @@ export function createEconomy(
             cancelJobs(
               (function (g6, g7) {
                 return function (a) {
-                  if (a.kind !== 'deliver' || a.good !== g6 || a.from !== g7) return false;
+                  if (a.kind !== 'deliver' || a.good !== g6 || a.sourceId !== g7) return false;
                   for (let ui = 0; ui < game.units.length; ui++)
                     if (game.units[ui].job === a && game.units[ui].carry) return false;
                   return true;
@@ -1353,11 +1365,11 @@ export function createEconomy(
               })(sp.out, b.id),
             );
         } else if (dl < dlMax)
-          game.jobs.push({ kind: 'deliver', good: sp.out, from: b.id, state: 'p' });
+          game.jobs.push({ kind: 'deliver', good: sp.out, sourceId: b.id, status: 'pending' });
       }
       if (sp.guard && !b.manned && game.soldierPool > 0 && !countSoldier(b.id)) {
         game.soldierPool--;
-        game.jobs.push({ kind: 'soldier', to: b.id, state: 'p' });
+        game.jobs.push({ kind: 'soldier', to: b.id, status: 'pending' });
       }
     }
     replenishTargets();
@@ -1369,7 +1381,7 @@ export function createEconomy(
     }
     if (!j.good) return null;
     if (j.kind === 'fetch' || j.kind === 'transfer') {
-      const s = byId(j.s);
+      const s = byId(j.sourceId);
       if (!s || ((s.stock[j.good] ?? 0) | 0) <= 0) {
         const old = s;
         const nb = nearestStorage(old || { x: 0, y: 0 }, { available: j.good });
@@ -1377,13 +1389,13 @@ export function createEconomy(
         if (old && old !== nb)
           old.reservedStock[j.good] = Math.max(0, ((old.reservedStock[j.good] ?? 0) | 0) - 1);
         nb.reservedStock[j.good] = ((nb.reservedStock[j.good] ?? 0) | 0) + 1;
-        j.s = nb.id;
+        j.sourceId = nb.id;
       }
-      const s2 = byId(j.s);
+      const s2 = byId(j.sourceId);
       return s2 ? { x: s2.x, y: s2.y } : null;
     }
     if (j.kind === 'deliver') {
-      const b = byId(j.from);
+      const b = byId(j.sourceId);
       return b ? { x: b.x, y: b.y } : null;
     }
     return null;
@@ -1410,7 +1422,7 @@ export function createEconomy(
     if (!pp) return;
     const p1 = game.findPath(Math.floor(u.x), Math.floor(u.y), pp.x, pp.y);
     if (!p1) return;
-    j.state = 't';
+    j.status = 'assigned';
     u.job = j;
     u.phase = 'p';
     u.path = p1;
@@ -1426,7 +1438,7 @@ export function createEconomy(
     });
     for (let i = 0; i < game.jobs.length; i++) {
       const j = game.jobs[i];
-      if (j.state !== 'p') continue;
+      if (j.status !== 'pending') continue;
       if (j.kind === 'soldier') {
         const g = byId(j.to),
           s = g ? nearestStoragePos(g.x, g.y) : null;
@@ -1443,7 +1455,7 @@ export function createEconomy(
           i--;
           continue;
         }
-        j.state = 't';
+        j.status = 'assigned';
         game.units.push({
           id: game.nextId++,
           kind: 'soldier',
@@ -1576,7 +1588,7 @@ export function createEconomy(
       const ji2 = game.jobs.indexOf(u.job);
       if (ji2 >= 0) game.jobs.splice(ji2, 1);
       if ((u.job.kind === 'fetch' || u.job.kind === 'transfer') && u.job.good && !u.carry) {
-        const source = byId(u.job.s);
+        const source = byId(u.job.sourceId);
         if (source)
           source.reservedStock[u.job.good] = Math.max(
             0,
@@ -1673,19 +1685,19 @@ export function createEconomy(
           dropFail(u);
           return;
         }
-        let s = byId(j.s);
+        let s = byId(j.sourceId);
         if (!s || ((s.stock[j.good] ?? 0) | 0) <= 0) {
           s = nearestStorage(u, { available: j.good, connected: true });
           if (!s || j.kind === 'transfer') {
-            j.state = 'p';
+            j.status = 'pending';
             resetCarrier(u, 'assignment');
             return;
           }
-          const old = byId(j.s);
+          const old = byId(j.sourceId);
           if (old && old !== s)
             old.reservedStock[j.good] = Math.max(0, ((old.reservedStock[j.good] ?? 0) | 0) - 1);
           s.reservedStock[j.good] = ((s.reservedStock[j.good] ?? 0) | 0) + 1;
-          j.s = s.id;
+          j.sourceId = s.id;
         }
         s.stock[j.good] = (s.stock[j.good] ?? 0) - 1;
         s.reservedStock[j.good] = Math.max(0, ((s.reservedStock[j.good] ?? 0) | 0) - 1);
@@ -1709,7 +1721,7 @@ export function createEconomy(
           dropFail(u);
           return;
         }
-        const b = byId(j.from);
+        const b = byId(j.sourceId);
         if (!b || ((b.stock[j.good] ?? 0) | 0) <= 0) {
           const ji2 = game.jobs.indexOf(j);
           if (ji2 >= 0) game.jobs.splice(ji2, 1);
@@ -1938,7 +1950,7 @@ export function createEconomy(
         for (const job of game.jobs)
           if (job.kind === 'soldier' && job.to === b.id) {
             if (game.units.some((unit) => !unit.dead && unit.job === job)) walking++;
-            else if (job.state === 't') unavailable++;
+            else if (job.status === 'assigned') unavailable++;
             else queued++;
           }
         lines.push({

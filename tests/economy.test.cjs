@@ -151,9 +151,9 @@ function checkEconomy(e) {
   const reservationCounts = new Map();
   const owners = new Map(e.units.filter((u) => u.job).map((u) => [u.job, u]));
   for (const j of e.jobs) {
-    if (j.state === 't') assert.ok(owners.has(j), 'every active job has a settler');
+    if (j.status === 'assigned') assert.ok(owners.has(j), 'every active job has a settler');
     if ((j.kind === 'fetch' || j.kind === 'transfer') && !owners.get(j)?.carry) {
-      const key = `${j.s}/${j.good}`;
+      const key = `${j.sourceId}/${j.good}`;
       reservationCounts.set(key, (reservationCounts.get(key) || 0) + 1);
     }
   }

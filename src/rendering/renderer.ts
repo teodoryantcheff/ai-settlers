@@ -1618,7 +1618,7 @@ export function createRenderer(
           (store.reservedStock[good] || 0);
     for (const job of game.jobs)
       if (job.kind === 'transfer' && job.good && goods.includes(job.good))
-        key += ':' + job.s + ',' + job.to + ',' + job.good + ',' + job.state;
+        key += ':' + job.sourceId + ',' + job.to + ',' + job.good + ',' + job.status;
     for (const unit of game.units)
       if (unit.job?.kind === 'transfer' && unit.carry) key += ':cargo' + unit.id + ',' + unit.carry;
     return key;
@@ -2066,11 +2066,11 @@ export function createRenderer(
       const counts = new Map<number, { waiting: number; assigned: number }>();
       let waitingJobs = 0;
       for (const job of game.jobs) {
-        if (job.state === 'p') waitingJobs++;
-        for (const id of new Set([job.to, job.from, job.s])) {
+        if (job.status === 'pending') waitingJobs++;
+        for (const id of new Set([job.to, job.sourceId])) {
           if (id === undefined) continue;
           const count = counts.get(id) || { waiting: 0, assigned: 0 };
-          if (job.state === 'p') count.waiting++;
+          if (job.status === 'pending') count.waiting++;
           else count.assigned++;
           counts.set(id, count);
         }

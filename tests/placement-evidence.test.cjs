@@ -62,10 +62,10 @@ test('construction affordability names reachable free stock and optional transfe
   const site = g.newBuilding('warehouse', 57, 52);
   g.buildings.push(site);
   g.jobs = [
-    { kind: 'transfer', good: 'planks', s: hq.id, to: warehouse.id, state: 0 },
-    { kind: 'transfer', good: 'planks', s: hq.id, to: warehouse.id, state: 1 },
-    { kind: 'fetch', good: 'planks', s: hq.id, to: site.id, state: 0 },
-    { kind: 'fetch', good: 'planks', s: hq.id, to: site.id, state: 0 },
+    { kind: 'transfer', good: 'planks', sourceId: hq.id, to: warehouse.id, status: 'pending' },
+    { kind: 'transfer', good: 'planks', sourceId: hq.id, to: warehouse.id, status: 'assigned' },
+    { kind: 'fetch', good: 'planks', sourceId: hq.id, to: site.id, status: 'pending' },
+    { kind: 'fetch', good: 'planks', sourceId: hq.id, to: site.id, status: 'pending' },
   ];
   g.units[0].job = g.jobs[1];
   g.units[0].phase = 'p';

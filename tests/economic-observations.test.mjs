@@ -57,7 +57,7 @@ test('stock categories reconcile without counting reservations or queued jobs tw
   hq.stock.logs = 10;
   hq.reservedStock.logs = 3;
   mill.stock.logs = 4;
-  game.jobs.push({ kind: 'transfer', good: 'logs', s: hq.id, from: hq.id, to: hq.id, state: 'p' });
+  game.jobs.push({ kind: 'transfer', good: 'logs', sourceId: hq.id, to: hq.id, status: 'pending' });
   game.spawnCarrier(hq);
   game.units[0].carry = 'logs';
   const stock = game.resourceAccounting('logs');

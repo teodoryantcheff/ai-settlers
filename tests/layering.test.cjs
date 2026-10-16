@@ -66,6 +66,14 @@ function historicalEconomySnapshot(value) {
       Object.entries(building).map(([key, value]) => [historicalFields[key] || key, value]),
     ),
   );
+  copy.j = copy.j.map((job) => ({
+    kind: job.kind,
+    good: job.good || null,
+    to: job.to || 0,
+    s: job.kind === 'fetch' || job.kind === 'transfer' ? job.sourceId : 0,
+    from: job.kind === 'deliver' || job.kind === 'transfer' ? job.sourceId : 0,
+    state: job.status === 'pending' ? 'p' : 't',
+  }));
   delete copy.identity;
   delete copy.observations;
   delete copy.attention;
@@ -347,10 +355,9 @@ test('only new banked gold emits a coin event; transfer and demolition salvage d
     u.job = {
       kind: transfer ? 'transfer' : 'deliver',
       good: 'gold',
-      state: 't',
-      from: transfer ? hq.id : gold.id,
+      status: 'assigned',
+      sourceId: transfer ? hq.id : gold.id,
       to: hq.id,
-      s: hq.id,
     };
     g.jobs.push(u.job);
     u.phase = 'd';

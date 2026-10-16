@@ -104,7 +104,7 @@ function checkReservations(e) {
       const pending = e.jobs.filter(
         (j) =>
           (j.kind === 'fetch' || j.kind === 'transfer') &&
-          j.s === b.id &&
+          j.sourceId === b.id &&
           j.good === good &&
           !e.units.some((u) => u.job === j && u.carry),
       ).length;
@@ -195,7 +195,13 @@ test('a pickup followed by a same-tile drop cannot read an empty route', () => {
   u.y = 5.5;
   u.lx = 0;
   u.ly = 0;
-  const j = { kind: 'fetch', good: 'planks', s: store.id, to: unreachable.id, state: 'p' };
+  const j = {
+    kind: 'fetch',
+    good: 'planks',
+    sourceId: store.id,
+    to: unreachable.id,
+    status: 'pending',
+  };
   store.reservedStock.planks = 1;
   e.jobs.push(j);
   e.startJob(u, j);
@@ -546,7 +552,7 @@ test('a nearby carrier across water does not block a reachable carrier', () => {
   reachable.x = 20.5;
   e.assign(1);
   assert.equal(stranded.job, null);
-  assert.equal(reachable.job?.from, farm.id, 'try the carrier that can reach the producer');
+  assert.equal(reachable.job?.sourceId, farm.id, 'try the carrier that can reach the producer');
   for (let i = 0; i < 600; i++) e.stepUnit(reachable, 1 / 60);
   assert.equal(store.stock.grain, 1);
   checkReservations(e);
@@ -562,7 +568,7 @@ test('construction reserves reachable stock instead of a closer disconnected war
   e.buildings.push(site);
   e.ensureJobs();
   assert.ok(e.jobs.length > 0);
-  assert.ok(e.jobs.every((j) => j.s === reachable.id));
+  assert.ok(e.jobs.every((j) => j.sourceId === reachable.id));
   assert.equal(disconnected.reservedStock.planks || 0, 0);
   checkReservations(e);
 });
@@ -580,7 +586,7 @@ test('lowering a stock target releases uncollected transfers without losing carg
   assert.equal(e.units[0].carry, 'logs');
   target.targets.logs = 0;
   e.ensureJobs();
-  assert.equal(e.jobs.filter((j) => j.kind === 'transfer' && j.state === 'p').length, 0);
+  assert.equal(e.jobs.filter((j) => j.kind === 'transfer' && j.status === 'pending').length, 0);
   assert.equal(source.reservedStock.logs, 0);
   for (let i = 0; i < 600; i++) e.stepUnit(e.units[0], 1 / 60);
   assert.equal(totalResources(e, 'logs'), 6);

@@ -54,8 +54,8 @@ test('demolition applies its quote across disconnected salvage, equipment and di
   const guard = building('guard', 10, 11, { tools: 3, gold: 2 });
   guard.manned = true;
   for (let x = 0; x < game.W; x++) game.tiles[game.idx(x, 12)].t = game.WATER;
-  const queued = { kind: 'soldier', to: guard.id, state: 'p' };
-  const dispatched = { kind: 'soldier', to: guard.id, state: 't' };
+  const queued = { kind: 'soldier', to: guard.id, status: 'pending' };
+  const dispatched = { kind: 'soldier', to: guard.id, status: 'assigned' };
   game.jobs.push(queued, dispatched);
   game.units.push({ id: 900, kind: 'soldier', job: dispatched, carry: null, dead: false });
   const before = new Map(game.storages().map((store) => [store.id, { ...store.stock }]));
@@ -97,16 +97,20 @@ test('pickup fallback preserves its unrestricted first-store choice before route
   building('warehouse', 1, 5, { grain: 2 });
   const site = building('windmill', 1, 2);
   for (let y = 0; y < game.H; y++) game.tiles[game.idx(3, y)].t = game.WATER;
-  const job = { kind: 'fetch', good: 'grain', s: source.id, to: site.id, state: 'p' };
+  const job = { kind: 'fetch', good: 'grain', sourceId: source.id, to: site.id, status: 'pending' };
   source.reservedStock.grain = 1;
   game.jobs.push(job);
   game.spawnCarrier(source);
   hooks.startJob(game.units[0], job);
-  assert.equal(job.s, first.id, 'fallback chooses by distance and storage order before routing');
+  assert.equal(
+    job.sourceId,
+    first.id,
+    'fallback chooses by distance and storage order before routing',
+  );
   assert.equal(source.reservedStock.grain, 0);
   assert.equal(first.reservedStock.grain, 1);
   assert.equal(game.units[0].job, null, 'route validation still rejects the disconnected pickup');
-  assert.equal(job.state, 'p');
+  assert.equal(job.status, 'pending');
 });
 
 test('carrier recovery preserves partial pickup state and fully clears completed cargo', () => {
@@ -115,7 +119,13 @@ test('carrier recovery preserves partial pickup state and fully clears completed
   const site = building('windmill', 9, 10);
   game.spawnCarrier(source);
   const unit = game.units[0];
-  const job = { kind: 'fetch', good: 'grain', s: source.id, to: site.id, state: 't' };
+  const job = {
+    kind: 'fetch',
+    good: 'grain',
+    sourceId: source.id,
+    to: site.id,
+    status: 'assigned',
+  };
   game.jobs.push(job);
   Object.assign(unit, {
     job,
@@ -130,7 +140,7 @@ test('carrier recovery preserves partial pickup state and fully clears completed
   const before = { ...unit };
   hooks.stepUnit(unit, 0.1);
   assert.deepEqual(unit, { ...before, job: null, phase: 'idle', moving: false });
-  assert.equal(job.state, 'p');
+  assert.equal(job.status, 'pending');
   Object.assign(unit, { phase: 'd', carry: 'grain', dropB: source.id, dropIsSite: false });
   hooks.stepUnit(unit, 0.1);
   assert.equal(source.stock.grain, 1);

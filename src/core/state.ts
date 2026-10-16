@@ -274,29 +274,36 @@ export function validateSave(
     fail('Missing headquarters');
   const buildings = new Map<number, Building>(checkedBuildings.map((b) => [b.id, b]));
   for (const j of d.j) {
+    if (!object(j)) fail('Invalid job');
+    // Old saves used s for stores, from for producers, and both for transfers.
+    // Canonical fields win when a save contains both spellings.
+    if (!Object.hasOwn(j, 'status'))
+      j.status = j.state === 'p' ? 'pending' : j.state === 't' ? 'assigned' : undefined;
+    const legacySource = !Object.hasOwn(j, 'sourceId');
+    if (legacySource && j.kind !== 'soldier') {
+      j.sourceId = j.kind === 'fetch' ? j.s : j.from;
+    }
     if (
-      !object(j) ||
       !oneOf(j.kind, ['fetch', 'deliver', 'soldier', 'transfer']) ||
-      !oneOf(j.state, ['p', 't'])
+      !oneOf(j.status, ['pending', 'assigned'])
     )
       fail('Invalid job');
     if (j.good !== null && j.good !== undefined && !knownKey(goods, j.good)) fail('Invalid cargo');
     if (j.kind !== 'soldier' && !knownKey(goods, j.good)) fail('Invalid cargo');
-    for (const key of ['to', 'from', 's'] as const)
+    for (const key of ['to', 'from', 's', 'sourceId'] as const)
       if (j[key] !== undefined && !int(j[key])) fail('Invalid job reference');
     const target = typeof j.to === 'number' ? buildings.get(j.to) : undefined;
-    const source = typeof j.from === 'number' ? buildings.get(j.from) : undefined;
-    const store = typeof j.s === 'number' ? buildings.get(j.s) : undefined;
+    const source = typeof j.sourceId === 'number' ? buildings.get(j.sourceId) : undefined;
     if ((j.kind === 'fetch' || j.kind === 'soldier' || j.kind === 'transfer') && !target)
       fail('Missing job destination');
-    if (j.kind === 'fetch' && (!store || !store.done || !specs[store.type].store))
+    if (j.kind === 'fetch' && (!source || !source.done || !specs[source.type].store))
       fail('Missing source store');
     if ((j.kind === 'deliver' || j.kind === 'transfer') && !source) fail('Missing job source');
     if (
       j.kind === 'transfer' &&
       (!source ||
         !target ||
-        j.s !== j.from ||
+        (legacySource && j.s !== j.from) ||
         !source.done ||
         !target.done ||
         !specs[source.type].store ||
@@ -335,7 +342,22 @@ export function validateSave(
       (!target || !target.done || !specs[target.type].guard || target.manned)
     )
       fail('Invalid soldier destination');
-    checkedJobs.push(pick<Job>(j, ['kind', 'good', 'to', 's', 'from', 'state']));
+    const status = j.status;
+    if (j.kind === 'soldier') {
+      if (!int(j.to, 1)) fail('Missing job destination');
+      checkedJobs.push({ kind: j.kind, to: j.to, status });
+    } else {
+      if (!knownKey(goods, j.good) || !int(j.sourceId, 1)) fail('Missing job source');
+      if (j.kind === 'deliver')
+        checkedJobs.push({ kind: j.kind, good: j.good, sourceId: j.sourceId, status });
+      else {
+        if (!int(j.to, 1)) fail('Missing job destination');
+        const cargo = { good: j.good, sourceId: j.sourceId, to: j.to, status };
+        checkedJobs.push(
+          j.kind === 'fetch' ? { kind: 'fetch', ...cargo } : { kind: 'transfer', ...cargo },
+        );
+      }
+    }
   }
   const jobOwners = new Set();
   const ownerByJob = new Map<number, SavedUnit>();
@@ -371,7 +393,8 @@ export function validateSave(
     )
       fail('Missing drop destination');
     if (u.ji >= 0) {
-      if (jobOwners.has(u.ji) || checkedJobs[u.ji].state !== 't') fail('Invalid job ownership');
+      if (jobOwners.has(u.ji) || checkedJobs[u.ji].status !== 'assigned')
+        fail('Invalid job ownership');
       jobOwners.add(u.ji);
     }
     u.carryTransfer =
@@ -392,7 +415,7 @@ export function validateSave(
     )
       fail('Invalid warehouse-transfer cargo origin');
     if (u.carryProducer === undefined)
-      u.carryProducer = u.carry && job?.kind === 'deliver' ? job.from : null;
+      u.carryProducer = u.carry && job?.kind === 'deliver' ? job.sourceId : null;
     if (u.carryProducer !== null) {
       if (
         !int(u.carryProducer, 1, d.nextId - 1) ||
@@ -400,7 +423,7 @@ export function validateSave(
         u.carryTransfer ||
         u.kind !== 'carrier' ||
         u.phase !== 'd' ||
-        (job && (job.kind !== 'deliver' || job.from !== u.carryProducer))
+        (job && (job.kind !== 'deliver' || job.sourceId !== u.carryProducer))
       )
         fail('Invalid producer cargo origin');
       const source = buildings.get(u.carryProducer);
@@ -473,7 +496,7 @@ export function validateSave(
     const j = checkedJobs[i];
     const owner = ownerByJob.get(i);
     if (['fetch', 'transfer'].includes(j.kind) && (!owner || !owner.carry)) {
-      const key = j.s + '/' + j.good;
+      const key = j.sourceId + '/' + j.good;
       reservations.set(key, (reservations.get(key) || 0) + 1);
     }
   }
@@ -487,7 +510,8 @@ export function validateSave(
     }
   }
   if (ids.size && d.nextId <= Math.max(...ids)) fail('Invalid next entity ID');
-  if (checkedJobs.some((j, i) => j.state === 't' && !jobOwners.has(i))) fail('Unowned active job');
+  if (checkedJobs.some((j, i) => j.status === 'assigned' && !jobOwners.has(i)))
+    fail('Unowned active job');
   if (
     !object(d.st) ||
     !oneOf(d.st.speed, [1, 2, 4, 8]) ||

@@ -44,14 +44,13 @@ game.SR.setState('123');
 const deadClauseJob: Job = {
   kind: 'transfer',
   good: 'logs',
-  from: 1,
+  sourceId: 1,
   to: 2,
-  s: 3,
   // Job records have no `d` field (the deleteJobsFor regression: a leftover
   // clause comparing j.d compiled only while parameters were implicitly any).
   // @ts-expect-error Unknown Job fields are rejected on assignment too.
   d: 4,
-  state: 'p',
+  status: 'pending',
 };
 // @ts-expect-error Unknown Job fields do not exist.
 const deadClauseRead = job.d;

@@ -134,7 +134,7 @@ test('carrier arrivals at the blockage threshold invalidate stale input reasons 
     const feedback = observe(game);
     feedback.advance(11_750);
     assert.deepEqual(feedback.notices, []);
-    const job = { kind: 'fetch', good, to: b.id, state: 't', s: 0 };
+    const job = { kind: 'fetch', good, to: b.id, status: 'assigned', sourceId: 0 };
     game.jobs.push(job);
     game.units.push({
       id: game.nextId++,

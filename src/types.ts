@@ -128,14 +128,13 @@ export interface BuildingStatus {
   lines: { t: string; w: boolean }[];
   bad: boolean;
 }
-export interface Job {
-  kind: 'fetch' | 'deliver' | 'transfer' | 'soldier';
-  good?: Good | null;
-  to?: number;
-  from?: number;
-  s?: number;
-  state: 'p' | 't';
-}
+export type JobStatus = 'pending' | 'assigned';
+export type Job = { status: JobStatus } & (
+  | { kind: 'fetch'; good: Good; sourceId: number; to: number }
+  | { kind: 'deliver'; good: Good; sourceId: number; to?: never }
+  | { kind: 'transfer'; good: Good; sourceId: number; to: number }
+  | { kind: 'soldier'; to: number; sourceId?: never; good?: never }
+);
 export interface Unit {
   id: number;
   kind: 'carrier' | 'soldier';

@@ -147,6 +147,6 @@ test('assignment records without a live carrier have unavailable evidence, not q
   assert.equal(report.rows[0].carrierId, null);
   assert.equal(report.rows[0].route, null);
   assert.equal(report.rows.filter((row) => row.stage === 'queued').length, game.jobs.length - 1);
-  assert.equal(game.jobs[0].state, 't', 'report leaves the assignment record unchanged');
+  assert.equal(game.jobs[0].status, 'assigned', 'report leaves the assignment record unchanged');
   assert.equal(JSON.stringify(game.snapshotGame()), before);
 });
