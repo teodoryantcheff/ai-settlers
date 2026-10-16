@@ -31,6 +31,7 @@ import type {
   Good,
   Inventory,
   Job,
+  PlacementRefusal,
   ProductionBlockReason,
   ProductionMetrics,
   ProductionRateWindow,
@@ -38,6 +39,24 @@ import type {
   ProductionWindowMetrics,
   Unit,
 } from '../types.ts';
+
+const placementAdvice: Record<PlacementRefusal['code'], PlacementAdvice> = {
+  'out-of-bounds': '',
+  'choose-map-tile': '',
+  water: '',
+  mountain: '',
+  territory: 'build an Outpost toward that spot — it pushes your border out',
+  'shore-land': '',
+  'no-water': 'place it on a shore inside your border (grass or sand both work)',
+  meadow: '',
+  deposit: 'click mountains to scout them, then build against the wall with the colored dots',
+  'no-rocks': 'find a grey rock cluster — the map guarantees some near your start',
+  blocked: '',
+  spacing: 'keep about 2 tiles of space between buildings',
+  stock: 'build more producers — or inspect a demolition quote for exact recoverable goods',
+  'unreachable-stock':
+    'build more producers — or inspect a demolition quote for exact recoverable goods',
+};
 
 interface StorageSearchOptions {
   available?: Good;
@@ -480,12 +499,12 @@ export function createEconomy(
   ): PlacementChecks {
     const checks: PlacementChecks = {
       ok: true,
-      reason: '',
-      terrain: { ok: true, reason: '' },
-      ownership: { ok: true, reason: '' },
-      resources: { ok: true, reason: '' },
+      reason: null,
+      terrain: { ok: true, reason: null },
+      ownership: { ok: true, reason: null },
+      resources: { ok: true, reason: null },
     };
-    function fail(kind: 'terrain' | 'ownership' | 'resources', reason: string) {
+    function fail(kind: 'terrain' | 'ownership' | 'resources', reason: PlacementRefusal) {
       if (checks[kind].ok !== false) checks[kind] = { ok: false, reason };
       if (checks.ok) {
         checks.ok = false;
@@ -496,47 +515,47 @@ export function createEconomy(
     if (!game.inB(x, y))
       return {
         ok: false,
-        reason: 'Out of bounds',
-        terrain: { ok: false, reason: 'Out of bounds' },
-        ownership: { ok: null, reason: 'Choose a tile inside the map' },
-        resources: { ok: null, reason: 'Choose a tile inside the map' },
+        reason: { code: 'out-of-bounds' },
+        terrain: { ok: false, reason: { code: 'out-of-bounds' } },
+        ownership: { ok: null, reason: { code: 'choose-map-tile' } },
+        resources: { ok: null, reason: { code: 'choose-map-tile' } },
       };
     const i = game.idx(x, y),
       tl = game.tiles[i];
-    if (tl.t === game.WATER) if (fail('terrain', 'Cannot build on water')) return checks;
-    if (tl.t === game.MTN) if (fail('terrain', 'Cannot build on mountains')) return checks;
-    if (!game.owned[i]) if (fail('ownership', 'Outside your territory')) return checks;
+    if (tl.t === game.WATER) if (fail('terrain', { code: 'water' })) return checks;
+    if (tl.t === game.MTN) if (fail('terrain', { code: 'mountain' })) return checks;
+    if (!game.owned[i]) if (fail('ownership', { code: 'territory' })) return checks;
     const sp = game.BSPEC[type];
     if (type === 'fisherman') {
-      if (!game.owned[i]) if (fail('ownership', 'Outside your territory')) return checks;
+      if (!game.owned[i]) if (fail('ownership', { code: 'territory' })) return checks;
       if (tl.t !== game.GRASS && tl.t !== game.SAND)
-        if (fail('terrain', 'Must stand on land by the shore')) return checks;
+        if (fail('terrain', { code: 'shore-land' })) return checks;
       let wa = false;
       for (let wy2 = y - 2; wy2 <= y + 2 && !wa; wy2++)
         for (let wx2 = x - 2; wx2 <= x + 2 && !wa; wx2++)
           if (game.inB(wx2, wy2) && game.tiles[game.idx(wx2, wy2)].t === game.WATER) wa = true;
-      if (!wa) if (fail('resources', 'No water nearby')) return checks;
+      if (!wa) if (fail('resources', { code: 'no-water' })) return checks;
       for (let d = 0; d < 4; d++) {
         const nx = x + game.DX[d],
           ny = y + game.DY[d];
         if (!game.inB(nx, ny)) continue;
         const n = game.idx(nx, ny);
         if (!game.passI(n)) continue;
-        if (!game.owned[n]) if (fail('ownership', 'Outside your territory')) return checks;
+        if (!game.owned[n]) if (fail('ownership', { code: 'territory' })) return checks;
       }
     } else {
       for (let d2 = 0; d2 < 4; d2++) {
         const nx2 = x + game.DX[d2],
           ny2 = y + game.DY[d2];
         if (!game.inB(nx2, ny2)) {
-          if (fail('ownership', 'Outside your territory')) return checks;
+          if (fail('ownership', { code: 'territory' })) return checks;
           continue;
         }
         const n2 = game.idx(nx2, ny2);
         if (!game.passI(n2)) continue;
-        if (!game.owned[n2]) if (fail('ownership', 'Outside your territory')) return checks;
+        if (!game.owned[n2]) if (fail('ownership', { code: 'territory' })) return checks;
       }
-      if (tl.t !== game.GRASS) if (fail('terrain', 'Must stand on meadow')) return checks;
+      if (tl.t !== game.GRASS) if (fail('terrain', { code: 'meadow' })) return checks;
       if (sp.resKind) {
         let ok = false;
         for (let dd = 0; dd < 8; dd++) {
@@ -548,16 +567,7 @@ export function createEconomy(
               ok = true;
           }
         }
-        if (!ok)
-          if (
-            fail(
-              'resources',
-              'Must border a mountain with ' +
-                game.GOODS[sp.resKind].name.toLowerCase() +
-                ' deposit',
-            )
-          )
-            return checks;
+        if (!ok) if (fail('resources', { code: 'deposit', good: sp.resKind })) return checks;
       }
       if (type === 'quarry') {
         const fr = sp.rad;
@@ -568,19 +578,19 @@ export function createEconomy(
             if ((x - xx) * (x - xx) + (y - yy) * (y - yy) > fr * fr) continue;
             if (game.tiles[game.idx(xx, yy)].rock) found = true;
           }
-        if (!found) if (fail('resources', 'No rocks nearby')) return checks;
+        if (!found) if (fail('resources', { code: 'no-rocks' })) return checks;
       }
     }
-    if (buildingAt(x, y)) if (fail('terrain', 'Blocked')) return checks;
+    if (buildingAt(x, y)) if (fail('terrain', { code: 'blocked' })) return checks;
     const mind = type === 'hq' ? 2.8 : 1.9;
     for (let bi = 0; bi < game.buildings.length; bi++) {
       const ob = game.buildings[bi];
       if (Math.hypot(ob.x - x, ob.y - y) < mind)
-        if (fail('terrain', 'Too close to ' + game.BSPEC[ob.type].name)) return checks;
+        if (fail('terrain', { code: 'spacing', building: ob.type })) return checks;
     }
     return checks;
   }
-  function canPlace(type: BuildingType, x: number, y: number): [boolean, string] {
+  function canPlace(type: BuildingType, x: number, y: number): [boolean, PlacementRefusal | null] {
     const checks = evaluatePlacement(type, x, y, false);
     return [checks.ok, checks.reason];
   }
@@ -588,35 +598,63 @@ export function createEconomy(
   function placementChecks(type: BuildingType, x: number, y: number): PlacementChecks {
     return evaluatePlacement(type, x, y, true);
   }
-  function suggestFor(reason: string): PlacementAdvice {
+  function placementText(reason: PlacementRefusal | null): string {
     if (!reason) return '';
-    if (reason.indexOf('Not enough') >= 0)
-      return 'build more producers — or inspect a demolition quote for exact recoverable goods';
-    if (reason.indexOf('Outside your territory') >= 0)
-      return 'build an Outpost toward that spot \u2014 it pushes your border out';
-    if (reason === 'No water nearby')
-      return 'place it on a shore inside your border (grass or sand both work)';
-    if (reason.indexOf('deposit') >= 0)
-      return 'click mountains to scout them, then build against the wall with the colored dots';
-    if (reason === 'No rocks nearby')
-      return 'find a grey rock cluster \u2014 the map guarantees some near your start';
-    if (reason.indexOf('Too close to') >= 0) return 'keep about 2 tiles of space between buildings';
-    return '';
+    switch (reason.code) {
+      case 'out-of-bounds':
+        return 'Out of bounds';
+      case 'choose-map-tile':
+        return 'Choose a tile inside the map';
+      case 'water':
+        return 'Cannot build on water';
+      case 'mountain':
+        return 'Cannot build on mountains';
+      case 'territory':
+        return 'Outside your territory';
+      case 'shore-land':
+        return 'Must stand on land by the shore';
+      case 'no-water':
+        return 'No water nearby';
+      case 'meadow':
+        return 'Must stand on meadow';
+      case 'deposit':
+        return (
+          'Must border a mountain with ' + game.GOODS[reason.good].name.toLowerCase() + ' deposit'
+        );
+      case 'no-rocks':
+        return 'No rocks nearby';
+      case 'blocked':
+        return 'Blocked';
+      case 'spacing':
+        return 'Too close to ' + game.BSPEC[reason.building].name;
+      case 'stock':
+        return 'Not enough ' + game.GOODS[reason.good].name;
+      case 'unreachable-stock':
+        return 'Not enough reachable stock';
+    }
+    const unhandled: never = reason;
+    throw new Error('Unformatted placement refusal: ' + JSON.stringify(unhandled));
+  }
+  function suggestFor(reason: PlacementRefusal | null): PlacementAdvice {
+    return reason ? placementAdvice[reason.code] : '';
   }
   function placeBuilding(type: BuildingType, x: number, y: number) {
     const c = canPlace(type, x, y);
     if (!c[0]) {
-      gameEvent('placementRejected', { type, x, y, reason: c[1], stock: false });
+      gameEvent('placementRejected', { type, x, y, reason: c[1] });
       return false;
     }
     const sp = game.BSPEC[type],
       needs = copyObj(sp.cost || {});
-    for (const g in needs)
-      if (availGood(g as Good, { x: x, y: y }) < needs[g as Good]) {
-        const r = 'Not enough ' + game.GOODS[g as Good].name;
-        gameEvent('placementRejected', { type, x, y, reason: r, stock: true });
+    for (const g in needs) {
+      const good = g as Good,
+        available = availGood(good, { x, y });
+      if (available < needs[good]) {
+        const r: PlacementRefusal = { code: 'stock', good, required: needs[good], available };
+        gameEvent('placementRejected', { type, x, y, reason: r });
         return false;
       }
+    }
     if (!requestStock(needs, { x: x, y: y })) return false;
     const i2 = game.idx(x, y),
       tl2 = game.tiles[i2];
@@ -2063,6 +2101,7 @@ export function createEconomy(
     buildingAffordability,
     hasLocalWater,
     suggestFor,
+    placementText,
     placeBuilding,
     demolish,
     demolitionQuote,
@@ -2097,7 +2136,7 @@ export interface EconomyInternals {
   stepUnit: (u: Unit, dt: number) => void;
 }
 
-/** Advice copy keyed by a placement failure reason (reason → advice). */
+/** Advice copy selected only by a placement refusal code. */
 export type PlacementAdvice =
   | ''
   | 'build more producers — or inspect a demolition quote for exact recoverable goods'
@@ -2141,8 +2180,9 @@ export interface EconomySubsystem {
     ref?: Pick<Building, 'x' | 'y'>,
   ) => BuildingAffordability;
   placementChecks: (type: BuildingType, x: number, y: number) => PlacementChecks;
-  canPlace: (type: BuildingType, x: number, y: number) => [boolean, string];
-  suggestFor: (reason: string) => PlacementAdvice;
+  canPlace: (type: BuildingType, x: number, y: number) => [boolean, PlacementRefusal | null];
+  suggestFor: (reason: PlacementRefusal | null) => PlacementAdvice;
+  placementText: (reason: PlacementRefusal | null) => string;
   placeBuilding: (type: BuildingType, x: number, y: number) => boolean;
   demolitionQuote: (b: Building) => DemolitionQuote;
   setBuildingPriority: (b: Building, priority: unknown) => boolean;
@@ -2210,11 +2250,11 @@ export interface EconomyDependencies
 /** Placement permission stays separate from click-time spending permission. */
 export interface PlacementCheck {
   ok: boolean | null;
-  reason: string;
+  reason: PlacementRefusal | null;
 }
 export interface PlacementChecks {
   ok: boolean;
-  reason: string;
+  reason: PlacementRefusal | null;
   terrain: PlacementCheck;
   ownership: PlacementCheck;
   resources: PlacementCheck;

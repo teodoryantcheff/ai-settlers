@@ -470,17 +470,12 @@ export function runScenarios(game: GameRuntime) {
                 const cp = game.canPlace(bt, x, y);
                 if (cp[0]) legal++;
                 else {
-                  const r3 = cp[1];
-                  rej[String(r3)] = (rej[String(r3)] | 0) + 1;
-                  if (
-                    r3 === 'Outside your territory' ||
-                    r3 === 'Must stand on meadow' ||
-                    r3 === 'Must stand on land by the shore'
-                  )
-                    contr++;
+                  const r3 = cp[1].code;
+                  rej[r3] = (rej[r3] | 0) + 1;
+                  if (r3 === 'territory' || r3 === 'meadow' || r3 === 'shore-land') contr++;
                 }
               }
-            const bad = rej['Outside your territory'] || 0;
+            const bad = rej.territory || 0;
             out.push(
               tag +
                 ':' +

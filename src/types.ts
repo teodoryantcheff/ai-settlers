@@ -40,6 +40,14 @@ export type BuildingType =
   | 'toolsmith'
   | 'armory'
   | 'guard';
+/** Structured, transient placement failures; display copy is derived from the code. */
+export type PlacementRefusal =
+  | { code: 'out-of-bounds' | 'choose-map-tile' }
+  | { code: 'water' | 'mountain' | 'territory' | 'shore-land' | 'no-water' | 'meadow' }
+  | { code: 'deposit'; good: 'coal' | 'iron' | 'gold' }
+  | { code: 'no-rocks' | 'blocked' | 'unreachable-stock' }
+  | { code: 'spacing'; building: BuildingType }
+  | { code: 'stock'; good: Good; required: number; available: number };
 export interface BuildingSpec {
   name: string;
   cost?: Inventory;
@@ -191,7 +199,7 @@ export interface TilePoint {
 /** Live placement feedback for the hovered tile while a build mode is armed. */
 export interface PlacementGhost extends TilePoint {
   ok: boolean;
-  reason: string;
+  reason: PlacementRefusal | null;
   in: boolean;
 }
 /** Transient HUD log entry; the text is already escaped for display. */
@@ -270,7 +278,7 @@ export interface GameEvents {
   territoryChanged: Record<string, never>;
   buildingPlaced: { building: Building };
   buildingDemolished: { id: number; type: BuildingType; x: number; y: number };
-  placementRejected: { type: BuildingType; x: number; y: number; reason: string; stock: boolean };
+  placementRejected: { type: BuildingType; x: number; y: number; reason: PlacementRefusal };
   demolitionRejected: { reason: 'headquarters' | 'last-store' };
   siteCleared: { x: number; y: number; tree: boolean };
   rocksExhausted: { building: Building };

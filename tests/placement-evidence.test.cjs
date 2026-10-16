@@ -33,11 +33,11 @@ test('placement evidence separates simultaneous terrain, ownership and resource 
     state: g.state,
   });
   const evidence = g.placementChecks('quarry', 51, 48);
-  assert.deepEqual(evidence.terrain, { ok: false, reason: 'Cannot build on water' });
-  assert.deepEqual(evidence.ownership, { ok: false, reason: 'Outside your territory' });
-  assert.deepEqual(evidence.resources, { ok: false, reason: 'No rocks nearby' });
-  assert.equal(evidence.reason, 'Cannot build on water');
-  assert.deepEqual(g.canPlace('quarry', 51, 48), [false, 'Cannot build on water']);
+  assert.deepEqual(evidence.terrain, { ok: false, reason: { code: 'water' } });
+  assert.deepEqual(evidence.ownership, { ok: false, reason: { code: 'territory' } });
+  assert.deepEqual(evidence.resources, { ok: false, reason: { code: 'no-rocks' } });
+  assert.deepEqual(evidence.reason, { code: 'water' });
+  assert.deepEqual(g.canPlace('quarry', 51, 48), [false, { code: 'water' }]);
   assert.equal(
     JSON.stringify({
       tiles: g.tiles,

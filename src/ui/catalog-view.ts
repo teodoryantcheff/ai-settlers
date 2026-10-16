@@ -241,17 +241,17 @@ export function createCatalogView(
       html += row(
         'Terrain & spacing',
         checks.terrain.ok,
-        checks.terrain.reason || 'Suitable ground and spacing',
+        game.placementText(checks.terrain.reason) || 'Suitable ground and spacing',
       );
       html += row(
         'Ownership',
         checks.ownership.ok,
-        checks.ownership.reason || 'Site and required neighbors are owned',
+        game.placementText(checks.ownership.reason) || 'Site and required neighbors are owned',
       );
       html += row(
         'Nearby resources',
         checks.resources.ok,
-        checks.resources.reason ||
+        game.placementText(checks.resources.reason) ||
           (game.BSPEC[(game.mode as { bt: BuildingType }).bt].resKind ||
           ['quarry', 'fisherman'].includes((game.mode as { bt: BuildingType }).bt)
             ? 'Required nearby resources are present'

@@ -2129,7 +2129,7 @@ export function createRenderer(
         (placement.canBuild
           ? 'Ready to build · '
           : !placement.checks.ok
-            ? placement.checks.reason + ' · '
+            ? game.placementText(placement.checks.reason) + ' · '
             : 'Not enough reachable stock · ') + placement.summary,
         placement.canBuild ? '#d3efd0' : '#ffd0b4',
       );

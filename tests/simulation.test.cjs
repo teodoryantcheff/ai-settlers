@@ -219,7 +219,7 @@ test('an unowned meadow pocket surrounded by mountains cannot host a mine', () =
     t.res = { kind: 'gold', amt: 100, amt0: 100 };
   }
   assert.equal(e.canPlace('mine_gold', 20, 20)[0], false);
-  assert.equal(e.canPlace('mine_gold', 20, 20)[1], 'Outside your territory');
+  assert.deepEqual(e.canPlace('mine_gold', 20, 20)[1], { code: 'territory' });
 });
 
 test('seed42 coastal expansion fixture retains useful claims and advances the mining route', () => {

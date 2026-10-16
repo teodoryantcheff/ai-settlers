@@ -313,7 +313,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
           '\u2716 ' +
           game.BSPEC[game.mode.bt].name +
           ': ' +
-          game.ghost.reason +
+          game.placementText(game.ghost.reason) +
           (game.suggestFor(game.ghost.reason)
             ? ' \u2192 ' + game.suggestFor(game.ghost.reason)
             : '');
@@ -380,10 +380,10 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     // recompute the placement ghost for the current hover tile; also called from
     // recomputeTerritory so the ghost never goes stale when the border moves
     if (game.mode && game.mode.type === 'build' && game.hoverIn) {
-      game.ghost = { x: game.ht.x, y: game.ht.y, ok: true, reason: '', in: true };
+      game.ghost = { x: game.ht.x, y: game.ht.y, ok: true, reason: null, in: true };
       const preview = game.placementPreview?.();
       const spatial = preview
-        ? ([preview.checks.ok, preview.checks.reason] as [boolean, string])
+        ? ([preview.checks.ok, preview.checks.reason] as ReturnType<typeof game.canPlace>)
         : game.canPlace(game.mode.bt, game.ht.x, game.ht.y);
       const spending = preview?.spending || game.buildingAffordability?.(game.mode.bt, game.ht);
       if (spatial[0] && spending && !spending.affordable) {
@@ -392,8 +392,13 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
         );
         spatial[0] = false;
         spatial[1] = missing
-          ? 'Not enough ' + game.GOODS[missing.good].name
-          : 'Not enough reachable stock';
+          ? {
+              code: 'stock',
+              good: missing.good,
+              required: missing.required,
+              available: missing.available,
+            }
+          : { code: 'unreachable-stock' };
       }
       game.ghost.ok = spatial[0];
       game.ghost.reason = spatial[1];

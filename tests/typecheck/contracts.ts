@@ -18,6 +18,12 @@ declare const job: Job;
 declare const mode: InteractionMode;
 declare const presentation: RendererPresentation;
 const events = createEventBus<GameEvents>();
+// @ts-expect-error Player copy cannot choose placement advice.
+game.suggestFor('Not enough Planks');
+// @ts-expect-error Placement refusal codes are a closed set.
+game.suggestFor({ code: 'teritory' });
+// @ts-expect-error Stock refusals require the missing good and quantities.
+game.placementText({ code: 'stock' });
 events.emit('goodsProduced', { building, good: 'logs', amount: 1 });
 game.newBuilding('farm', 48, 48);
 
