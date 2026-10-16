@@ -588,18 +588,6 @@ export function createRenderer(
     g.textAlign = 'left';
     g.restore();
   }
-  function buildingActive(b: Building): boolean {
-    const sp = game.BSPEC[b.type];
-    if (!b.done || b.exhausted || b.disabled || b.blockedReason) return false;
-    if (!sp.prod || sp.prod === 'none' || sp.store || sp.guard) return false;
-    if (sp.prod === 'craft' || sp.prod === 'mine') {
-      for (const g2 in sp.in) if ((b.stock[g2 as Good] | 0) < sp.in[g2 as Good]) return false;
-    }
-    if (sp.out && (b.stock[sp.out] | 0) >= 8) return false;
-    if (sp.out && ['food', 'bread', 'meat', 'fish'].includes(sp.out) && game.foodSaturated(sp.out))
-      return false;
-    return true;
-  }
   function chip(g: CanvasRenderingContext2D, x: number, y: number, c: string) {
     g.fillStyle = 'rgba(0,0,0,0.38)';
     game.rr(g, x, y, 5, 5, 1);
@@ -660,7 +648,7 @@ export function createRenderer(
         img2.h + 6,
       );
       game.drawVillageDetails(g, b);
-      const active = buildingActive(b);
+      const active = game.buildingWorking(b);
       const anc = game.ART.anchors[b.type];
       if (active && anc && anc.blade) {
         const an = anc.blade;
@@ -1933,7 +1921,7 @@ export function createRenderer(
             ? 'Ⅱ'
             : warning
               ? '!'
-              : buildingActive(b)
+              : game.buildingWorking(b)
                 ? '▶'
                 : '·',
         color = warning ? '#ffcead' : reason === 'paused' ? '#e9dbb5' : '#e0efcb',
@@ -1972,7 +1960,7 @@ export function createRenderer(
           ? 'Under construction'
           : _reasonNames[reason] ||
             (warning ? game.bStatus(b).lines.find((line) => line.w)?.t : '') ||
-            (buildingActive(b)
+            (game.buildingWorking(b)
               ? 'Working'
               : sp.guard
                 ? b.man

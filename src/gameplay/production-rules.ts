@@ -62,16 +62,7 @@ export function productionTiming(
   spec: BuildingSpec,
   upgrade = 0,
 ) {
-  const base =
-    spec.prod === 'gather' || spec.prod === 'plant'
-      ? 7
-      : spec.prod === 'rock'
-        ? 8
-        : spec.prod === 'fish'
-          ? 9
-          : spec.prod === 'farm'
-            ? 15
-            : spec.time || 10;
+  const base = spec.time ?? 0;
   const tier = Math.min(3, upgrade || 0);
   const variety = spec.prod === 'mine' ? foodVarietyBonus(building) : 0;
   return { base, tier, variety, upgradeFactor: Math.pow(0.9, tier), foodMultiplier: 1 + variety };

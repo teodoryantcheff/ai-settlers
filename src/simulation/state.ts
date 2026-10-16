@@ -36,14 +36,16 @@ export function createSimulationState(): SimulationStateSubsystem {
       cost: { planks: 2, tools: 1 },
       rad: 6,
       prod: 'gather',
+      time: 7,
       out: 'logs',
     },
-    forester: { name: 'Forester', cost: { planks: 2, tools: 1 }, rad: 6, prod: 'plant' },
+    forester: { name: 'Forester', cost: { planks: 2, tools: 1 }, rad: 6, prod: 'plant', time: 7 },
     quarry: {
       name: 'Quarry',
       cost: { planks: 2, stone: 2, tools: 1 },
       rad: 5,
       prod: 'rock',
+      time: 8,
       out: 'stone',
     },
     fisherman: {
@@ -51,6 +53,7 @@ export function createSimulationState(): SimulationStateSubsystem {
       cost: { planks: 2, tools: 1 },
       rad: 5,
       prod: 'fish',
+      time: 9,
       out: 'fish',
     },
     farm: {
@@ -58,6 +61,7 @@ export function createSimulationState(): SimulationStateSubsystem {
       cost: { planks: 3, stone: 2, tools: 1 },
       rad: 4,
       prod: 'farm',
+      time: 15,
       out: 'grain',
     },
     mine_coal: {
