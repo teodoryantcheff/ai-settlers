@@ -1,5 +1,6 @@
 import { validateAttention } from '../observations/validate-attention.ts';
 import { saveName } from './save-catalog.ts';
+import { unpackSaveHistories } from './save-codec.ts';
 import {
   ECONOMIC_FLOWS,
   emptyEconomicTotals,
@@ -104,6 +105,8 @@ export function validateSave(
   const size = width * height;
   if (!object(input) || !oneOf(input.v, [1, 2])) fail('Unsupported save version');
   const d = detached ? input : structuredClone(input);
+  // Packed sample histories become plain samples before any rule checks them.
+  unpackSaveHistories(d, fail);
   if (d.economy !== undefined && d.economy !== 2) fail('Unsupported economy version');
   if (!int(d.seed, -2147483648, 2147483647) || !int(d.nextId, 1) || !array(d.t) || d.t.length !== 5)
     fail('Invalid world header');

@@ -14,6 +14,7 @@ import type { AutoplaySubsystem } from '../simulation/autoplay.ts';
 import type { EventsSubsystem } from './events.ts';
 import type { MapSubsystem } from '../simulation/map.ts';
 import { validateSave } from './state.ts';
+import { saveText } from './save-codec.ts';
 import type {
   Building,
   Job,
@@ -258,7 +259,7 @@ export function createPersistence(
     };
     next.entries = next.entries.filter((candidate) => candidate.id !== id).concat(entry);
     writeCatalog(next, 'Checkpoint saved: ' + entry.name);
-    baseline = JSON.stringify(data);
+    baseline = saveText(data);
     baselineId = id;
     return saveMetadata(entry);
   }
@@ -266,7 +267,7 @@ export function createPersistence(
   function saveAutosave(): boolean {
     try {
       const data = validateSave(snapshotGame(), game.W, game.H, game.BSPEC, game.GOODS, true);
-      const text = JSON.stringify(data);
+      const text = saveText(data);
       const savedAt = Date.now();
       try {
         catalog.writeAutosave(text, savedAt);
@@ -429,14 +430,12 @@ export function createPersistence(
   }
   /** Serialize the live colony independently of browser-storage availability. */
   function exportSave(): string {
-    return JSON.stringify(
-      validateSave(snapshotGame(), game.W, game.H, game.BSPEC, game.GOODS, true),
-    );
+    return saveText(validateSave(snapshotGame(), game.W, game.H, game.BSPEC, game.GOODS, true));
   }
   function exportCheckpoint(id: string): string {
     const entry = readEntries().find((candidate) => candidate.id === id);
     if (!entry) throw new Error('Checkpoint no longer exists');
-    return JSON.stringify(entry.data);
+    return saveText(entry.data);
   }
   function inspectSave(json: string): SaveMetadata {
     return saveMetadata({

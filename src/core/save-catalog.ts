@@ -1,5 +1,6 @@
 import type { ValidatedSave, SaveMetadata } from '../types.ts';
 import type { StoragePort } from './persistence.ts';
+import { saveText } from './save-codec.ts';
 
 export const SAVE_CATALOG_KEY = 'settlers.saves.v1';
 export const AUTOSAVE_KEY = 'settlers.autosave.v1';
@@ -171,7 +172,7 @@ export function createSaveCatalog(
   }
   function write(value: SaveCatalog) {
     const clean = validate(value);
-    const raw = JSON.stringify(clean);
+    const raw = saveText(clean);
     if (raw.length > MAX_CATALOG_TEXT) throw new Error('Save catalog is too large');
     if (!storage) throw new Error('Browser storage is unavailable');
     storage.setItem(SAVE_CATALOG_KEY, raw);

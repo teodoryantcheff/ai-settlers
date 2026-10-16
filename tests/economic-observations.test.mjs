@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame } from './helpers/game.cjs';
+import { plainSave } from './helpers/saves.mjs';
 
 function colony() {
   const { game } = createGame({
@@ -133,7 +134,7 @@ test('malformed or unbounded colony observations cannot replace a valid colony',
     },
   ];
   for (const corrupt of corruptions) {
-    const bad = JSON.parse(valid);
+    const bad = plainSave(valid);
     corrupt(bad.observations);
     assert.throws(() => game.importSave(JSON.stringify(bad)), /observation|resource/i);
     assert.equal(game.exportSave(), valid);
