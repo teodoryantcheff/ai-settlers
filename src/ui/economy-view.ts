@@ -1,3 +1,4 @@
+import { html as markup, trusted } from './markup.ts';
 import { createLiveReportUpdater } from './live-report.ts';
 import { revealReportHeading } from './report-navigation.ts';
 import type { GameRuntime } from '../runtime.ts';
@@ -14,11 +15,7 @@ export function createEconomyView(game: GameRuntime): EconomyViewSubsystem {
   let selectedGood: Good | null = null;
   let inspected: RemovedContributor | null = null;
   const goods = RESOURCE_GROUPS.flatMap((group) => group.goods);
-  const escape = (text: string) =>
-    String(text).replace(
-      /[&<>"']/g,
-      (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
-    );
+
   const number = (value: number) => value.toFixed(1);
   const flowLabels = {
     produced: 'Production',
@@ -34,10 +31,10 @@ export function createEconomyView(game: GameRuntime): EconomyViewSubsystem {
     transferred: 'Warehouse transfers',
   } as const;
   if (host) {
-    host.innerHTML = `<h1 id="economy-heading" class="report-content-heading">Stock and production</h1>
+    host.innerHTML = markup`<h1 id="economy-heading" class="report-content-heading">Stock and production</h1>
       <p class="economy-intro">Physical stock, supply chains and completed deliveries · rates in goods per simulation minute.</p>
       <div class="economy-controls"><label>Reporting window <select id="economy-window"><option value="30">30 seconds</option><option value="120">2 minutes</option><option value="600">10 minutes</option><option value="lifetime">Lifetime</option></select></label>
-      <label>Production chain <select id="economy-chain"><option value="all">All chains</option>${RESOURCE_GROUPS.map((group, i) => `<option value="${i}">${group.name}</option>`).join('')}</select></label>
+      <label>Production chain <select id="economy-chain"><option value="all">All chains</option>${trusted(RESOURCE_GROUPS.map((group, i) => markup`<option value="${i}">${group.name}</option>`).join(''))}</select></label>
       <label>Find a resource <input id="economy-query" type="search" placeholder="Name or supply chain"></label></div>
       <p id="economy-coverage" class="economy-coverage" aria-live="polite"></p>
       <div id="economy-balances"></div><div id="economy-detail"></div>`;
@@ -125,9 +122,9 @@ export function createEconomyView(game: GameRuntime): EconomyViewSubsystem {
     const max = Math.max(1, ...series.flatMap((entry) => entry.points.map((point) => point.value)));
     const first = samples[0].time,
       elapsed = samples.at(-1).time - first;
-    return `<figure class="economy-history"><figcaption>Recorded recent flow · ${number(elapsed)} simulation seconds · goods/min${window === 'lifetime' ? ' (latest ten minutes only)' : ''}</figcaption>
-      <svg viewBox="0 0 600 146" role="img" aria-label="Measured ${escape(game.GOODS[good].name)} flow history: production, consumption and output delivered to storage"><title>Observed rates from ${number(first)} to ${number(samples.at(-1).time)} simulation seconds, maximum ${number(max)} goods per minute</title>
-      <text x="24" y="13" fill="var(--ink-dim)" font-size="12">${number(max)}</text><text x="2" y="108" fill="var(--ink-dim)" font-size="12">0</text><text x="24" y="137" fill="var(--ink-dim)" font-size="12">${number(first)}s</text><text x="592" y="137" text-anchor="end" fill="var(--ink-dim)" font-size="12">${number(samples.at(-1).time)}s</text><path d="M24 18V108H592" fill="none" stroke="var(--brass-dim)"/>${series.map(({ flow, points }) => `<path class="economy-flow-${flow}" fill="none" stroke-width="2" d="${points.map((point, i) => `${i ? 'V' : `M${24 + ((point.from - first) / elapsed) * 568},`}${108 - (point.value / max) * 82} H${24 + ((point.time - first) / elapsed) * 568}`).join(' ')}"/>`).join('')}</svg>
+    return markup`<figure class="economy-history"><figcaption>Recorded recent flow · ${number(elapsed)} simulation seconds · goods/min${window === 'lifetime' ? ' (latest ten minutes only)' : ''}</figcaption>
+      <svg viewBox="0 0 600 146" role="img" aria-label="Measured ${game.GOODS[good].name} flow history: production, consumption and output delivered to storage"><title>Observed rates from ${number(first)} to ${number(samples.at(-1).time)} simulation seconds, maximum ${number(max)} goods per minute</title>
+      <text x="24" y="13" fill="var(--ink-dim)" font-size="12">${number(max)}</text><text x="2" y="108" fill="var(--ink-dim)" font-size="12">0</text><text x="24" y="137" fill="var(--ink-dim)" font-size="12">${number(first)}s</text><text x="592" y="137" text-anchor="end" fill="var(--ink-dim)" font-size="12">${number(samples.at(-1).time)}s</text><path d="M24 18V108H592" fill="none" stroke="var(--brass-dim)"/>${trusted(series.map(({ flow, points }) => markup`<path class="economy-flow-${flow}" fill="none" stroke-width="2" d="${points.map((point, i) => `${i ? 'V' : `M${24 + ((point.from - first) / elapsed) * 568},`}${108 - (point.value / max) * 82} H${24 + ((point.time - first) / elapsed) * 568}`).join(' ')}"/>`).join(''))}</svg>
       <div class="economy-chart-key"><span class="economy-flow-produced">● Production</span><span class="economy-flow-consumed">● Consumption</span><span class="economy-flow-outputStored">● Delivered to storage</span></div>
       <p class="economy-muted">Two-second observations; no estimates between samples. Paused and offline time add no history. Exact totals are below.</p></figure>`;
   }
@@ -154,11 +151,11 @@ export function createEconomyView(game: GameRuntime): EconomyViewSubsystem {
     if (!spec.out) return '';
     const inputs = eligibleIngredients(building, spec);
     const link = (good: Good, quantity: number, role: string) =>
-      `<button data-economy-resource="${good}" data-economy-key="recipe-${building.id}-${role}-${good}">${quantity} ${escape(game.GOODS[good].name)}</button>`;
+      markup`<button data-economy-resource="${good}" data-economy-key="recipe-${building.id}-${role}-${good}">${quantity} ${game.GOODS[good].name}</button>`;
     const input = Object.entries(inputs)
       .map(([good, quantity]) => link(good as Good, quantity, 'input'))
       .join(spec.prod === 'mine' ? ' or ' : ' + ');
-    return `<p class="economy-recipe">${input || 'Natural resources'} → ${link(spec.out, spec.prod === 'gather' ? 2 : 1, 'output')} per cycle${spec.prod === 'mine' ? ' · choose one edible alternative' : ''}${building.legacyIndustry ? ' · legacy recipe' : ''}${spec.water ? ' · working well within 6 tiles (local support, not cargo)' : ''}</p>`;
+    return markup`<p class="economy-recipe">${trusted(input || 'Natural resources')} → ${trusted(link(spec.out, spec.prod === 'gather' ? 2 : 1, 'output'))} per cycle${spec.prod === 'mine' ? ' · choose one edible alternative' : ''}${building.legacyIndustry ? ' · legacy recipe' : ''}${spec.water ? ' · working well within 6 tiles (local support, not cargo)' : ''}</p>`;
   }
   function contributors(good: Good) {
     const holders = new Set(game.resourceAccounting(good).contributors.map((entry) => entry.id));
@@ -170,9 +167,9 @@ export function createEconomyView(game: GameRuntime): EconomyViewSubsystem {
     });
     const former =
       inspected && !game.byId(inspected.id)
-        ? `<aside class="economy-former"><h3>Contributor removed</h3><p>${escape(game.BSPEC[inspected.type].name)} no longer exists. Its recorded production remains in colony lifetime totals; its former location is (${inspected.x}, ${inspected.y}).</p><button data-economy-locate="former" data-economy-key="former-locate">Locate former site</button></aside>`
+        ? markup`<aside class="economy-former"><h3>Contributor removed</h3><p>${game.BSPEC[inspected.type].name} no longer exists. Its recorded production remains in colony lifetime totals; its former location is (${inspected.x}, ${inspected.y}).</p><button data-economy-locate="former" data-economy-key="former-locate">Locate former site</button></aside>`
         : '';
-    return `<section class="economy-contributors"><h3>Contributing buildings</h3>${former}${
+    return markup`<section class="economy-contributors"><h3>Contributing buildings</h3>${trusted(former)}${trusted(
       relevant.length
         ? relevant
             .map((building) => {
@@ -192,13 +189,13 @@ export function createEconomyView(game: GameRuntime): EconomyViewSubsystem {
                 .join(' · ');
               const observed =
                 producer || consumer
-                  ? `<p class="economy-muted">Observed ${number(metric.elapsed)}s; delivery coverage ${number(metric.deliveryElapsed)}s. Produced ${metric.elapsed ? number(((metric.produced[good] || 0) * 60) / metric.elapsed) : 'unavailable'} · Consumed ${metric.elapsed ? number(((metric.consumed[good] || 0) * 60) / metric.elapsed) : 'unavailable'} · Input arrivals ${metric.deliveryElapsed ? number(((metric.inputDelivered[good] || 0) * 60) / metric.deliveryElapsed) : 'unavailable'} · Output stored ${metric.deliveryElapsed ? number(((metric.outputDelivered[good] || 0) * 60) / metric.deliveryElapsed) : 'unavailable'} goods/min.</p>`
+                  ? markup`<p class="economy-muted">Observed ${number(metric.elapsed)}s; delivery coverage ${number(metric.deliveryElapsed)}s. Produced ${metric.elapsed ? number(((metric.produced[good] || 0) * 60) / metric.elapsed) : 'unavailable'} · Consumed ${metric.elapsed ? number(((metric.consumed[good] || 0) * 60) / metric.elapsed) : 'unavailable'} · Input arrivals ${metric.deliveryElapsed ? number(((metric.inputDelivered[good] || 0) * 60) / metric.deliveryElapsed) : 'unavailable'} · Output stored ${metric.deliveryElapsed ? number(((metric.outputDelivered[good] || 0) * 60) / metric.deliveryElapsed) : 'unavailable'} goods/min.</p>`
                   : '';
-              return `<article><div class="economy-contributor-heading"><strong>${escape(spec.name)} #${building.id}</strong><span>${roles}</span><div><button data-economy-inspect="${building.id}" data-economy-key="inspect-${building.id}">Inspect</button><button data-economy-locate="${building.id}" data-economy-key="locate-${building.id}">Locate</button></div></div>${recipe(building)}${observed}${producer ? `<details data-economy-explanation="capacity-${building.id}"><summary data-economy-key="capacity-${building.id}">Nominal capacity and limiting conditions</summary><p>${capacity(building)}</p></details>` : ''}</article>`;
+              return markup`<article><div class="economy-contributor-heading"><strong>${spec.name} #${building.id}</strong><span>${roles}</span><div><button data-economy-inspect="${building.id}" data-economy-key="inspect-${building.id}">Inspect</button><button data-economy-locate="${building.id}" data-economy-key="locate-${building.id}">Locate</button></div></div>${trusted(recipe(building))}${trusted(observed)}${trusted(producer ? markup`<details data-economy-explanation="capacity-${building.id}"><summary data-economy-key="capacity-${building.id}">Nominal capacity and limiting conditions</summary><p>${capacity(building)}</p></details>` : '')}</article>`;
             })
             .join('')
-        : '<p>No current producer, consumer or holder for this resource. Colony totals include former buildings.</p>'
-    }</section>`;
+        : '<p>No current producer, consumer or holder for this resource. Colony totals include former buildings.</p>',
+    )}</section>`;
   }
   function updateEconomyView() {
     if (!host || game.workspace !== 'economy') return;
@@ -221,15 +218,15 @@ export function createEconomyView(game: GameRuntime): EconomyViewSubsystem {
     });
     replaceReport(
       'economy-balances',
-      `<h2>Resource balances</h2><p class="economy-muted">Stored includes reserved goods. Available = stored − reserved. Goods outside storage are listed separately.</p><div class="economy-table-scroll"><table><caption>Physical stock and measured flow · goods/min</caption><thead><tr><th scope="col">Resource / chain</th><th scope="col">Stored</th><th scope="col">Reserved</th><th scope="col">Available</th><th scope="col">In transit</th><th scope="col">Produced /min</th><th scope="col">Consumed /min</th></tr></thead><tbody>${filtered
-        .map((good) => {
-          const stock = game.resourceAccounting(good);
-          const group = RESOURCE_GROUPS.find((entry) => entry.goods.includes(good));
-          return `<tr data-economy-good="${good}"><th scope="row"><button data-economy-resource="${good}" data-economy-key="resource-${good}" aria-expanded="${selectedGood === good}">${resourceIcon(good)}${escape(game.GOODS[good].name)}</button><small>${group.name}</small></th><td>${stock.stored}</td><td>${stock.reserved}</td><td>${stock.available}</td><td>${stock.inTransit}</td><td>${measured.available ? number(measured.rates.produced[good] || 0) : '—'}</td><td>${measured.available ? number(measured.rates.consumed[good] || 0) : '—'}</td></tr>`;
-        })
-        .join(
-          '',
-        )}</tbody></table></div>${filtered.length ? '' : '<p class="empty-state">No resources match these filters. Clear the search or choose another chain.</p>'}`,
+      markup`<h2>Resource balances</h2><p class="economy-muted">Stored includes reserved goods. Available = stored − reserved. Goods outside storage are listed separately.</p><div class="economy-table-scroll"><table><caption>Physical stock and measured flow · goods/min</caption><thead><tr><th scope="col">Resource / chain</th><th scope="col">Stored</th><th scope="col">Reserved</th><th scope="col">Available</th><th scope="col">In transit</th><th scope="col">Produced /min</th><th scope="col">Consumed /min</th></tr></thead><tbody>${trusted(
+        filtered
+          .map((good) => {
+            const stock = game.resourceAccounting(good);
+            const group = RESOURCE_GROUPS.find((entry) => entry.goods.includes(good));
+            return markup`<tr data-economy-good="${good}"><th scope="row"><button data-economy-resource="${good}" data-economy-key="resource-${good}" aria-expanded="${selectedGood === good}">${trusted(resourceIcon(good))}${game.GOODS[good].name}</button><small>${group.name}</small></th><td>${stock.stored}</td><td>${stock.reserved}</td><td>${stock.available}</td><td>${stock.inTransit}</td><td>${measured.available ? number(measured.rates.produced[good] || 0) : '—'}</td><td>${measured.available ? number(measured.rates.consumed[good] || 0) : '—'}</td></tr>`;
+          })
+          .join(''),
+      )}</tbody></table></div>${trusted(filtered.length ? '' : '<p class="empty-state">No resources match these filters. Clear the search or choose another chain.</p>')}`,
     );
     if (!selectedGood) {
       replaceReport(
@@ -242,29 +239,31 @@ export function createEconomyView(game: GameRuntime): EconomyViewSubsystem {
       stock = game.resourceAccounting(good);
     replaceReport(
       'economy-detail',
-      `<section aria-labelledby="economy-resource-heading"><h2 id="economy-resource-heading" tabindex="-1" data-economy-key="resource-heading">${resourceIcon(good)}${escape(game.GOODS[good].name)} · resource detail</h2><p>Reserved stock is part of stored stock, not additional goods. In transit means collected cargo only.</p>
-      <dl class="economy-stock">${Object.entries({
-        'Stored stock': stock.stored,
-        'Reserved stock': stock.reserved,
-        'Available stock': stock.available,
-        'Goods in transit': stock.inTransit,
-        'Producer input stock': stock.producerInputs,
-        'Output awaiting collection': stock.awaitingCollection,
-        'Construction materials delivered': stock.constructionMaterials,
-        'Other local stock': stock.otherLocal,
-        'Physical goods across all locations': stock.physicalGoods,
-      })
-        .map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`)
-        .join('')}</dl>
+      markup`<section aria-labelledby="economy-resource-heading"><h2 id="economy-resource-heading" tabindex="-1" data-economy-key="resource-heading">${trusted(resourceIcon(good))}${game.GOODS[good].name} · resource detail</h2><p>Reserved stock is part of stored stock, not additional goods. In transit means collected cargo only.</p>
+      <dl class="economy-stock">${trusted(
+        Object.entries({
+          'Stored stock': stock.stored,
+          'Reserved stock': stock.reserved,
+          'Available stock': stock.available,
+          'Goods in transit': stock.inTransit,
+          'Producer input stock': stock.producerInputs,
+          'Output awaiting collection': stock.awaitingCollection,
+          'Construction materials delivered': stock.constructionMaterials,
+          'Other local stock': stock.otherLocal,
+          'Physical goods across all locations': stock.physicalGoods,
+        })
+          .map(([label, value]) => markup`<div><dt>${label}</dt><dd>${value}</dd></div>`)
+          .join(''),
+      )}</dl>
       <p class="economy-muted">${stock.reclaimable ? `${stock.reclaimable} uncollected warehouse-transfer reservations may be reclaimed by eligible actions. Reachability and committed construction/ingredient promises still apply; this does not change Available stock.` : 'Construction and ingredient reservations remain committed; eligible actions may reclaim optional uncollected warehouse transfers.'}</p>
-      ${history(good)}<h3>Recorded flows</h3><p class="economy-muted">Creation, consumption, spending and refunds are separate from internal movement. Transfers and pickups do not count as producer output arriving at storage. Initial stocks are excluded from production.</p><table class="economy-flows"><thead><tr><th scope="col">Flow</th><th scope="col">Goods in covered interval</th><th scope="col">Goods / simulation minute</th></tr></thead><tbody>${Object.entries(
-        flowLabels,
-      )
-        .map(
-          ([flow, label]) =>
-            `<tr><th scope="row">${label}</th><td>${measured.available ? measured.totals[flow as EconomicFlow][good] || 0 : 'Unavailable'}</td><td>${measured.available ? number(measured.rates[flow as EconomicFlow][good] || 0) : '—'}</td></tr>`,
-        )
-        .join('')}</tbody></table>${contributors(good)}</section>`,
+      ${trusted(history(good))}<h3>Recorded flows</h3><p class="economy-muted">Creation, consumption, spending and refunds are separate from internal movement. Transfers and pickups do not count as producer output arriving at storage. Initial stocks are excluded from production.</p><table class="economy-flows"><thead><tr><th scope="col">Flow</th><th scope="col">Goods in covered interval</th><th scope="col">Goods / simulation minute</th></tr></thead><tbody>${trusted(
+        Object.entries(flowLabels)
+          .map(
+            ([flow, label]) =>
+              markup`<tr><th scope="row">${label}</th><td>${measured.available ? measured.totals[flow as EconomicFlow][good] || 0 : 'Unavailable'}</td><td>${measured.available ? number(measured.rates[flow as EconomicFlow][good] || 0) : '—'}</td></tr>`,
+          )
+          .join(''),
+      )}</tbody></table>${trusted(contributors(good))}</section>`,
     );
   }
   observePresentation(game, 'buildingDemolished', (event) => {

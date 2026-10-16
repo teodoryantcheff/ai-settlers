@@ -1,3 +1,4 @@
+import { html as markup, trusted } from './markup.ts';
 import { createLiveReportUpdater } from './live-report.ts';
 import { revealReportHeading } from './report-navigation.ts';
 import type { GameRuntime } from '../runtime.ts';
@@ -27,12 +28,7 @@ export function createLogisticsView(game: GameRuntime): LogisticsViewSubsystem {
     transfer: 'Warehouse transfer',
     recovered: 'Recovered cargo',
   };
-  const escape = (text: string) =>
-    String(text).replace(
-      /[&<>"']/g,
-      (character) =>
-        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character],
-    );
+
   const updateReport = createLiveReportUpdater({
     focusAttribute: 'data-logistics-key',
     disclosureAttribute: 'data-logistics-explanation',
@@ -45,14 +41,14 @@ export function createLogisticsView(game: GameRuntime): LogisticsViewSubsystem {
   }
   function endpoint(endpoint: TransportEndpoint | null, id: number | null) {
     return endpoint
-      ? `${escape(game.BSPEC[endpoint.type].name)} #${endpoint.id} (${endpoint.x}, ${endpoint.y})${endpoint.done ? '' : ' · construction'}`
+      ? `${game.BSPEC[endpoint.type].name} #${endpoint.id} (${endpoint.x}, ${endpoint.y})${endpoint.done ? '' : ' · construction'}`
       : id
         ? `Former or unavailable building #${id}`
         : 'Not recorded';
   }
   function actions(target: TransportEndpoint | null, label: string, key: string) {
     return target
-      ? `<button data-logistics-inspect="${target.id}" data-logistics-key="inspect-${key}">Inspect ${label}</button><button data-logistics-locate="${target.id}" data-logistics-key="locate-${key}">Locate ${label}</button>`
+      ? markup`<button data-logistics-inspect="${target.id}" data-logistics-key="inspect-${key}">Inspect ${label}</button><button data-logistics-locate="${target.id}" data-logistics-key="locate-${key}">Locate ${label}</button>`
       : '';
   }
   function routeDetail(row: TransportRow) {
@@ -76,7 +72,7 @@ export function createLogisticsView(game: GameRuntime): LogisticsViewSubsystem {
     const plot = points.map(
       (point) => `${left + (point.x - minX) * scale},${top + (point.y - minY) * scale}`,
     );
-    return `<figure class="logistics-route"><figcaption>Actual current carrier path · ${remaining.length} remaining recorded tiles</figcaption><svg viewBox="0 0 300 180" role="img" aria-label="Actual current carrier path from its observed position to the active path endpoint"><title>Carrier #${row.carrierId}: current position (${row.position.x.toFixed(1)}, ${row.position.y.toFixed(1)}), ${remaining.length} recorded remaining tiles</title><polyline points="${plot.join(' ')}" fill="none" stroke="var(--forest)" stroke-width="3"/><circle cx="${plot[0].split(',')[0]}" cy="${plot[0].split(',')[1]}" r="5" fill="var(--brass)"/><circle cx="${plot.at(-1).split(',')[0]}" cy="${plot.at(-1).split(',')[1]}" r="5" fill="var(--forest)"/></svg><p class="logistics-muted">Brass: observed carrier position. Green: active path endpoint. Tile coordinates, not a history of earlier routes.</p></figure><details data-logistics-explanation="route-${row.key}"><summary data-logistics-key="route-${row.key}">Recorded path coordinates</summary><p>${remaining.length ? remaining.map((point) => `(${point.x}, ${point.y})`).join(' → ') : 'The carrier is at the end of this recorded path.'}</p></details>`;
+    return markup`<figure class="logistics-route"><figcaption>Actual current carrier path · ${remaining.length} remaining recorded tiles</figcaption><svg viewBox="0 0 300 180" role="img" aria-label="Actual current carrier path from its observed position to the active path endpoint"><title>Carrier #${row.carrierId}: current position (${row.position.x.toFixed(1)}, ${row.position.y.toFixed(1)}), ${remaining.length} recorded remaining tiles</title><polyline points="${plot.join(' ')}" fill="none" stroke="var(--forest)" stroke-width="3"/><circle cx="${plot[0].split(',')[0]}" cy="${plot[0].split(',')[1]}" r="5" fill="var(--brass)"/><circle cx="${plot.at(-1).split(',')[0]}" cy="${plot.at(-1).split(',')[1]}" r="5" fill="var(--forest)"/></svg><p class="logistics-muted">Brass: observed carrier position. Green: active path endpoint. Tile coordinates, not a history of earlier routes.</p></figure><details data-logistics-explanation="route-${row.key}"><summary data-logistics-key="route-${row.key}">Recorded path coordinates</summary><p>${remaining.length ? remaining.map((point) => `(${point.x}, ${point.y})`).join(' → ') : 'The carrier is at the end of this recorded path.'}</p></details>`;
   }
   function selection(rows: TransportRow[]) {
     if (!selected)
@@ -93,10 +89,10 @@ export function createLogisticsView(game: GameRuntime): LogisticsViewSubsystem {
     if (current) selected = current;
     const removed =
       inspected && !game.byId(inspected.id)
-        ? `<aside class="logistics-removed"><h3>Contributor removed</h3><p>${escape(game.BSPEC[inspected.type].name)} no longer exists. Its former location is (${inspected.x}, ${inspected.y}). Current cargo may be rerouted to surviving storage.</p><button data-logistics-former data-logistics-key="former">Locate former site</button></aside>`
+        ? markup`<aside class="logistics-removed"><h3>Contributor removed</h3><p>${game.BSPEC[inspected.type].name} no longer exists. Its former location is (${inspected.x}, ${inspected.y}). Current cargo may be rerouted to surviving storage.</p><button data-logistics-former data-logistics-key="former">Locate former site</button></aside>`
         : '';
     const row = selected;
-    return `<h2 tabindex="-1" data-logistics-key="evidence-heading">${resourceIcon(row.good)}${escape(game.GOODS[row.good].name)} · delivery evidence</h2>${removed}${current ? `<p><strong>${stages[row.stage]}</strong> · ${kinds[row.kind]}${row.carrierId ? ' · carrier #' + row.carrierId : ''}</p><dl class="logistics-endpoints"><div><dt>Pickup source</dt><dd>${endpoint(row.source, row.sourceId)}</dd>${actions(row.source, 'source', row.key + '-source')}</div><div><dt>Delivery destination</dt><dd>${endpoint(row.target, row.targetId)}${!row.targetId && row.kind === 'deliver' && ['queued', 'assigned'].includes(row.stage) ? ' · storage chosen after collection' : ''}</dd>${actions(row.target, 'destination', row.key + '-target')}</div></dl><p>${row.stage === 'carrying' ? 'One good is physically carried. Assignment and pickup are not completed arrival.' : row.stage === 'unknown' ? 'Assignment is recorded, but no live carrier matches this job. Pickup, physical cargo and travel stage are unavailable.' : 'Cargo has not been collected; this job is not goods in transit.'}${row.position ? ` Current carrier position: (${row.position.x.toFixed(1)}, ${row.position.y.toFixed(1)}).` : ''}</p>${routeDetail(row)}` : '<p class="empty-state">This delivery is no longer active. It may have arrived, been canceled or been replaced. Its individual outcome and former route are unavailable; completed arrival totals below cover recorded physical deliveries.</p>'}<p class="logistics-muted">Measured ETA unavailable. Complete historical route records are unavailable. Current paths are observed evidence and do not establish a historical delay or forecast an arrival time.</p>`;
+    return markup`<h2 tabindex="-1" data-logistics-key="evidence-heading">${trusted(resourceIcon(row.good))}${game.GOODS[row.good].name} · delivery evidence</h2>${trusted(removed)}${trusted(current ? markup`<p><strong>${stages[row.stage]}</strong> · ${kinds[row.kind]}${row.carrierId ? ' · carrier #' + row.carrierId : ''}</p><dl class="logistics-endpoints"><div><dt>Pickup source</dt><dd>${endpoint(row.source, row.sourceId)}</dd>${trusted(actions(row.source, 'source', row.key + '-source'))}</div><div><dt>Delivery destination</dt><dd>${endpoint(row.target, row.targetId)}${!row.targetId && row.kind === 'deliver' && ['queued', 'assigned'].includes(row.stage) ? ' · storage chosen after collection' : ''}</dd>${trusted(actions(row.target, 'destination', row.key + '-target'))}</div></dl><p>${row.stage === 'carrying' ? 'One good is physically carried. Assignment and pickup are not completed arrival.' : row.stage === 'unknown' ? 'Assignment is recorded, but no live carrier matches this job. Pickup, physical cargo and travel stage are unavailable.' : 'Cargo has not been collected; this job is not goods in transit.'}${row.position ? ` Current carrier position: (${row.position.x.toFixed(1)}, ${row.position.y.toFixed(1)}).` : ''}</p>${trusted(routeDetail(row))}` : '<p class="empty-state">This delivery is no longer active. It may have arrived, been canceled or been replaced. Its individual outcome and former route are unavailable; completed arrival totals below cover recorded physical deliveries.</p>')}<p class="logistics-muted">Measured ETA unavailable. Complete historical route records are unavailable. Current paths are observed evidence and do not establish a historical delay or forecast an arrival time.</p>`;
   }
   function waiting(rows: TransportRow[]) {
     const outputs = game.buildings.flatMap((building) => {
@@ -117,15 +113,15 @@ export function createLogisticsView(game: GameRuntime): LogisticsViewSubsystem {
         game.BSPEC[building.type].in &&
         ingredientShortages(building, game.BSPEC[building.type]).length,
     );
-    return `<h2>Goods waiting at buildings</h2><h3>Output awaiting collection</h3>${
+    return markup`<h2>Goods waiting at buildings</h2><h3>Output awaiting collection</h3>${trusted(
       outputs.length
         ? outputs
             .map(({ building, good }) => {
-              return `<article><strong>${escape(game.BSPEC[building.type].name)} #${building.id}</strong> · ${building.stock[good]} ${escape(game.GOODS[good].name)} outside storage ${actions({ id: building.id, type: building.type, x: building.x, y: building.y, done: building.done }, 'producer', 'waiting-out-' + building.id + '-' + good)}</article>`;
+              return markup`<article><strong>${game.BSPEC[building.type].name} #${building.id}</strong> · ${building.stock[good]} ${game.GOODS[good].name} outside storage ${trusted(actions({ id: building.id, type: building.type, x: building.x, y: building.y, done: building.done }, 'producer', 'waiting-out-' + building.id + '-' + good))}</article>`;
             })
             .join('')
-        : '<p>No producer output currently awaits collection.</p>'
-    }<h3>Producer ingredient shortfalls</h3><p class="logistics-muted">These are current recipe shortfalls, not alarms. Intentional pauses are labeled. Queued and assigned supplies have not yet arrived.</p>${
+        : '<p>No producer output currently awaits collection.</p>',
+    )}<h3>Producer ingredient shortfalls</h3><p class="logistics-muted">These are current recipe shortfalls, not alarms. Intentional pauses are labeled. Queued and assigned supplies have not yet arrived.</p>${trusted(
       inputs.length
         ? inputs
             .map((building) => {
@@ -143,11 +139,11 @@ export function createLogisticsView(game: GameRuntime): LogisticsViewSubsystem {
                           `${game.GOODS[shortage.good].name}: ${shortage.have}/${shortage.need} local input`,
                       )
                       .join(' · ');
-              return `<article><strong>${escape(spec.name)} #${building.id}</strong> · ${escape(shortages)}${building.disabled ? ' · intentionally paused' : ''}<p class="logistics-muted">Incoming: ${inbound.filter((row) => row.stage === 'queued').length} queued, ${inbound.filter((row) => row.stage === 'assigned').length} assigned before pickup, ${inbound.filter((row) => row.stage === 'carrying').length} physically carrying${inbound.some((row) => row.stage === 'unknown') ? `; ${inbound.filter((row) => row.stage === 'unknown').length} assignment records with unavailable carrier evidence` : ''}. Zero incoming is absence of current deliveries; supplier availability and reachability require inspection.</p>${actions({ id: building.id, type: building.type, x: building.x, y: building.y, done: building.done }, 'consumer', 'waiting-in-' + building.id)}</article>`;
+              return markup`<article><strong>${spec.name} #${building.id}</strong> · ${shortages}${building.disabled ? ' · intentionally paused' : ''}<p class="logistics-muted">Incoming: ${inbound.filter((row) => row.stage === 'queued').length} queued, ${inbound.filter((row) => row.stage === 'assigned').length} assigned before pickup, ${inbound.filter((row) => row.stage === 'carrying').length} physically carrying${inbound.some((row) => row.stage === 'unknown') ? `; ${inbound.filter((row) => row.stage === 'unknown').length} assignment records with unavailable carrier evidence` : ''}. Zero incoming is absence of current deliveries; supplier availability and reachability require inspection.</p>${trusted(actions({ id: building.id, type: building.type, x: building.x, y: building.y, done: building.done }, 'consumer', 'waiting-in-' + building.id))}</article>`;
             })
             .join('')
-        : '<p>No current recipe shortfall at completed producers.</p>'
-    }`;
+        : '<p>No current recipe shortfall at completed producers.</p>',
+    )}`;
   }
   function updateLogisticsView() {
     if (!host || game.workspace !== 'logistics') return;
@@ -165,39 +161,37 @@ export function createLogisticsView(game: GameRuntime): LogisticsViewSubsystem {
     );
     replace(
       'logistics-live',
-      `<h2>Current transport</h2><p class="logistics-muted">Live quantities are independent of the reporting window. Only physically collected goods are in transit.</p><dl class="logistics-counts">${Object.entries(
-        stages,
-      )
-        .filter(([stage]) => stage !== 'unknown')
-        .map(
-          ([stage, label]) =>
-            `<div><dt>${label}</dt><dd data-live-stage="${stage}">${snapshot.rows.filter((row) => row.stage === stage).length}</dd></div>`,
-        )
-        .join(
-          '',
-        )}<div><dt>Idle carriers / all carriers</dt><dd>${snapshot.carriers.filter((carrier) => carrier.state === 'idle').length} / ${snapshot.carriers.length}</dd></div></dl>${snapshot.rows.some((row) => row.stage === 'unknown') ? `<p class="logistics-muted">Assignment evidence unavailable: <strong data-live-stage="unknown">${snapshot.rows.filter((row) => row.stage === 'unknown').length}</strong> recorded assignments have no matched live carrier; pickup/cargo status is unknown.</p>` : ''}<div class="logistics-table-scroll"><table><caption>Active delivery jobs and recovered cargo</caption><thead><tr><th scope="col">Stage</th><th scope="col">Good / purpose</th><th scope="col">Source → destination</th><th scope="col">Carrier</th><th scope="col">Evidence</th></tr></thead><tbody>${filtered.map((row) => `<tr><td>${stages[row.stage]}</td><td>${resourceIcon(row.good)}${escape(game.GOODS[row.good].name)}<small>${kinds[row.kind]}</small></td><td>${endpoint(row.source, row.sourceId)} → ${endpoint(row.target, row.targetId)}${!row.targetId && row.kind === 'deliver' && ['queued', 'assigned'].includes(row.stage) ? ' (storage chosen after pickup)' : ''}</td><td>${row.carrierId ? '#' + row.carrierId : row.stage === 'unknown' ? 'Unavailable' : 'Unassigned'}</td><td><button data-logistics-select="${row.key}" data-logistics-key="select-${row.key}" aria-expanded="${selected?.key === row.key}">Details</button></td></tr>`).join('')}</tbody></table></div>${filtered.length ? '' : '<p class="empty-state">No active deliveries match these filters. Completed deliveries appear separately below.</p>'}`,
+      markup`<h2>Current transport</h2><p class="logistics-muted">Live quantities are independent of the reporting window. Only physically collected goods are in transit.</p><dl class="logistics-counts">${trusted(
+        Object.entries(stages)
+          .filter(([stage]) => stage !== 'unknown')
+          .map(
+            ([stage, label]) =>
+              markup`<div><dt>${label}</dt><dd data-live-stage="${stage}">${snapshot.rows.filter((row) => row.stage === stage).length}</dd></div>`,
+          )
+          .join(''),
+      )}<div><dt>Idle carriers / all carriers</dt><dd>${snapshot.carriers.filter((carrier) => carrier.state === 'idle').length} / ${snapshot.carriers.length}</dd></div></dl>${trusted(snapshot.rows.some((row) => row.stage === 'unknown') ? markup`<p class="logistics-muted">Assignment evidence unavailable: <strong data-live-stage="unknown">${snapshot.rows.filter((row) => row.stage === 'unknown').length}</strong> recorded assignments have no matched live carrier; pickup/cargo status is unknown.</p>` : '')}<div class="logistics-table-scroll"><table><caption>Active delivery jobs and recovered cargo</caption><thead><tr><th scope="col">Stage</th><th scope="col">Good / purpose</th><th scope="col">Source → destination</th><th scope="col">Carrier</th><th scope="col">Evidence</th></tr></thead><tbody>${trusted(filtered.map((row) => markup`<tr><td>${stages[row.stage]}</td><td>${trusted(resourceIcon(row.good))}${game.GOODS[row.good].name}<small>${kinds[row.kind]}</small></td><td>${endpoint(row.source, row.sourceId)} → ${endpoint(row.target, row.targetId)}${!row.targetId && row.kind === 'deliver' && ['queued', 'assigned'].includes(row.stage) ? ' (storage chosen after pickup)' : ''}</td><td>${row.carrierId ? '#' + row.carrierId : row.stage === 'unknown' ? 'Unavailable' : 'Unassigned'}</td><td><button data-logistics-select="${row.key}" data-logistics-key="select-${row.key}" aria-expanded="${selected?.key === row.key}">Details</button></td></tr>`).join(''))}</tbody></table></div>${trusted(filtered.length ? '' : '<p class="empty-state">No active deliveries match these filters. Completed deliveries appear separately below.</p>')}`,
     );
     replace('logistics-detail', selection(snapshot.rows));
     const arrival = game.cargoWindow(window);
     replace(
       'logistics-completions',
-      `<h2>Completed arrivals</h2>${
+      markup`<h2>Completed arrivals</h2>${trusted(
         arrival.available
-          ? `<p>Observed ${arrival.elapsed.toFixed(1)} simulation seconds (${arrival.from.toFixed(1)}–${arrival.to.toFixed(1)}). Recorded arrivals only; earlier unrecorded history is unavailable.</p><table><thead><tr><th scope="col">Good</th><th scope="col">Arrivals in covered interval</th><th scope="col">Goods / simulation minute</th></tr></thead><tbody>${goods
-              .filter((good) => arrival.totals[good])
-              .map(
-                (good) =>
-                  `<tr><th scope="row">${escape(game.GOODS[good].name)}</th><td>${arrival.totals[good]}</td><td>${arrival.rates[good].toFixed(1)}</td></tr>`,
-              )
-              .join(
-                '',
-              )}</tbody></table>${Object.values(arrival.totals).some((value) => value > 0) ? '' : '<p>No completed goods arrivals observed during this covered interval.</p>'}`
-          : '<p class="empty-state">History unavailable — gathering carrier-arrival observations. Missing history is not zero completed deliveries.</p>'
-      }<p class="logistics-muted">Counts include producer inputs, storage arrivals, construction and returned cargo once they actually arrive. Initial stock, assignments, pickups, soldier deployments and direct salvage are excluded. Transfers count as arrivals but do not create goods.</p>`,
+          ? markup`<p>Observed ${arrival.elapsed.toFixed(1)} simulation seconds (${arrival.from.toFixed(1)}–${arrival.to.toFixed(1)}). Recorded arrivals only; earlier unrecorded history is unavailable.</p><table><thead><tr><th scope="col">Good</th><th scope="col">Arrivals in covered interval</th><th scope="col">Goods / simulation minute</th></tr></thead><tbody>${trusted(
+              goods
+                .filter((good) => arrival.totals[good])
+                .map(
+                  (good) =>
+                    markup`<tr><th scope="row">${game.GOODS[good].name}</th><td>${arrival.totals[good]}</td><td>${arrival.rates[good].toFixed(1)}</td></tr>`,
+                )
+                .join(''),
+            )}</tbody></table>${trusted(Object.values(arrival.totals).some((value) => value > 0) ? '' : '<p>No completed goods arrivals observed during this covered interval.</p>')}`
+          : '<p class="empty-state">History unavailable — gathering carrier-arrival observations. Missing history is not zero completed deliveries.</p>',
+      )}<p class="logistics-muted">Counts include producer inputs, storage arrivals, construction and returned cargo once they actually arrive. Initial stock, assignments, pickups, soldier deployments and direct salvage are excluded. Transfers count as arrivals but do not create goods.</p>`,
     );
     replace(
       'logistics-workload',
-      `<h2>Carrier workload</h2>${snapshot.carriers.length ? `<div class="logistics-carriers">${snapshot.carriers.map((carrier) => `<article><strong>Carrier #${carrier.id}</strong> · ${carrier.state === 'pickup' ? 'Assigned before pickup' : carrier.state === 'carrying' ? 'Physically carrying ' + escape(game.GOODS[carrier.cargo].name) : carrier.state === 'idle' ? 'Idle' : 'Moving without cargo'}<small>Position (${carrier.position.x.toFixed(1)}, ${carrier.position.y.toFixed(1)}) · ${carrier.route ? Math.max(0, carrier.route.points.length - carrier.route.next) + ' current path tiles remaining' : 'No current path recorded'}</small></article>`).join('')}</div>` : '<p>No carriers are currently present.</p>'}<p class="logistics-muted">${snapshot.deployments} active soldier deployments are separate from carrier cargo. Historical route workload and measured travel times are unavailable.</p>`,
+      markup`<h2>Carrier workload</h2>${trusted(snapshot.carriers.length ? markup`<div class="logistics-carriers">${trusted(snapshot.carriers.map((carrier) => markup`<article><strong>Carrier #${carrier.id}</strong> · ${carrier.state === 'pickup' ? 'Assigned before pickup' : carrier.state === 'carrying' ? 'Physically carrying ' + game.GOODS[carrier.cargo].name : carrier.state === 'idle' ? 'Idle' : 'Moving without cargo'}<small>Position (${carrier.position.x.toFixed(1)}, ${carrier.position.y.toFixed(1)}) · ${carrier.route ? Math.max(0, carrier.route.points.length - carrier.route.next) + ' current path tiles remaining' : 'No current path recorded'}</small></article>`).join(''))}</div>` : '<p>No carriers are currently present.</p>')}<p class="logistics-muted">${snapshot.deployments} active soldier deployments are separate from carrier cargo. Historical route workload and measured travel times are unavailable.</p>`,
     );
     replace('logistics-waiting', waiting(snapshot.rows));
   }

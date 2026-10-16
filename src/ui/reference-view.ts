@@ -1,6 +1,7 @@
+import { html as markup, trusted, formatGoods } from './markup.ts';
 import { artworkAssetURL } from '../rendering/painted-assets.ts';
 import type { GameRuntime } from '../runtime.ts';
-import type { BuildingType, Good, Inventory } from '../types.ts';
+import type { BuildingType, Good } from '../types.ts';
 import { recipeRequirements, edibleGoods } from '../gameplay/production-rules.ts';
 import { buildingPurposes } from './catalog-view.ts';
 import { resourceIcon } from './resource-icons.ts';
@@ -11,11 +12,6 @@ interface Article {
   title: string;
   body: string;
 }
-const escape = (text: string) =>
-  text.replace(
-    /[&<>"']/g,
-    (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char],
-  );
 
 /** Search and contextual copy read the same specs and recipe rules as simulation. */
 export function createReferenceView(game: GameRuntime): ReferenceViewSubsystem {
@@ -23,17 +19,13 @@ export function createReferenceView(game: GameRuntime): ReferenceViewSubsystem {
   const topic = document.getElementById('reference-topic') as HTMLSelectElement;
   const results = document.getElementById('reference-results');
   let articles: Article[] = [];
-  const goods = (inventory: Readonly<Inventory>) =>
-    Object.entries(inventory || {})
-      .map(([good, n]) => `${n} ${game.GOODS[good as Good].name}`)
-      .join(' + ') || 'None';
   function buildingArticle(type: BuildingType): Article {
     const spec = game.BSPEC[type];
     const recipe =
       spec.prod === 'mine'
         ? `Fish, bread, meat or provisions: consume 1 of any → 1 ${game.GOODS[spec.out].name}. The best-stocked meal is chosen; grain, flour, pigs and beer are not mine meals.`
         : spec.in
-          ? `${goods(recipeRequirements({ type }, spec))} → 1 ${game.GOODS[spec.out].name}.`
+          ? `${formatGoods(game.GOODS, recipeRequirements({ type }, spec), { empty: 'None' })} → 1 ${game.GOODS[spec.out].name}.`
           : spec.out
             ? `${spec.prod === 'gather' ? '2' : '1'} ${game.GOODS[spec.out].name} per successful local work cycle.`
             : type === 'well'
@@ -56,7 +48,7 @@ export function createReferenceView(game: GameRuntime): ReferenceViewSubsystem {
         ' Production needs a completed, working, connected well within 6 tiles. Water is local coverage, never carried cargo.';
     let extra = '';
     if (type === 'armory')
-      extra = `<p><strong>Retained legacy armory recipe:</strong> ${goods(recipeRequirements({ type, legacyIndustry: true }, spec))} → 1 Weapons. Existing migrated armories keep this recipe; new armories use iron bars. ${game.buildings.filter((b) => b.type === 'armory' && b.legacyIndustry).length} retained legacy armories in this colony.</p>`;
+      extra = markup`<p><strong>Retained legacy armory recipe:</strong> ${formatGoods(game.GOODS, recipeRequirements({ type, legacyIndustry: true }, spec), { empty: 'None' })} → 1 Weapons. Existing migrated armories keep this recipe; new armories use iron bars. ${game.buildings.filter((b) => b.type === 'armory' && b.legacyIndustry).length} retained legacy armories in this colony.</p>`;
     if (type === 'workshop' || type === 'toolsmith')
       extra +=
         '<p>Legacy toolsmith migration: older saves migrate the original wood-and-stone toolsmith into the basic Workshop, preserving stock, delivered materials, timers and pickups. The current Toolsmith uses iron bars and planks.</p>';
@@ -64,7 +56,7 @@ export function createReferenceView(game: GameRuntime): ReferenceViewSubsystem {
       extra +=
         '<p>Legacy provisions remain an eligible meal. Different stocked food types can improve mining speed; inspect actual food variety and measured output separately.</p>';
     if (type === 'guard')
-      extra += `<p>Unmanned outposts claim up to ${Math.min(spec.rad, 3)} tiles of land radius. A soldier expands this to ${spec.rad}. Territory follows an orthogonal flood through traversable land; water and mountains restrict it. A queued deployment is not a walking soldier.</p>`;
+      extra += markup`<p>Unmanned outposts claim up to ${Math.min(spec.rad, 3)} tiles of land radius. A soldier expands this to ${spec.rad}. Territory follows an orthogonal flood through traversable land; water and mountains restrict it. A queued deployment is not a walking soldier.</p>`;
     const purpose =
       type === 'hq'
         ? 'Starting storage and colony center. Headquarters demolition is protected.'
@@ -75,7 +67,7 @@ export function createReferenceView(game: GameRuntime): ReferenceViewSubsystem {
       id: 'building-' + type,
       topic: 'buildings',
       title: spec.name,
-      body: `<p>${purpose}</p><dl><dt>Construction goods</dt><dd>${goods(spec.cost)}</dd><dt>Recipe / output</dt><dd>${recipe}</dd><dt>Placement and work</dt><dd>${requirements}</dd></dl>${spec.time ? `<p>Base nominal recipe cycle: ${spec.time} simulation seconds. Production upgrades reduce cycle time; input, ${spec.water ? 'local water, ' : ''}reserve and output limits still apply. Nominal capacity is not a forecast. Economy shows current capacity and measured rates separately.</p>` : ''}${extra}`,
+      body: markup`<p>${purpose}</p><dl><dt>Construction goods</dt><dd>${formatGoods(game.GOODS, spec.cost, { empty: 'None' })}</dd><dt>Recipe / output</dt><dd>${recipe}</dd><dt>Placement and work</dt><dd>${requirements}</dd></dl>${trusted(spec.time && (spec.prod === 'craft' || spec.prod === 'mine') ? markup`<p>Base nominal recipe cycle: ${spec.time} simulation seconds. Production upgrades reduce cycle time; input, ${spec.water ? 'local water, ' : ''}reserve and output limits still apply. Nominal capacity is not a forecast. Economy shows current capacity and measured rates separately.</p>` : '')}${trusted(extra)}`,
     };
   }
   function collect(): Article[] {
@@ -108,7 +100,7 @@ export function createReferenceView(game: GameRuntime): ReferenceViewSubsystem {
         id: 'progression',
         topic: 'progression',
         title: 'Gold, Journey, contracts and upgrades',
-        body: `<p>Bank ${game.GOAL} gold to reach the colony objective. Produced gold waiting at a mine is not yet banked. Carriers deliver it to completed storage; moving gold between warehouses does not earn it again.</p><p>Journey introduces timber, food, expansion and mining. Colony groups optional contracts, gold-funded hauling/production upgrades and autoplay. Spending gold delays the treasury objective; costs and rewards are shown before the action. Upgrades change nominal capacity or movement rather than rewriting recorded output.</p><p>After victory, Continue Colony keeps production, reports and management available. Return Home keeps the live colony for Continue. Named checkpoints and a separate autosave preserve deliberate recovery points.</p>`,
+        body: markup`<p>Bank ${game.GOAL} gold to reach the colony objective. Produced gold waiting at a mine is not yet banked. Carriers deliver it to completed storage; moving gold between warehouses does not earn it again.</p><p>Journey introduces timber, food, expansion and mining. Colony groups optional contracts, gold-funded hauling/production upgrades and autoplay. Spending gold delays the treasury objective; costs and rewards are shown before the action. Upgrades change nominal capacity or movement rather than rewriting recorded output.</p><p>After victory, Continue Colony keeps production, reports and management available. Return Home keeps the live colony for Continue. Named checkpoints and a separate autosave preserve deliberate recovery points.</p>`,
       },
       {
         id: 'controls',
@@ -133,7 +125,7 @@ export function createReferenceView(game: GameRuntime): ReferenceViewSubsystem {
         id: 'resource-' + good,
         topic: 'resources',
         title: game.GOODS[good].name,
-        body: `<p>${resourceIcon(good)}${edibleGoods.includes(good) ? 'An edible mine meal. Grain, flour, pigs and beer are not edible mine meals. ' : ''}${good === 'gold' ? 'Banked storage gold funds contracts/upgrades and the objective. ' : ''}Current production sources: ${producers.join(', ') || 'No current producer recipe; retained stocks and rewards can remain valid'}.</p><p>Use Economy for this resource’s physical locations, reservations, covered production/consumption and completed deliveries. Inspect contributors before choosing Locate.</p>`,
+        body: markup`<p>${trusted(resourceIcon(good))}${edibleGoods.includes(good) ? 'An edible mine meal. Grain, flour, pigs and beer are not edible mine meals. ' : ''}${good === 'gold' ? 'Banked storage gold funds contracts/upgrades and the objective. ' : ''}Current production sources: ${producers.join(', ') || 'No current producer recipe; retained stocks and rewards can remain valid'}.</p><p>Use Economy for this resource’s physical locations, reservations, covered production/consumption and completed deliveries. Inspect contributors before choosing Locate.</p>`,
       });
     }
     return articles;
@@ -154,7 +146,7 @@ export function createReferenceView(game: GameRuntime): ReferenceViewSubsystem {
       visible
         .map(
           (article) =>
-            `<article id="reference-${article.id}" data-reference-article="${article.id}"><h3>${escape(article.title)}</h3>${article.body}</article>`,
+            markup`<article id="reference-${article.id}" data-reference-article="${article.id}"><h3>${article.title}</h3>${trusted(article.body)}</article>`,
         )
         .join('') ||
       '<p class="empty-state">No matching reference articles. Try a building, ingredient, delivery stage or another topic.</p>';
@@ -181,11 +173,7 @@ export function createReferenceView(game: GameRuntime): ReferenceViewSubsystem {
     const provenance = artworkAssetURL('prompts.md').href,
       manifest = artworkAssetURL().href;
     document.getElementById('about-body').innerHTML =
-      '<p class="reference-lead">The Settlers — browser tribute · <strong>Version 2.0.0</strong></p><p>A peaceful settlement game about production chains, carriers, roads and the 200-gold objective. An independent browser tribute inspired by The Settlers (1993), Blue Byte; this project is not an official release of the original game.</p><h3>Credits and acknowledgments</h3><p>Game code, procedural source artwork, sound and music are provided by this project. The native WebGL renderer uses PixiJS v8. Painted building, foliage, meadow and mountain artwork was generated with the built-in image generation tool.</p><h3>Artwork provenance</h3><p>The original generated images, style references and exact prompts are included with the project. Crop definitions live in the manifest; runtime installation preserves gameplay footprints and sprite anchors.</p><p><a href="' +
-      escape(provenance) +
-      '" target="_blank" rel="noopener">Read the artwork prompts and provenance</a> · <a href="' +
-      escape(manifest) +
-      '" target="_blank" rel="noopener">Artwork crop manifest</a></p><p>Named colonies are stored in this browser. Export JSON to keep an independent copy.</p>';
+      markup`<p class="reference-lead">The Settlers — browser tribute · <strong>Version 2.0.0</strong></p><p>A peaceful settlement game about production chains, carriers, roads and the 200-gold objective. An independent browser tribute inspired by The Settlers (1993), Blue Byte; this project is not an official release of the original game.</p><h3>Credits and acknowledgments</h3><p>Game code, procedural source artwork, sound and music are provided by this project. The native WebGL renderer uses PixiJS v8. Painted building, foliage, meadow and mountain artwork was generated with the built-in image generation tool.</p><h3>Artwork provenance</h3><p>The original generated images, style references and exact prompts are included with the project. Crop definitions live in the manifest; runtime installation preserves gameplay footprints and sprite anchors.</p><p><a href="${provenance}" target="_blank" rel="noopener">Read the artwork prompts and provenance</a> · <a href="${manifest}" target="_blank" rel="noopener">Artwork crop manifest</a></p><p>Named colonies are stored in this browser. Export JSON to keep an independent copy.</p>`;
   }
   function updateReferenceContext() {
     const workspace = game.workspace || 'map';
@@ -212,26 +200,26 @@ export function createReferenceView(game: GameRuntime): ReferenceViewSubsystem {
             : article === 'progression'
               ? 'Gold spending delays the treasury objective. Optional contracts, upgrades and autoplay remain available as shown in Colony.'
               : b
-                ? '<p>' +
-                  (b.type === 'guard'
-                    ? 'Outposts claim a smaller territory before a soldier arrives.'
-                    : buildingPurposes[b.type] || 'Colony storage holds reserved and free goods.') +
-                  '</p><p>' +
-                  (game.BSPEC[b.type].prod === 'mine'
-                    ? 'Mine meals: fish, bread, meat or provisions; one of any.'
-                    : game.BSPEC[b.type].in
-                      ? 'Actual recipe: ' +
-                        goods(recipeRequirements(b, game.BSPEC[b.type])) +
-                        ' → ' +
-                        game.GOODS[game.BSPEC[b.type].out].name +
-                        '.'
-                      : 'Inspect actual stock, current status and consequences before acting.') +
-                  '</p>'
+                ? markup`<p>${
+                    b.type === 'guard'
+                      ? 'Outposts claim a smaller territory before a soldier arrives.'
+                      : buildingPurposes[b.type] || 'Colony storage holds reserved and free goods.'
+                  }</p><p>${
+                    game.BSPEC[b.type].prod === 'mine'
+                      ? 'Mine meals: fish, bread, meat or provisions; one of any.'
+                      : game.BSPEC[b.type].in
+                        ? 'Actual recipe: ' +
+                          formatGoods(game.GOODS, recipeRequirements(b, game.BSPEC[b.type]), {
+                            empty: 'None',
+                          }) +
+                          ' → ' +
+                          game.GOODS[game.BSPEC[b.type].out].name +
+                          '.'
+                        : 'Inspect actual stock, current status and consequences before acting.'
+                  }</p>`
                 : 'Map and compact explanations remain live. Full utility screens suspend simulation and preserve your manual pause choice.';
     const node = document.getElementById('reference-context-copy');
-    const html =
-      (b && article.startsWith('building-') ? explanation : '<p>' + explanation + '</p>') +
-      `<button type="button" data-reference="${article}">Read the full reference</button>`;
+    const html = markup`${trusted(b && article.startsWith('building-') ? explanation : markup`<p>${explanation}</p>`)}<button type="button" data-reference="${article}">Read the full reference</button>`;
     if (node.innerHTML !== html && !node.contains(document.activeElement)) node.innerHTML = html;
   }
   search.addEventListener('input', filter);
