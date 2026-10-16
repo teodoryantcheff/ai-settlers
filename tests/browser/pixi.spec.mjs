@@ -744,3 +744,151 @@ test('graphical workload overlay preserves jobs and renders at both quality leve
   await page.screenshot({ path: test.info().outputPath('workload-empty-mobile.png') });
   expect(errors).toEqual([]);
 });
+
+for (const tiled of [false, true])
+  test(`incremental borders and minimap match full paints (${tiled ? 'tiled' : 'single'} textures)`, async ({
+    page,
+  }) => {
+    test.setTimeout(120000);
+    const errors = captureErrors(page);
+    if (tiled)
+      await page.addInitScript(() => {
+        const original = WebGL2RenderingContext.prototype.getParameter;
+        WebGL2RenderingContext.prototype.getParameter = function (parameter) {
+          const value = original.call(this, parameter);
+          return parameter === this.MAX_TEXTURE_SIZE ? Math.min(2048, value) : value;
+        };
+      });
+    await page.addInitScript(() => {
+      window.__cacheCanvases = new Set();
+      const original = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (...args) {
+        if (args[0] === '2d') window.__cacheCanvases.add(this);
+        return original.apply(this, args);
+      };
+    });
+    await frozenGame(page);
+    const result = await page.evaluate(() => {
+      const game = window.productionArtPreview.game;
+      performance.now = () => 5000;
+      game.draw();
+      game.drawMini();
+      const border = [...window.__cacheCanvases].find(
+        (c) => c.width === game.W * game.TS && c.height === game.H * game.TS,
+      );
+      const mini = [...window.__cacheCanvases].find(
+        (c) => c.width === 192 && c.height === 192 && !c.id,
+      );
+      if (!border || !mini) throw new Error('Missing cache canvases');
+      const pixels = (c) => c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+      const mismatch = (a, b) => a.reduce((n, value, i) => n + (value !== b[i]), 0);
+      const gl = document.getElementById('pixi-view').getContext('webgl2');
+      const gpuPixels = () => {
+        const data = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
+        gl.readPixels(
+          0,
+          0,
+          gl.drawingBufferWidth,
+          gl.drawingBufferHeight,
+          gl.RGBA,
+          gl.UNSIGNED_BYTE,
+          data,
+        );
+        return data;
+      };
+      const uploads = [];
+      const original = gl.texSubImage2D;
+      gl.texSubImage2D = function (...args) {
+        const source = args.at(-1);
+        if (source instanceof HTMLCanvasElement)
+          uploads.push([args[2], args[3], source.width, source.height]);
+        return original.apply(this, args);
+      };
+      const comparisons = [];
+      const check = (name, mutate) => {
+        mutate();
+        const rng = game.SR.getState(),
+          time = game.state.time;
+        uploads.length = 0;
+        game.draw();
+        game.drawMini();
+        const changedUploads = uploads.slice();
+        const incrementalBorder = pixels(border),
+          incrementalMini = pixels(mini),
+          incrementalGpu = gpuPixels();
+        game.staticDirty = true;
+        game.draw();
+        game.drawMini();
+        comparisons.push({
+          name,
+          border: mismatch(incrementalBorder, pixels(border)),
+          mini: mismatch(incrementalMini, pixels(mini)),
+          gpu: /territory|edges|adjacent/.test(name) ? mismatch(incrementalGpu, gpuPixels()) : null,
+          changedUploads,
+          deterministic: rng === game.SR.getState() && time === game.state.time,
+        });
+      };
+      const i = game.idx(50, 50);
+      check('territory hole', () => {
+        game.owned[i] = 0;
+        game.emitGameEvent('territoryChanged', {});
+      });
+      check('territory restoration clears transparent pixels', () => {
+        game.owned[i] = 1;
+        game.emitGameEvent('territoryChanged', {});
+      });
+      check('edges and disjoint changes', () => {
+        for (const i of [
+          0,
+          game.W - 1,
+          game.W * (game.H - 1),
+          game.W * game.H - 1,
+          game.idx(51, 51),
+        ])
+          game.owned[i] ^= 1;
+        game.emitGameEvent('territoryChanged', {});
+      });
+      check('adjacent cells and repeated events before painting', () => {
+        game.owned[i] ^= 1;
+        game.emitGameEvent('territoryChanged', {});
+        game.owned[i + 1] ^= 1;
+        game.owned[i + game.W] ^= 1;
+        game.emitGameEvent('territoryChanged', {});
+      });
+      check('territory across chunk boundaries', () => {
+        game.owned[game.idx(48, 48)] ^= 1;
+        game.emitGameEvent('territoryChanged', {});
+      });
+      check('felled tree and road', () => {
+        game.tiles[i].tree = 0;
+        game.tiles[i].road = true;
+        game.emitGameEvent('tileChanged', { index: i });
+        game.emitGameEvent('tileChanged', { index: i });
+      });
+      check('depleted deposit and road removal', () => {
+        game.tiles[i].road = false;
+        game.tiles[i].t = game.MTN;
+        game.tiles[i].deposit = { kind: 'gold', amt: 0, amt0: 100 };
+        game.emitGameEvent('tileChanged', { index: i });
+      });
+      check('partial deposit and ownership', () => {
+        game.tiles[i].deposit.amt = 40;
+        game.owned[i] = 0;
+        game.emitGameEvent('tileChanged', { index: i });
+        game.emitGameEvent('territoryChanged', {});
+      });
+      gl.texSubImage2D = original;
+      return comparisons;
+    });
+    for (const row of result) {
+      expect(row.border, row.name + ' border pixels').toBe(0);
+      expect(row.mini, row.name + ' minimap pixels').toBe(0);
+      if (row.gpu !== null) expect(row.gpu, row.name + ' GPU pixels').toBe(0);
+      expect(row.deterministic, row.name).toBe(true);
+    }
+    expect(result[0].changedUploads).toEqual([[48 * 24, 48 * 24, 192, 192]]);
+    expect(result[1].changedUploads).toEqual([[48 * 24, 48 * 24, 192, 192]]);
+    expect(result[2].changedUploads.length).toBeGreaterThan(1);
+    expect(result[2].changedUploads.every(([, , w, h]) => w <= 192 && h <= 192)).toBe(true);
+    expect(errors).toEqual([]);
+  });

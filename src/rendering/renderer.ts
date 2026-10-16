@@ -143,7 +143,8 @@ export function createRenderer(
   const bcan = game.Acan(game.W * game.TS, game.H * game.TS),
     bctx = requireCanvas2D(bcan, reportGraphicsFailure, { willReadFrequently: true });
   let borderDirty = true;
-  const borderSegs: LineSeg[] = [];
+  const borderOwned = new Uint8Array(game.W * game.H);
+  let borderReady = false;
   const FXL: FXEffect[] = [];
   let NOW = 0,
     BAR_H = 44,
@@ -233,7 +234,7 @@ export function createRenderer(
     terrainRevision++;
     paintTileFull(g, i);
     if (macroCan) paintMacroTile(g, i);
-    miniDirty = true;
+    miniTiles.add(i);
     // Both painters clip to the tile, so the upload can be limited to its rect.
     const tss = game.TS * game.ST;
     presentation?.invalidate(g.canvas, {
@@ -296,13 +297,31 @@ export function createRenderer(
     g.drawImage(macroCan, x - 1, y - 1, 3, 3, (x - 1) * size, (y - 1) * size, 3 * size, 3 * size);
     g.restore();
   }
-  function drawBorders() {
+  const borderChunkTiles = 8,
+    borderChunkSize = borderChunkTiles * game.TS,
+    borderColumns = Math.ceil(game.W / borderChunkTiles),
+    borderRows = Math.ceil(game.H / borderChunkTiles);
+  function paintBorderChunk(cx: number, cy: number) {
+    const rect = {
+      x: cx * borderChunkSize,
+      y: cy * borderChunkSize,
+      width: Math.min(borderChunkSize, bcan.width - cx * borderChunkSize),
+      height: Math.min(borderChunkSize, bcan.height - cy * borderChunkSize),
+    };
     const g = bctx;
+    g.save();
     g.setTransform(1, 0, 0, 1, 0, 0);
-    g.clearRect(0, 0, game.W * game.TS, game.H * game.TS);
-    borderSegs.length = 0;
-    for (let y2 = 0; y2 < game.H; y2++)
-      for (let x2 = 0; x2 < game.W; x2++) {
+    g.beginPath();
+    g.rect(rect.x, rect.y, rect.width, rect.height);
+    g.clip();
+    g.clearRect(rect.x, rect.y, rect.width, rect.height);
+    const borderSegs: LineSeg[] = [];
+    const minX = Math.max(0, cx * borderChunkTiles - 1),
+      minY = Math.max(0, cy * borderChunkTiles - 1),
+      maxX = Math.min(game.W - 1, (cx + 1) * borderChunkTiles),
+      maxY = Math.min(game.H - 1, (cy + 1) * borderChunkTiles);
+    for (let y2 = minY; y2 <= maxY; y2++)
+      for (let x2 = minX; x2 <= maxX; x2++) {
         const i2 = game.idx(x2, y2);
         if (!game.owned[i2]) continue;
         const px = x2 * game.TS,
@@ -335,9 +354,74 @@ export function createRenderer(
     strokeAll('rgba(49,52,27,0.30)', 3.4);
     strokeAll('rgba(244,218,144,0.50)', 1.6);
     strokeAll('rgba(255,239,186,0.72)', 0.65);
+    g.restore();
+    return rect;
+  }
+  function drawBorders(full = false) {
+    full ||= !borderReady;
+    const chunks = new Set<number>();
+    if (full) {
+      for (let i = 0; i < borderColumns * borderRows; i++) chunks.add(i);
+    } else {
+      for (let i = 0; i < game.owned.length; i++) {
+        if (game.owned[i] === borderOwned[i]) continue;
+        miniTiles.add(i);
+        const x = (i % game.W) * game.TS,
+          y = ((i / game.W) | 0) * game.TS;
+        // Include round caps and antialiasing on either side of a chunk edge.
+        const x0 = Math.floor(Math.max(0, x - 3) / borderChunkSize),
+          y0 = Math.floor(Math.max(0, y - 3) / borderChunkSize),
+          x1 = Math.floor(Math.min(bcan.width - 1, x + game.TS + 2) / borderChunkSize),
+          y1 = Math.floor(Math.min(bcan.height - 1, y + game.TS + 2) / borderChunkSize);
+        for (let cy = y0; cy <= y1; cy++)
+          for (let cx = x0; cx <= x1; cx++) chunks.add(cy * borderColumns + cx);
+      }
+    }
+    // Fixed integer clips and identical neighbouring paths make partial paints
+    // byte-identical to a full rebuild, including Canvas round-cap rasterization.
+    // Separate chunks also keep distant changes from uploading the whole map.
+    for (const chunk of chunks) {
+      paintBorderChunk(chunk % borderColumns, (chunk / borderColumns) | 0);
+    }
+    borderOwned.set(game.owned);
+    borderReady = true;
     borderDirty = false;
-    miniDirty = true;
-    presentation?.invalidate(bcan);
+    if (full) presentation.invalidate(bcan);
+    else {
+      // One upload per connected region avoids repeated driver synchronization
+      // for neighbouring chunks while keeping distant changes separate.
+      for (const first of chunks) {
+        const pending = [first];
+        chunks.delete(first);
+        let x0 = first % borderColumns,
+          x1 = x0,
+          y0 = (first / borderColumns) | 0,
+          y1 = y0;
+        while (pending.length) {
+          const chunk = pending.pop();
+          if (chunk === undefined) break;
+          const x = chunk % borderColumns,
+            y = (chunk / borderColumns) | 0;
+          x0 = Math.min(x0, x);
+          x1 = Math.max(x1, x);
+          y0 = Math.min(y0, y);
+          y1 = Math.max(y1, y);
+          for (let d = 0; d < 4; d++) {
+            const nx = x + game.DX[d],
+              ny = y + game.DY[d];
+            if (nx < 0 || ny < 0 || nx >= borderColumns || ny >= borderRows) continue;
+            const next = ny * borderColumns + nx;
+            if (chunks.delete(next)) pending.push(next);
+          }
+        }
+        presentation.invalidate(bcan, {
+          x: x0 * borderChunkSize,
+          y: y0 * borderChunkSize,
+          width: Math.min(bcan.width, (x1 + 1) * borderChunkSize) - x0 * borderChunkSize,
+          height: Math.min(bcan.height, (y1 + 1) * borderChunkSize) - y0 * borderChunkSize,
+        });
+      }
+    }
   }
   function drawStatic() {
     terrainRevision++;
@@ -348,7 +432,9 @@ export function createRenderer(
     const macro = macroCan || buildMacro();
     sctx.imageSmoothingEnabled = true;
     sctx.drawImage(macro, 0, 0, game.W * game.TS * game.ST, game.H * game.TS * game.ST);
-    drawBorders();
+    drawBorders(true);
+    miniDirty = true;
+    miniTiles.clear();
     game.staticDirty = false;
     presentation?.invalidate(scan);
   }
@@ -2469,6 +2555,8 @@ export function createRenderer(
   });
   observePresentation(game, 'territoryChanged', () => {
     borderDirty = true;
+    for (let i = 0; i < game.owned.length; i++)
+      if (game.owned[i] !== borderOwned[i]) miniTiles.add(i);
     _placementCache = null;
     _roadCache = null;
   });
@@ -2483,6 +2571,10 @@ export function createRenderer(
     _roadCache = null;
     unitPoses = {};
     workPulses = {};
+    borderReady = false;
+    borderDirty = true;
+    miniDirty = true;
+    miniTiles.clear();
   }
   function visibleAt(x: number, y: number) {
     return (
@@ -2668,51 +2760,56 @@ export function createRenderer(
     msctx = requireCanvas2D(mscan, reportGraphicsFailure);
   let miniDirty = true;
   let _miniRendered = 0;
-  function drawMiniStatic() {
-    const s = 192 / game.W;
-    msctx.fillStyle = '#101418';
-    msctx.fillRect(0, 0, 192, 192);
-    for (let y = 0; y < game.H; y++)
-      for (let x = 0; x < game.W; x++) {
-        const i = game.idx(x, y),
-          tl = game.tiles[i];
-        let c;
-        if (tl.t === game.WATER) c = '#447b89';
-        else if (tl.t === game.SAND) c = '#d7c39b';
-        else if (tl.t === game.MTN) c = '#aaa79a';
-        else c = tl.tree ? '#4b7040' : '#6b8750';
-        msctx.fillStyle = c;
-        msctx.fillRect(x * s, y * s, s, s);
-        if (tl.deposit && tl.deposit.amt > 0) {
-          msctx.fillStyle =
-            tl.deposit.kind === 'gold'
-              ? '#ffd23f'
-              : tl.deposit.kind === 'iron'
-                ? '#d0763a'
-                : '#565e68';
-          msctx.fillRect(x * s, y * s, s, s);
-          const fr2 = tl.deposit.amt / (tl.deposit.amt0 || tl.deposit.amt);
-          if (fr2 < 0.999) {
-            msctx.fillStyle = 'rgba(0,0,0,' + ((1 - fr2) * 0.55).toFixed(2) + ')';
-            msctx.fillRect(x * s, y * s, s, s);
-          }
-        }
+  const miniTiles = new Set<number>();
+  let miniVignette: CanvasGradient | null = null;
+  function paintMiniTile(i: number, vignette: CanvasGradient) {
+    const s = 192 / game.W,
+      x = (i % game.W) * s,
+      y = ((i / game.W) | 0) * s,
+      tl = game.tiles[i];
+    let c;
+    if (tl.t === game.WATER) c = '#447b89';
+    else if (tl.t === game.SAND) c = '#d7c39b';
+    else if (tl.t === game.MTN) c = '#aaa79a';
+    else c = tl.tree ? '#4b7040' : '#6b8750';
+    msctx.fillStyle = c;
+    msctx.fillRect(x, y, s, s);
+    if (tl.deposit && tl.deposit.amt > 0) {
+      msctx.fillStyle =
+        tl.deposit.kind === 'gold' ? '#ffd23f' : tl.deposit.kind === 'iron' ? '#d0763a' : '#565e68';
+      msctx.fillRect(x, y, s, s);
+      const fraction = tl.deposit.amt / (tl.deposit.amt0 || tl.deposit.amt);
+      if (fraction < 0.999) {
+        msctx.fillStyle = 'rgba(0,0,0,' + ((1 - fraction) * 0.55).toFixed(2) + ')';
+        msctx.fillRect(x, y, s, s);
       }
-    msctx.fillStyle = 'rgba(255,214,110,0.16)';
-    for (let y = 0; y < game.H; y++)
-      for (let x = 0; x < game.W; x++)
-        if (game.owned[game.idx(x, y)]) msctx.fillRect(x * s, y * s, s, s);
-    for (let y = 0; y < game.H; y++)
-      for (let x = 0; x < game.W; x++)
-        if (game.tiles[game.idx(x, y)].road) {
-          msctx.fillStyle = '#c2a878';
-          msctx.fillRect(x * s, y * s, s, s);
-        }
-    const vg = msctx.createRadialGradient(96, 96, 60, 96, 96, 140);
-    vg.addColorStop(0, 'rgba(0,0,0,0)');
-    vg.addColorStop(1, 'rgba(0,0,0,0.22)');
-    msctx.fillStyle = vg;
-    msctx.fillRect(0, 0, 192, 192);
+    }
+    if (game.owned[i]) {
+      msctx.fillStyle = 'rgba(255,214,110,0.16)';
+      msctx.fillRect(x, y, s, s);
+    }
+    if (tl.road) {
+      msctx.fillStyle = '#c2a878';
+      msctx.fillRect(x, y, s, s);
+    }
+    // Use the same world-aligned vignette on both full and incremental paints.
+    msctx.fillStyle = vignette;
+    msctx.fillRect(x, y, s, s);
+  }
+  function drawMiniStatic() {
+    if (!miniVignette) {
+      miniVignette = msctx.createRadialGradient(96, 96, 60, 96, 96, 140);
+      miniVignette.addColorStop(0, 'rgba(0,0,0,0)');
+      miniVignette.addColorStop(1, 'rgba(0,0,0,0.22)');
+    }
+    if (miniDirty) {
+      msctx.fillStyle = '#101418';
+      msctx.fillRect(0, 0, 192, 192);
+      for (let i = 0; i < game.tiles.length; i++) paintMiniTile(i, miniVignette);
+    } else {
+      for (const i of miniTiles) paintMiniTile(i, miniVignette);
+    }
+    miniTiles.clear();
     miniDirty = false;
   }
   function miniDia(
@@ -2738,9 +2835,9 @@ export function createRenderer(
     g.fill();
   }
   function drawMini() {
-    if (!miniDirty && NOW - _miniRendered < 100) return;
+    if (!miniDirty && !miniTiles.size && NOW - _miniRendered < 100) return;
     _miniRendered = NOW;
-    if (miniDirty) drawMiniStatic();
+    if (miniDirty || miniTiles.size) drawMiniStatic();
     mctx.setTransform(1, 0, 0, 1, 0, 0);
     mctx.drawImage(mscan, 0, 0);
     const s = 192 / game.W;
@@ -2809,6 +2906,8 @@ export function createRenderer(
     Object.assign(internals, {
       paintTileFull,
       drawStatic,
+      drawBorders,
+      drawMiniStatic,
       buildingContour,
       drawBuilding,
       drawTree,
@@ -3107,6 +3206,8 @@ export const UNLIT_AT_NIGHT: ReadonlySet<BuildingType> = new Set<BuildingType>([
 export interface RendererInternals {
   paintTileFull: (g: CanvasRenderingContext2D, i: number) => void;
   drawStatic: () => void;
+  drawBorders: (full?: boolean) => void;
+  drawMiniStatic: () => void;
   buildingContour: (img: Sprite) => HTMLCanvasElement;
   drawBuilding: (g: CanvasRenderingContext2D, b: Building) => void;
   drawTree: (g: CanvasRenderingContext2D, x: number, y: number, tl: Tile, now: number) => void;

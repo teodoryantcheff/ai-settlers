@@ -481,10 +481,10 @@ export async function createPixiRenderer() {
       loseGpu(error instanceof Error ? error.message : 'WebGL draw failed');
     }
   }
-  /** Upload only a dirty sub-region of a single-part texture straight to the GPU.
+  /** Upload only a dirty sub-region of a cached texture straight to the GPU.
    * Returns false when the fast path is unavailable; the caller then falls back
    * to a full source update. (ix/iy are part-relative, which equals source
-   * coordinates because single parts always start at 0,0.)
+   * coordinates for both single sources and the canvases of tiled sources.)
    */
   function partialUpload(
     part: ImagePart,
@@ -500,7 +500,9 @@ export async function createPixiRenderer() {
         return false;
       if (!scratchUploadCanvas || !scratchUploadCtx) {
         scratchUploadCanvas = document.createElement('canvas');
-        scratchUploadCtx = requireCanvas2D(scratchUploadCanvas, loseGpu);
+        scratchUploadCtx = requireCanvas2D(scratchUploadCanvas, loseGpu, {
+          willReadFrequently: true,
+        });
       }
       const scratch = scratchUploadCanvas;
       const g = scratchUploadCtx;
@@ -508,6 +510,7 @@ export async function createPixiRenderer() {
         h = Math.max(1, Math.round(ih));
       if (scratch.width !== w) scratch.width = w;
       if (scratch.height !== h) scratch.height = h;
+      g.clearRect(0, 0, w, h);
       g.drawImage(source, ix, iy, iw, ih, 0, 0, w, h);
       const sys = renderer.texture as any;
       if (!sys || typeof sys.getGlSource !== 'function') return false;
@@ -560,21 +563,15 @@ export async function createPixiRenderer() {
               ix = left - part.x,
               iy = top - part.y;
             if (part.canvas) {
-              // Tiled path (huge canvases on old GPUs): repaint the sub-region,
-              // then re-upload that whole tile.
-              requireCanvas2D(part.canvas, loseGpu).drawImage(
-                source,
-                left,
-                top,
-                iw,
-                ih,
-                ix,
-                iy,
-                iw,
-                ih,
-              );
-              part.texture.source.update();
-              textureUpdates++;
+              // Tiled path (huge canvases on old GPUs): replace transparent
+              // pixels too, then upload only this part's changed region.
+              const g = requireCanvas2D(part.canvas, loseGpu);
+              g.clearRect(ix, iy, iw, ih);
+              g.drawImage(source, left, top, iw, ih, ix, iy, iw, ih);
+              if (!partialUpload(part, part.canvas, ix, iy, iw, ih)) {
+                part.texture.source.update();
+                textureUpdates++;
+              }
             } else if (!partialUpload(part, source, ix, iy, iw, ih)) {
               part.texture.source.update();
               textureUpdates++;

@@ -675,3 +675,72 @@ test('night glow lights domestic windows but leaves mines and open yards dark', 
   );
   assert.equal(e.SR.getState(), rng, 'cosmetic glow consumes no simulation RNG');
 });
+
+test('territory caches upload only changed bounds and skip unchanged projections', () => {
+  const uploads = [];
+  const e = renderer({
+    presentation: {
+      available: true,
+      invalidate: (canvas, rect) => uploads.push({ canvas, rect }),
+      begin() {},
+      layer() {},
+      end() {},
+    },
+  });
+  e.drawBorders();
+  assert.equal(uploads.length, 1);
+  assert.equal(uploads[0].rect, undefined, 'first paint refreshes everything');
+  uploads.length = 0;
+  const before = e.SR.getState();
+  e.owned[e.idx(50, 50)] = 0;
+  e.emitGameEvent('territoryChanged', {});
+  e.drawBorders();
+  assert.deepEqual(
+    uploads.map(({ rect }) => rect),
+    [
+      {
+        x: 48 * e.TS,
+        y: 48 * e.TS,
+        width: 8 * e.TS,
+        height: 8 * e.TS,
+      },
+    ],
+  );
+  uploads.length = 0;
+  e.emitGameEvent('territoryChanged', {});
+  e.drawBorders();
+  assert.equal(uploads.length, 0, 'unchanged projection does not upload');
+  assert.equal(e.borderDirty, false);
+  assert.equal(e.SR.getState(), before);
+  e.emitGameEvent('worldLoaded', { reason: 'load' });
+  e.drawBorders();
+  assert.equal(uploads.length, 1);
+  assert.equal(uploads[0].rect, undefined, 'loads repaint everything');
+});
+
+test('minimap deduplicates changed cells and loads discard pending patches', () => {
+  const e = renderer();
+  e.drawBorders();
+  e.drawMiniStatic();
+  e.staticDirty = false;
+  e.calls.length = 0;
+  const i = e.idx(50, 50);
+  e.emitGameEvent('tileChanged', { index: i });
+  e.emitGameEvent('tileChanged', { index: i });
+  e.calls.length = 0;
+  e.drawMiniStatic();
+  const fills = e.calls.filter((call) => call.method === 'fillRect');
+  assert.equal(fills.length, 3, 'one cell gets base, ownership and vignette');
+  assert.ok(fills.every((call) => JSON.stringify(call.args) === JSON.stringify([100, 100, 2, 2])));
+  e.calls.length = 0;
+  e.drawMiniStatic();
+  assert.equal(e.calls.length, 0, 'unchanged cells are reused');
+  e.owned[i] = 0;
+  e.emitGameEvent('territoryChanged', {});
+  e.drawMiniStatic();
+  assert.equal(e.calls.filter((call) => call.method === 'fillRect').length, 2);
+  e.emitGameEvent('worldLoaded', { reason: 'load' });
+  e.calls.length = 0;
+  e.drawMiniStatic();
+  assert.ok(e.calls.some((call) => call.method === 'fillRect' && call.args[2] === 192));
+});

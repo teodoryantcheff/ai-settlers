@@ -90,7 +90,7 @@ Each item lands independently and is measurable with `npm run bench:render`.
 4. **Stable geometry for animated shapes.** Draw smoke, dust, sparks, motes and water glints in local coordinates (`translate`/`scale`), with opacity in `globalAlpha` rather than in the `rgba()` style. The existing geometry key then stays constant and only the transform and alpha change. Render flag pennants from a few pre-rendered frames. This removes the per-frame re-tessellation (≈5 ms at close zoom) and most rebuild triggers.
 5. **`antialias: false`** in `createPixiRenderer`, since only the filtered full-screen quad is multisampled (−0.5–1 ms GPU).
 6. **Autosave without a hitch.** Store the autosave under its own key instead of rewriting the full catalog, serialize once, and keep validation before replacement. Done in #38. Validation also skips its defensive copy for fresh snapshots and bounds cumulative samples by the goods they record instead of every good. Measured in Chromium on the reference laptop, with ten named checkpoints (a 3-minute colony, 3.3 MB catalog): autosave **414 ms → 7–9 ms** median, with single samples of 11–16 ms. Snapshot, validation and serialization of a 20-minute colony take about 25 ms in Node, and older colonies rarely leave room for ten checkpoints within the browser's ~5 MB storage quota. Garbage-collection pauses can still push one autosave past a frame.
-7. **Incremental borders.** Repaint and upload only the changed tiles' border rectangles (as `drawTile` already does for terrain), or draw borders as retained line geometry.
+7. **Incremental borders.** Implemented in #39: repaint fixed 8×8-tile chunks, merge neighbouring dirty chunks for upload, and keep distant changes separate. Minimap changes repaint only queued cells. See the recorded cache measurements below.
 
 Expected result: about 18–25 ms per frame while running at default zoom, which is still short of the target.
 
@@ -118,4 +118,28 @@ Migrate behind the existing `presentation.layer` seam in this order: trees and r
 4. Compute bloom at half resolution, or keep it only at quality 1.
 5. Re-measure GPU p95 once CPU load is lower.
 
-Also worth doing: repaint the minimap incrementally per changed tile instead of in full on every change (1–3 ms per frame at 8×).
+The incremental minimap from #39 replaces the former full repaint on each change (previously 1–3 ms per frame at 8×).
+
+
+## Incremental border and minimap measurements (#39)
+
+Recorded 2026-10-16 on the reference i7-8550U / UHD 620 with hardware WebGL (`ANGLE (Intel, Mesa Intel(R) UHD Graphics 620 (KBL GT2), OpenGL ES 3.2)`), 1920×1080, quality 1, seed 2024, and a 20-minute colony (30 buildings, 16 units). Software rendering is rejected by the territory benchmark.
+
+```sh
+npm run build
+node scripts/bench-territory.mjs
+node scripts/bench-render.mjs --minutes 20 --zooms 3 --modes running --speed 8 --ms 15000 --port 8796
+```
+
+The territory benchmark freezes cosmetic time and pauses simulation, warms 30 frames, then samples 80 pairs on native browser animation frames at zoom index 3. Each pair compares an ordinary frame with the first frame after switching between the real territory projections with and without the outpost at (57,48): 33 changed ownership cells. Buildings and their artwork remain unchanged, isolating the cache work. Snapshotting the projection and emitting its event happen before the timed changed frame. The callback includes the world draw, minimap and HUD. Full cache rebuilds remain a world-load cost.
+
+| Whole frame | Mean | Median | p95 |
+|---|---:|---:|---:|
+| Ordinary | 29.215 ms | 26.5 ms | 47.3 ms |
+| After territory change | 32.995 ms | 30.1 ms | 45.2 ms |
+
+Mean additional cost is **3.780 ms**, below the 5 ms budget. This is a measured average, not a hard bound for every frame: the paired differences have p95 15.4 ms and maximum 30.7 ms on this shared laptop. Raw samples and the actual-game screenshot are in `output/bench-territory/2026-10-16T18-23-17-323Z/`. Manual back-to-back draws misattribute queued GPU work to the following draw; the retained benchmark uses native compositor frame boundaries.
+
+At 8× speed the ordinary render benchmark records **0.2 ms per frame for the minimap**, below the 0.5 ms budget, over a 15-second window (10.4 fps; total CPU 92.7 ms/frame). The remaining world-rendering work still dominates. Raw results are in `output/bench/2026-10-16T18-17-19-283Z/results.json`.
+
+Pixel tests compare incremental caches with full rebuilds on both ordinary and forced-tiled textures. They cover holes/restoration, map edges, disjoint changes, batched notifications, chunk boundaries, felled trees, roads, deposits and ownership; territory changes also compare actual GPU readback bytes. A single interior tile uploads one 192² chunk instead of the 2304² border image. Neighbouring chunks share an upload; separate regions do not cause a map-sized upload. CPU-backed staging and replacement of transparent pixels apply to both ordinary and tiled textures. Unchanged frames and unchanged projections reuse their caches.
