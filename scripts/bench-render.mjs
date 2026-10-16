@@ -6,60 +6,55 @@
 //
 // Options (all optional):
 //   --minutes 20       simulated autoplay minutes before measuring
-//   --zooms 0,1,...,6  zoom indexes (0 = farthest)
+//   --zooms 0,3        zoom indexes (0 = farthest; default: every zoom)
 //   --modes running,paused
-//   --speed 1          simulation speed while "running"
+//   --speed 1          simulation speed while "running" (1, 2, 4 or 8)
 //   --ms 3000          measurement window per zoom/mode
 //   --seed 2024        map seed
 //   --size 1920x1080   viewport
+//   --quality 1        rendering quality (1 or 0.75)
 //   --profile 0,3      write V8 CPU profiles for these zooms (running mode)
-//   --port 8790
+//   --port 8790        static server port
 // Results: a table on stdout and JSON (plus profiles) under output/bench/.
 import { chromium } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { benchOptions, isSoftwareRenderer, summarize } from './bench-render-helpers.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
-const argv = process.argv.slice(2);
-const option = (name, fallback) => {
-  const index = argv.indexOf('--' + name);
-  return index >= 0 ? argv[index + 1] : fallback;
-};
-const list = (value) => value.split(',').filter(Boolean);
-const minutes = Number(option('minutes', '20'));
-const zooms = list(option('zooms', '0,1,2,3,4,5,6')).map(Number);
-const modes = list(option('modes', 'running,paused'));
-const speed = Number(option('speed', '1'));
-const windowMs = Number(option('ms', '3000'));
-const seed = Number(option('seed', '2024'));
-const [width, height] = option('size', '1920x1080').split('x').map(Number);
-const profileZooms = list(option('profile', '')).map(Number);
-const port = Number(option('port', '8790'));
+let options;
+try {
+  options = benchOptions(process.argv.slice(2));
+} catch (error) {
+  console.error(error.message);
+  process.exit(1);
+}
+const { minutes, modes, speed, windowMs, seed, width, height, quality, port } = options;
 const outDir = path.join(root, 'output', 'bench', new Date().toISOString().replace(/[:.]/g, '-'));
+const origin = `http://127.0.0.1:${port}`;
 
 if (!fs.existsSync(path.join(root, 'tests', 'game.html'))) {
   console.error('Missing tests/game.html: run `npm run build` first.');
   process.exit(1);
 }
-fs.mkdirSync(outDir, { recursive: true });
-
+// Another server on the port could be serving a different checkout.
+const responseFrom = (url) =>
+  fetch(url, { signal: AbortSignal.timeout(1000) }).then(
+    (response) => response,
+    () => null,
+  );
+if (await responseFrom(origin)) {
+  console.error(`Port ${port} is already in use; pick another with --port.`);
+  process.exit(1);
+}
 const server = spawn('python3', ['-m', 'http.server', String(port), '--bind', '127.0.0.1'], {
   cwd: root,
   stdio: 'ignore',
 });
-const browser = await chromium.launch({
-  headless: true,
-  channel: 'chromium',
-  args: [
-    '--headless=new',
-    '--enable-gpu',
-    '--ignore-gpu-blocklist',
-    '--use-angle=gl-egl',
-    // Exposes EXT_disjoint_timer_query_webgl2 for GPU frame timing.
-    '--enable-privileged-webgl-extensions',
-  ],
-});
+let serverExited = false;
+server.on('exit', () => (serverExited = true));
+server.on('error', () => (serverExited = true));
 
 /** Installed before boot: per-frame rAF callback time, GPU timer queries and GL call counts. */
 function instrument() {
@@ -80,11 +75,11 @@ function instrument() {
       if (state.recording) {
         const entry = (state.gl[name] ||= { calls: 0, bytes: 0 });
         entry.calls++;
-        const data = name === 'bufferData' ? args[1] : name === 'bufferSubData' ? args[2] : null;
-        if (data && data.BYTES_PER_ELEMENT)
-          entry.bytes +=
-            (name === 'bufferSubData' && args.length >= 5 ? args[4] : data.length) *
-            data.BYTES_PER_ELEMENT;
+        // bufferData(target, src, usage, srcOffset?, length?) and
+        // bufferSubData(target, dstOffset, src, srcOffset?, length?); length 0 means the rest.
+        const data = args[{ bufferData: 1, bufferSubData: 2 }[name]];
+        if (data?.BYTES_PER_ELEMENT)
+          entry.bytes += (args[4] || data.length - (args[3] || 0)) * data.BYTES_PER_ELEMENT;
       }
       return original.apply(this, args);
     };
@@ -130,30 +125,65 @@ function instrument() {
     });
 }
 
-const percentile = (sorted, p) =>
-  sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))] ?? 0;
-const round = (value, digits = 1) => Number(value.toFixed(digits));
 const rows = [];
+let browser;
 try {
+  for (let tries = 0; !(await responseFrom(origin + '/tests/game.html'))?.ok; tries++) {
+    if (serverExited || tries >= 50) throw new Error(`The static server on port ${port} failed.`);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  browser = await chromium.launch({
+    headless: true,
+    channel: 'chromium',
+    args: [
+      '--headless=new',
+      '--enable-gpu',
+      '--ignore-gpu-blocklist',
+      '--use-angle=gl-egl',
+      // Exposes EXT_disjoint_timer_query_webgl2 for GPU frame timing.
+      '--enable-privileged-webgl-extensions',
+    ],
+  });
   const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
+  // Pin the preferences that change what is drawn, so runs stay comparable.
+  await context.addInitScript((quality) => {
+    localStorage.setItem(
+      'settlers.prefs',
+      JSON.stringify({ muted: true, music: false, reducedMotion: false, weather: true, quality }),
+    );
+  }, quality);
   const page = await context.newPage();
   page.on('pageerror', (error) => console.error('pageerror:', error.message));
   await page.addInitScript(instrument);
-  await page.goto(`http://127.0.0.1:${port}/tests/game.html?seed=${seed}`);
+  await page.goto(`${origin}/tests/game.html?seed=${seed}`);
   await page.waitForFunction(() => window.productionArtPreview?.game, null, { timeout: 60000 });
-  const gpuName = await page.evaluate(() => {
-    const gl = document.createElement('canvas').getContext('webgl2');
-    const info = gl.getExtension('WEBGL_debug_renderer_info');
-    return info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+  const boot = await page.evaluate(() => {
+    const game = window.productionArtPreview.game;
+    const gl =
+      document.getElementById('pixi-view')?.getContext('webgl2') ||
+      document.createElement('canvas').getContext('webgl2');
+    const info = gl?.getExtension('WEBGL_debug_renderer_info');
+    return {
+      rendering: game.renderingAvailable !== false && !!gl,
+      gpu:
+        gl && (info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)),
+      zoomCount: game.zooms.length,
+    };
   });
-  console.log('GPU:', gpuName);
-  if (/swiftshader|llvmpipe/i.test(gpuName))
-    console.warn('Warning: software rendering; GPU timings are not representative.');
+  if (!boot.rendering) throw new Error('WebGL 2 rendering is unavailable in headless Chromium.');
+  const software = isSoftwareRenderer(boot.gpu);
+  const softwareWarning = 'Warning: software rendering; GPU timings are not representative.';
+  console.log('GPU:', boot.gpu);
+  if (software) console.warn(softwareWarning);
+  const zooms = options.zooms ?? Array.from({ length: boot.zoomCount }, (_, zoom) => zoom);
+  const invalid = [...zooms, ...options.profile].filter((zoom) => zoom >= boot.zoomCount);
+  if (invalid.length)
+    throw new Error(`Zoom indexes run from 0 to ${boot.zoomCount - 1}, not ${invalid.join(',')}.`);
+  fs.mkdirSync(outDir, { recursive: true });
 
   await page.evaluate(() => {
     const game = window.productionArtPreview.game;
     game.closeLayer('start');
-    game.setMuted?.(true);
     game.state.paused = true;
     game.state.auto = true;
   });
@@ -214,7 +244,7 @@ try {
         { zoom, mode, speed },
       );
       await page.waitForTimeout(1000);
-      const profile = mode === 'running' && profileZooms.includes(zoom);
+      const profile = mode === 'running' && options.profile.includes(zoom);
       if (profile) {
         await cdp.send('Profiler.enable');
         await cdp.send('Profiler.setSamplingInterval', { interval: 200 });
@@ -244,50 +274,35 @@ try {
         await cdp.send('Profiler.disable');
         fs.writeFileSync(path.join(outDir, `zoom${zoom}-${mode}.cpuprofile`), JSON.stringify(data));
       }
-      // Several rAF callbacks may share one frame timestamp; attribute them together.
-      const perFrame = new Map();
-      for (const [ts, ms] of sample.frames) perFrame.set(ts, (perFrame.get(ts) || 0) + ms);
-      const stamps = [...perFrame.keys()].sort((a, b) => a - b);
-      const frames = Math.max(1, stamps.length);
-      const cpu = [...perFrame.values()].sort((a, b) => a - b);
-      const gpu = [...sample.gpu].sort((a, b) => a - b);
-      const gl = sample.gl;
-      const row = {
-        zoom,
-        scale: sample.z,
-        mode,
-        fps:
-          stamps.length > 1 ? round(((stamps.length - 1) * 1000) / (stamps.at(-1) - stamps[0])) : 0,
-        cpuMean: round(cpu.reduce((a, b) => a + b, 0) / frames),
-        cpuP95: round(percentile(cpu, 0.95)),
-        drawMs: round((sample.phases.draw || 0) / frames),
-        stepMs: round((sample.phases.step || 0) / frames),
-        gpuP50: gpu.length ? round(percentile(gpu, 0.5)) : null,
-        gpuP95: gpu.length ? round(percentile(gpu, 0.95)) : null,
-        sprites: sample.stats.nativeSprites,
-        graphics: sample.stats.nativeGraphics,
-        graphicsBuilds: round((sample.stats.graphicsBuilds - before.graphicsBuilds) / frames),
-        drawCalls: round(((gl.drawElements?.calls || 0) + (gl.drawArrays?.calls || 0)) / frames),
-        uploadKB: round(
-          ((gl.bufferData?.bytes || 0) + (gl.bufferSubData?.bytes || 0)) / frames / 1024,
-          0,
-        ),
-      };
+      const row = { zoom, mode, ...summarize(sample, before) };
       rows.push(row);
       console.log(JSON.stringify(row));
     }
   console.log();
   console.table(rows);
+  if (software) console.warn(softwareWarning);
+  if (rows.some((row) => row.gpuP50 === null))
+    console.warn('Warning: GPU timer queries were unavailable; GPU columns are empty.');
   fs.writeFileSync(
     path.join(outDir, 'results.json'),
     JSON.stringify(
-      { gpu: gpuName, seed, minutes, speed, viewport: { width, height }, colony, rows },
+      {
+        gpu: boot.gpu,
+        software,
+        seed,
+        minutes,
+        speed,
+        quality,
+        viewport: { width, height },
+        colony,
+        rows,
+      },
       null,
       2,
     ),
   );
   console.log('Results:', path.relative(root, outDir));
 } finally {
-  await browser.close();
+  await browser?.close();
   server.kill();
 }

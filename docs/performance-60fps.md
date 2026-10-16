@@ -1,12 +1,12 @@
 # Reaching 60 fps at every zoom
 
-Measured on 2026-10-16 on the reference laptop: Intel Core i7-8550U (4C/8T, 15 W), Intel UHD Graphics 620, 1920×1080, Chromium with ANGLE on the hardware GPU. This is a diagnosis and plan, not an adoption decision; no runtime behavior changed.
+Measured on 2026-10-16 on the reference laptop: Intel Core i7-8550U (4C/8T, 15 W), Intel UHD Graphics 620, 1920×1080, Chromium with ANGLE on the hardware GPU. This is a diagnosis and plan, not an adoption decision; no runtime behavior changed. The work is tracked in [#35](https://github.com/teodoryantcheff/ai-settlers/issues/35) and its sub-issues.
 
 **Verdict.** The frame is CPU-bound in rendering. The simulation, HUD and minimap together cost about 1 ms per frame at 1× speed. The world renderer re-describes every visible object each frame through intercepted Canvas2D calls, maps them onto a positional pool of PixiJS objects, and makes PixiJS re-batch the whole scene. That work grows with the number of visible objects (∝ 1/zoom²) and roughly doubles while the colony is running. Three cheap fixes halve the cost, but 60 fps at every zoom needs a retained world scene. A prototype of that scene on this machine costs 2–5 ms per frame.
 
 ## Method
 
-`npm run bench:render` (`scripts/bench-render.mjs`) boots the development bundle in headless Chromium on the real GPU (`--use-angle=gl-egl`). It grows a 20-minute autoplay colony (seed 2024: 30 buildings, 16 units, 2,463 trees), centers on the headquarters and samples every zoom for 3 s with the simulation running at 1× and paused. Per frame it records main-thread time for the `requestAnimationFrame` callback (CPU), WebGL timer-query GPU time, `productionRendererStats` counts, draw calls and vertex upload. Results and optional CPU profiles go to `output/bench/`.
+`npm run bench:render` (`scripts/bench-render.mjs`) boots the development bundle in headless Chromium on the real GPU (`--use-angle=gl-egl`). It grows a 20-minute autoplay colony (seed 2024: 30 buildings, 16 units, 2,463 trees), centers on the headquarters and samples every zoom for 3 s with the simulation running at 1× and paused. Per frame it records main-thread time for the `requestAnimationFrame` callback (CPU), WebGL timer-query GPU time, `productionRendererStats` counts, draw calls, vertex upload and texture uploads. It pins quality 1 (or `--quality 0.75`), full motion and weather, and mutes audio, and it warns when Chromium falls back to software rendering. Results and optional CPU profiles go to `output/bench/`.
 
 The laptop shares a 15 W budget between CPU and GPU and throttles under sustained load. Repeated runs vary by about ±20%, so compare variants within one session.
 
@@ -105,7 +105,7 @@ Expected result: about 18–25 ms per frame while running at default zoom, which
 
    Per frame, update only what moves or animates: unit position and frame, sway frames on their timers, and flag frames.
 4. Keep the existing y-order key with one container per tile row (`sortableChildren`), hiding rows outside the camera. Static objects are inserted once; units move between rows.
-5. Pack the ~190 generated art canvases into one or two atlases at load. Draw particles and weather as sprites, or as a `ParticleContainer` on that atlas.
+5. Pack the ~190 generated art canvases into one or two atlases at load. Draw particles and weather as sprites, or as a `ParticleContainer` on that atlas. #35 leaves atlases and `ParticleContainer` out of scope unless the benchmark shows draw calls or effects as the bound once the retained scene lands.
 6. Keep the Canvas-capture adapter only for low-volume interactive overlays (selection, ghost, placement and road previews, logistics routes, captions), where its cost is bounded.
 
 Migrate behind the existing `presentation.layer` seam in this order: trees and rocks (≈70% of commands), then units, buildings and effects. Preserve scene ordering, anchors and the camera/input mapping, and reach new state in tests through the renderer's `internals` hooks. Expected result: CPU 2–5 ms per frame at every zoom.
