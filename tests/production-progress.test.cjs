@@ -51,7 +51,7 @@ test('countdown uses actual upgraded mine work speed and preserves recipe, water
   g.state.upgrades.production = 2;
   const deposit = g.tiles[g.idx(52, 48)];
   Object.assign(deposit, { t: g.MTN, res: { kind: g.BSPEC.mine_gold.resKind, amt: 4 } });
-  let p = g.productionProgress(b);
+  const p = g.productionProgress(b);
   assert.equal(p.variety, 0.1);
   assert.equal(p.duration, (16 * 0.81) / 1.1);
   assert.equal(p.remaining, (8 * 0.81) / 1.1);

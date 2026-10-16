@@ -17,11 +17,10 @@ function lint(configPath, ...targets) {
   return { status: result.status, output: result.stdout + result.stderr };
 }
 
-// Files that still used var or reassignable bindings when linting began; the list may only shrink.
+// Files that still used var when linting began; the list may only shrink.
 const declarationBaseline = [
   'src/application/loop.ts',
   'src/audio/ambience.ts',
-  'src/audio/audio.ts',
   'src/audio/music.ts',
   'src/audio/world-effects.ts',
   'src/core/persistence.ts',
@@ -43,9 +42,6 @@ const declarationBaseline = [
   'src/ui/hud.ts',
   'src/ui/inspector-view.ts',
   'src/ui/interaction.ts',
-  'tests/browser/report-windows.spec.mjs',
-  'tests/controls.test.cjs',
-  'tests/production-progress.test.cjs',
 ];
 
 test('the declaration exclusion list holds exactly the files still failing no-var or prefer-const', async (t) => {
@@ -60,7 +56,7 @@ test('the declaration exclusion list holds exactly the files still failing no-va
   t.after(() => fs.rm(directory, { recursive: true, force: true }));
   const strict = path.join(directory, 'strict.json');
   await fs.writeFile(strict, JSON.stringify({ ...settings, overrides: [] }));
-  const { output } = lint(strict, 'src', 'scripts', 'tests');
+  const { output } = lint(strict, 'src', 'scripts', 'tests', 'playwright.config.mjs');
   const failing = [
     ...new Set(
       output

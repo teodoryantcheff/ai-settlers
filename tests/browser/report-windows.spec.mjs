@@ -83,7 +83,7 @@ test('pointer and keyboard window geometry survives closing and remains reachabl
   await page.mouse.down();
   await page.mouse.move(title.x + 70, title.y + 40, { steps: 4 });
   await page.mouse.up();
-  let moved = await report.boundingBox();
+  const moved = await report.boundingBox();
   expect(moved.x).toBeGreaterThan(original.x);
   expect(moved.y).toBeGreaterThan(original.y);
   const move = page.getByRole('button', { name: 'Move Economy window', exact: true });

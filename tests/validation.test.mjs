@@ -129,7 +129,12 @@ test('the full plan includes every Node test before build and single-worker brow
     (await validationSteps(root, { nodeOnly: true })).map((entry) => entry.name),
     ['lint', 'typecheck', 'null-check', ...files],
   );
-  assert.deepEqual(plan[1].args.slice(-3), ['src', 'scripts', 'tests']);
+  assert.deepEqual(plan.find((entry) => entry.name === 'lint').args.slice(-4), [
+    'src',
+    'scripts',
+    'tests',
+    'playwright.config.mjs',
+  ]);
   const { scripts } = JSON.parse(await fs.readFile(path.join(root, 'package.json')));
   assert.equal(scripts.check, 'node scripts/validate.mjs');
   assert.equal(scripts['build:pages'], 'npm run build && node scripts/package-pages.mjs');

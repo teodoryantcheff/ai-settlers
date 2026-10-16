@@ -37,7 +37,6 @@
       "files": [
         "src/application/loop.ts",
         "src/audio/ambience.ts",
-        "src/audio/audio.ts",
         "src/audio/music.ts",
         "src/audio/world-effects.ts",
         "src/core/persistence.ts",
@@ -58,10 +57,7 @@
         "src/ui/economic-notices.ts",
         "src/ui/hud.ts",
         "src/ui/inspector-view.ts",
-        "src/ui/interaction.ts",
-        "tests/browser/report-windows.spec.mjs",
-        "tests/controls.test.cjs",
-        "tests/production-progress.test.cjs"
+        "src/ui/interaction.ts"
       ],
       "rules": {
         "no-var": "off",

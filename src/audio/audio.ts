@@ -203,8 +203,7 @@ export function createAudio(game: GameRuntime, internals?: AudioInternals): Audi
     if (transition) return transition;
     const owner = context;
     let appliedVersion = -1;
-    let pending: Promise<void>;
-    pending = (async () => {
+    const pending: Promise<void> = (async () => {
       while (graph && context === owner && phase === 'ready') {
         const version = playbackVersion;
         if (visible()) {
