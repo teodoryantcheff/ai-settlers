@@ -147,10 +147,7 @@ test('the full plan includes every Node and soak test before build and single-wo
   assert.equal(scripts.check, 'node scripts/validate.mjs');
   assert.equal(scripts['test:soak'], 'node scripts/validate.mjs --soak');
   assert.equal(scripts['build:pages'], 'npm run build && node scripts/package-pages.mjs');
-  assert.match(
-    scripts.deploy,
-    /^npm test && npm run test:soak && npm run build:pages && wrangler pages deploy /,
-  );
+  assert.match(scripts.deploy, /^npm test && npm run build:pages && wrangler pages deploy /);
 });
 
 test('pull-request CI validates on the supported Node and never publishes', async () => {
