@@ -38,6 +38,15 @@ import type {
   Unit,
 } from '../types.ts';
 
+interface StorageSearchOptions {
+  available?: Good;
+  connected?: boolean;
+  exclude?: Building;
+  retainTarget?: boolean;
+  /** Keep distance rounding identical to each original caller for deterministic ties. */
+  euclidean?: boolean;
+}
+
 export function createEconomy(
   game: EconomyDependencies,
   internals?: EconomyInternals,
@@ -124,34 +133,38 @@ export function createEconomy(
     const s = storages();
     return s.length ? s[0] : null;
   }
-  function nearestStoragePos(x: number, y: number): Building | null {
+  /** Closest eligible store; strict comparison keeps the first store on equal distances. */
+  function nearestStorage(
+    ref: Pick<Building, 'x' | 'y'>,
+    options: StorageSearchOptions = {},
+  ): Building | null {
     let best = null,
-      bd = 1e9;
+      distance = options.euclidean ? Infinity : 1e9;
     const ss = storages();
     for (let i = 0; i < ss.length; i++) {
-      if (!game.connectedLand(x, y, ss[i].x, ss[i].y)) continue;
-      const d = (ss[i].x - x) * (ss[i].x - x) + (ss[i].y - y) * (ss[i].y - y);
-      if (d < bd) {
-        bd = d;
-        best = ss[i];
+      const store = ss[i];
+      if (store === options.exclude) continue;
+      if (options.available) {
+        const good = options.available;
+        const free =
+          (store.stock[good] | 0) -
+          (store.res[good] | 0) -
+          (options.retainTarget ? (store.targets || {})[good] | 0 : 0);
+        if (free <= 0) continue;
+      }
+      if (options.connected && !game.connectedLand(ref.x, ref.y, store.x, store.y)) continue;
+      const dx = store.x - ref.x,
+        dy = store.y - ref.y;
+      const d = options.euclidean ? Math.hypot(dx, dy) : dx * dx + dy * dy;
+      if (d < distance) {
+        best = store;
+        distance = d;
       }
     }
     return best;
   }
-  function nearestStorageWith(x: number, y: number, g: Good): Building | null {
-    let best = null,
-      bd = 1e9;
-    const ss = storages();
-    for (let i = 0; i < ss.length; i++) {
-      if ((ss[i].stock[g] | 0) - (ss[i].res[g] | 0) <= 0) continue;
-      if (!game.connectedLand(x, y, ss[i].x, ss[i].y)) continue;
-      const d = (ss[i].x - x) * (ss[i].x - x) + (ss[i].y - y) * (ss[i].y - y);
-      if (d < bd) {
-        bd = d;
-        best = ss[i];
-      }
-    }
-    return best;
+  function nearestStoragePos(x: number, y: number): Building | null {
+    return nearestStorage({ x, y }, { connected: true });
   }
   function totalGood(g: Good) {
     let s = 0;
@@ -192,14 +205,6 @@ export function createEconomy(
   }
   function carrierCap() {
     return 8 + 8 * Math.max(0, storages().length - 1);
-  }
-  function countFetch(g: Good, bid: number) {
-    let n = 0;
-    for (let i = 0; i < game.jobs.length; i++) {
-      const j = game.jobs[i];
-      if (j.kind === 'fetch' && j.good === g && j.to === bid) n++;
-    }
-    return n;
   }
   function countDeliver(g: Good, bid: number) {
     let n = 0;
@@ -359,22 +364,10 @@ export function createEconomy(
     gameEvent('buildingCompleted', { building: b });
   }
   function pickStorageFor(g: Good, ref: Pick<Building, 'x' | 'y'>) {
-    let best = null,
-      bd = 1e9;
-    const ss = storages();
-    const rx = ref ? ref.x : game.W / 2,
-      ry = ref ? ref.y : game.H / 2;
-    for (let i = 0; i < ss.length; i++) {
-      const av = (ss[i].stock[g] | 0) - (ss[i].res[g] | 0);
-      if (av <= 0) continue;
-      if (ref && !game.connectedLand(rx, ry, ss[i].x, ss[i].y)) continue;
-      const d = (ss[i].x - rx) * (ss[i].x - rx) + (ss[i].y - ry) * (ss[i].y - ry);
-      if (d < bd) {
-        bd = d;
-        best = ss[i];
-      }
-    }
-    return best;
+    return nearestStorage(ref || { x: game.W / 2, y: game.H / 2 }, {
+      available: g,
+      connected: !!ref,
+    });
   }
   function availableGood(g: Good, ref: Pick<Building, 'x' | 'y'>, includeTransfers: boolean) {
     let s = 0;
@@ -475,10 +468,7 @@ export function createEconomy(
       assigned.dropIsSite = false;
       goDrop(assigned);
     } else {
-      assigned.phase = 'idle';
-      assigned.path = null;
-      assigned.dropB = null;
-      assigned.dropIsSite = false;
+      resetCarrier(assigned, 'destination');
     }
   }
   function evaluatePlacement(
@@ -669,16 +659,7 @@ export function createEconomy(
           : sp.store && storages().length <= 1
             ? 'Storage demolition requires more than one completed storehouse. Complete another first.'
             : '';
-    const stores = storages().filter((store) => store !== b);
-    let receiver: Building | null = null,
-      distance = Infinity;
-    for (const store of stores) {
-      const d = Math.hypot(store.x - b.x, store.y - b.y);
-      if (d < distance) {
-        receiver = store;
-        distance = d;
-      }
-    }
+    const receiver = nearestStorage(b, { exclude: b, euclidean: true });
     const refund: Inventory = {},
       salvage: Inventory = {};
     if (allowed && receiver) {
@@ -737,58 +718,51 @@ export function createEconomy(
     };
   }
   function demolish(b: Building) {
-    if (b.type === 'hq') {
-      gameEvent('demolitionRejected', { reason: 'headquarters' });
+    const quote = demolitionQuote(b);
+    if (!quote.allowed) {
+      if (b.type === 'hq') gameEvent('demolitionRejected', { reason: 'headquarters' });
+      else if (game.BSPEC[b.type].store && storages().length <= 1)
+        gameEvent('demolitionRejected', { reason: 'last-store' });
       return;
     }
-    if (game.BSPEC[b.type].store && storages().length <= 1) {
-      gameEvent('demolitionRejected', { reason: 'last-store' });
-      return;
-    }
-    if (b.type === 'guard' && b.man) {
-      game.soldierPool++;
-      const ws = nearestStoragePos(b.x, b.y);
-      if (ws) {
-        ws.stock['weapons'] = (ws.stock['weapons'] | 0) + 1;
-        game.recordEconomicFlow('salvage', 'weapons', 1);
+    // Job cancellation returns dispatched soldiers itself; add only the garrison here.
+    const dispatched = game.jobs.filter(
+      (job) => job.kind === 'soldier' && (job.from === b.id || job.to === b.id || job.s === b.id),
+    ).length;
+    game.soldierPool += quote.returnedSoldiers - dispatched;
+    const equipmentStore = quote.equipmentReceiver ? byId(quote.equipmentReceiver.id) : null;
+    if (equipmentStore)
+      for (const name in quote.equipment) {
+        const good = name as Good;
+        const amount = quote.equipment[good];
+        equipmentStore.stock[good] = (equipmentStore.stock[good] | 0) + amount;
+        game.recordEconomicFlow('salvage', good, amount);
       }
-    }
     const sp = game.BSPEC[b.type];
-    let s = null,
-      sd = Infinity;
-    const ss = storages();
-    for (let si = 0; si < ss.length; si++) {
-      if (ss[si] === b) continue;
-      const dd = Math.hypot(ss[si].x - b.x, ss[si].y - b.y);
-      if (dd < sd) {
-        sd = dd;
-        s = ss[si];
+    const receiver = quote.receiver ? byId(quote.receiver.id) : null;
+    if (receiver) {
+      for (const name in quote.refund) {
+        const good = name as Good;
+        const amount = quote.refund[good];
+        receiver.stock[good] = (receiver.stock[good] | 0) + amount;
+        game.recordEconomicFlow('refund', good, amount);
       }
-    }
-    if (s) {
-      for (const g in sp.cost) {
-        const n = Math.floor((b.done ? sp.cost[g as Good] : b.got[g as Good] | 0) / 2);
-        if (n > 0) {
-          s.stock[g as Good] = (s.stock[g as Good] | 0) + n;
-          game.recordEconomicFlow('refund', g as Good, n);
+      for (const name in quote.salvage) {
+        const good = name as Good;
+        const amount = quote.salvage[good];
+        receiver.stock[good] = (receiver.stock[good] | 0) + amount;
+        game.recordEconomicFlow('salvage', good, amount);
+        if (good === 'gold' && !sp.store) {
+          game.state.gold += amount;
+          game.state.goldDelivered = (game.state.goldDelivered || 0) + amount;
+          gameEvent('goodsDelivered', {
+            building: receiver,
+            good,
+            amount,
+            transfer: false,
+          });
         }
       }
-      for (const g in b.stock)
-        if ((b.stock[g as Good] | 0) > 0) {
-          const salvaged = b.stock[g as Good] | 0;
-          s.stock[g as Good] = (s.stock[g as Good] | 0) + salvaged;
-          game.recordEconomicFlow('salvage', g as Good, salvaged);
-          if (g === 'gold' && !sp.store) {
-            game.state.gold += salvaged;
-            game.state.goldDelivered = (game.state.goldDelivered || 0) + salvaged;
-            gameEvent('goodsDelivered', {
-              building: s,
-              good: g as Good,
-              amount: salvaged,
-              transfer: false,
-            });
-          }
-        }
     }
     deleteJobsFor(b.id);
     game.buildings.splice(game.buildings.indexOf(b), 1);
@@ -1117,17 +1091,11 @@ export function createEconomy(
   function deliveryStorage(g: Good, ref: Pick<Building, 'x' | 'y'>): Building | null {
     const ss = storages();
     let best = null,
-      score = -Infinity,
-      nearest = null,
-      dist = Infinity;
+      score = -Infinity;
     for (let i = 0; i < ss.length; i++) {
       const s = ss[i],
         d = Math.hypot(s.x - ref.x, s.y - ref.y);
       if (!game.connectedLand(ref.x, ref.y, s.x, s.y)) continue;
-      if (d < dist) {
-        nearest = s;
-        dist = d;
-      }
       const deficit = ((s.targets || {})[g] | 0) - (s.stock[g] | 0) - incomingStock(g, s.id);
       const value = deficit / (1 + d * 0.15);
       if (deficit > 0 && value > score) {
@@ -1135,7 +1103,7 @@ export function createEconomy(
         score = value;
       }
     }
-    return best || nearest;
+    return best || nearestStorage(ref, { connected: true, euclidean: true });
   }
   function replenishTargets() {
     const ss = storages();
@@ -1193,23 +1161,13 @@ export function createEconomy(
         );
         // Keep a small queue: construction and producers retain first use of carriers.
         for (let k = 0; k < Math.min(2, missing); k++) {
-          let source: Building = null,
-            dist = Infinity;
-          for (let j = 0; j < ss.length; j++) {
-            const candidate = ss[j];
-            if (candidate === target) continue;
-            if (!game.connectedLand(candidate.x, candidate.y, target.x, target.y)) continue;
-            const surplus =
-              (candidate.stock[g as Good] | 0) -
-              (candidate.res[g as Good] | 0) -
-              ((candidate.targets || {})[g as Good] | 0);
-            if (surplus <= 0) continue;
-            const d = Math.hypot(candidate.x - target.x, candidate.y - target.y);
-            if (d < dist) {
-              source = candidate;
-              dist = d;
-            }
-          }
+          const source = nearestStorage(target, {
+            available: g as Good,
+            connected: true,
+            exclude: target,
+            retainTarget: true,
+            euclidean: true,
+          });
           if (!source) break;
           source.res[g as Good] = (source.res[g as Good] | 0) + 1;
           game.jobs.push({
@@ -1263,7 +1221,7 @@ export function createEconomy(
             );
             continue;
           }
-          const pen = countFetch(g, b.id);
+          const pen = incomingCount(g, b.id);
           for (let c2 = pen; c2 < rem; c2++) {
             let s = pickStorageFor(g, b);
             if (!s) {
@@ -1293,7 +1251,7 @@ export function createEconomy(
             );
             continue;
           }
-          const toC = want - have - countFetch(g, b.id);
+          const toC = want - have - incomingCount(g, b.id);
           for (let c3 = 0; c3 < toC; c3++) {
             const s3 = pickStorageFor(g, b);
             if (!s3) break;
@@ -1343,19 +1301,7 @@ export function createEconomy(
       const s = byId(j.s);
       if (!s || (s.stock[j.good] | 0) <= 0) {
         const old = s;
-        let nb = null,
-          bd = 1e9;
-        const ss = storages();
-        for (let i = 0; i < ss.length; i++) {
-          if ((ss[i].stock[j.good] | 0) - (ss[i].res[j.good] | 0) <= 0) continue;
-          const ddx = ss[i].x - (old ? old.x : 0),
-            ddy = ss[i].y - (old ? old.y : 0),
-            d2 = ddx * ddx + ddy * ddy;
-          if (d2 < bd) {
-            bd = d2;
-            nb = ss[i];
-          }
-        }
+        const nb = nearestStorage(old || { x: 0, y: 0 }, { available: j.good });
         if (!nb || j.kind === 'transfer') return null;
         if (old && old !== nb) old.res[j.good] = Math.max(0, (old.res[j.good] | 0) - 1);
         nb.res[j.good] = (nb.res[j.good] | 0) + 1;
@@ -1534,9 +1480,28 @@ export function createEconomy(
     const haul = game.state.upgrades ? Math.min(3, game.state.upgrades.haul || 0) : 0;
     return (2.7 / game.moveCost(i)) * (1 + 0.12 * haul);
   }
+  /** Preserve the narrower state transitions used by retries and cancelled pickups. */
+  function resetCarrier(
+    u: Unit,
+    scope: 'route' | 'assignment' | 'destination' | 'complete' = 'complete',
+  ) {
+    if (scope === 'complete') {
+      u.carry = null;
+      u.carryTransfer = false;
+      u.carryWarehouseTransfer = false;
+      u.carryProducer = null;
+    }
+    if (scope !== 'route') u.job = null;
+    u.phase = 'idle';
+    u.path = null;
+    if (scope === 'destination' || scope === 'complete') {
+      u.dropB = null;
+      u.dropIsSite = false;
+    }
+  }
   function dropFail(u: Unit) {
-    // delivery unreachable: unwind the job cleanly. Orphaning a taken job in the queue makes
-    // countFetch count it forever, so ensureJobs never recreates the fetch and the site stalls.
+    // Unreachable delivery must unwind its job. A taken job left in the queue keeps
+    // the fetch count elevated, so ensureJobs never replaces it and the site stalls.
     if (u.job) {
       const ji2 = game.jobs.indexOf(u.job);
       if (ji2 >= 0) game.jobs.splice(ji2, 1);
@@ -1547,14 +1512,7 @@ export function createEconomy(
       u.job = null;
     }
     if (u.carry) dumpGood(u, u.carry); // salvage the cargo into storage instead of losing it
-    u.carry = null;
-    u.carryTransfer = false;
-    u.carryWarehouseTransfer = false;
-    u.carryProducer = null;
-    u.phase = 'idle';
-    u.path = null;
-    u.dropB = null;
-    u.dropIsSite = false;
+    resetCarrier(u);
   }
   function goDrop(u: Unit) {
     let dp = null,
@@ -1639,12 +1597,10 @@ export function createEconomy(
       if (j.kind === 'fetch' || j.kind === 'transfer') {
         let s = byId(j.s);
         if (!s || (s.stock[j.good] | 0) <= 0) {
-          s = nearestStorageWith(u.x, u.y, j.good);
+          s = nearestStorage(u, { available: j.good, connected: true });
           if (!s || j.kind === 'transfer') {
             j.state = 'p';
-            u.job = null;
-            u.phase = 'idle';
-            u.path = null;
+            resetCarrier(u, 'assignment');
             return;
           }
           const old = byId(j.s);
@@ -1674,9 +1630,7 @@ export function createEconomy(
         if (!b || (b.stock[j.good] | 0) <= 0) {
           const ji2 = game.jobs.indexOf(j);
           if (ji2 >= 0) game.jobs.splice(ji2, 1);
-          u.job = null;
-          u.phase = 'idle';
-          u.path = null;
+          resetCarrier(u, 'assignment');
           return;
         }
         b.stock[j.good]--;
@@ -1714,19 +1668,10 @@ export function createEconomy(
         const ji = game.jobs.indexOf(j);
         if (ji >= 0) game.jobs.splice(ji, 1);
       }
-      u.carry = null;
-      u.carryTransfer = false;
-      u.carryWarehouseTransfer = false;
-      u.carryProducer = null;
-      u.job = null;
-      u.phase = 'idle';
-      u.path = null;
-      u.dropB = null;
-      u.dropIsSite = false;
+      resetCarrier(u);
       return;
     }
-    u.phase = 'idle';
-    u.path = null;
+    resetCarrier(u, 'route');
   }
   function arriveSoldier(u: Unit) {
     u.dead = true;
@@ -2085,6 +2030,7 @@ export function createEconomy(
   // Test-only view of closure internals; never merged into the runtime.
   if (internals)
     Object.assign(internals, {
+      nearestStorage,
       ensureJobs,
       startJob,
       bTick,
@@ -2135,6 +2081,10 @@ export function createEconomy(
 
 /** Test-only view of closure internals; never merged into the runtime. */
 export interface EconomyInternals {
+  nearestStorage: (
+    ref: Pick<Building, 'x' | 'y'>,
+    options?: StorageSearchOptions,
+  ) => Building | null;
   ensureJobs: () => void;
   startJob: (u: Unit, j: Job) => void;
   bTick: (b: Building, dt: number) => void;
