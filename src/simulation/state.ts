@@ -9,7 +9,7 @@ import type {
 } from '../types.ts';
 
 export function createSimulationState(): SimulationStateSubsystem {
-  var GOODS = {
+  const GOODS = {
     logs: { name: 'Logs', c: '#a97b4f' },
     planks: { name: 'Planks', c: '#d8b06a' },
     stone: { name: 'Stone', c: '#aab2b8' },
@@ -28,7 +28,7 @@ export function createSimulationState(): SimulationStateSubsystem {
     weapons: { name: 'Weapons', c: '#cfd4ff' },
     gold: { name: 'Gold', c: '#ffd23f' },
   };
-  var BSPEC: Record<BuildingType, BuildingSpec> = {
+  const BSPEC: Record<BuildingType, BuildingSpec> = {
     hq: { name: 'Headquarters', rad: 10, store: true },
     warehouse: { name: 'Warehouse', cost: { planks: 4, stone: 3 }, rad: 8, store: true },
     lumberjack: {
@@ -36,14 +36,16 @@ export function createSimulationState(): SimulationStateSubsystem {
       cost: { planks: 2, tools: 1 },
       rad: 6,
       prod: 'gather',
+      time: 7,
       out: 'logs',
     },
-    forester: { name: 'Forester', cost: { planks: 2, tools: 1 }, rad: 6, prod: 'plant' },
+    forester: { name: 'Forester', cost: { planks: 2, tools: 1 }, rad: 6, prod: 'plant', time: 7 },
     quarry: {
       name: 'Quarry',
       cost: { planks: 2, stone: 2, tools: 1 },
       rad: 5,
       prod: 'rock',
+      time: 8,
       out: 'stone',
     },
     fisherman: {
@@ -51,6 +53,7 @@ export function createSimulationState(): SimulationStateSubsystem {
       cost: { planks: 2, tools: 1 },
       rad: 5,
       prod: 'fish',
+      time: 9,
       out: 'fish',
     },
     farm: {
@@ -58,6 +61,7 @@ export function createSimulationState(): SimulationStateSubsystem {
       cost: { planks: 3, stone: 2, tools: 1 },
       rad: 4,
       prod: 'farm',
+      time: 15,
       out: 'grain',
     },
     mine_coal: {
@@ -181,7 +185,7 @@ export function createSimulationState(): SimulationStateSubsystem {
       guard: true,
     },
   };
-  var state: SimulationState = {
+  const state: SimulationState = {
     paused: true,
     speed: 1,
     won: false,
@@ -195,11 +199,11 @@ export function createSimulationState(): SimulationStateSubsystem {
     milestones: [],
     roadsBuilt: 0,
   };
-  var buildings: Building[] = [];
-  var units: Unit[] = [];
-  var jobs: Job[] = [];
-  var nextId = 1;
-  var serfPool = 14,
+  let buildings: Building[] = [];
+  let units: Unit[] = [];
+  let jobs: Job[] = [];
+  let nextId = 1;
+  let serfPool = 14,
     soldierPool = 3,
     spawnT = 8,
     serfT = 15,

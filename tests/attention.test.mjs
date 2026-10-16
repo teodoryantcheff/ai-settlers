@@ -12,16 +12,16 @@ function colony(storage = { getItem: () => null, setItem() {} }) {
     t: game.GRASS,
     tree: 0,
     rock: null,
-    res: null,
+    deposit: null,
     road: false,
   }));
   const hq = game.newBuilding('hq', 48, 48);
   hq.done = true;
-  hq.prog = 1;
+  hq.constructionProgress = 1;
   hq.stock = { planks: 48, stone: 48, tools: 16, weapons: 6 };
   const producer = game.newBuilding('sawmill', 54, 48);
   producer.done = true;
-  producer.prog = 1;
+  producer.constructionProgress = 1;
   game.buildings.push(hq, producer);
   game.recomputeTerritory();
   game.spawnT = game.serfT = 1e6;
@@ -177,7 +177,7 @@ test('all simultaneous semantic transitions survive presentation cooldowns; pass
   for (let i = 0; i < 14; i++) {
     const b = game.newBuilding('sawmill', 20 + i * 2, 20);
     b.done = true;
-    b.prog = 1;
+    b.constructionProgress = 1;
     game.buildings.push(b);
   }
   advance(game, 15);
@@ -236,7 +236,7 @@ test('local well support is not missing transported food, and no-op roads do not
   assert.equal(game.activityHistory().events.length, events);
   const well = game.newBuilding('well', 56, 48);
   well.done = true;
-  well.prog = 1;
+  well.constructionProgress = 1;
   game.buildings.push(well);
   assert.equal(game.activeAttention().length, 0, 'same-frame water support clears stale reason');
   advance(game, 1);

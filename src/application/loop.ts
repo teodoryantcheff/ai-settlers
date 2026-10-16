@@ -1,7 +1,8 @@
+import { requireElement } from '../ui/dom.ts';
 import type { GameRuntime } from '../runtime.ts';
 import { observePresentation } from '../ui/domain-feedback.ts';
 export function createLoop(game: GameRuntime, internals?: LoopInternals): LoopSubsystem {
-  var last = 0,
+  let last = 0,
     simAccumulator = 0,
     autoSaveT = 300;
   let initialized = false;
@@ -19,13 +20,13 @@ export function createLoop(game: GameRuntime, internals?: LoopInternals): LoopSu
       requestAnimationFrame(frame);
       return;
     }
-    var dt = last ? Math.max(0, Math.min(0.1, (ts - last) / 1000)) : 0;
+    const dt = last ? Math.max(0, Math.min(0.1, (ts - last) / 1000)) : 0;
     last = ts;
     if (!game.modalOpen() && (!game.workspace || game.workspace === 'map')) game.keyPan(dt);
     game.refreshHover();
     if (!game.state.paused && !game.modalOpen() && document.visibilityState !== 'hidden') {
       simAccumulator += dt * game.state.speed;
-      var steps = 0;
+      let steps = 0;
       while (simAccumulator + 1e-9 >= FIXED_STEP && steps < 60) {
         game.step(FIXED_STEP, !!game.mode);
         simAccumulator -= FIXED_STEP;
@@ -60,7 +61,7 @@ export function createLoop(game: GameRuntime, internals?: LoopInternals): LoopSu
   function init() {
     if (initialized) return;
     initialized = true;
-    var hq = game.initializeColony();
+    const hq = game.initializeColony();
     game.resize();
     game.initSky();
     game.cam.x = hq.x * game.TS - game.vw / game.z / 2;
@@ -68,19 +69,19 @@ export function createLoop(game: GameRuntime, internals?: LoopInternals): LoopSu
     game.clampCam();
     window.addEventListener('resize', game.resize);
     const sizing = new ResizeObserver(game.resize);
-    sizing.observe(document.getElementById('bar'));
-    const mapHost = document.getElementById('main');
+    sizing.observe(requireElement('bar'));
+    const mapHost = requireElement('main');
     if (mapHost) sizing.observe(mapHost);
-    var grain = document.getElementById('grain');
+    const grain = requireElement('grain');
     if (grain && game.ART.grainURL) grain.style.backgroundImage = 'url(' + game.ART.grainURL + ')';
     game.loadPrefs();
     game.resize();
-    var mb = document.getElementById('musicb');
+    const mb = requireElement('musicb');
     if (mb) mb.classList.toggle('off', !game.musicOn);
-    document.getElementById('mute').style.opacity = game.muted ? '0.4' : '1';
+    requireElement('mute').style.opacity = game.muted ? '0.4' : '1';
     game.buildPalette();
     game.updateHint();
-    var boot = document.getElementById('boot');
+    const boot = requireElement('boot');
     if (boot) boot.remove();
     requestAnimationFrame(frame);
   }

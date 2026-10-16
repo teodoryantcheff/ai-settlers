@@ -8,7 +8,7 @@ export function createProgression(
   game: ProgressionDependencies,
   internals?: ProgressionInternals,
 ): ProgressionSubsystem {
-  var tutorialSteps: LessonStep[] = [
+  const tutorialSteps: LessonStep[] = [
     {
       title: 'Start the timber chain',
       text: 'Place a Lumberjack where its reach covers mature trees.',
@@ -47,7 +47,7 @@ export function createProgression(
       building: 'guard',
       check: function () {
         return game.buildings.some(function (b) {
-          return b.type === 'guard' && b.man;
+          return b.type === 'guard' && b.manned;
         });
       },
     },
@@ -60,7 +60,7 @@ export function createProgression(
       },
     },
   ];
-  var contracts: Array<{ name: string; cost: Inventory; reward: Inventory }> = [
+  const contracts: Array<{ name: string; cost: Inventory; reward: Inventory }> = [
     { name: 'Timber for the realm', cost: { planks: 12 }, reward: { tools: 4, gold: 5 } },
     { name: 'A winter provision', cost: { bread: 12 }, reward: { stone: 8, gold: 8 } },
     {
@@ -73,8 +73,8 @@ export function createProgression(
     { name: 'Tools for the frontier', cost: { tools: 8 }, reward: { planks: 10, gold: 10 } },
   ];
   function producedTotal(g: Good) {
-    var n = 0;
-    for (var b of game.buildings) n += (b.metrics && b.metrics.produced[g]) || 0;
+    let n = 0;
+    for (const b of game.buildings) n += (b.metrics && b.metrics.produced[g]) || 0;
     return n;
   }
   function actionAvailability(cost: Inventory): ActionAvailability {
@@ -102,12 +102,12 @@ export function createProgression(
     purpose: 'contractSpent' | 'upgradeSpent' = 'contractSpent',
   ) {
     if (!game.requestStock(cost)) return false;
-    for (var good in cost) {
-      var remaining = cost[good as Good];
-      for (var store of game.storages()) {
-        var take = Math.min(
+    for (const good in cost) {
+      let remaining = cost[good as Good] || 0;
+      for (const store of game.storages()) {
+        const take = Math.min(
           remaining,
-          Math.max(0, (store.stock[good as Good] || 0) - (store.res[good as Good] || 0)),
+          Math.max(0, (store.stock[good as Good] || 0) - (store.reservedStock[good as Good] || 0)),
         );
         store.stock[good as Good] = (store.stock[good as Good] || 0) - take;
         remaining -= take;
@@ -122,27 +122,28 @@ export function createProgression(
     return true;
   }
   function claimContract(index: number) {
-    var c = contracts[index];
+    const c = contracts[index];
     if (!c || game.state.contracts.indexOf(index) >= 0) return;
     if (!spendStock(c.cost, 'contractSpent')) {
       game.emitGameEvent('contractRejected', { reason: 'stock' });
       return;
     }
-    var store = game.anyStorage();
+    const store = game.anyStorage();
     if (!store) return;
-    for (var g in c.reward) {
-      store.stock[g as Good] = (store.stock[g as Good] || 0) + c.reward[g as Good];
-      if (g === 'gold') game.state.gold += c.reward[g as Good];
-      game.recordEconomicFlow('contractReward', g as Good, c.reward[g as Good]);
+    for (const g in c.reward) {
+      const amount = c.reward[g as Good] || 0;
+      store.stock[g as Good] = (store.stock[g as Good] || 0) + amount;
+      if (g === 'gold') game.state.gold += amount;
+      game.recordEconomicFlow('contractReward', g as Good, amount);
     }
     game.state.contracts.push(index);
     game.emitGameEvent('contractFulfilled', { index, name: c.name, x: store.x, y: store.y });
   }
   function buyUpgrade(kind: 'haul' | 'production') {
     if (!['haul', 'production'].includes(kind)) return;
-    var level = game.state.upgrades[kind] || 0;
+    const level = game.state.upgrades[kind] || 0;
     if (level >= 3) return;
-    var price = 15 * (level + 1);
+    const price = 15 * (level + 1);
     if (!spendStock({ gold: price }, 'upgradeSpent')) {
       game.emitGameEvent('upgradeRejected', { kind, price });
       return;
@@ -155,9 +156,9 @@ export function createProgression(
     // per 0.5 sim-second. The gate is a pure function of sim time, staying correct
     // across save continuation and fast-forward without bookkeeping. The first
     // sim minute remains ungated so early tutorial feedback stays immediate.
-    var tickN = Math.floor(game.state.time * 60);
+    const tickN = Math.floor(game.state.time * 60);
     if (tickN >= 60 && tickN % 30 !== 0) return;
-    for (var i = 0; i < tutorialSteps.length; i++)
+    for (let i = 0; i < tutorialSteps.length; i++)
       if (game.state.milestones.indexOf(i) < 0 && tutorialSteps[i].check()) {
         game.state.milestones.push(i);
         game.emitGameEvent('milestoneReached', { index: i, title: tutorialSteps[i].title });
@@ -165,11 +166,11 @@ export function createProgression(
   }
   function pendingOutpost() {
     return game.buildings.find(function (b) {
-      return b.type === 'guard' && !b.man;
+      return b.type === 'guard' && !b.manned;
     });
   }
   function currentLesson() {
-    for (var i = 0; i < tutorialSteps.length; i++)
+    for (let i = 0; i < tutorialSteps.length; i++)
       if (game.state.milestones.indexOf(i) < 0) return { step: tutorialSteps[i], index: i };
     return null;
   }
@@ -221,11 +222,11 @@ export interface ProgressionSubsystem {
   claimContract: (index: number) => void;
   buyUpgrade: (kind: 'haul' | 'production') => void;
   gameTick: () => void;
-  pendingOutpost: () => Building;
+  pendingOutpost: () => Building | undefined;
   currentLesson: () => {
     step: LessonStep;
     index: number;
-  };
+  } | null;
   readonly contracts: Array<{ name: string; cost: Inventory; reward: Inventory }>;
 }
 

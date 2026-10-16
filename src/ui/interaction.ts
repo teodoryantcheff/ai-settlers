@@ -10,7 +10,7 @@ import type {
 import { observePresentation } from './domain-feedback.ts';
 import type { GameRuntime } from '../runtime.ts';
 export function createInteraction(game: GameRuntime): InteractionSubsystem {
-  var ORDER = [
+  const ORDER = [
     'lumberjack',
     'forester',
     'sawmill',
@@ -35,7 +35,7 @@ export function createInteraction(game: GameRuntime): InteractionSubsystem {
     'road',
     'demolish',
   ];
-  var selected: Building = null,
+  let selected: Building | null = null,
     mode: InteractionMode | null = null,
     anchor: TilePoint | null = null,
     ghost: PlacementGhost | null = null,
@@ -88,12 +88,12 @@ export function createInteraction(game: GameRuntime): InteractionSubsystem {
       anchor = null;
     }
   }
-  function demolitionInput(target: Building, shift = false): DemolitionAction {
+  function demolitionInput(target: Building | null, shift = false): DemolitionAction {
     if (!target) {
       demoArm = null;
       return 'missing';
     }
-    if (!shift && game.requestDemolitionConfirmation && game.openLayer) {
+    if (!shift && game.requestDemolitionConfirmation) {
       demoArm = target;
       game.requestDemolitionConfirmation(target);
       return 'armed';
@@ -110,12 +110,12 @@ export function createInteraction(game: GameRuntime): InteractionSubsystem {
     setMode(mtype, bt);
     dismissInspector();
   }
-  function selectMapTarget(building: Building, tile: TilePoint) {
+  function selectMapTarget(building: Building | null, tile: TilePoint) {
     selected = building;
     selInfo = building ? null : { x: tile.x, y: tile.y };
     game.updateInfo?.();
   }
-  function inspectBuilding(building: Building, source: InspectionSource) {
+  function inspectBuilding(building: Building | null, source: InspectionSource) {
     if (source === 'journey') setMode(null);
     selected = building;
     if (source !== 'advisor') selInfo = null;
@@ -213,16 +213,16 @@ export type InspectionSource = 'advisor' | 'flagged' | 'journey';
 export type DemolitionAction = 'missing' | 'armed' | 'confirmed';
 export interface InteractionSubsystem {
   activateTool: (mtype: InteractionModeType, bt?: BuildingType | null) => void;
-  selectMapTarget: (building: Building, tile: TilePoint) => void;
-  inspectBuilding: (building: Building, source: InspectionSource) => void;
+  selectMapTarget: (building: Building | null, tile: TilePoint) => void;
+  inspectBuilding: (building: Building | null, source: InspectionSource) => void;
   setMode: (mtype: InteractionModeType | null, bt?: BuildingType | null) => void;
   cancelMode: () => void;
-  demolitionInput: (target: Building, shift?: boolean) => DemolitionAction;
+  demolitionInput: (target: Building | null, shift?: boolean) => DemolitionAction;
   roadInput: (tile: TilePoint, shift?: boolean) => void;
   dismissInspector: () => void;
   readonly ORDER: string[];
   readonly presentationPrefs: PresentationPreferences;
-  selected: Building;
+  selected: Building | null;
   mode: InteractionMode | null;
   anchor: TilePoint | null;
   ghost: PlacementGhost | null;

@@ -37,7 +37,7 @@ export function createLandscape(
   // Cosmetic hashes never consume the simulation RNG. Geometry and marks use world
   // coordinates so adjoining tiles share contours, strata, shoreline and road joins.
   function landscapeHash(x: number, y: number, salt: number): number {
-    var h =
+    let h =
       Math.imul(x | 0, 374761393) ^
       Math.imul(y | 0, 668265263) ^
       Math.imul(game.seed | 0, 69069) ^
@@ -46,15 +46,15 @@ export function createLandscape(
     return (h ^ (h >>> 16)) >>> 0;
   }
   function landscapeNoise(x: number, y: number, scale: number, salt: number): number {
-    var xx = x / scale,
+    const xx = x / scale,
       yy = y / scale,
       ix = Math.floor(xx),
-      iy = Math.floor(yy),
-      fx = xx - ix,
+      iy = Math.floor(yy);
+    let fx = xx - ix,
       fy = yy - iy;
     fx = fx * fx * (3 - 2 * fx);
     fy = fy * fy * (3 - 2 * fy);
-    var a = landscapeHash(ix, iy, salt) / 4294967295,
+    const a = landscapeHash(ix, iy, salt) / 4294967295,
       b = landscapeHash(ix + 1, iy, salt) / 4294967295,
       c = landscapeHash(ix, iy + 1, salt) / 4294967295,
       d = landscapeHash(ix + 1, iy + 1, salt) / 4294967295;
@@ -78,7 +78,7 @@ export function createLandscape(
     width: number,
     alpha: number,
   ): void {
-    var a =
+    const a =
         side === 0
           ? [0, 0, 0, width]
           : side === 1
@@ -271,24 +271,24 @@ export function createLandscape(
     y: number,
     sandy: boolean,
   ): void {
-    var wx = x * game.TS,
+    const wx = x * game.TS,
       wy = y * game.TS,
       step = 72;
     // These soft washes span several tiles. A dirty tile reconstructs the same
     // neighboring patches, rather than stamping a gradient into each square.
-    for (var by = Math.floor((wy - 90) / step); by <= Math.floor((wy + game.TS + 90) / step); by++)
+    for (let by = Math.floor((wy - 90) / step); by <= Math.floor((wy + game.TS + 90) / step); by++)
       for (
-        var bx = Math.floor((wx - 90) / step);
+        let bx = Math.floor((wx - 90) / step);
         bx <= Math.floor((wx + game.TS + 90) / step);
         bx++
       ) {
-        var hash = landscapeHash(bx, by, sandy ? 128 : 126),
+        const hash = landscapeHash(bx, by, sandy ? 128 : 126),
           cx = bx * step + 10 + (hash % 53) - wx,
           cy = by * step + 10 + ((hash >>> 8) % 53) - wy,
           radius = 34 + ((hash >>> 16) % 49);
         if (cx + radius < 0 || cy + radius < 0 || cx - radius > game.TS || cy - radius > game.TS)
           continue;
-        var gradient = g.createRadialGradient(cx, cy, 0, cx, cy, radius),
+        const gradient = g.createRadialGradient(cx, cy, 0, cx, cy, radius),
           color = sandy
             ? hash & 1
               ? '220,197,143'
@@ -304,9 +304,9 @@ export function createLandscape(
       }
     // Tiny angled pigment marks break up the old repeating tile texture. Positions
     // come from a world grid, including overlapping marks on either side of a seam.
-    for (var gy = Math.floor(wy / 4) - 1; gy <= Math.floor((wy + game.TS) / 4); gy++)
-      for (var gx = Math.floor(wx / 4) - 1; gx <= Math.floor((wx + game.TS) / 4); gx++) {
-        var grain = landscapeHash(gx, gy, 130),
+    for (let gy = Math.floor(wy / 4) - 1; gy <= Math.floor((wy + game.TS) / 4); gy++)
+      for (let gx = Math.floor(wx / 4) - 1; gx <= Math.floor((wx + game.TS) / 4); gx++) {
+        const grain = landscapeHash(gx, gy, 130),
           px = gx * 4 + (grain % 37) / 10 - wx,
           py = gy * 4 + ((grain >>> 8) % 37) / 10 - wy;
         g.strokeStyle = sandy
@@ -330,14 +330,14 @@ export function createLandscape(
     tl: Tile,
     h: number,
   ): void {
-    var wx = x * game.TS,
+    const wx = x * game.TS,
       wy = y * game.TS;
     // Leave the road bed and workyards clear. Forest floors still receive smaller,
     // shaded grass tufts; stones retain their separate readable sprite silhouette.
     if (tl.road || game.buildingAt(x, y) || tl.rock) return;
-    for (var gy = Math.floor(wy / 5) - 1; gy <= Math.floor((wy + game.TS) / 5); gy++)
-      for (var gx = Math.floor(wx / 5) - 1; gx <= Math.floor((wx + game.TS) / 5); gx++) {
-        var n = landscapeHash(gx, gy, 201),
+    for (let gy = Math.floor(wy / 5) - 1; gy <= Math.floor((wy + game.TS) / 5); gy++)
+      for (let gx = Math.floor(wx / 5) - 1; gx <= Math.floor((wx + game.TS) / 5); gx++) {
+        const n = landscapeHash(gx, gy, 201),
           ax = gx * 5 + (n % 47) / 10,
           ay = gy * 5 + ((n >>> 8) % 47) / 10,
           px = ax - wx,
@@ -369,7 +369,7 @@ export function createLandscape(
         if (underTree || patch < 0.59 || lush < 0.45 || n % 7 > 1) continue;
         // Independently hashed offsets and counts scatter blossoms into loose
         // clusters. Nothing reuses the former rectangular four-dot stamp.
-        var flower = (n >>> 10) % 9,
+        const flower = (n >>> 10) % 9,
           colors = [
             'rgba(219,207,140,0.76)',
             'rgba(226,218,184,0.75)',
@@ -380,8 +380,8 @@ export function createLandscape(
             'rgba(221,213,167,0.74)',
           ],
           count = 1 + ((n >>> 18) % 4);
-        for (var blossom = 0; blossom < count; blossom++) {
-          var bloomHash = landscapeHash(gx, gy, 347 + blossom),
+        for (let blossom = 0; blossom < count; blossom++) {
+          const bloomHash = landscapeHash(gx, gy, 347 + blossom),
             fx = px + (bloomHash % 51) / 10 - 2.5,
             fy = py - height + ((bloomHash >>> 8) % 31) / 10 - 1.5,
             size = 0.38 + ((bloomHash >>> 16) % 6) / 10,
@@ -421,16 +421,16 @@ export function createLandscape(
       }
     // Small moss hummocks have uneven leaves and a cool grounding shadow. Sparse
     // placement prevents the meadow from becoming another repeated symbol grid.
-    var lush = landscapeNoise(wx + 12, wy + 12, 84, 101);
+    const lush = landscapeNoise(wx + 12, wy + 12, 84, 101);
     if (!tl.tree && lush > 0.6 && h % 9 === 0) {
-      var sx = 5 + (h % 11),
+      const sx = 5 + (h % 11),
         sy = 5 + ((h >>> 3) % 12);
       g.fillStyle = 'rgba(35,65,28,0.18)';
       g.beginPath();
       g.ellipse(sx + 1, sy + 1.2, 3.7, 1.7, -0.15, 0, 7);
       g.fill();
-      for (var leaf = 0; leaf < 5; leaf++) {
-        var lh = landscapeHash(x, y, 344 + leaf);
+      for (let leaf = 0; leaf < 5; leaf++) {
+        const lh = landscapeHash(x, y, 344 + leaf);
         g.fillStyle = leaf & 1 ? '#93a85e' : '#6c914b';
         g.beginPath();
         g.ellipse(sx + (lh % 35) / 10 - 1.7, sy - ((lh >>> 5) % 18) / 10, 1.2, 0.65, -0.3, 0, 7);
@@ -440,14 +440,14 @@ export function createLandscape(
   }
   function paintLandscapeWorkyard(g: CanvasRenderingContext2D, x: number, y: number): void {
     if (!game.buildingAt(x, y)) return;
-    var dirt = g.createRadialGradient(12, 14, 2, 12, 14, 11);
+    const dirt = g.createRadialGradient(12, 14, 2, 12, 14, 11);
     dirt.addColorStop(0, 'rgba(166,130,76,0.68)');
     dirt.addColorStop(0.55, 'rgba(184,153,92,0.38)');
     dirt.addColorStop(1, 'rgba(173,143,88,0)');
     g.fillStyle = dirt;
     g.fillRect(0, 0, game.TS, game.TS);
-    for (var k = 0; k < 9; k++) {
-      var h = landscapeHash(x, y, 380 + k),
+    for (let k = 0; k < 9; k++) {
+      const h = landscapeHash(x, y, 380 + k),
         px = 2 + (h % 20),
         py = 12 + ((h >>> 8) % 11);
       g.fillStyle = k & 1 ? 'rgba(226,201,141,0.42)' : 'rgba(89,84,52,0.24)';
@@ -457,7 +457,7 @@ export function createLandscape(
     }
   }
   function mountainContour(x: number, y: number): MountainContour {
-    var same = landscapeSides(x, y, game.MTN),
+    const same = landscapeSides(x, y, game.MTN),
       n = !same[0],
       e = !same[1],
       s = !same[2],
@@ -470,7 +470,7 @@ export function createLandscape(
     // The shared vertex uses the same world-space sample on either side of a seam.
     // South/east escarpments occupy the perimeter only; adjoining mountain interiors
     // have neither a cliff nor a per-tile light/dark panel.
-    var nw = rim(wx, wy),
+    const nw = rim(wx, wy),
       ne = rim(wx + game.TS, wy),
       se = rim(wx + game.TS, wy + game.TS),
       sw = rim(wx, wy + game.TS),
@@ -497,13 +497,13 @@ export function createLandscape(
     contour: MountainContour,
     shift?: number,
   ): void {
-    var points = contour.points,
+    const points = contour.points,
       dy = shift || 0,
       dx = dy * 0.55;
     g.beginPath();
     g.moveTo(points[0][0] + dx, points[0][1] + dy);
-    for (var k = 1; k < points.length; k += 2) {
-      var end = points[(k + 1) % points.length];
+    for (let k = 1; k < points.length; k += 2) {
+      const end = points[(k + 1) % points.length];
       g.quadraticCurveTo(points[k][0] + dx, points[k][1] + dy, end[0] + dx, end[1] + dy);
     }
     g.closePath();
@@ -512,7 +512,7 @@ export function createLandscape(
   // peak spans several tiles; painting a dirty tile reuses its exact world geometry.
   // The cache keys on tiles identity, seed, and painted mountain art: an async pack
   // install flips crag sort order without touching tiles or seed.
-  var landscapeCragMap: LandscapeCragMap | null = null;
+  let landscapeCragMap: LandscapeCragMap | null = null;
   function prepareLandscapeCrags() {
     if (
       landscapeCragMap &&
@@ -520,39 +520,39 @@ export function createLandscape(
       landscapeCragMap.seed === game.seed &&
       landscapeCragMap.painted === (game.ART.paintedMountains || null)
     )
-      return;
-    var perTile: LandscapeCragFeature[][] = new Array(game.W * game.H),
+      return landscapeCragMap;
+    const perTile: LandscapeCragFeature[][] = new Array(game.W * game.H),
       step = 4;
-    for (var by = 0; by < game.H; by += step)
-      for (var bx = 0; bx < game.W; bx += step) {
-        var count = 0,
+    for (let by = 0; by < game.H; by += step)
+      for (let bx = 0; bx < game.W; bx += step) {
+        let count = 0,
           sumX = 0,
           sumY = 0;
-        for (var yy = by; yy < Math.min(game.H, by + step); yy++)
-          for (var xx = bx; xx < Math.min(game.W, bx + step); xx++)
+        for (let yy = by; yy < Math.min(game.H, by + step); yy++)
+          for (let xx = bx; xx < Math.min(game.W, bx + step); xx++)
             if (landscapeIs(xx, yy, game.MTN)) {
               count++;
               sumX += xx;
               sumY += yy;
             }
         if (!count) continue;
-        var anchorX = sumX / count,
+        let anchorX = sumX / count,
           anchorY = sumY / count,
           nearest = Infinity;
         // Place the planted artwork base on a real mountain tile, including thin
         // ridges and isolated outcrops where a geometric centroid can be grass.
-        for (yy = by; yy < Math.min(game.H, by + step); yy++)
-          for (xx = bx; xx < Math.min(game.W, bx + step); xx++) {
+        for (let yy = by; yy < Math.min(game.H, by + step); yy++)
+          for (let xx = bx; xx < Math.min(game.W, bx + step); xx++) {
             if (!landscapeIs(xx, yy, game.MTN)) continue;
-            var distance = (xx - sumX / count) ** 2 + (yy - sumY / count) ** 2;
+            const distance = (xx - sumX / count) ** 2 + (yy - sumY / count) ** 2;
             if (distance < nearest) {
               nearest = distance;
               anchorX = xx;
               anchorY = yy;
             }
           }
-        var artFoot = [(anchorX + 0.5) * game.TS, (anchorY + 0.85) * game.TS];
-        var hash = landscapeHash(bx, by, 901),
+        const artFoot = [(anchorX + 0.5) * game.TS, (anchorY + 0.85) * game.TS];
+        const hash = landscapeHash(bx, by, 901),
           cx = (sumX / count + 0.5) * game.TS + (((hash >>> 8) % 13) - 6),
           cy = (sumY / count + 0.5) * game.TS + (((hash >>> 12) % 13) - 6),
           radius = 26 + Math.min(15, count * 1.4) + (hash % 12),
@@ -577,7 +577,7 @@ export function createLandscape(
             snow: false,
             density: count,
           };
-        var minX = Math.max(
+        const minX = Math.max(
             0,
             Math.floor((Math.min(cx - radius * 1.35, artFoot[0] - radius * 1.3) - 1) / game.TS),
           ),
@@ -596,24 +596,24 @@ export function createLandscape(
                 game.TS,
             ),
           );
-        for (yy = minY; yy <= maxY; yy++)
-          for (xx = minX; xx <= maxX; xx++) {
-            var i = game.idx(xx, yy);
+        for (let yy = minY; yy <= maxY; yy++)
+          for (let xx = minX; xx <= maxX; xx++) {
+            const i = game.idx(xx, yy);
             if (!perTile[i]) perTile[i] = [];
             perTile[i].push(feature);
           }
       }
     // Snow belongs to the highest dense massifs of this map, not an arbitrary
     // repeating variant. Sparse isolated outcrops never acquire a snowy summit.
-    var unique = new Set<LandscapeCragFeature>();
-    for (var group of perTile) if (group) for (var crag of group) unique.add(crag);
-    var dense = Array.from(unique)
+    const unique = new Set<LandscapeCragFeature>();
+    for (const group of perTile) if (group) for (const crag of group) unique.add(crag);
+    const dense = Array.from(unique)
       .filter((f) => f.density >= 7)
       .sort((a, b) => b.height - a.height);
-    for (var summit = 0; summit < Math.ceil(dense.length * 0.15); summit++)
+    for (let summit = 0; summit < Math.ceil(dense.length * 0.15); summit++)
       if (dense[summit].height >= 55) dense[summit].snow = true;
     // The same back-to-front order is used in every tile crossed by a feature.
-    for (var features of perTile)
+    for (const features of perTile)
       if (features)
         features.sort((a, b) =>
           game.ART.paintedMountains ? a.artFoot[1] - b.artFoot[1] : a.foot[1] - b.foot[1],
@@ -624,6 +624,7 @@ export function createLandscape(
       painted: game.ART.paintedMountains || null,
       perTile: perTile,
     };
+    return landscapeCragMap;
   }
   function traceWorldFacet(
     g: CanvasRenderingContext2D,
@@ -633,12 +634,12 @@ export function createLandscape(
   ): void {
     g.beginPath();
     g.moveTo(points[0][0] - wx, points[0][1] - wy);
-    for (var p = 1; p < points.length; p++) g.lineTo(points[p][0] - wx, points[p][1] - wy);
+    for (let p = 1; p < points.length; p++) g.lineTo(points[p][0] - wx, points[p][1] - wy);
     g.closePath();
   }
   function paintLandscapeCrags(g: CanvasRenderingContext2D, x: number, y: number): void {
-    prepareLandscapeCrags();
-    var list = landscapeCragMap.perTile[game.idx(x, y)] || [],
+    const crags = prepareLandscapeCrags();
+    const list = crags.perTile[game.idx(x, y)] || [],
       wx = x * game.TS,
       wy = y * game.TS;
     function facet(points: number[][], color: string | CanvasGradient | CanvasPattern): void {
@@ -649,10 +650,10 @@ export function createLandscape(
     function between(a: number[], b: number[], t: number): number[] {
       return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
     }
-    for (var f of list) {
-      var painted = game.ART.paintedMountains;
+    for (const f of list) {
+      const painted = game.ART.paintedMountains;
       if (painted) {
-        var variants = f.snow && painted.snowy.length ? painted.snowy : painted.dry,
+        const variants = f.snow && painted.snowy.length ? painted.snowy : painted.dry,
           image =
             f.density <= 3 && painted.foothill
               ? painted.foothill
@@ -665,7 +666,7 @@ export function createLandscape(
         g.drawImage(image, f.artFoot[0] - width * 0.52 - wx, bottom - height - wy, width, height);
         continue;
       }
-      var peak = f.peak,
+      const peak = f.peak,
         foot = f.foot,
         left = f.left,
         right = f.right,
@@ -680,8 +681,8 @@ export function createLandscape(
         outline = [left, shoulder, spur, notch, peak, ridge, eastNotch, eastSpur, right, foot];
       // Broad stepped limestone aprons give the granite mass a planted base. The
       // flat grassy tops and pale vertical risers share the peak's world footprint.
-      for (var terrace = 2; terrace >= 0; terrace--) {
-        var spread = 1 + terrace * 0.08,
+      for (let terrace = 2; terrace >= 0; terrace--) {
+        const spread = 1 + terrace * 0.08,
           drop = 4 + terrace * 4,
           apron = [
             [left[0] - r * (spread - 1), left[1] + drop],
@@ -710,7 +711,7 @@ export function createLandscape(
         outline.map((p) => [p[0] + 5, p[1] + 6]),
         'rgba(39,53,45,0.28)',
       );
-      var base = g.createLinearGradient(peak[0] - wx, peak[1] - wy, foot[0] - wx, foot[1] - wy);
+      const base = g.createLinearGradient(peak[0] - wx, peak[1] - wy, foot[0] - wx, foot[1] - wy);
       base.addColorStop(0, '#b7b6a1');
       base.addColorStop(0.45, '#979c91');
       base.addColorStop(1, '#788779');
@@ -720,13 +721,18 @@ export function createLandscape(
       g.clip();
       // Tall, narrow planes descend from unequal spires; cool occluded faces sit
       // alongside warm northwest light rather than a repeated diamond texture.
-      var shade = g.createLinearGradient(peak[0] - wx, peak[1] - wy, right[0] - wx, right[1] - wy);
+      const shade = g.createLinearGradient(
+        peak[0] - wx,
+        peak[1] - wy,
+        right[0] - wx,
+        right[1] - wy,
+      );
       shade.addColorStop(0, '#969d91');
       shade.addColorStop(0.5, '#6b7976');
       shade.addColorStop(1, '#4e6465');
       facet([peak, ridge, eastNotch, eastSpur, right, foot], shade);
       facet([peak, [peak[0] + r * 0.12, peak[1] + ht * 0.4], foot], '#4e6265');
-      var sun = g.createLinearGradient(peak[0] - wx, peak[1] - wy, foot[0] - wx, foot[1] - wy);
+      const sun = g.createLinearGradient(peak[0] - wx, peak[1] - wy, foot[0] - wx, foot[1] - wy);
       sun.addColorStop(0, '#d2c7a7');
       sun.addColorStop(0.55, '#b4b29b');
       sun.addColorStop(1, '#8d9a84');
@@ -737,8 +743,8 @@ export function createLandscape(
       facet([ridge, [ridge[0] + r * 0.06, ridge[1] + ht * 0.3], foot], '#75827a');
       // Broken granite joints follow the vertical relief, with occasional angled
       // ledges. All samples are feature-local hashes, never simulation random draws.
-      for (var crack = 0; crack < 9; crack++) {
-        var q = landscapeHash(f.hash, crack, 912),
+      for (let crack = 0; crack < 9; crack++) {
+        const q = landscapeHash(f.hash, crack, 912),
           t = 0.12 + (q % 65) / 100,
           start = between(left, peak, t),
           end = between(left, foot, t + 0.1),
@@ -755,16 +761,16 @@ export function createLandscape(
         g.lineWidth = 0.4;
         g.stroke();
       }
-      for (var ledge = 0; ledge < 4; ledge++) {
-        var t2 = 0.46 + ledge * 0.12,
+      for (let ledge = 0; ledge < 4; ledge++) {
+        const t2 = 0.46 + ledge * 0.12,
           a = between(peak, left, t2),
           b = between(peak, foot, t2 + 0.06);
         facet([a, [a[0] + 4, a[1] - 1.5], b, [b[0] - 2, b[1] + 1.5]], 'rgba(221,210,175,0.30)');
       }
       // Small translucent angular brush marks soften the large stone planes.
       // They are cached with the terrain, with no new raster work on live frames.
-      for (var fleck = 0; fleck < 24; fleck++) {
-        var fh = landscapeHash(f.hash, fleck, 919),
+      for (let fleck = 0; fleck < 24; fleck++) {
+        const fh = landscapeHash(f.hash, fleck, 919),
           fx = left[0] + ((fh % 1000) / 1000) * r * 2,
           fy = peak[1] + (((fh >>> 12) % 1000) / 1000) * ht * 1.1,
           size = 1.5 + ((fh >>> 24) % 40) / 10;
@@ -799,7 +805,7 @@ export function createLandscape(
       g.restore();
       g.beginPath();
       g.moveTo(shoulder[0] - wx, shoulder[1] - wy);
-      for (var p of [spur, notch, peak]) g.lineTo(p[0] - wx, p[1] - wy);
+      for (const p of [spur, notch, peak]) g.lineTo(p[0] - wx, p[1] - wy);
       g.strokeStyle = 'rgba(243,226,184,0.7)';
       g.lineWidth = 0.85;
       g.stroke();
@@ -815,10 +821,10 @@ export function createLandscape(
     if (game.ART.paintedMountains) {
       paintLandscapeMaterial(g, x, y, game.GRASS, h);
       paintLandscapeCrags(g, x, y);
-      if (tl.res && tl.res.amt > 0) paintOreSeams(g, tl.res, x, y);
+      if (tl.deposit && tl.deposit.amt > 0) paintOreSeams(g, tl.deposit, x, y);
       return;
     }
-    var wx = x * game.TS,
+    const wx = x * game.TS,
       wy = y * game.TS,
       c = mountainContour(x, y);
     // Mossy ground below the irregular rock edge avoids a geometric slab outline.
@@ -832,7 +838,7 @@ export function createLandscape(
     g.fillStyle = '#818573';
     g.fill();
     traceMountain(g, c);
-    var base = g.createLinearGradient(-wx, -wy, game.W * game.TS - wx, game.H * game.TS - wy);
+    const base = g.createLinearGradient(-wx, -wy, game.W * game.TS - wx, game.H * game.TS - wy);
     base.addColorStop(0, '#afaf86');
     base.addColorStop(0.55, '#97a175');
     base.addColorStop(1, '#84976a');
@@ -841,10 +847,10 @@ export function createLandscape(
     g.save();
     g.clip();
     // Strata are long continuous world lines, never tile-sized cracks or frames.
-    for (var band = Math.floor(wy / 10) - 1; band <= Math.floor((wy + game.TS) / 10) + 1; band++) {
+    for (let band = Math.floor(wy / 10) - 1; band <= Math.floor((wy + game.TS) / 10) + 1; band++) {
       g.beginPath();
-      for (var p = 0; p <= game.TS; p += 4) {
-        var yy = band * 10 + Math.sin((wx + p) / 31 + band * 0.47) * 3.8 - wy;
+      for (let p = 0; p <= game.TS; p += 4) {
+        const yy = band * 10 + Math.sin((wx + p) / 31 + band * 0.47) * 3.8 - wy;
         if (p === 0) g.moveTo(p, yy);
         else g.lineTo(p, yy);
       }
@@ -855,8 +861,8 @@ export function createLandscape(
       g.lineWidth = 0.45;
       g.stroke();
     }
-    for (var chip = 0; chip < 4; chip++) {
-      var hh = landscapeHash(x, y, 440 + chip),
+    for (let chip = 0; chip < 4; chip++) {
+      const hh = landscapeHash(x, y, 440 + chip),
         cx = 2 + (hh % 21),
         cy = 2 + ((hh >>> 6) % 21);
       g.strokeStyle = 'rgba(88,100,83,0.22)';
@@ -868,7 +874,7 @@ export function createLandscape(
       g.stroke();
     }
     paintLandscapeCrags(g, x, y);
-    if (tl.res && tl.res.amt > 0) paintOreSeams(g, tl.res, x, y);
+    if (tl.deposit && tl.deposit.amt > 0) paintOreSeams(g, tl.deposit, x, y);
     g.restore();
     paintMountainScree(g, c, h);
     // Edge lighting is restricted to actual exposed northern/western ridges.
@@ -889,20 +895,20 @@ export function createLandscape(
   }
   function paintOreSeams(
     g: CanvasRenderingContext2D,
-    res: Tile['res'],
+    deposit: NonNullable<Tile['deposit']>,
     x: number,
     y: number,
   ): void {
-    var gold = res.kind === 'gold',
-      iron = res.kind === 'iron',
+    const gold = deposit.kind === 'gold',
+      iron = deposit.kind === 'iron',
       shade = gold ? '#78602d' : iron ? '#89523b' : '#293c34',
       light = gold ? '#e4bf59' : iron ? '#ce8d60' : '#586c5e',
-      amount = Math.max(1, Math.ceil(2 * Math.min(1, res.amt / (res.amt0 || res.amt))));
-    var angle = 0.15 + landscapeNoise((x + 0.5) * game.TS, (y + 0.5) * game.TS, 76, 714) * 2.3,
+      amount = Math.max(1, Math.ceil(2 * Math.min(1, deposit.amt / (deposit.amt0 || deposit.amt))));
+    const angle = 0.15 + landscapeNoise((x + 0.5) * game.TS, (y + 0.5) * game.TS, 76, 714) * 2.3,
       cosine = Math.cos(angle),
       sine = Math.sin(angle);
-    for (var j = 0; j < amount; j++) {
-      var hash = landscapeHash(x, y, 719 + j),
+    for (let j = 0; j < amount; j++) {
+      const hash = landscapeHash(x, y, 719 + j),
         xx = 7 + (hash % 11),
         yy = 7 + ((hash >>> 5) % 10),
         length = (j ? 5.4 : 9.5) + ((hash >>> 9) % 4),
@@ -913,8 +919,8 @@ export function createLandscape(
           [length / 2, 0.35],
         ];
       g.beginPath();
-      for (var p = 0; p < points.length; p++) {
-        var px = xx + points[p][0] * cosine - points[p][1] * sine,
+      for (let p = 0; p < points.length; p++) {
+        const px = xx + points[p][0] * cosine - points[p][1] * sine,
           py = yy + points[p][0] * sine + points[p][1] * cosine;
         if (!p) g.moveTo(px, py);
         else g.lineTo(px, py);
@@ -943,10 +949,10 @@ export function createLandscape(
     contour: MountainContour,
     h: number,
   ): void {
-    for (var side = 0; side < 4; side++) {
+    for (let side = 0; side < 4; side++) {
       if (!contour.exposed[side]) continue;
-      for (var j = 0; j < 2; j++) {
-        var along = 3 + ((h + j * 11 + side * 5) % 18),
+      for (let j = 0; j < 2; j++) {
+        const along = 3 + ((h + j * 11 + side * 5) % 18),
           px = side === 1 ? game.TS - 1.4 : side === 3 ? 1.4 : along,
           py = side === 0 ? 1.5 : side === 2 ? game.TS - 1.8 : along;
         g.fillStyle = 'rgba(55,73,53,0.28)';
@@ -968,15 +974,15 @@ export function createLandscape(
     }
   }
   function landscapeRoadMask(x: number, y: number): number {
-    var mask = 0,
-      offsets = [
-        [0, -1],
-        [1, 0],
-        [0, 1],
-        [-1, 0],
-      ];
-    for (var i = 0; i < 4; i++) {
-      var xx = x + offsets[i][0],
+    let mask = 0;
+    const offsets = [
+      [0, -1],
+      [1, 0],
+      [0, 1],
+      [-1, 0],
+    ];
+    for (let i = 0; i < 4; i++) {
+      const xx = x + offsets[i][0],
         yy = y + offsets[i][1];
       if (game.inB(xx, yy) && (game.tiles[game.idx(xx, yy)].road || game.buildingAt(xx, yy)))
         mask |= 1 << i;
@@ -1007,7 +1013,7 @@ export function createLandscape(
     }
   }
   function paintLandscapeRoad(g: CanvasRenderingContext2D, x: number, y: number): void {
-    var mask = landscapeRoadMask(x, y);
+    const mask = landscapeRoadMask(x, y);
     g.lineCap = 'round';
     g.lineJoin = 'round';
     traceLandscapeRoad(g, mask);
@@ -1019,7 +1025,7 @@ export function createLandscape(
     g.lineWidth = 7;
     g.stroke();
     function roadDistance(px: number, py: number) {
-      var distance = Math.hypot(px - 12, py - 12);
+      let distance = Math.hypot(px - 12, py - 12);
       if (mask & 1 && py < 12) distance = Math.min(distance, Math.abs(px - 12));
       if (mask & 2 && px > 12) distance = Math.min(distance, Math.abs(py - 12));
       if (mask & 4 && py > 12) distance = Math.min(distance, Math.abs(px - 12));
@@ -1028,13 +1034,13 @@ export function createLandscape(
     }
     // Tile-coordinate hashes give cached brush marks stable variation, independent
     // of simulation RNG. Small broken patches soften shoulders without changing joins.
-    for (var k = 0; k < 42; k++) {
-      var hh = landscapeHash(x, y, 550 + k),
+    for (let k = 0; k < 42; k++) {
+      const hh = landscapeHash(x, y, 550 + k),
         px = 1.5 + (hh % 210) / 10,
         py = 1.5 + ((hh >>> 8) % 210) / 10,
         distance = roadDistance(px, py);
       if (distance > 4.6) continue;
-      var shoulder = distance > 2.8;
+      const shoulder = distance > 2.8;
       g.fillStyle = shoulder
         ? 'rgba(153,132,86,0.43)'
         : k % 3
@@ -1057,11 +1063,11 @@ export function createLandscape(
         g.fillRect(px, py, 0.8, 0.5);
       }
     }
-    for (var blade = 0; blade < 14; blade++) {
-      var grassHash = landscapeHash(x, y, 585 + blade),
+    for (let blade = 0; blade < 14; blade++) {
+      const grassHash = landscapeHash(x, y, 585 + blade),
         gx = 1 + (grassHash % 22),
-        gy = 1 + ((grassHash >>> 5) % 22),
-        distance = Math.hypot(gx - 12, gy - 12);
+        gy = 1 + ((grassHash >>> 5) % 22);
+      let distance = Math.hypot(gx - 12, gy - 12);
       if (mask & 1 && gy < 12) distance = Math.min(distance, Math.abs(gx - 12));
       if (mask & 2 && gx > 12) distance = Math.min(distance, Math.abs(gy - 12));
       if (mask & 4 && gy > 12) distance = Math.min(distance, Math.abs(gx - 12));
@@ -1083,11 +1089,11 @@ export function createLandscape(
     type: number,
     h: number,
   ): void {
-    var painted = game.ART.paintedTerrain;
+    const painted = game.ART.paintedTerrain;
     if (type === game.GRASS && painted) {
       // Select a continuous world-space piece of the painted material. Its period
       // is a multiple of TS, so neighboring dirty tiles reconstruct exactly.
-      var period = painted.worldSize,
+      const period = painted.worldSize,
         sx = (((x * game.TS) % period) / period) * painted.image.width,
         sy = (((y * game.TS) % period) / period) * painted.image.height;
       g.drawImage(
@@ -1126,14 +1132,14 @@ export function createLandscape(
       paintMountain(g, x, y, tl, h);
       return;
     }
-    var painted = game.ART.paintedTerrain;
+    const painted = game.ART.paintedTerrain;
     paintLandscapeMaterial(g, x, y, tl.t, h);
     paintLandscapeGround(g, x, y, tl.t === game.SAND);
-    var other = tl.t === game.SAND ? game.GRASS : game.SAND,
+    const other = tl.t === game.SAND ? game.GRASS : game.SAND,
       edges = landscapeSides(x, y, other),
       waters = landscapeSides(x, y, game.WATER),
       mountains = landscapeSides(x, y, game.MTN);
-    for (var side = 0; side < 4; side++) {
+    for (let side = 0; side < 4; side++) {
       if (edges[side]) landscapeShelf(g, side, tl.t === game.SAND ? '#778d55' : '#c8b584', 8, 0.5);
       if (waters[side]) {
         landscapeShelf(g, side, '#8b9270', 7, 0.32);
@@ -1142,9 +1148,9 @@ export function createLandscape(
           g.strokeStyle = 'rgba(64,91,48,0.48)';
           g.lineWidth = 0.6;
           g.beginPath();
-          for (var reed = 0; reed < 5; reed++) {
-            var at = 4 + ((h + reed * 7) % 17);
-            var rx = side === 1 ? game.TS - 2 : side === 3 ? 2 : at,
+          for (let reed = 0; reed < 5; reed++) {
+            const at = 4 + ((h + reed * 7) % 17);
+            const rx = side === 1 ? game.TS - 2 : side === 3 ? 2 : at,
               ry = side === 0 ? 2 : side === 2 ? game.TS - 2 : at;
             g.moveTo(rx, ry + 1.3);
             g.lineTo(rx - 0.8, ry - 2.8 - (reed % 3));
@@ -1158,8 +1164,8 @@ export function createLandscape(
         landscapeShelf(g, side, '#919780', 7, 0.37);
         if (side === 0 || side === 3) landscapeShelf(g, side, '#424e35', 9, 0.23);
         g.fillStyle = 'rgba(135,141,113,0.65)';
-        for (var stone = 0; stone < 3; stone++) {
-          var at2 = 3 + ((h + stone * 7) % 19),
+        for (let stone = 0; stone < 3; stone++) {
+          const at2 = 3 + ((h + stone * 7) % 19),
             dep = 2 + ((h + stone * 3) % 4);
           g.beginPath();
           g.ellipse(
@@ -1180,7 +1186,7 @@ export function createLandscape(
     paintLandscapeWorkyard(g, x, y);
     if (tl.road) paintLandscapeRoad(g, x, y);
     if (tl.rock || tl.tree) {
-      var cx = tl.tree ? 12 + (((h >>> 2) % 7) - 3) : 14,
+      const cx = tl.tree ? 12 + (((h >>> 2) % 7) - 3) : 14,
         cy = tl.tree ? 18.5 + (((h >>> 5) % 5) - 2) : 19;
       g.fillStyle = 'rgba(35,45,25,0.16)';
       g.beginPath();
@@ -1228,7 +1234,12 @@ export interface LandscapeSubsystem {
 /** Test-only view of closure internals; never merged into the runtime. */
 export interface LandscapeInternals {
   mountainContour: (x: number, y: number) => MountainContour;
-  paintOreSeams: (g: CanvasRenderingContext2D, res: Tile['res'], x: number, y: number) => void;
+  paintOreSeams: (
+    g: CanvasRenderingContext2D,
+    deposit: Tile['deposit'],
+    x: number,
+    y: number,
+  ) => void;
   landscapeRoadMask: (x: number, y: number) => number;
   traceLandscapeRoad: (g: CanvasRenderingContext2D, mask: number) => void;
 }

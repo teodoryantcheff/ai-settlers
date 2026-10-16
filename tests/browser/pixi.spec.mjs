@@ -541,7 +541,7 @@ test('domain actions retain outpost, gold, contract and upgrade feedback in the 
     const placed = game.placeBuilding('guard', 51, 48);
     const guard = game.buildings.at(-1);
     guard.got = { ...guard.needs };
-    guard.prog = 0.999;
+    guard.constructionProgress = 0.999;
     for (let i = 0; i < 1200; i++) game.step(1 / 60);
     const outpostNotice = game.msgs.some((m) => m.t === 'A soldier mans the outpost');
     const mine = game.newBuilding('mine_gold', 50, 51);
@@ -571,7 +571,7 @@ test('domain actions retain outpost, gold, contract and upgrade feedback in the 
     game.hudTick();
     return {
       placed,
-      manned: guard.man,
+      manned: guard.manned,
       outpostNotice,
       banked,
       contracts: game.state.contracts,

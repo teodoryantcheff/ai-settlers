@@ -14,7 +14,7 @@ function colony() {
     t: game.GRASS,
     tree: 0,
     rock: null,
-    res: null,
+    deposit: null,
     road: false,
   }));
   game.owned.fill(1);
@@ -33,11 +33,11 @@ test('placement evidence separates simultaneous terrain, ownership and resource 
     state: g.state,
   });
   const evidence = g.placementChecks('quarry', 51, 48);
-  assert.deepEqual(evidence.terrain, { ok: false, reason: 'Cannot build on water' });
-  assert.deepEqual(evidence.ownership, { ok: false, reason: 'Outside your territory' });
-  assert.deepEqual(evidence.resources, { ok: false, reason: 'No rocks nearby' });
-  assert.equal(evidence.reason, 'Cannot build on water');
-  assert.deepEqual(g.canPlace('quarry', 51, 48), [false, 'Cannot build on water']);
+  assert.deepEqual(evidence.terrain, { ok: false, reason: { code: 'water' } });
+  assert.deepEqual(evidence.ownership, { ok: false, reason: { code: 'territory' } });
+  assert.deepEqual(evidence.resources, { ok: false, reason: { code: 'no-rocks' } });
+  assert.deepEqual(evidence.reason, { code: 'water' });
+  assert.deepEqual(g.canPlace('quarry', 51, 48), [false, { code: 'water' }]);
   assert.equal(
     JSON.stringify({
       tiles: g.tiles,
@@ -54,18 +54,18 @@ test('construction affordability names reachable free stock and optional transfe
   const g = colony();
   const hq = g.anyStorage();
   hq.stock = { planks: 5, stone: 3, tools: 1 };
-  hq.res = { planks: 4 };
+  hq.reservedStock = { planks: 4 };
   const warehouse = g.newBuilding('warehouse', 60, 48);
   warehouse.done = true;
-  warehouse.prog = 1;
+  warehouse.constructionProgress = 1;
   g.buildings.push(warehouse);
   const site = g.newBuilding('warehouse', 57, 52);
   g.buildings.push(site);
   g.jobs = [
-    { kind: 'transfer', good: 'planks', s: hq.id, to: warehouse.id, state: 0 },
-    { kind: 'transfer', good: 'planks', s: hq.id, to: warehouse.id, state: 1 },
-    { kind: 'fetch', good: 'planks', s: hq.id, to: site.id, state: 0 },
-    { kind: 'fetch', good: 'planks', s: hq.id, to: site.id, state: 0 },
+    { kind: 'transfer', good: 'planks', sourceId: hq.id, to: warehouse.id, status: 'pending' },
+    { kind: 'transfer', good: 'planks', sourceId: hq.id, to: warehouse.id, status: 'assigned' },
+    { kind: 'fetch', good: 'planks', sourceId: hq.id, to: site.id, status: 'pending' },
+    { kind: 'fetch', good: 'planks', sourceId: hq.id, to: site.id, status: 'pending' },
   ];
   g.units[0].job = g.jobs[1];
   g.units[0].phase = 'p';
@@ -76,11 +76,11 @@ test('construction affordability names reachable free stock and optional transfe
     { good: 'planks', required: 3, free: 1, available: 3, optionalTransfers: 2, reclaim: 2 },
   );
   assert.equal(g.jobs.length, 4);
-  assert.equal(hq.res.planks, 4);
+  assert.equal(hq.reservedStock.planks, 4);
   assert.equal(g.placeBuilding('farm', 51, 48), true);
   assert.equal(g.jobs.length, 2);
   assert.ok(g.jobs.every((job) => job.kind === 'fetch'));
-  assert.equal(hq.res.planks, 2);
+  assert.equal(hq.reservedStock.planks, 2);
 });
 
 test('remote stored goods cannot make an isolated construction site affordable', () => {

@@ -1,5 +1,5 @@
 import { createEventBus } from '../../src/core/state.ts';
-import type { RendererPresentation } from '../../src/rendering/renderer.ts';
+import { UNLIT_AT_NIGHT, type RendererPresentation } from '../../src/rendering/renderer.ts';
 import type { GameRuntime } from '../../src/runtime.ts';
 import type {
   Building,
@@ -18,6 +18,12 @@ declare const job: Job;
 declare const mode: InteractionMode;
 declare const presentation: RendererPresentation;
 const events = createEventBus<GameEvents>();
+// @ts-expect-error Player copy cannot choose placement advice.
+game.suggestFor('Not enough Planks');
+// @ts-expect-error Placement refusal codes are a closed set.
+game.suggestFor({ code: 'teritory' });
+// @ts-expect-error Stock refusals require the missing good and quantities.
+game.placementText({ code: 'stock' });
 events.emit('goodsProduced', { building, good: 'logs', amount: 1 });
 game.newBuilding('farm', 48, 48);
 
@@ -38,14 +44,13 @@ game.SR.setState('123');
 const deadClauseJob: Job = {
   kind: 'transfer',
   good: 'logs',
-  from: 1,
+  sourceId: 1,
   to: 2,
-  s: 3,
   // Job records have no `d` field (the deleteJobsFor regression: a leftover
   // clause comparing j.d compiled only while parameters were implicitly any).
   // @ts-expect-error Unknown Job fields are rejected on assignment too.
   d: 4,
-  state: 'p',
+  status: 'pending',
 };
 // @ts-expect-error Unknown Job fields do not exist.
 const deadClauseRead = job.d;
@@ -61,7 +66,14 @@ presentation.layer('bogus-layer', null as unknown as CanvasRenderingContext2D, (
 game.presentationPrefs.overlay = 'bogus-overlay';
 // @ts-expect-error Implicitly-any parameters are gone: tile hashes take tile indexes.
 game.tileHash('12');
+// @ts-expect-error Night-glow exclusions name real building types.
+const misspelledUnlit: typeof UNLIT_AT_NIGHT = new Set(['coalmine']);
+// @ts-expect-error Production block reasons are a closed set, including on live buildings.
+building.blockedReason = 'resouces';
+// @ts-expect-error Misspelled production reason comparisons must be rejected too.
+if (building.blockedReason === 'resouces') game.buildingWorking(building);
 void unknownGood;
+void misspelledUnlit;
 void deadClauseJob;
 void deadClauseRead;
 void incompleteMode;
@@ -89,6 +101,10 @@ import type { AutoplayDependencies } from '../../src/simulation/autoplay.ts';
 import type { MapDependencies } from '../../src/simulation/map.ts';
 import type { ProgressionDependencies } from '../../src/gameplay/progression.ts';
 import type { PersistenceDependencies } from '../../src/core/persistence.ts';
+import type { ProductionProgress } from '../../src/simulation/economy.ts';
+declare const productionProgress: ProductionProgress;
+// @ts-expect-error Production projections retain the same closed reason contract.
+productionProgress.reason = 'resouces';
 declare const economy: EconomyDependencies;
 declare const autoplay: AutoplayDependencies;
 declare const map: MapDependencies;

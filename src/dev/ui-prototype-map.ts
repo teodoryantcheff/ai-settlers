@@ -43,13 +43,13 @@ export function preparePrototypeMap(game: GameRuntime) {
         (x === 55 && y >= 40 && y <= 53);
       if (!clear && !road) continue;
       const index = game.idx(x, y);
-      Object.assign(game.tiles[index], { t: game.GRASS, tree: 0, rock: null, res: null, road });
+      Object.assign(game.tiles[index], { t: game.GRASS, tree: 0, rock: null, deposit: null, road });
       game.emitGameEvent('tileChanged', { index });
     }
   }
   for (const [type, x, y] of layout) {
     const building = game.newBuilding(type, x, y);
-    Object.assign(building, { done: true, prog: 1 });
+    Object.assign(building, { done: true, constructionProgress: 1 });
     const spec = game.BSPEC[type];
     if (spec.out) building.stock[spec.out] = 3;
     game.buildings.push(building);

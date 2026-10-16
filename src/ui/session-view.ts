@@ -1,3 +1,4 @@
+import { requireElement } from './dom.ts';
 import type { GameRuntime } from '../runtime.ts';
 import { observePresentation } from './domain-feedback.ts';
 import { saveName } from '../core/save-catalog.ts';
@@ -5,11 +6,11 @@ import type { SaveMetadata } from '../types.ts';
 
 /** One session boundary: layers suspend time; replacing a colony is deliberate. */
 export function createSessionView(game: GameRuntime): SessionSubsystem {
-  const status = document.getElementById('welcome-status');
-  const continueButton = document.getElementById('continueb') as HTMLButtonElement;
-  const form = document.getElementById('new-colony-form');
-  const nameInput = document.getElementById('new-colony-name') as HTMLInputElement;
-  const seedInput = document.getElementById('new-colony-seed') as HTMLInputElement;
+  const status = requireElement('welcome-status');
+  const continueButton = requireElement('continueb') as HTMLButtonElement;
+  const form = requireElement('new-colony-form');
+  const nameInput = requireElement('new-colony-name') as HTMLInputElement;
+  const seedInput = requireElement('new-colony-seed') as HTMLInputElement;
   let liveColony = game.started;
   let saved: SaveMetadata[] = [];
   let pendingNew: (() => void) | null = null;
@@ -39,7 +40,7 @@ export function createSessionView(game: GameRuntime): SessionSubsystem {
       }
     }
     continueButton.disabled = !liveColony && saved.length === 0;
-    const text = document.getElementById('welcome-continuation');
+    const text = requireElement('welcome-continuation');
     text.textContent = liveColony
       ? game.colonyName +
         ' · Seed ' +
@@ -112,7 +113,7 @@ export function createSessionView(game: GameRuntime): SessionSubsystem {
     };
     if (liveColony && game.hasUnsavedProgress()) {
       pendingNew = start;
-      document.getElementById('session-confirm-text').textContent =
+      requireElement('session-confirm-text').textContent =
         'Start ' +
         colonyName +
         ' with seed ' +
@@ -133,26 +134,26 @@ export function createSessionView(game: GameRuntime): SessionSubsystem {
     );
   }
   function settingsStatus() {
-    const element = document.getElementById('settings-status');
+    const element = requireElement('settings-status');
     element.textContent = game.preferencesHealth.message;
     element.setAttribute('role', game.preferencesHealth.status === 'failed' ? 'alert' : 'status');
   }
   function closeUtility() {
-    const utility = document.getElementById('utility') as HTMLDetailsElement;
+    const utility = requireElement('utility') as HTMLDetailsElement;
     if (utility) utility.open = false;
   }
   function openSettings() {
-    (document.getElementById('speedpref') as HTMLSelectElement).value = String(game.state.speed);
-    (document.getElementById('advisorpref') as HTMLInputElement).checked = game.advisorVisible;
-    (document.getElementById('mutepref') as HTMLInputElement).checked = game.muted;
-    (document.getElementById('musicpref') as HTMLInputElement).checked = game.musicOn;
+    (requireElement('speedpref') as HTMLSelectElement).value = String(game.state.speed);
+    (requireElement('advisorpref') as HTMLInputElement).checked = game.advisorVisible;
+    (requireElement('mutepref') as HTMLInputElement).checked = game.muted;
+    (requireElement('musicpref') as HTMLInputElement).checked = game.musicOn;
     for (const [id, value] of [
       ['musvol', game.musVol],
       ['sfxvol', game.sfxVol],
       ['ambvol', game.ambVol],
     ] as const) {
-      (document.getElementById(id) as HTMLInputElement).value = String(Math.round(value * 100));
-      document.getElementById(id + 'v').textContent = Math.round(value * 100) + '%';
+      (requireElement(id) as HTMLInputElement).value = String(Math.round(value * 100));
+      requireElement(id + 'v').textContent = Math.round(value * 100) + '%';
     }
     settingsStatus();
     game.openLayer('mix', { blocking: true });
@@ -168,43 +169,43 @@ export function createSessionView(game: GameRuntime): SessionSubsystem {
     game.openLayer('about', { blocking: true });
     closeUtility();
   }
-  document.getElementById('continueb').onclick = continueColony;
-  document.getElementById('new-colonyb').onclick = openNewColony;
-  document.getElementById('load-colonyb').onclick = () => game.openSaveManager();
-  document.getElementById('welcome-settings').onclick = openSettings;
-  document.getElementById('welcome-reference').onclick = () => openReference();
-  document.getElementById('welcome-about').onclick = openAbout;
-  document.getElementById('close-about').onclick = () => game.closeLayer('about');
-  document.getElementById('homeb').onclick = returnHome;
-  document.getElementById('confirm-new-colony').onclick = () => {
+  requireElement('continueb').onclick = continueColony;
+  requireElement('new-colonyb').onclick = openNewColony;
+  requireElement('load-colonyb').onclick = () => game.openSaveManager();
+  requireElement('welcome-settings').onclick = openSettings;
+  requireElement('welcome-reference').onclick = () => openReference();
+  requireElement('welcome-about').onclick = openAbout;
+  requireElement('close-about').onclick = () => game.closeLayer('about');
+  requireElement('homeb').onclick = returnHome;
+  requireElement('confirm-new-colony').onclick = () => {
     const action = pendingNew;
     pendingNew = null;
     game.closeLayer('session-confirm');
     if (action) attempt(action);
   };
-  document.getElementById('cancel-new-colony').onclick = () => {
+  requireElement('cancel-new-colony').onclick = () => {
     pendingNew = null;
     game.closeLayer('session-confirm');
   };
-  document.getElementById('protect-current-colony').onclick = () => game.openSaveManager();
-  (document.getElementById('speedpref') as HTMLSelectElement).onchange = (event) => {
+  requireElement('protect-current-colony').onclick = () => game.openSaveManager();
+  (requireElement('speedpref') as HTMLSelectElement).onchange = (event) => {
     const value = Number((event.target as HTMLSelectElement).value);
     if ([1, 2, 4, 8].includes(value)) {
       game.state.speed = value as 1 | 2 | 4 | 8;
       game.persistPreferences();
     }
   };
-  (document.getElementById('advisorpref') as HTMLInputElement).onchange = (event) =>
+  (requireElement('advisorpref') as HTMLInputElement).onchange = (event) =>
     game.setAdvisorVisible((event.target as HTMLInputElement).checked);
-  (document.getElementById('mutepref') as HTMLInputElement).onchange = (event) => {
+  (requireElement('mutepref') as HTMLInputElement).onchange = (event) => {
     game.setMuted((event.target as HTMLInputElement).checked);
-    document.getElementById('mute').style.opacity = game.muted ? '0.4' : '1';
+    requireElement('mute').style.opacity = game.muted ? '0.4' : '1';
     game.persistPreferences();
   };
-  (document.getElementById('musicpref') as HTMLInputElement).onchange = (event) => {
+  (requireElement('musicpref') as HTMLInputElement).onchange = (event) => {
     game.initAudio();
     game.setMusicVol((event.target as HTMLInputElement).checked);
-    document.getElementById('musicb').classList.toggle('off', !game.musicOn);
+    requireElement('musicb').classList.toggle('off', !game.musicOn);
     game.persistPreferences();
   };
   observePresentation(game, 'worldLoaded', () => {
@@ -214,8 +215,8 @@ export function createSessionView(game: GameRuntime): SessionSubsystem {
   observePresentation(game, 'preferencesResult', settingsStatus);
   seedInput.value = String(game.seed);
   refreshWelcome();
-  if (!document.getElementById('start').classList.contains('hidden'))
-    (continueButton.disabled ? document.getElementById('new-colonyb') : continueButton).focus();
+  if (!requireElement('start').classList.contains('hidden'))
+    (continueButton.disabled ? requireElement('new-colonyb') : continueButton).focus();
   return {
     openWelcome,
     returnHome,

@@ -2,13 +2,13 @@ import type { WorldSubsystem } from '../core/world.ts';
 import type { Tile } from '../types.ts';
 
 export function createNavigation(game: NavigationDependencies): NavigationSubsystem {
-  var NAVG = new Float32Array(game.W * game.H),
+  const NAVG = new Float32Array(game.W * game.H),
     NAVPI = new Int32Array(game.W * game.H),
     NAVST = new Int32Array(game.W * game.H),
-    NAVCL = new Int32Array(game.W * game.H),
-    navStamp = 0;
-  var landRegionTiles: Tile[] | null = null,
-    landRegions = new Uint16Array(game.W * game.H);
+    NAVCL = new Int32Array(game.W * game.H);
+  let navStamp = 0;
+  let landRegionTiles: Tile[] | null = null;
+  const landRegions = new Uint16Array(game.W * game.H);
   function connectedLand(ax: number, ay: number, bx: number, by: number) {
     ax = Math.floor(ax);
     ay = Math.floor(ay);
@@ -19,21 +19,21 @@ export function createNavigation(game: NavigationDependencies): NavigationSubsys
     // deposits change travel cost, but not connectivity. Imports replace tiles.
     if (landRegionTiles !== game.tiles) {
       landRegions.fill(0);
-      var region = 0;
-      for (var i = 0; i < game.tiles.length; i++) {
+      let region = 0;
+      for (let i = 0; i < game.tiles.length; i++) {
         if (landRegions[i] || !game.passI(i)) continue;
         region++;
-        var queue = [i];
+        const queue = [i];
         landRegions[i] = region;
-        for (var q = 0; q < queue.length; q++) {
-          var current = queue[q],
+        for (let q = 0; q < queue.length; q++) {
+          const current = queue[q],
             x = current % game.W,
             y = (current / game.W) | 0;
-          for (var d = 0; d < 4; d++) {
-            var nx = x + game.DX[d],
+          for (let d = 0; d < 4; d++) {
+            const nx = x + game.DX[d],
               ny = y + game.DY[d];
             if (!game.inB(nx, ny)) continue;
-            var next = game.idx(nx, ny);
+            const next = game.idx(nx, ny);
             if (landRegions[next] || !game.passI(next)) continue;
             landRegions[next] = region;
             queue.push(next);
@@ -42,18 +42,18 @@ export function createNavigation(game: NavigationDependencies): NavigationSubsys
       }
       landRegionTiles = game.tiles;
     }
-    var source = landRegions[game.idx(ax, ay)];
+    const source = landRegions[game.idx(ax, ay)];
     return source > 0 && source === landRegions[game.idx(bx, by)];
   }
   function moveCost(n: number) {
-    var tl = game.tiles[n];
+    const tl = game.tiles[n];
     if (tl.road) return 0.3;
     if (tl.tree) return 1.6;
     if (tl.t === game.SAND) return 1.15;
     return 1;
   }
   function hex(a: number, b: number) {
-    var ax = a % game.W,
+    const ax = a % game.W,
       ay = (a / game.W) | 0,
       bx = b % game.W,
       by = (b / game.W) | 0,
@@ -61,26 +61,26 @@ export function createNavigation(game: NavigationDependencies): NavigationSubsys
       dy = Math.abs(ay - by);
     return 0.3 * (Math.max(dx, dy) + (Math.SQRT2 - 1) * Math.min(dx, dy));
   }
-  var heapI: number[] = [],
+  const heapI: number[] = [],
     heapF: number[] = [];
   function hPush(i: number, f: number) {
     heapI.push(i);
     heapF.push(f);
-    var c = heapF.length - 1;
+    let c = heapF.length - 1;
     while (c > 0) {
-      var p = (c - 1) >> 1;
+      const p = (c - 1) >> 1;
       if (heapF[p] <= heapF[c]) break;
-      var tf = heapF[p];
+      const tf = heapF[p];
       heapF[p] = heapF[c];
       heapF[c] = tf;
-      var ti = heapI[p];
+      const ti = heapI[p];
       heapI[p] = heapI[c];
       heapI[c] = ti;
       c = p;
     }
   }
   function hPop() {
-    var i = heapI[0],
+    const i = heapI[0],
       li = heapI.length - 1;
     if (li === 0) {
       heapI.length = 0;
@@ -91,18 +91,18 @@ export function createNavigation(game: NavigationDependencies): NavigationSubsys
     heapF[0] = heapF[li];
     heapI.length = li;
     heapF.length = li;
-    var c = 0;
+    let c = 0;
     for (;;) {
-      var l = 2 * c + 1,
-        r2 = l + 1,
-        m = c;
+      const l = 2 * c + 1,
+        r2 = l + 1;
+      let m = c;
       if (l < li && heapF[l] < heapF[m]) m = l;
       if (r2 < li && heapF[r2] < heapF[m]) m = r2;
       if (m === c) break;
-      var tf = heapF[c];
+      const tf = heapF[c];
       heapF[c] = heapF[m];
       heapF[m] = tf;
-      var ti = heapI[c];
+      const ti = heapI[c];
       heapI[c] = heapI[m];
       heapI[m] = ti;
       c = m;
@@ -111,7 +111,7 @@ export function createNavigation(game: NavigationDependencies): NavigationSubsys
   }
   function findPath(sx: number, sy: number, tx: number, ty: number) {
     if (!game.inB(sx, sy) || !game.inB(tx, ty)) return null;
-    var s = game.idx(sx, sy),
+    const s = game.idx(sx, sy),
       g = game.idx(tx, ty);
     if (!game.passI(s) || !game.passI(g)) return null;
     if (s === g) return [];
@@ -122,14 +122,14 @@ export function createNavigation(game: NavigationDependencies): NavigationSubsys
     NAVST[s] = navStamp;
     NAVPI[s] = -1;
     hPush(s, hex(s, g));
-    var exp = 0;
+    let exp = 0;
     while (heapI.length) {
-      var cur = hPop();
+      const cur = hPop();
       if (NAVCL[cur] === navStamp) continue;
       NAVCL[cur] = navStamp;
       if (cur === g) {
-        var path: number[] = [],
-          c2 = cur;
+        const path: number[] = [];
+        let c2 = cur;
         while (c2 !== s) {
           path.push(c2);
           c2 = NAVPI[c2];
@@ -138,16 +138,16 @@ export function createNavigation(game: NavigationDependencies): NavigationSubsys
         return path;
       }
       if (++exp > 15000) break;
-      var cx2 = cur % game.W,
+      const cx2 = cur % game.W,
         cy2 = (cur / game.W) | 0;
-      for (var d = 0; d < 8; d++) {
-        var nx = cx2 + game.DX[d],
+      for (let d = 0; d < 8; d++) {
+        const nx = cx2 + game.DX[d],
           ny = cy2 + game.DY[d];
         if (!game.inB(nx, ny)) continue;
-        var n = game.idx(nx, ny);
+        const n = game.idx(nx, ny);
         if (!game.passI(n) || NAVCL[n] === navStamp) continue;
         if (d >= 4 && (!game.passI(game.idx(cx2, ny)) || !game.passI(game.idx(nx, cy2)))) continue;
-        var step = moveCost(n) * (d >= 4 ? Math.SQRT2 : 1),
+        const step = moveCost(n) * (d >= 4 ? Math.SQRT2 : 1),
           ng = NAVG[cur] + step;
         if (NAVST[n] !== navStamp || ng < NAVG[n] - 1e-6) {
           NAVST[n] = navStamp;
@@ -178,7 +178,7 @@ export interface NavigationSubsystem {
   connectedLand: (ax: number, ay: number, bx: number, by: number) => boolean;
   moveCost: (n: number) => 1 | 0.3 | 1.6 | 1.15;
   /** Tile indexes from the first step after the start to the target, or null when unreachable. */
-  findPath: (sx: number, sy: number, tx: number, ty: number) => number[];
+  findPath: (sx: number, sy: number, tx: number, ty: number) => number[] | null;
 }
 
 export interface NavigationDependencies extends Pick<

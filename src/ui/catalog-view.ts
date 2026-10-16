@@ -1,9 +1,11 @@
+import { requireElement } from './dom.ts';
+import { requireCanvas2D } from '../rendering/canvas-context.ts';
+import { html as markup, trusted, formatGoods } from './markup.ts';
 import { recipeRequirements } from '../gameplay/production-rules.ts';
-import { resourceIcon } from './resource-icons.ts';
 import type { TransientHelp } from './transient-help.ts';
 import type { PlacementFeedback } from './placement-feedback.ts';
 import type { GameRuntime } from '../runtime.ts';
-import type { BuildingType, Good, Inventory } from '../types.ts';
+import type { BuildingType } from '../types.ts';
 
 type CatalogTool = BuildingType | 'road' | 'demolish';
 const groups: Record<string, string> = {
@@ -35,24 +37,6 @@ export const buildingPurposes: Partial<Record<BuildingType, string>> = {
   warehouse: 'Stores goods and requests stock targets from connected storage.',
   guard: 'Claims a small land radius before manning; an arriving soldier expands its territory.',
 };
-function goodsText(game: GameRuntime, inventory: Inventory) {
-  return Object.entries(inventory)
-    .map(([good, count]) => count + ' ' + game.GOODS[good as Good].name)
-    .join(' + ');
-}
-function goodsMarkup(game: GameRuntime, inventory: Inventory) {
-  return Object.entries(inventory)
-    .map(
-      ([good, count]) =>
-        '<span class="catalog-good">' +
-        resourceIcon(good as Good) +
-        count +
-        ' ' +
-        game.GOODS[good as Good].name +
-        '</span>',
-    )
-    .join(' + ');
-}
 function toolDetails(game: GameRuntime, type: CatalogTool) {
   if (type === 'road')
     return {
@@ -74,10 +58,12 @@ function toolDetails(game: GameRuntime, type: CatalogTool) {
     };
   const sp = game.BSPEC[type];
   let recipe =
-    sp.prod === 'mine'
+    sp.prod === 'mine' && sp.out
       ? 'Fish, bread, meat or provisions (1 of any) → 1 ' + game.GOODS[sp.out].name
-      : sp.in
-        ? goodsText(game, recipeRequirements({ type }, sp)) + ' → 1 ' + game.GOODS[sp.out].name
+      : sp.in && sp.out
+        ? formatGoods(game.GOODS, recipeRequirements({ type }, sp)) +
+          ' → 1 ' +
+          game.GOODS[sp.out].name
         : sp.out
           ? 'Produces ' + game.GOODS[sp.out].name + ' from local work.'
           : type === 'well'
@@ -86,7 +72,8 @@ function toolDetails(game: GameRuntime, type: CatalogTool) {
               ? 'Plants trees on clear owned ground.'
               : 'No production recipe.';
   if (type === 'armory') recipe += ' Existing legacy armories retain iron ore + coal.';
-  if (sp.time) recipe += ' · Base cycle ' + sp.time + 's.';
+  if (sp.time && (sp.prod === 'craft' || sp.prod === 'mine'))
+    recipe += ' · Base cycle ' + sp.time + 's.';
   let requirements =
     type === 'fisherman'
       ? 'Grass or sand with water within 2 tiles. The site and all passable neighboring tiles must be owned.'
@@ -113,7 +100,7 @@ function toolDetails(game: GameRuntime, type: CatalogTool) {
   return {
     name: sp.name,
     purpose: buildingPurposes[type] || '',
-    cost: goodsText(game, sp.cost || {}),
+    cost: formatGoods(game.GOODS, sp.cost || {}),
     recipe,
     requirements,
   };
@@ -133,8 +120,8 @@ export function createCatalogView(
     element: HTMLButtonElement;
   }> = [];
   const helpCleanup: Array<() => void> = [];
-  const search = document.getElementById('catalog-search') as HTMLInputElement;
-  const chain = document.getElementById('catalog-chain') as HTMLSelectElement;
+  const search = requireElement('catalog-search') as HTMLInputElement;
+  const chain = requireElement('catalog-chain') as HTMLSelectElement;
   function filter() {
     help.dismiss();
     const query = (search?.value || '').trim().toLowerCase();
@@ -147,22 +134,22 @@ export function createCatalogView(
       );
       if (!card.element.hidden) count++;
     }
-    const output = document.getElementById('catalog-count');
+    const output = requireElement('catalog-count');
     if (output) output.textContent = count + ' of ' + cards.length + ' buildings and tools';
-    const empty = document.getElementById('catalog-empty');
+    const empty = requireElement('catalog-empty');
     if (empty) empty.hidden = count > 0;
   }
   search?.addEventListener('input', filter);
   chain?.addEventListener('change', filter);
-  document.getElementById('catalog-clear')?.addEventListener('click', () => {
+  requireElement('catalog-clear')?.addEventListener('click', () => {
     search.value = '';
     chain.value = 'all';
     filter();
     search.focus();
   });
   function build() {
-    const palette = document.getElementById('paletteitems');
-    const helpHost = document.getElementById('catalog-help-host');
+    const palette = requireElement('paletteitems');
+    const helpHost = requireElement('catalog-help-host');
     for (const cleanup of helpCleanup.splice(0)) cleanup();
     helpHost.innerHTML = '';
     palette.innerHTML = '';
@@ -182,7 +169,7 @@ export function createCatalogView(
       icon.style.width = '64px';
       icon.style.height = '64px';
       icon.setAttribute('aria-hidden', 'true');
-      const context = icon.getContext('2d');
+      const context = requireCanvas2D(icon, game.reportGraphicsFailure);
       context.scale(2, 2);
       context.imageSmoothingEnabled = true;
       if (type === 'road') context.drawImage(game.ART.road, 10, 10, 44, 44);
@@ -215,22 +202,11 @@ export function createCatalogView(
       const cost =
         type === 'road' || type === 'demolish'
           ? details.cost
-          : goodsMarkup(game, game.BSPEC[type].cost || {});
-      popup.innerHTML =
-        '<h3>' +
-        details.name +
-        '</h3><p class="catalog-chain-name">' +
-        group +
-        '</p><p>' +
-        details.purpose +
-        '</p>' +
-        '<p><strong>Cost</strong><br>' +
-        cost +
-        '</p><p><strong>Recipe</strong><br>' +
-        details.recipe +
-        '</p><p><strong>Placement</strong><br>' +
-        details.requirements +
-        '</p>';
+          : formatGoods(game.GOODS, game.BSPEC[type].cost, {
+              icons: true,
+              className: 'catalog-good',
+            });
+      popup.innerHTML = markup`<h3>${details.name}</h3><p class="catalog-chain-name">${group}</p><p>${details.purpose}</p><p><strong>Cost</strong><br>${trusted(cost)}</p><p><strong>Recipe</strong><br>${details.recipe}</p><p><strong>Placement</strong><br>${details.requirements}</p>`;
       helpHost.appendChild(popup);
       helpCleanup.push(help.bind(button, popup));
       const text = [
@@ -260,36 +236,24 @@ export function createCatalogView(
     }
     let html = '';
     const row = (label: string, ok: boolean | null, reason: string) =>
-      '<div class="placement-check ' +
-      (ok === false ? 'failed' : ok === null ? 'unknown' : 'passed') +
-      '"><b>' +
-      (ok === false ? '✖ ' : ok === null ? '— ' : '✓ ') +
-      label +
-      '</b><span>' +
-      reason +
-      '</span></div>';
+      markup`<div class="placement-check ${ok === false ? 'failed' : ok === null ? 'unknown' : 'passed'}"><b>${ok === false ? '✖ ' : ok === null ? '— ' : '✓ '}${label}</b><span>${reason}</span></div>`;
     if (placement) {
       const { checks, spending } = placement;
-      html =
-        '<h3>' +
-        game.BSPEC[(game.mode as { bt: BuildingType }).bt].name +
-        ' · ' +
-        (placement.canBuild ? 'Ready to build' : 'Cannot build here') +
-        '</h3>';
+      html = markup`<h3>${game.BSPEC[(game.mode as { bt: BuildingType }).bt].name} · ${placement.canBuild ? 'Ready to build' : 'Cannot build here'}</h3>`;
       html += row(
         'Terrain & spacing',
         checks.terrain.ok,
-        checks.terrain.reason || 'Suitable ground and spacing',
+        game.placementText(checks.terrain.reason) || 'Suitable ground and spacing',
       );
       html += row(
         'Ownership',
         checks.ownership.ok,
-        checks.ownership.reason || 'Site and required neighbors are owned',
+        game.placementText(checks.ownership.reason) || 'Site and required neighbors are owned',
       );
       html += row(
         'Nearby resources',
         checks.resources.ok,
-        checks.resources.reason ||
+        game.placementText(checks.resources.reason) ||
           (game.BSPEC[(game.mode as { bt: BuildingType }).bt].resKind ||
           ['quarry', 'fisherman'].includes((game.mode as { bt: BuildingType }).bt)
             ? 'Required nearby resources are present'
@@ -302,48 +266,38 @@ export function createCatalogView(
           ? 'Enough spendable stock in reachable storage'
           : 'Required goods are missing from reachable storage',
       );
-      html +=
-        '<div class="placement-materials">' +
+      html += markup`<div class="placement-materials">${trusted(
         spending.materials
           .map(
             (material) =>
-              '<span>' +
-              material.required +
-              ' ' +
-              game.GOODS[material.good].name +
-              ': ' +
-              material.free +
-              ' free' +
-              (material.optionalTransfers
-                ? ' + ' + material.optionalTransfers + ' optional transfer reservations'
-                : '') +
-              '</span>',
+              markup`<span>${material.required} ${game.GOODS[material.good].name}: ${material.free} free${
+                material.optionalTransfers
+                  ? ' + ' + material.optionalTransfers + ' optional transfer reservations'
+                  : ''
+              }</span>`,
           )
-          .join('') +
-        '</div>';
+          .join(''),
+      )}</div>`;
       const reclaim = spending.materials.filter((material) => material.reclaim > 0);
       if (reclaim.length)
-        html +=
-          '<p class="placement-note">' +
-          (placement.canBuild
+        html += markup`<p class="placement-note">${
+          placement.canBuild
             ? 'Building here reclaims '
-            : 'When placement and the full cost are valid, construction can reclaim ') +
-          reclaim
-            .map((material) => material.reclaim + ' ' + game.GOODS[material.good].name)
-            .join(', ') +
-          ' from uncollected optional warehouse transfers. Construction and producer-input promises stay protected.</p>';
+            : 'When placement and the full cost are valid, construction can reclaim '
+        }${reclaim
+          .map((material) => material.reclaim + ' ' + game.GOODS[material.good].name)
+          .join(
+            ', ',
+          )} from uncollected optional warehouse transfers. Construction and producer-input promises stay protected.</p>`;
       if (placement.operatingSupport)
         html += row(
           'Production support',
           placement.operatingSupport.ok,
           placement.operatingSupport.reason,
         );
-      html += '<p class="placement-note">' + placement.summary + '</p>';
-    } else {
-      html =
-        '<h3>Road plan · ' +
-        (road.ok ? road.count + ' new tiles' : 'Cannot pave this route') +
-        '</h3>';
+      html += markup`<p class="placement-note">${placement.summary}</p>`;
+    } else if (road) {
+      html = markup`<h3>Road plan · ${road.ok ? road.count + ' new tiles' : 'Cannot pave this route'}</h3>`;
       html += row('Resource cost', true, '0 goods — roads consume no resources');
       html += row(
         'Route & ownership',
@@ -352,10 +306,7 @@ export function createCatalogView(
           'Only clear owned tiles are paved; occupied or unowned route tiles are skipped',
       );
       if (road.ok)
-        html +=
-          '<p class="placement-note">' +
-          road.summary +
-          ' Hold Shift when choosing an endpoint to continue the plan.</p>';
+        html += markup`<p class="placement-note">${road.summary} Hold Shift when choosing an endpoint to continue the plan.</p>`;
     }
     feedback.show(
       html,

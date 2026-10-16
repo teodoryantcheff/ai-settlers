@@ -74,7 +74,7 @@ function colony(seed = 2024) {
   e.genMap();
   const hq = e.newBuilding('hq', 48, 48);
   hq.done = true;
-  hq.prog = 1;
+  hq.constructionProgress = 1;
   hq.stock = { planks: 48, stone: 48, food: 20, tools: 16, weapons: 6 };
   e.buildings.push(hq);
   e.recomputeTerritory();
@@ -85,15 +85,70 @@ function colony(seed = 2024) {
 
 const snapshot = (e) => JSON.parse(JSON.stringify(e.snapshotGame()));
 
+test('imported unknown production block reasons normalize to no reason', () => {
+  const e = colony();
+  for (const version of [1, 2]) {
+    for (const reason of [
+      undefined,
+      'none',
+      'input',
+      'resouces',
+      'constructor',
+      '__proto__',
+      7,
+      null,
+      {},
+    ]) {
+      const imported = snapshot(e);
+      imported.v = version;
+      imported.b[0].blockedReason = reason;
+      e.importSave(JSON.stringify(imported));
+      assert.equal(e.buildings[0].blockedReason, '', JSON.stringify(reason));
+      assert.equal(JSON.parse(e.exportSave()).b[0].blockedReason, '', JSON.stringify(reason));
+    }
+  }
+});
+
+test('every production block reason round-trips through exported files and checkpoints', () => {
+  const e = colony();
+  const mill = e.newBuilding('sawmill', 51, 48);
+  mill.done = true;
+  mill.constructionProgress = 1;
+  e.buildings.push(mill);
+  e.step(1 / 60);
+  for (const reason of [
+    '',
+    'paused',
+    'exhausted',
+    'output',
+    'demand',
+    'reserve',
+    'water',
+    'inputs',
+    'resources',
+  ]) {
+    e.buildings[1].blockedReason = reason;
+    const exported = e.exportSave();
+    e.importSave(exported);
+    assert.equal(e.buildings[1].blockedReason, reason);
+    assert.deepEqual(JSON.parse(e.exportSave()), JSON.parse(exported));
+    const saved = e.saveCheckpoint('Production reason');
+    e.buildings[1].blockedReason = '';
+    e.loadCheckpoint(saved.id);
+    assert.equal(e.buildings[1].blockedReason, reason);
+    assert.deepEqual(JSON.parse(e.exportSave()), JSON.parse(exported));
+  }
+});
+
 test('version-two save continues RNG, timers, cargo and production exactly', () => {
   const e = colony();
   const lumber = e.newBuilding('lumberjack', 51, 48);
   lumber.done = true;
-  lumber.prog = 1;
+  lumber.constructionProgress = 1;
   e.buildings.push(lumber);
   const mill = e.newBuilding('sawmill', 46, 50);
   mill.done = true;
-  mill.prog = 1;
+  mill.constructionProgress = 1;
   e.buildings.push(mill);
   e.state.paused = false;
   for (let tick = 0; tick < 1073; tick++) e.step(1 / 60);
@@ -130,14 +185,14 @@ test('malformed load leaves both active colony and saved slot untouched', () => 
     to: idleJob.b[1].id,
     state: 't',
   });
-  idleJob.b[0].res.planks = 1;
+  idleJob.b[0].reservedStock.planks = 1;
   idleJob.u[0].ji = 0;
   assert.throws(() => e.prepareLoad(JSON.stringify(idleJob)), /idle carrier/);
   const wrongCargo = structuredClone(idleJob);
   wrongCargo.u[0].phase = 'd';
   wrongCargo.u[0].path = [];
   wrongCargo.u[0].carry = 'stone';
-  wrongCargo.b[0].res.planks = 0;
+  wrongCargo.b[0].reservedStock.planks = 0;
   assert.throws(() => e.prepareLoad(JSON.stringify(wrongCargo)), /cargo/);
 });
 
@@ -157,7 +212,7 @@ test('the pantry milestone distinguishes initial stock from prepared food produc
   const e = colony();
   const bakery = e.newBuilding('bakery', 51, 48);
   bakery.done = true;
-  bakery.prog = 1;
+  bakery.constructionProgress = 1;
   e.buildings.push(bakery);
   e.step(1 / 60);
   assert.equal(e.state.milestones.includes(3), false);
@@ -290,7 +345,7 @@ test('advisor waits for an existing outpost to finish expanding the border', () 
     t: e.GRASS,
     tree: 0,
     rock: null,
-    res: null,
+    deposit: null,
     road: false,
   }));
   for (const type of [
@@ -315,7 +370,7 @@ test('advisor waits for an existing outpost to finish expanding the border', () 
     t: e.MTN,
     tree: 0,
     rock: null,
-    res: { kind: 'gold', amt: 240, amt0: 240 },
+    deposit: { kind: 'gold', amt: 240, amt0: 240 },
     road: false,
   };
   e.recomputeTerritory();
@@ -327,7 +382,7 @@ test('advisor waits for an existing outpost to finish expanding the border', () 
   assert.equal(e.advTargets().find((r) => r.bt === 'guard').def, 0);
   guard.done = true;
   assert.equal(e.advisorDecision().waiting.id, guard.id, 'wait for the garrison too');
-  guard.man = true;
+  guard.manned = true;
   e.recomputeTerritory();
   e.gameTick();
   assert.equal(e.advisorDecision().waiting, undefined);
@@ -339,7 +394,7 @@ test('imported job, settler, and building extras cannot introduce inherited game
   e.buildings.push(e.newBuilding('sawmill', 46, 50));
   const data = snapshot(e);
   data.j.push({ kind: 'fetch', good: 'planks', s: data.b[0].id, to: data.b[1].id, state: 'p' });
-  data.b[0].res.planks = 1;
+  data.b[0].reservedStock.planks = 1;
   for (const entity of [data.j[0], data.u[0], data.b[0]]) {
     Object.defineProperty(entity, '__proto__', {
       value: { foreign: true, d: 999 },
@@ -376,7 +431,7 @@ test('contracts cannot be redeemed twice and upgrades spend actual unreserved go
   assert.equal(e.state.spentGold, 90);
   assert.equal(e.state.gold, 15);
   assert.equal(e.buildings[0].stock.gold, 15);
-  e.buildings[0].res.gold = 15;
+  e.buildings[0].reservedStock.gold = 15;
   e.buyUpgrade('production');
   assert.equal(e.state.upgrades.production, 0);
 });
@@ -390,11 +445,11 @@ test('contracts reclaim uncollected stock transfers without spending reserved co
   e.buildings.push(warehouse);
   e.recomputeTerritory();
   for (let q = 0; q < 6; q++) e.ensureJobs();
-  assert.equal(e.buildings[0].res.planks, 12);
+  assert.equal(e.buildings[0].reservedStock.planks, 12);
   e.claimContract(0);
   assert.equal(e.state.contracts.includes(0), true);
   assert.equal(e.buildings[0].stock.planks, 0);
-  assert.equal(e.buildings[0].res.planks, 0);
+  assert.equal(e.buildings[0].reservedStock.planks, 0);
   assert.equal(e.state.gold, 5);
   assert.doesNotThrow(() => e.prepareLoad(JSON.stringify(e.snapshotGame())));
 });
@@ -414,7 +469,7 @@ test('old version-one and version-two saves begin honest recent and delivery cov
     const e = colony();
     const mill = e.newBuilding('sawmill', 46, 50);
     mill.done = true;
-    mill.prog = 1;
+    mill.constructionProgress = 1;
     e.buildings.push(mill);
     mill.metrics.elapsed = 240;
     mill.metrics.active = 240;

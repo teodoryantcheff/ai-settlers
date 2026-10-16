@@ -115,7 +115,12 @@ test('Advisor keeps live action focus, and V respects native input and blocking 
       g.buildings.push(b);
     }
     const armory = g.newBuilding('armory', hq.x + 3, hq.y);
-    Object.assign(armory, { done: true, prog: 1, legacyIndustry: true, stock: { coal: 1 } });
+    Object.assign(armory, {
+      done: true,
+      constructionProgress: 1,
+      legacyIndustry: true,
+      stock: { coal: 1 },
+    });
     armory.metrics.elapsed = 60;
     armory.metrics.inputBlocked = 60;
     g.buildings.push(armory);

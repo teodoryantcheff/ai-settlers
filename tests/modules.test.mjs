@@ -45,14 +45,14 @@ test('composed simulation delivers grain and emits victory without a DOM', () =>
     t: game.GRASS,
     tree: 0,
     rock: null,
-    res: null,
+    deposit: null,
     road: false,
   }));
   const hq = game.newBuilding('hq', 48, 48);
   const farm = game.newBuilding('farm', 50, 48);
   for (const b of [hq, farm]) {
     b.done = true;
-    b.prog = 1;
+    b.constructionProgress = 1;
   }
   game.buildings.push(hq, farm);
   game.recomputeTerritory();

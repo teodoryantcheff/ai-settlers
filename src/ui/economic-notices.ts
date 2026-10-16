@@ -37,20 +37,20 @@ export function createEconomicNotices(game: EconomicNoticeSource): EconomicNotic
     economicFeedback.update(performance.now(), { active: false, canNotify: false });
   });
   function updateEconomicFeedback(realNowMs: number, active = true): EconomicFeedbackNotice | null {
-    var messages = game.msgs || [];
-    var canNotify = typeof game.msg === 'function';
+    const messages = game.msgs || [];
+    let canNotify = typeof game.msg === 'function';
     // Never evict a still-visible message from the eight-entry shared feed, and
     // leave fresh player actions/errors room to read before adding a quiet cue.
     if (messages.length >= 8 && realNowMs - messages[0].at < 7000) canNotify = false;
-    for (var message of messages) {
-      var age = realNowMs - message.at;
+    for (const message of messages) {
+      const age = realNowMs - message.at;
       if (
         age < 750 ||
         (age < 3500 && /failed|failure|cannot|can't|✖|exhausted|error|no route/i.test(message.t))
       )
         canNotify = false;
     }
-    var notification = economicFeedback.update(realNowMs, {
+    const notification = economicFeedback.update(realNowMs, {
       active: active && (typeof document === 'undefined' || document.visibilityState !== 'hidden'),
       canNotify,
     });
@@ -62,8 +62,8 @@ export function createEconomicNotices(game: EconomicNoticeSource): EconomicNotic
       // Text commits before this optional effect: a missing or failed audio
       // engine cannot swallow the report or interrupt the frame loop.
       try {
-        var b = notification.buildings[0];
-        var method = (
+        const b = notification.buildings[0];
+        const method = (
           {
             started: 'chainStart',
             blocked: 'chainBlocked',

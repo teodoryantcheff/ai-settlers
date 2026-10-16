@@ -3,6 +3,7 @@ import type { Building, BuildingSpec, BuildingType, Good, SimulationState } from
 import {
   deliberatePause,
   productionBlockage as blockage,
+  type BlockageReason,
 } from '../observations/production-condition.ts';
 
 export const ECONOMIC_BLOCKAGE_DELAY_MS = 12_000;
@@ -12,7 +13,7 @@ const MAX_SAMPLE_GAP_MS = 1_500;
 const MAX_NOTICE_EXAMPLES = 3;
 
 export type EconomicFeedbackKind = 'started' | 'blocked' | 'recovered';
-export type EconomicBlockageReason = 'inputs' | 'output' | 'resources' | 'exhausted';
+export type EconomicBlockageReason = BlockageReason;
 export interface EconomicFeedbackNotice {
   kind: EconomicFeedbackKind;
   reason: EconomicBlockageReason | null;
@@ -112,10 +113,11 @@ export function createEconomicFeedback(source: EconomicFeedbackSource) {
     const others =
       group.length > examples.length ? ' + ' + (group.length - examples.length) + ' more' : '';
     let description: string;
-    if (kind === 'started')
-      description =
-        'first ' + source.GOODS[source.BSPEC[group[0].type].out].name.toLowerCase() + ' produced';
+    const output = source.BSPEC[group[0].type].out;
+    if (kind === 'started' && output)
+      description = 'first ' + source.GOODS[output].name.toLowerCase() + ' produced';
     else if (kind === 'recovered') description = 'production resumed';
+    else if (!reason) description = 'production resumed';
     else if (group.length === 1) description = 'blocked — ' + reasonText(group[0], reason);
     else
       description =
@@ -230,7 +232,7 @@ export function createEconomicFeedback(source: EconomicFeedbackSource) {
     // take precedence; every matching building commits together, even muted.
     for (const kind of ['blocked', 'recovered', 'started'] as const) {
       const group: Building[] = [];
-      let groupKey: string;
+      let groupKey: string | undefined;
       let reason: EconomicBlockageReason | null = null;
       for (const [b, observation] of observations) {
         if (realNowMs - observation.lastNotice < ECONOMIC_BUILDING_COOLDOWN_MS) continue;
@@ -247,6 +249,7 @@ export function createEconomicFeedback(source: EconomicFeedbackSource) {
             : kind === 'started'
               ? source.BSPEC[b.type].out
               : kind;
+        if (!key) continue;
         if (groupKey !== undefined && key !== groupKey) continue;
         groupKey = key;
         reason = kind === 'blocked' ? observation.reason : null;
@@ -256,6 +259,7 @@ export function createEconomicFeedback(source: EconomicFeedbackSource) {
       const result = notice(kind, reason, group, realNowMs);
       for (const b of group) {
         const observation = observations.get(b);
+        if (!observation) continue;
         observation.lastNotice = realNowMs;
         if (kind === 'blocked') {
           observation.announced = true;

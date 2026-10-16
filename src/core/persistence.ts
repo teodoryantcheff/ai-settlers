@@ -13,7 +13,14 @@ import type { AutoplaySubsystem } from '../simulation/autoplay.ts';
 import type { EventsSubsystem } from './events.ts';
 import type { MapSubsystem } from '../simulation/map.ts';
 import { validateSave } from './state.ts';
-import type { Building, PreparedSave, SaveData, SavedDeposit, SaveMetadata } from '../types.ts';
+import type {
+  Building,
+  Job,
+  PreparedSave,
+  SaveData,
+  SavedDeposit,
+  SaveMetadata,
+} from '../types.ts';
 
 /**
  * Persistence owns the save wire format: snapshots, validation-driven hydration,
@@ -57,37 +64,37 @@ export function createPersistence(
   }
   // Build a complete snapshot; validation and hydration happen before committing any load.
   function snapshotGame(): SaveData {
-    var T = [],
+    const T = [],
       TR = [],
       RK = [],
       RD = [],
       RS: SavedDeposit[] = [];
-    for (var tl of game.tiles) {
+    for (const tl of game.tiles) {
       T.push(tl.t);
       TR.push(tl.tree);
       RK.push(tl.rock ? tl.rock.amt : 0);
       RD.push(tl.road ? 1 : 0);
-      RS.push(tl.res ? [tl.res.kind, tl.res.amt, tl.res.amt0 || 0] : null);
+      RS.push(tl.deposit ? [tl.deposit.kind, tl.deposit.amt, tl.deposit.amt0 || 0] : null);
     }
-    var B = game.buildings.map(function (b): Building {
+    const B = game.buildings.map(function (b): Building {
       return {
         id: b.id,
         type: b.type,
         x: b.x,
         y: b.y,
         done: b.done,
-        prog: b.prog,
+        constructionProgress: b.constructionProgress,
         needs: b.needs,
         got: b.got,
         stock: b.stock,
-        res: b.res,
-        man: b.man,
+        reservedStock: b.reservedStock,
+        manned: b.manned,
         exhausted: b.exhausted,
         produced: b.produced,
         timer: b.timer,
-        nofood: !!b.nofood,
+        foodBlockedNoticeSent: !!b.foodBlockedNoticeSent,
         legacyIndustry: b.legacyIndustry,
-        norock: !!b.norock,
+        rocksExhaustedNoticeSent: !!b.rocksExhaustedNoticeSent,
         metrics: b.metrics,
         blockedReason: b.blockedReason,
         priority: b.priority || 0,
@@ -95,17 +102,16 @@ export function createPersistence(
         disabled: !!b.disabled,
       };
     });
-    var J = game.jobs.map(function (j) {
-      return {
-        kind: j.kind,
-        good: j.good || null,
-        to: j.to || 0,
-        s: j.s || 0,
-        from: j.from || 0,
-        state: j.state,
-      };
+    const J = game.jobs.map((job): Job => {
+      const status = job.status;
+      if (job.kind === 'soldier') return { kind: job.kind, to: job.to, status };
+      const cargo = { good: job.good, sourceId: job.sourceId, status };
+      if (job.kind === 'deliver') return { kind: job.kind, ...cargo };
+      return job.kind === 'fetch'
+        ? { kind: 'fetch', to: job.to, ...cargo }
+        : { kind: 'transfer', to: job.to, ...cargo };
     });
-    var U = game.units
+    const U = game.units
       .filter(function (u) {
         return !u.dead;
       })
@@ -273,43 +279,43 @@ export function createPersistence(
     // Keep a finite file guard without stranding ordinary larger settlements.
     if (typeof raw !== 'string' || raw.length > MAX_SAVE_TEXT)
       throw new Error('Save code is too large');
-    var d = validateSave(JSON.parse(raw), game.W, game.H, game.BSPEC, game.GOODS);
+    const d = validateSave(JSON.parse(raw), game.W, game.H, game.BSPEC, game.GOODS);
     if (d.economy !== undefined && d.economy !== 2) throw new Error('Unsupported economy version');
     // Legacy toolsmiths are the same basic wood-and-stone workshop: preserve
     // their stock, construction materials, timers and already assigned pickups.
     if (d.economy === undefined)
-      for (var b of d.b) {
+      for (const b of d.b) {
         if (b.type === 'toolsmith') b.type = 'workshop';
         if (b.type === 'armory') b.legacyIndustry = true;
       }
     d.economy = 2;
-    var T = d.t[0],
+    const T = d.t[0],
       TR = d.t[1],
       RK = d.t[2],
       RD = d.t[3],
       RS = d.t[4];
-    var newTiles = T.map(function (type, i) {
+    const newTiles = T.map(function (type, i) {
       return {
         t: type,
         tree: TR[i],
         rock: RK[i] > 0 ? { amt: RK[i] } : null,
         road: !!RD[i],
-        res: RS[i] ? { kind: RS[i][0], amt: RS[i][1], amt0: RS[i][2] || RS[i][1] } : null,
+        deposit: RS[i] ? { kind: RS[i][0], amt: RS[i][1], amt0: RS[i][2] || RS[i][1] } : null,
         owned: false,
       };
     });
-    var newJobs = d.j.map(function (j) {
+    const newJobs = d.j.map(function (j) {
       return Object.assign({}, j);
     });
-    var newUnits = d.u.map(function (u) {
+    const newUnits = d.u.map(function (u) {
       return Object.assign({}, u, { job: u.ji >= 0 ? newJobs[u.ji] : null, dead: false });
     });
-    var rng = game.mulberry32(d.seed + 0x5bd1e995);
+    const rng = game.mulberry32(d.seed + 0x5bd1e995);
     if (d.v === 2) rng.setState(d.rng);
     return { data: d, tiles: newTiles, buildings: d.b, jobs: newJobs, units: newUnits, rng: rng };
   }
   function commitLoad(prepared: PreparedSave) {
-    var d = prepared.data;
+    const d = prepared.data;
     game.tiles = prepared.tiles;
     game.buildings = prepared.buildings;
     game.jobs = prepared.jobs;

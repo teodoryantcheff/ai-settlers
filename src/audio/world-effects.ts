@@ -11,14 +11,14 @@ export function createWorldEffects(
   runtime: AudioRuntime,
   internals?: AudioInternals,
 ) {
-  let graph: AudioGraph = null;
+  let graph: AudioGraph | null = null;
   let audioWorkBound = false;
   const sfxCanPlay = () => runtime.canPlay('effects');
   function panOf(wx: number) {
-    if (!runtime.graph) return 0;
-    var cx = game.cam.x + game.vw / 2 / game.z,
+    if (!graph) return 0;
+    const cx = game.cam.x + game.vw / 2 / game.z,
       half = game.vw / 2 / game.z;
-    var p = (wx * game.TS - cx) / half;
+    const p = (wx * game.TS - cx) / half;
     return Math.max(-0.75, Math.min(0.75, p * 0.55));
   }
   interface Cue {
@@ -35,11 +35,12 @@ export function createWorldEffects(
   }
   function play(pan: number, build: (cue: Cue) => void, at?: number) {
     if (!graph || !sfxCanPlay()) return;
+    const owner = graph;
     runtime.guard(() => {
       const time = at ?? runtime.immediate();
-      const output = runtime.own(new graph.tone.Panner({ context: graph.context, pan }));
-      const cue: Cue = { graph, time, output, resources: [output], until: time };
-      output.connect(graph.channels.effects);
+      const output = runtime.own(new owner.tone.Panner({ context: owner.context, pan }));
+      const cue: Cue = { graph: owner, time, output, resources: [output], until: time };
+      output.connect(owner.channels.effects);
       build(cue);
       runtime.releaseAt(cue.until, cue.resources);
     });
@@ -168,9 +169,9 @@ export function createWorldEffects(
   function bindWorkAudio() {
     if (audioWorkBound || typeof game.gameEvents === 'undefined' || !game.gameEvents.on) return;
     observePresentation(game, 'goodsProduced', function (event) {
-      var b = event.building;
+      const b = event.building;
       if (!b) return;
-      var method = (
+      const method = (
         {
           lumberjack: 'chop',
           sawmill: 'saw',
@@ -188,7 +189,7 @@ export function createWorldEffects(
       if (method) game.SND[method](b.x, b.y);
     });
     observePresentation(game, 'firstGold', function (event) {
-      var b = event.building;
+      const b = event.building;
       if (b) game.SND.coin(b.x, b.y);
     });
     audioWorkBound = true;
@@ -198,10 +199,10 @@ export function createWorldEffects(
   // Limit work sounds by building and globally. Fast simulation and large
   // settlements should produce a readable soundscape, without allocating dozens
   // of simultaneous noise/oscillator graphs for every industrial cycle.
-  var industrialVoices: IndustrialVoice[] = [],
+  let industrialVoices: IndustrialVoice[] = [],
     industrialLast: Record<string, number> = Object.create(null),
     industrialNext = 0;
-  var INDUSTRIAL_MAX_VOICES = 6,
+  const INDUSTRIAL_MAX_VOICES = 6,
     INDUSTRIAL_SPACING = 0.07;
   function industrialAudio(
     kind: 'hammer' | 'chop' | 'saw' | 'clang' | 'forge',
@@ -211,7 +212,7 @@ export function createWorldEffects(
     t: number,
   ) {
     if (typeof wx === 'number' && typeof wy === 'number') {
-      var margin = game.TS * 5;
+      const margin = game.TS * 5;
       if (
         wx * game.TS < game.cam.x - margin ||
         wx * game.TS > game.cam.x + game.vw / game.z + margin ||
@@ -223,8 +224,8 @@ export function createWorldEffects(
     industrialVoices = industrialVoices.filter(function (voice) {
       return voice.until > t;
     });
-    for (var old in industrialLast) if (t - industrialLast[old] > 4) delete industrialLast[old];
-    var key = kind + ':' + wx + ':' + wy;
+    for (const old in industrialLast) if (t - industrialLast[old] > 4) delete industrialLast[old];
+    const key = kind + ':' + wx + ':' + wy;
     if (
       t < industrialNext ||
       industrialVoices.length >= INDUSTRIAL_MAX_VOICES ||
@@ -247,7 +248,7 @@ export function createWorldEffects(
     const time = runtime.immediate();
     if (industrialAudio(kind, wx, wy, duration, time)) play(panOf(wx), build, time);
   }
-  var sounds: WorldSounds = {
+  const sounds: WorldSounds = {
     place() {
       play(0, (cue) => {
         thump(cue, cue.time, 150, 0.22);

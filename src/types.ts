@@ -40,6 +40,14 @@ export type BuildingType =
   | 'toolsmith'
   | 'armory'
   | 'guard';
+/** Structured, transient placement failures; display copy is derived from the code. */
+export type PlacementRefusal =
+  | { code: 'out-of-bounds' | 'choose-map-tile' }
+  | { code: 'water' | 'mountain' | 'territory' | 'shore-land' | 'no-water' | 'meadow' }
+  | { code: 'deposit'; good: 'coal' | 'iron' | 'gold' }
+  | { code: 'no-rocks' | 'blocked' | 'unreachable-stock' }
+  | { code: 'spacing'; building: BuildingType }
+  | { code: 'stock'; good: Good; required: number; available: number };
 export interface BuildingSpec {
   name: string;
   cost?: Inventory;
@@ -86,28 +94,33 @@ export interface ProductionWindowMetrics extends ProductionSample {
   /** Recent snapshots are two simulation seconds apart; lifetime counters are exact. */
   sampleInterval: number;
 }
+/** The empty string means no blockage and preserves the existing save representation. */
+export type ProductionBlockReason =
+  '' | 'paused' | 'exhausted' | 'output' | 'demand' | 'reserve' | 'water' | 'inputs' | 'resources';
 export interface Building {
   id: number;
   type: BuildingType;
   x: number;
   y: number;
   done: boolean;
-  prog: number;
+  constructionProgress: number;
   needs: Inventory;
   got: Inventory;
   stock: Inventory;
-  res: Inventory;
+  reservedStock: Inventory;
   timer: number;
   priority: 0 | 1 | 2;
   targets: Inventory;
   disabled: boolean;
   metrics: ProductionMetrics;
-  blockedReason: string;
-  man: boolean;
+  blockedReason: ProductionBlockReason;
+  manned: boolean;
   exhausted: boolean;
-  nofood: boolean;
+  /** Suppress repeat notices until a successful production attempt clears the record. */
+  foodBlockedNoticeSent: boolean;
+  /** Records the quarry's reported exhaustion, cleared when it produces stone again. */
+  rocksExhaustedNoticeSent: boolean;
   legacyIndustry?: boolean;
-  norock: boolean;
   produced: number;
   /** Transient display cache; never serialized or accepted from imported saves. */
 }
@@ -115,14 +128,13 @@ export interface BuildingStatus {
   lines: { t: string; w: boolean }[];
   bad: boolean;
 }
-export interface Job {
-  kind: 'fetch' | 'deliver' | 'transfer' | 'soldier';
-  good?: Good;
-  to?: number;
-  from?: number;
-  s?: number;
-  state: 'p' | 't';
-}
+export type JobStatus = 'pending' | 'assigned';
+export type Job = { status: JobStatus } & (
+  | { kind: 'fetch'; good: Good; sourceId: number; to: number }
+  | { kind: 'deliver'; good: Good; sourceId: number; to?: never }
+  | { kind: 'transfer'; good: Good; sourceId: number; to: number }
+  | { kind: 'soldier'; to: number; sourceId?: never; good?: never }
+);
 export interface Unit {
   id: number;
   kind: 'carrier' | 'soldier';
@@ -188,7 +200,7 @@ export interface TilePoint {
 /** Live placement feedback for the hovered tile while a build mode is armed. */
 export interface PlacementGhost extends TilePoint {
   ok: boolean;
-  reason: string;
+  reason: PlacementRefusal | null;
   in: boolean;
 }
 /** Transient HUD log entry; the text is already escaped for display. */
@@ -206,7 +218,7 @@ export interface Tile {
   rock: { amt: number } | null;
   road: boolean;
   owned?: boolean;
-  res: { kind: 'gold' | 'iron' | 'coal'; amt: number; amt0?: number } | null;
+  deposit: { kind: 'gold' | 'iron' | 'coal'; amt: number; amt0?: number } | null;
 }
 export interface Random {
   (): number;
@@ -223,9 +235,6 @@ export interface Sprite {
 }
 export interface ArtAtlas {
   grass: HTMLCanvasElement[];
-  sand: HTMLCanvasElement[];
-  water: HTMLCanvasElement[];
-  shimmer: HTMLCanvasElement[];
   road: HTMLCanvasElement;
   tree: HTMLCanvasElement[][][];
   rock: HTMLCanvasElement[];
@@ -270,7 +279,7 @@ export interface GameEvents {
   territoryChanged: Record<string, never>;
   buildingPlaced: { building: Building };
   buildingDemolished: { id: number; type: BuildingType; x: number; y: number };
-  placementRejected: { type: BuildingType; x: number; y: number; reason: string; stock: boolean };
+  placementRejected: { type: BuildingType; x: number; y: number; reason: PlacementRefusal };
   demolitionRejected: { reason: 'headquarters' | 'last-store' };
   siteCleared: { x: number; y: number; tree: boolean };
   rocksExhausted: { building: Building };
@@ -331,8 +340,15 @@ export interface SaveData {
     treeGrowthT: number;
   };
 }
+/** The validator has supplied the historical defaults required to adopt a world. */
+export type ValidatedSave = SaveData & {
+  identity: ColonyIdentity;
+  observations: EconomicObservations;
+  attention: import('./observations/attention.ts').AttentionData;
+} & ({ v: 1 } | { v: 2; rng: number });
+
 export interface PreparedSave {
-  data: SaveData;
+  data: ValidatedSave;
   tiles: Tile[];
   buildings: Building[];
   jobs: Job[];

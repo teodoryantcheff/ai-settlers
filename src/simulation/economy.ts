@@ -1,3 +1,11 @@
+import {
+  hasWellCoverage,
+  wellRadius,
+  productionOutputLimit,
+  productionOutputBlocked,
+  intermediateReserves,
+  productionReserves,
+} from '../gameplay/colony-rules.ts';
 import { deliveryStage } from './delivery-stage.ts';
 import type { ObservationSubsystem } from './observations.ts';
 import {
@@ -23,12 +31,41 @@ import type {
   Good,
   Inventory,
   Job,
+  PlacementRefusal,
+  ProductionBlockReason,
   ProductionMetrics,
   ProductionRateWindow,
   ProductionSample,
   ProductionWindowMetrics,
   Unit,
 } from '../types.ts';
+
+const placementAdvice: Record<PlacementRefusal['code'], PlacementAdvice> = {
+  'out-of-bounds': '',
+  'choose-map-tile': '',
+  water: '',
+  mountain: '',
+  territory: 'build an Outpost toward that spot — it pushes your border out',
+  'shore-land': '',
+  'no-water': 'place it on a shore inside your border (grass or sand both work)',
+  meadow: '',
+  deposit: 'click mountains to scout them, then build against the wall with the colored dots',
+  'no-rocks': 'find a grey rock cluster — the map guarantees some near your start',
+  blocked: '',
+  spacing: 'keep about 2 tiles of space between buildings',
+  stock: 'build more producers — or inspect a demolition quote for exact recoverable goods',
+  'unreachable-stock':
+    'build more producers — or inspect a demolition quote for exact recoverable goods',
+};
+
+interface StorageSearchOptions {
+  available?: Good;
+  connected?: boolean;
+  exclude?: Building;
+  retainTarget?: boolean;
+  /** Keep distance rounding identical to each original caller for deterministic ties. */
+  euclidean?: boolean;
+}
 
 export function createEconomy(
   game: EconomyDependencies,
@@ -41,55 +78,50 @@ export function createEconomy(
   // per-building done/store signature so completion flips made outside this
   // subsystem (tests, tools) stay visible; a cache hit never allocates.
   // No caller mutates the array storages() returns.
-  var buildingVersion = 0,
-    storagesSource: Building[] = null,
+  let buildingVersion = 0,
+    storagesSource: Building[] = [],
     storagesVersion = -1,
     storagesLength = -1,
-    storagesCache: Building[] = null,
-    storagesSig: boolean[] = null,
-    byIdSource: Building[] = null,
+    storagesCache: Building[] = [],
+    storagesSig: boolean[] = [],
+    byIdSource: Building[] = [],
     byIdVersion = -1,
-    byIdLength = -1,
-    byIdMap = new Map<number, Building>(),
-    unitsDirty = false,
-    unitsSource: Unit[] = null;
-  function byId(id: number): Building | null {
+    byIdLength = -1;
+  const byIdMap = new Map<number, Building>();
+  let unitsDirty = false,
+    unitsSource: Unit[] = [];
+  function byId(id: number | null | undefined): Building | null {
+    if (id === null || id === undefined) return null;
     if (
       byIdSource !== game.buildings ||
       byIdVersion !== buildingVersion ||
       byIdLength !== game.buildings.length
     ) {
       byIdMap.clear();
-      for (var i = 0; i < game.buildings.length; i++) {
-        var b = game.buildings[i];
+      for (let i = 0; i < game.buildings.length; i++) {
+        const b = game.buildings[i];
         if (!byIdMap.has(b.id)) byIdMap.set(b.id, b);
       }
       byIdSource = game.buildings;
       byIdVersion = buildingVersion;
       byIdLength = game.buildings.length;
     }
-    var found = byIdMap.get(id);
+    const found = byIdMap.get(id);
     return found === undefined ? null : found;
   }
   function buildingAt(x: number, y: number): Building | null {
-    for (var i = 0; i < game.buildings.length; i++)
+    for (let i = 0; i < game.buildings.length; i++)
       if (game.buildings[i].x === x && game.buildings[i].y === y) return game.buildings[i];
     return null;
   }
   function storages(): Building[] {
-    var src = game.buildings,
-      n = src.length,
-      i = 0,
-      b: Building = null;
-    if (
-      storagesCache !== null &&
-      storagesSource === src &&
-      storagesVersion === buildingVersion &&
-      storagesLength === n
-    ) {
-      var fresh = true;
+    const src = game.buildings,
+      n = src.length;
+    let i = 0;
+    if (storagesSource === src && storagesVersion === buildingVersion && storagesLength === n) {
+      let fresh = true;
       for (i = 0; i < n; i++) {
-        b = src[i];
+        const b = src[i];
         if (!!(b.done && game.BSPEC[b.type].store) !== storagesSig[i]) {
           fresh = false;
           break;
@@ -97,11 +129,11 @@ export function createEconomy(
       }
       if (fresh) return storagesCache;
     }
-    var r = [],
+    const r = [],
       sig = [];
     for (i = 0; i < n; i++) {
-      b = src[i];
-      var isStore = !!(b.done && game.BSPEC[b.type].store);
+      const b = src[i];
+      const isStore = !!(b.done && game.BSPEC[b.type].store);
       sig.push(isStore);
       if (isStore) r.push(b);
     }
@@ -113,56 +145,60 @@ export function createEconomy(
     return r;
   }
   function anyStorage(): Building | null {
-    var s = storages();
+    const s = storages();
     return s.length ? s[0] : null;
   }
-  function nearestStoragePos(x: number, y: number): Building | null {
-    var best = null,
-      bd = 1e9,
-      ss = storages();
-    for (var i = 0; i < ss.length; i++) {
-      if (!game.connectedLand(x, y, ss[i].x, ss[i].y)) continue;
-      var d = (ss[i].x - x) * (ss[i].x - x) + (ss[i].y - y) * (ss[i].y - y);
-      if (d < bd) {
-        bd = d;
-        best = ss[i];
+  /** Closest eligible store; strict comparison keeps the first store on equal distances. */
+  function nearestStorage(
+    ref: Pick<Building, 'x' | 'y'>,
+    options: StorageSearchOptions = {},
+  ): Building | null {
+    let best: Building | null = null,
+      distance = options.euclidean ? Infinity : 1e9;
+    const ss = storages();
+    for (let i = 0; i < ss.length; i++) {
+      const store = ss[i];
+      if (store === options.exclude) continue;
+      if (options.available) {
+        const good = options.available;
+        const free =
+          ((store.stock[good] ?? 0) | 0) -
+          ((store.reservedStock[good] ?? 0) | 0) -
+          (options.retainTarget ? ((store.targets || {})[good] ?? 0) | 0 : 0);
+        if (free <= 0) continue;
+      }
+      if (options.connected && !game.connectedLand(ref.x, ref.y, store.x, store.y)) continue;
+      const dx = store.x - ref.x,
+        dy = store.y - ref.y;
+      const d = options.euclidean ? Math.hypot(dx, dy) : dx * dx + dy * dy;
+      if (d < distance) {
+        best = store;
+        distance = d;
       }
     }
     return best;
   }
-  function nearestStorageWith(x: number, y: number, g: Good): Building | null {
-    var best = null,
-      bd = 1e9,
-      ss = storages();
-    for (var i = 0; i < ss.length; i++) {
-      if ((ss[i].stock[g] | 0) - (ss[i].res[g] | 0) <= 0) continue;
-      if (!game.connectedLand(x, y, ss[i].x, ss[i].y)) continue;
-      var d = (ss[i].x - x) * (ss[i].x - x) + (ss[i].y - y) * (ss[i].y - y);
-      if (d < bd) {
-        bd = d;
-        best = ss[i];
-      }
-    }
-    return best;
+  function nearestStoragePos(x: number, y: number): Building | null {
+    return nearestStorage({ x, y }, { connected: true });
   }
   function totalGood(g: Good) {
-    var s = 0,
-      ss = storages();
-    for (var i = 0; i < ss.length; i++) s += ss[i].stock[g] | 0;
+    let s = 0;
+    const ss = storages();
+    for (let i = 0; i < ss.length; i++) s += (ss[i].stock[g] ?? 0) | 0;
     return s;
   }
   function liveMines() {
-    var n = 0;
-    for (var i = 0; i < game.buildings.length; i++) {
-      var b = game.buildings[i];
+    let n = 0;
+    for (let i = 0; i < game.buildings.length; i++) {
+      const b = game.buildings[i];
       if (b.done && !b.exhausted && game.BSPEC[b.type].prod === 'mine') n++;
     }
     return n;
   }
   function stockTargetTotal(g: Good) {
-    var target = 0,
-      ss = storages();
-    for (var i = 0; i < ss.length; i++) target += Math.max(0, (ss[i].targets || {})[g] | 0);
+    let target = 0;
+    const ss = storages();
+    for (let i = 0; i < ss.length; i++) target += Math.max(0, ((ss[i].targets || {})[g] ?? 0) | 0);
     return target;
   }
   function foodSaturated(good?: Good) {
@@ -176,42 +212,27 @@ export function createEconomy(
     );
   }
   function intermediateSaturated(good: Good) {
-    var reserve = good === 'grain' ? 24 : ['flour', 'pigs', 'iron_bars'].includes(good) ? 12 : 0;
+    const reserve = intermediateReserves[good] || 0;
     return reserve > 0 && totalGood(good) >= Math.max(reserve, stockTargetTotal(good));
   }
   function hasLocalWater(b: Pick<Building, 'x' | 'y'>) {
-    return game.buildings.some(
-      (well) =>
-        well.type === 'well' &&
-        well.done &&
-        !well.disabled &&
-        (well.x - b.x) ** 2 + (well.y - b.y) ** 2 <= (game.BSPEC.well.rad || 6) ** 2 &&
-        game.connectedLand(b.x, b.y, well.x, well.y),
-    );
+    return hasWellCoverage(game, b, 'active');
   }
   function carrierCap() {
     return 8 + 8 * Math.max(0, storages().length - 1);
   }
-  function countFetch(g: Good, bid: number) {
-    var n = 0;
-    for (var i = 0; i < game.jobs.length; i++) {
-      var j = game.jobs[i];
-      if (j.kind === 'fetch' && j.good === g && j.to === bid) n++;
-    }
-    return n;
-  }
   function countDeliver(g: Good, bid: number) {
-    var n = 0;
-    for (var i = 0; i < game.jobs.length; i++) {
-      var j = game.jobs[i];
-      if (j.kind === 'deliver' && j.good === g && j.from === bid) n++;
+    let n = 0;
+    for (let i = 0; i < game.jobs.length; i++) {
+      const j = game.jobs[i];
+      if (j.kind === 'deliver' && j.good === g && j.sourceId === bid) n++;
     }
     return n;
   }
   function countSoldier(bid: number) {
-    var n = 0;
-    for (var i = 0; i < game.jobs.length; i++) {
-      var j = game.jobs[i];
+    let n = 0;
+    for (let i = 0; i < game.jobs.length; i++) {
+      const j = game.jobs[i];
       if (j.kind === 'soldier' && j.to === bid) n++;
     }
     return n;
@@ -220,7 +241,8 @@ export function createEconomy(
     game.emitGameEvent(name, payload);
   }
   function productionMetrics(): ProductionMetrics {
-    var m: ProductionMetrics = {
+    const recent: ProductionSample[] = [];
+    const m: ProductionMetrics = {
       elapsed: 0,
       active: 0,
       blocked: 0,
@@ -232,9 +254,9 @@ export function createEconomy(
       inputDelivered: {},
       outputDelivered: {},
       deliveryStarted: 0,
-      recent: [],
+      recent,
     };
-    m.recent.push(productionSample(m));
+    recent.push(productionSample(m));
     return m;
   }
   function productionSample(m: ProductionMetrics): ProductionSample {
@@ -247,7 +269,10 @@ export function createEconomy(
       outputDelivered: copyObj(m.outputDelivered || {}),
     };
   }
-  function ensureProductionHistory(m: ProductionMetrics) {
+  function ensureProductionHistory(
+    m: ProductionMetrics,
+  ): asserts m is ProductionMetrics &
+    Required<Pick<ProductionMetrics, 'recent' | 'inputDelivered' | 'outputDelivered'>> {
     // Older saves retain their lifetime production/consumption, but cannot reconstruct
     // arrivals separately from construction, or outgoing delivery completion.
     if (m.deliveryStarted === undefined) {
@@ -256,10 +281,12 @@ export function createEconomy(
       m.outputDelivered = {};
     }
     if (!m.recent || !m.recent.length) m.recent = [productionSample(m)];
+    m.inputDelivered ??= {};
+    m.outputDelivered ??= {};
   }
   function sampleProduction(m: ProductionMetrics) {
     ensureProductionHistory(m);
-    var samples = m.recent;
+    const samples = m.recent;
     if (m.elapsed - samples[samples.length - 1].elapsed >= 2 - 1e-9)
       samples.push(productionSample(m));
     // Keep only complete covered intervals, never interpolate goods or invent a
@@ -270,30 +297,30 @@ export function createEconomy(
     m: ProductionMetrics,
     window: ProductionRateWindow,
   ): ProductionWindowMetrics {
-    var empty = {
-        elapsed: 0,
-        inputBlocked: 0,
-        produced: {},
-        consumed: {},
-        inputDelivered: {},
-        outputDelivered: {},
-      },
-      baseline: ProductionSample = empty;
+    const empty = {
+      elapsed: 0,
+      inputBlocked: 0,
+      produced: {},
+      consumed: {},
+      inputDelivered: {},
+      outputDelivered: {},
+    };
+    let baseline: ProductionSample = empty;
     if (window !== 'lifetime') {
-      baseline = (m.recent || []).find(function (sample) {
-        return sample.elapsed >= m.elapsed - window - 1e-9;
-      });
-      if (!baseline) baseline = productionSample(m);
+      baseline =
+        (m.recent || []).find(function (sample) {
+          return sample.elapsed >= m.elapsed - window - 1e-9;
+        }) ?? productionSample(m);
     }
-    var elapsed = Math.max(0, m.elapsed - baseline.elapsed),
+    const elapsed = Math.max(0, m.elapsed - baseline.elapsed),
       deliveryElapsed =
         m.deliveryStarted === undefined
           ? 0
           : Math.max(0, m.elapsed - Math.max(baseline.elapsed, m.deliveryStarted));
     function difference(current: Inventory, before: Inventory): Inventory {
-      var out: Inventory = {};
-      for (var good in current)
-        out[good as Good] = Math.max(0, current[good as Good] - (before[good as Good] || 0));
+      const out: Inventory = {};
+      for (const good in current)
+        out[good as Good] = Math.max(0, (current[good as Good] ?? 0) - (before[good as Good] || 0));
       return out;
     }
     return {
@@ -308,11 +335,11 @@ export function createEconomy(
     };
   }
   function addStock(b: Building, g: Good, n: number) {
-    var accepted = Math.min(n, Math.max(0, 8 - (b.stock[g] | 0)));
-    b.stock[g] = (b.stock[g] | 0) + accepted;
+    const accepted = Math.min(n, Math.max(0, productionOutputLimit - ((b.stock[g] ?? 0) | 0)));
+    b.stock[g] = ((b.stock[g] ?? 0) | 0) + accepted;
     b.produced = (b.produced | 0) + accepted;
     if (!b.metrics) b.metrics = productionMetrics();
-    b.metrics.produced[g] = (b.metrics.produced[g] | 0) + accepted;
+    b.metrics.produced[g] = ((b.metrics.produced[g] ?? 0) | 0) + accepted;
     game.recordEconomicFlow('produced', g, accepted);
     if (accepted) gameEvent('goodsProduced', { building: b, good: g as Good, amount: accepted });
     return accepted;
@@ -324,16 +351,16 @@ export function createEconomy(
       x: x,
       y: y,
       done: false,
-      prog: 0,
+      constructionProgress: 0,
       needs: copyObj(game.BSPEC[type].cost || {}),
       got: {},
       stock: {},
-      res: {},
+      reservedStock: {},
       timer: 1 + game.SR(),
-      man: false,
+      manned: false,
       exhausted: false,
-      nofood: false,
-      norock: false,
+      foodBlockedNoticeSent: false,
+      rocksExhaustedNoticeSent: false,
       produced: 0,
       priority: 0,
       targets: {},
@@ -343,12 +370,13 @@ export function createEconomy(
     };
   }
   function copyObj(o: Inventory): Inventory {
-    var r: Inventory = {};
-    for (var k in o) r[k as Good] = o[k as Good];
+    const r: Inventory = {};
+    for (const k in o) r[k as Good] = o[k as Good];
     return r;
   }
   function siteReady(b: Building) {
-    for (var g in b.needs) if ((b.got[g as Good] | 0) < b.needs[g as Good]) return false;
+    for (const g in b.needs)
+      if (((b.got[g as Good] ?? 0) | 0) < (b.needs[g as Good] ?? 0)) return false;
     return true;
   }
   function onDone(b: Building) {
@@ -357,38 +385,35 @@ export function createEconomy(
     game.recomputeTerritory();
     gameEvent('buildingCompleted', { building: b });
   }
-  function pickStorageFor(g: Good, ref: Pick<Building, 'x' | 'y'>) {
-    var best = null,
-      bd = 1e9,
-      ss = storages();
-    var rx = ref ? ref.x : game.W / 2,
-      ry = ref ? ref.y : game.H / 2;
-    for (var i = 0; i < ss.length; i++) {
-      var av = (ss[i].stock[g] | 0) - (ss[i].res[g] | 0);
-      if (av <= 0) continue;
-      if (ref && !game.connectedLand(rx, ry, ss[i].x, ss[i].y)) continue;
-      var d = (ss[i].x - rx) * (ss[i].x - rx) + (ss[i].y - ry) * (ss[i].y - ry);
-      if (d < bd) {
-        bd = d;
-        best = ss[i];
-      }
-    }
-    return best;
+  function pickStorageFor(g: Good, ref?: Pick<Building, 'x' | 'y'>) {
+    return nearestStorage(ref || { x: game.W / 2, y: game.H / 2 }, {
+      available: g,
+      connected: !!ref,
+    });
   }
-  function availableGood(g: Good, ref: Pick<Building, 'x' | 'y'>, includeTransfers: boolean) {
-    var s = 0,
-      ss = storages();
-    for (var i = 0; i < ss.length; i++) {
-      var store = ss[i];
+  function availableGood(
+    g: Good,
+    ref: Pick<Building, 'x' | 'y'> | undefined,
+    includeTransfers: boolean,
+  ) {
+    let s = 0;
+    const ss = storages();
+    for (let i = 0; i < ss.length; i++) {
+      const store = ss[i];
       if (ref && !game.connectedLand(ref.x, ref.y, store.x, store.y)) continue;
-      var free = (store.stock[g] | 0) - (store.res[g] | 0);
+      let free = ((store.stock[g] ?? 0) | 0) - ((store.reservedStock[g] ?? 0) | 0);
       if (includeTransfers)
-        for (var j = 0; j < game.jobs.length; j++) {
-          var job = game.jobs[j];
-          if (job.kind === 'transfer' && job.s === store.id && job.good === g && !collectedJob(job))
+        for (let j = 0; j < game.jobs.length; j++) {
+          const job = game.jobs[j];
+          if (
+            job.kind === 'transfer' &&
+            job.sourceId === store.id &&
+            job.good === g &&
+            !collectedJob(job)
+          )
             free++;
         }
-      s += Math.max(0, Math.min(store.stock[g] | 0, free));
+      s += Math.max(0, Math.min((store.stock[g] ?? 0) | 0, free));
     }
     return s;
   }
@@ -422,26 +447,28 @@ export function createEconomy(
     };
   }
   function requestStock(cost: Inventory, ref?: Pick<Building, 'x' | 'y'>) {
-    var shortage: Inventory = {};
+    const shortage: Inventory = {};
     // Validate every good before releasing anything: an unaffordable request must
     // not disturb existing logistics merely because one material was available.
-    for (var g in cost) {
-      if (availGood(g as Good, ref) < cost[g as Good]) return false;
-      shortage[g as Good] = Math.max(0, cost[g as Good] - availableGood(g as Good, ref, false));
+    for (const g in cost) {
+      const required = cost[g as Good] ?? 0;
+      if (availGood(g as Good, ref) < required) return false;
+      shortage[g as Good] = Math.max(0, required - availableGood(g as Good, ref, false));
     }
     cancelJobs(function (job) {
-      if (job.kind !== 'transfer' || !shortage[job.good] || collectedJob(job)) return false;
-      var source = byId(job.s);
+      if (job.kind !== 'transfer' || !job.good || !shortage[job.good] || collectedJob(job))
+        return false;
+      const source = byId(job.sourceId);
       if (!source || !source.done || !game.BSPEC[source.type].store) return false;
       if (ref && !game.connectedLand(ref.x, ref.y, source.x, source.y)) return false;
-      shortage[job.good]--;
+      shortage[job.good] = (shortage[job.good] ?? 0) - 1;
       return true;
     });
     return true;
   }
   function cancelJobs(pred: (j: Job) => boolean) {
-    for (var i = game.jobs.length - 1; i >= 0; i--) {
-      var j = game.jobs[i];
+    for (let i = game.jobs.length - 1; i >= 0; i--) {
+      const j = game.jobs[i];
       if (!pred(j)) continue;
       game.jobs.splice(i, 1);
       unwindJob(j);
@@ -450,15 +477,15 @@ export function createEconomy(
   // Both pending and assigned pickups hold a reservation until their cargo is collected.
   // Cancellation detaches units as well as queue entries so no ghost job can create goods.
   function unwindJob(j: Job) {
-    var assigned = null;
-    for (var i = 0; i < game.units.length; i++)
+    let assigned: Unit | null = null;
+    for (let i = 0; i < game.units.length; i++)
       if (game.units[i].job === j) {
         assigned = game.units[i];
         break;
       }
-    if ((j.kind === 'fetch' || j.kind === 'transfer') && (!assigned || !assigned.carry)) {
-      var s = byId(j.s);
-      if (s) s.res[j.good] = Math.max(0, (s.res[j.good] | 0) - 1);
+    if ((j.kind === 'fetch' || j.kind === 'transfer') && j.good && (!assigned || !assigned.carry)) {
+      const s = byId(j.sourceId);
+      if (s) s.reservedStock[j.good] = Math.max(0, ((s.reservedStock[j.good] ?? 0) | 0) - 1);
     }
     if (j.kind === 'soldier') {
       game.soldierPool++;
@@ -474,10 +501,7 @@ export function createEconomy(
       assigned.dropIsSite = false;
       goDrop(assigned);
     } else {
-      assigned.phase = 'idle';
-      assigned.path = null;
-      assigned.dropB = null;
-      assigned.dropIsSite = false;
+      resetCarrier(assigned, 'destination');
     }
   }
   function evaluatePlacement(
@@ -488,12 +512,12 @@ export function createEconomy(
   ): PlacementChecks {
     const checks: PlacementChecks = {
       ok: true,
-      reason: '',
-      terrain: { ok: true, reason: '' },
-      ownership: { ok: true, reason: '' },
-      resources: { ok: true, reason: '' },
+      reason: null,
+      terrain: { ok: true, reason: null },
+      ownership: { ok: true, reason: null },
+      resources: { ok: true, reason: null },
     };
-    function fail(kind: 'terrain' | 'ownership' | 'resources', reason: string) {
+    function fail(kind: 'terrain' | 'ownership' | 'resources', reason: PlacementRefusal) {
       if (checks[kind].ok !== false) checks[kind] = { ok: false, reason };
       if (checks.ok) {
         checks.ok = false;
@@ -504,91 +528,87 @@ export function createEconomy(
     if (!game.inB(x, y))
       return {
         ok: false,
-        reason: 'Out of bounds',
-        terrain: { ok: false, reason: 'Out of bounds' },
-        ownership: { ok: null, reason: 'Choose a tile inside the map' },
-        resources: { ok: null, reason: 'Choose a tile inside the map' },
+        reason: { code: 'out-of-bounds' },
+        terrain: { ok: false, reason: { code: 'out-of-bounds' } },
+        ownership: { ok: null, reason: { code: 'choose-map-tile' } },
+        resources: { ok: null, reason: { code: 'choose-map-tile' } },
       };
-    var i = game.idx(x, y),
+    const i = game.idx(x, y),
       tl = game.tiles[i];
-    if (tl.t === game.WATER) if (fail('terrain', 'Cannot build on water')) return checks;
-    if (tl.t === game.MTN) if (fail('terrain', 'Cannot build on mountains')) return checks;
-    if (!game.owned[i]) if (fail('ownership', 'Outside your territory')) return checks;
-    var sp = game.BSPEC[type];
+    if (tl.t === game.WATER) if (fail('terrain', { code: 'water' })) return checks;
+    if (tl.t === game.MTN) if (fail('terrain', { code: 'mountain' })) return checks;
+    if (!game.owned[i]) if (fail('ownership', { code: 'territory' })) return checks;
+    const sp = game.BSPEC[type];
     if (type === 'fisherman') {
-      if (!game.owned[i]) if (fail('ownership', 'Outside your territory')) return checks;
+      if (!game.owned[i]) if (fail('ownership', { code: 'territory' })) return checks;
       if (tl.t !== game.GRASS && tl.t !== game.SAND)
-        if (fail('terrain', 'Must stand on land by the shore')) return checks;
-      var wa = false;
-      for (var wy2 = y - 2; wy2 <= y + 2 && !wa; wy2++)
-        for (var wx2 = x - 2; wx2 <= x + 2 && !wa; wx2++)
+        if (fail('terrain', { code: 'shore-land' })) return checks;
+      let wa = false;
+      for (let wy2 = y - 2; wy2 <= y + 2 && !wa; wy2++)
+        for (let wx2 = x - 2; wx2 <= x + 2 && !wa; wx2++)
           if (game.inB(wx2, wy2) && game.tiles[game.idx(wx2, wy2)].t === game.WATER) wa = true;
-      if (!wa) if (fail('resources', 'No water nearby')) return checks;
-      for (var d = 0; d < 4; d++) {
-        var nx = x + game.DX[d],
+      if (!wa) if (fail('resources', { code: 'no-water' })) return checks;
+      for (let d = 0; d < 4; d++) {
+        const nx = x + game.DX[d],
           ny = y + game.DY[d];
         if (!game.inB(nx, ny)) continue;
-        var n = game.idx(nx, ny);
+        const n = game.idx(nx, ny);
         if (!game.passI(n)) continue;
-        if (!game.owned[n]) if (fail('ownership', 'Outside your territory')) return checks;
+        if (!game.owned[n]) if (fail('ownership', { code: 'territory' })) return checks;
       }
     } else {
-      for (var d2 = 0; d2 < 4; d2++) {
-        var nx2 = x + game.DX[d2],
+      for (let d2 = 0; d2 < 4; d2++) {
+        const nx2 = x + game.DX[d2],
           ny2 = y + game.DY[d2];
         if (!game.inB(nx2, ny2)) {
-          if (fail('ownership', 'Outside your territory')) return checks;
+          if (fail('ownership', { code: 'territory' })) return checks;
           continue;
         }
-        var n2 = game.idx(nx2, ny2);
+        const n2 = game.idx(nx2, ny2);
         if (!game.passI(n2)) continue;
-        if (!game.owned[n2]) if (fail('ownership', 'Outside your territory')) return checks;
+        if (!game.owned[n2]) if (fail('ownership', { code: 'territory' })) return checks;
       }
-      if (tl.t !== game.GRASS) if (fail('terrain', 'Must stand on meadow')) return checks;
+      if (tl.t !== game.GRASS) if (fail('terrain', { code: 'meadow' })) return checks;
       if (sp.resKind) {
-        var ok = false;
-        for (var dd = 0; dd < 8; dd++) {
-          var mx = x + game.DX[dd],
+        let ok = false;
+        for (let dd = 0; dd < 8; dd++) {
+          const mx = x + game.DX[dd],
             my = y + game.DY[dd];
           if (game.inB(mx, my)) {
-            var mt = game.tiles[game.idx(mx, my)];
-            if (mt.t === game.MTN && mt.res && mt.res.kind === sp.resKind && mt.res.amt > 0)
+            const mt = game.tiles[game.idx(mx, my)];
+            if (
+              mt.t === game.MTN &&
+              mt.deposit &&
+              mt.deposit.kind === sp.resKind &&
+              mt.deposit.amt > 0
+            )
               ok = true;
           }
         }
-        if (!ok)
-          if (
-            fail(
-              'resources',
-              'Must border a mountain with ' +
-                game.GOODS[sp.resKind].name.toLowerCase() +
-                ' deposit',
-            )
-          )
-            return checks;
+        if (!ok) if (fail('resources', { code: 'deposit', good: sp.resKind })) return checks;
       }
       if (type === 'quarry') {
-        var fr = sp.rad,
-          found = false;
-        for (var yy = y - fr; yy <= y + fr && !found; yy++)
-          for (var xx = x - fr; xx <= x + fr && !found; xx++) {
+        const fr = sp.rad ?? 0;
+        let found = false;
+        for (let yy = y - fr; yy <= y + fr && !found; yy++)
+          for (let xx = x - fr; xx <= x + fr && !found; xx++) {
             if (!game.inB(xx, yy)) continue;
             if ((x - xx) * (x - xx) + (y - yy) * (y - yy) > fr * fr) continue;
             if (game.tiles[game.idx(xx, yy)].rock) found = true;
           }
-        if (!found) if (fail('resources', 'No rocks nearby')) return checks;
+        if (!found) if (fail('resources', { code: 'no-rocks' })) return checks;
       }
     }
-    if (buildingAt(x, y)) if (fail('terrain', 'Blocked')) return checks;
-    var mind = type === 'hq' ? 2.8 : 1.9;
-    for (var bi = 0; bi < game.buildings.length; bi++) {
-      var ob = game.buildings[bi];
+    if (buildingAt(x, y)) if (fail('terrain', { code: 'blocked' })) return checks;
+    const mind = type === 'hq' ? 2.8 : 1.9;
+    for (let bi = 0; bi < game.buildings.length; bi++) {
+      const ob = game.buildings[bi];
       if (Math.hypot(ob.x - x, ob.y - y) < mind)
-        if (fail('terrain', 'Too close to ' + game.BSPEC[ob.type].name)) return checks;
+        if (fail('terrain', { code: 'spacing', building: ob.type })) return checks;
     }
     return checks;
   }
-  function canPlace(type: BuildingType, x: number, y: number): [boolean, string] {
+  function canPlace(type: BuildingType, x: number, y: number): [boolean, PlacementRefusal | null] {
     const checks = evaluatePlacement(type, x, y, false);
     return [checks.ok, checks.reason];
   }
@@ -596,40 +616,69 @@ export function createEconomy(
   function placementChecks(type: BuildingType, x: number, y: number): PlacementChecks {
     return evaluatePlacement(type, x, y, true);
   }
-  function suggestFor(reason: string): PlacementAdvice {
+  function placementText(reason: PlacementRefusal | null): string {
     if (!reason) return '';
-    if (reason.indexOf('Not enough') >= 0)
-      return 'build more producers — or inspect a demolition quote for exact recoverable goods';
-    if (reason.indexOf('Outside your territory') >= 0)
-      return 'build an Outpost toward that spot \u2014 it pushes your border out';
-    if (reason === 'No water nearby')
-      return 'place it on a shore inside your border (grass or sand both work)';
-    if (reason.indexOf('deposit') >= 0)
-      return 'click mountains to scout them, then build against the wall with the colored dots';
-    if (reason === 'No rocks nearby')
-      return 'find a grey rock cluster \u2014 the map guarantees some near your start';
-    if (reason.indexOf('Too close to') >= 0) return 'keep about 2 tiles of space between buildings';
-    return '';
+    switch (reason.code) {
+      case 'out-of-bounds':
+        return 'Out of bounds';
+      case 'choose-map-tile':
+        return 'Choose a tile inside the map';
+      case 'water':
+        return 'Cannot build on water';
+      case 'mountain':
+        return 'Cannot build on mountains';
+      case 'territory':
+        return 'Outside your territory';
+      case 'shore-land':
+        return 'Must stand on land by the shore';
+      case 'no-water':
+        return 'No water nearby';
+      case 'meadow':
+        return 'Must stand on meadow';
+      case 'deposit':
+        return (
+          'Must border a mountain with ' + game.GOODS[reason.good].name.toLowerCase() + ' deposit'
+        );
+      case 'no-rocks':
+        return 'No rocks nearby';
+      case 'blocked':
+        return 'Blocked';
+      case 'spacing':
+        return 'Too close to ' + game.BSPEC[reason.building].name;
+      case 'stock':
+        return 'Not enough ' + game.GOODS[reason.good].name;
+      case 'unreachable-stock':
+        return 'Not enough reachable stock';
+    }
+    const unhandled: never = reason;
+    throw new Error('Unformatted placement refusal: ' + JSON.stringify(unhandled));
+  }
+  function suggestFor(reason: PlacementRefusal | null): PlacementAdvice {
+    return reason ? placementAdvice[reason.code] : '';
   }
   function placeBuilding(type: BuildingType, x: number, y: number) {
-    var c = canPlace(type, x, y);
+    const c = canPlace(type, x, y);
     if (!c[0]) {
-      gameEvent('placementRejected', { type, x, y, reason: c[1], stock: false });
+      if (c[1]) gameEvent('placementRejected', { type, x, y, reason: c[1] });
       return false;
     }
-    var sp = game.BSPEC[type],
+    const sp = game.BSPEC[type],
       needs = copyObj(sp.cost || {});
-    for (var g in needs)
-      if (availGood(g as Good, { x: x, y: y }) < needs[g as Good]) {
-        var r = 'Not enough ' + game.GOODS[g as Good].name;
-        gameEvent('placementRejected', { type, x, y, reason: r, stock: true });
+    for (const g in needs) {
+      const good = g as Good,
+        available = availGood(good, { x, y }),
+        required = needs[good] ?? 0;
+      if (available < required) {
+        const r: PlacementRefusal = { code: 'stock', good, required, available };
+        gameEvent('placementRejected', { type, x, y, reason: r });
         return false;
       }
+    }
     if (!requestStock(needs, { x: x, y: y })) return false;
-    var i2 = game.idx(x, y),
+    const i2 = game.idx(x, y),
       tl2 = game.tiles[i2];
     if (tl2.tree || tl2.rock) {
-      var clearedTree = !!tl2.tree;
+      const clearedTree = !!tl2.tree;
       game.tiles[i2].tree = 0;
       game.tiles[i2].rock = null;
       gameEvent('tileChanged', { index: i2 });
@@ -639,6 +688,22 @@ export function createEconomy(
     game.buildings.push(placed);
     buildingVersion++;
     gameEvent('buildingPlaced', { building: placed });
+    return true;
+  }
+  /** Set a building's construction priority level; other values are rejected. */
+  function setBuildingPriority(b: Building, priority: unknown) {
+    if (priority !== 0 && priority !== 1 && priority !== 2) return false;
+    b.priority = priority;
+    gameEvent('productionControlChanged', { building: b });
+    return true;
+  }
+  /** Request a warehouse reserve, clamped to a whole number from 0 to 500. */
+  function setStockTarget(b: Building, good: Good, amount: unknown) {
+    if (typeof amount !== 'number' || !Number.isFinite(amount)) return false;
+    if (!game.BSPEC[b.type].store || !Object.hasOwn(game.GOODS, good)) return false;
+    if (!b.targets) b.targets = {};
+    b.targets[good] = Math.max(0, Math.min(500, Math.floor(amount)));
+    gameEvent('productionControlChanged', { building: b });
     return true;
   }
   function demolitionQuote(b: Building): DemolitionQuote {
@@ -652,32 +717,22 @@ export function createEconomy(
           : sp.store && storages().length <= 1
             ? 'Storage demolition requires more than one completed storehouse. Complete another first.'
             : '';
-    const stores = storages().filter((store) => store !== b);
-    let receiver: Building | null = null,
-      distance = Infinity;
-    for (const store of stores) {
-      const d = Math.hypot(store.x - b.x, store.y - b.y);
-      if (d < distance) {
-        receiver = store;
-        distance = d;
-      }
-    }
+    const receiver = nearestStorage(b, { exclude: b, euclidean: true });
     const refund: Inventory = {},
       salvage: Inventory = {};
     if (allowed && receiver) {
       for (const name in sp.cost) {
         const good = name as Good;
-        const amount = Math.floor((b.done ? sp.cost[good] : b.got[good] | 0) / 2);
+        const amount = Math.floor((b.done ? (sp.cost?.[good] ?? 0) : (b.got[good] ?? 0) | 0) / 2);
         if (amount > 0) refund[good] = amount;
       }
       for (const name in b.stock)
-        if ((b.stock[name as Good] | 0) > 0) salvage[name as Good] = b.stock[name as Good] | 0;
+        if (((b.stock[name as Good] ?? 0) | 0) > 0)
+          salvage[name as Good] = (b.stock[name as Good] ?? 0) | 0;
     }
     const equipmentReceiver =
-      allowed && b.type === 'guard' && b.man ? nearestStoragePos(b.x, b.y) : null;
-    const touching = game.jobs.filter(
-      (job) => job.from === b.id || job.to === b.id || job.s === b.id,
-    );
+      allowed && b.type === 'guard' && b.manned ? nearestStoragePos(b.x, b.y) : null;
+    const touching = game.jobs.filter((job) => job.sourceId === b.id || job.to === b.id);
     const cancelledDeliveries: DeliveryStages = { queued: 0, assigned: 0, carrying: 0 };
     for (const job of touching) {
       if (job.kind === 'soldier') continue;
@@ -709,7 +764,7 @@ export function createEconomy(
       salvage,
       receiver: location(receiver),
       returnedSoldiers: allowed
-        ? (b.type === 'guard' && b.man ? 1 : 0) +
+        ? (b.type === 'guard' && b.manned ? 1 : 0) +
           touching.filter((job) => job.kind === 'soldier').length
         : 0,
       equipment: equipmentReceiver ? { weapons: 1 } : {},
@@ -720,65 +775,56 @@ export function createEconomy(
     };
   }
   function demolish(b: Building) {
-    if (b.type === 'hq') {
-      gameEvent('demolitionRejected', { reason: 'headquarters' });
+    const quote = demolitionQuote(b);
+    if (!quote.allowed) {
+      if (b.type === 'hq') gameEvent('demolitionRejected', { reason: 'headquarters' });
+      else if (game.BSPEC[b.type].store && storages().length <= 1)
+        gameEvent('demolitionRejected', { reason: 'last-store' });
       return;
     }
-    if (game.BSPEC[b.type].store && storages().length <= 1) {
-      gameEvent('demolitionRejected', { reason: 'last-store' });
-      return;
-    }
-    if (b.type === 'guard' && b.man) {
-      game.soldierPool++;
-      var ws = nearestStoragePos(b.x, b.y);
-      if (ws) {
-        ws.stock['weapons'] = (ws.stock['weapons'] | 0) + 1;
-        game.recordEconomicFlow('salvage', 'weapons', 1);
+    // Job cancellation returns dispatched soldiers itself; add only the garrison here.
+    const dispatched = game.jobs.filter((job) => job.kind === 'soldier' && job.to === b.id).length;
+    game.soldierPool += quote.returnedSoldiers - dispatched;
+    const equipmentStore = quote.equipmentReceiver ? byId(quote.equipmentReceiver.id) : null;
+    if (equipmentStore)
+      for (const name in quote.equipment) {
+        const good = name as Good;
+        const amount = quote.equipment[good] ?? 0;
+        equipmentStore.stock[good] = ((equipmentStore.stock[good] ?? 0) | 0) + amount;
+        game.recordEconomicFlow('salvage', good, amount);
       }
-    }
-    var sp = game.BSPEC[b.type],
-      s = null,
-      sd = Infinity,
-      ss = storages();
-    for (var si = 0; si < ss.length; si++) {
-      if (ss[si] === b) continue;
-      var dd = Math.hypot(ss[si].x - b.x, ss[si].y - b.y);
-      if (dd < sd) {
-        sd = dd;
-        s = ss[si];
+    const sp = game.BSPEC[b.type];
+    const receiver = quote.receiver ? byId(quote.receiver.id) : null;
+    if (receiver) {
+      for (const name in quote.refund) {
+        const good = name as Good;
+        const amount = quote.refund[good] ?? 0;
+        receiver.stock[good] = ((receiver.stock[good] ?? 0) | 0) + amount;
+        game.recordEconomicFlow('refund', good, amount);
       }
-    }
-    if (s) {
-      for (var g in sp.cost) {
-        var n = Math.floor((b.done ? sp.cost[g as Good] : b.got[g as Good] | 0) / 2);
-        if (n > 0) {
-          s.stock[g as Good] = (s.stock[g as Good] | 0) + n;
-          game.recordEconomicFlow('refund', g as Good, n);
+      for (const name in quote.salvage) {
+        const good = name as Good;
+        const amount = quote.salvage[good] ?? 0;
+        receiver.stock[good] = ((receiver.stock[good] ?? 0) | 0) + amount;
+        game.recordEconomicFlow('salvage', good, amount);
+        if (good === 'gold' && !sp.store) {
+          game.state.gold += amount;
+          game.state.goldDelivered = (game.state.goldDelivered || 0) + amount;
+          gameEvent('goodsDelivered', {
+            building: receiver,
+            good,
+            amount,
+            transfer: false,
+          });
         }
       }
-      for (g in b.stock)
-        if ((b.stock[g as Good] | 0) > 0) {
-          var salvaged = b.stock[g as Good] | 0;
-          s.stock[g as Good] = (s.stock[g as Good] | 0) + salvaged;
-          game.recordEconomicFlow('salvage', g as Good, salvaged);
-          if (g === 'gold' && !sp.store) {
-            game.state.gold += salvaged;
-            game.state.goldDelivered = (game.state.goldDelivered || 0) + salvaged;
-            gameEvent('goodsDelivered', {
-              building: s,
-              good: g as Good,
-              amount: salvaged,
-              transfer: false,
-            });
-          }
-        }
     }
     deleteJobsFor(b.id);
     game.buildings.splice(game.buildings.indexOf(b), 1);
     buildingVersion++;
     game.recomputeTerritory();
-    for (var d = 0; d < 4; d++) {
-      var nx = b.x + game.DX[d],
+    for (let d = 0; d < 4; d++) {
+      const nx = b.x + game.DX[d],
         ny = b.y + game.DY[d];
       if (game.inB(nx, ny) && game.tiles[game.idx(nx, ny)].road)
         gameEvent('tileChanged', { index: game.idx(nx, ny) });
@@ -787,30 +833,32 @@ export function createEconomy(
   }
   function deleteJobsFor(id: number) {
     cancelJobs(function (j) {
-      return j.from === id || j.to === id || j.s === id;
+      return j.sourceId === id || j.to === id;
     });
   }
   /** Exact scheduling gate; also read by the inspector without mutating recorded reasons. */
-  function productionConstraint(b: Building) {
+  function productionConstraint(b: Building): ProductionBlockReason {
     const sp = game.BSPEC[b.type];
-    var reason = '';
+    let reason: ProductionBlockReason = '';
     if (b.disabled) reason = 'paused';
     else if (b.exhausted) reason = 'exhausted';
-    else if (sp.out && (b.stock[sp.out] | 0) + (sp.prod === 'gather' ? 2 : 1) > 8)
-      reason = 'output';
+    else if (productionOutputBlocked(b, sp)) reason = 'output';
     else if (sp.out && edibleGoods.includes(sp.out) && foodSaturated(sp.out)) reason = 'demand';
     else if (sp.out && intermediateSaturated(sp.out)) reason = 'demand';
-    else if (sp.out === 'beer' && totalGood('beer') >= Math.max(12, stockTargetTotal('beer')))
+    else if (
+      sp.out === 'beer' &&
+      totalGood('beer') >= Math.max(productionReserves.beer, stockTargetTotal('beer'))
+    )
       reason = 'demand';
     else if (
       (b.type === 'toolsmith' || b.type === 'workshop') &&
-      (totalGood('tools') >= Math.max(12, stockTargetTotal('tools')) ||
-        (b.type === 'workshop' && totalGood('planks') < 4))
+      (totalGood('tools') >= Math.max(productionReserves.tools, stockTargetTotal('tools')) ||
+        (b.type === 'workshop' && totalGood('planks') < productionReserves.planks))
     )
       reason = 'reserve';
     else if (
       b.type === 'armory' &&
-      totalGood('weapons') >= Math.max(15, stockTargetTotal('weapons'))
+      totalGood('weapons') >= Math.max(productionReserves.weapons, stockTargetTotal('weapons'))
     )
       reason = 'reserve';
     else if (sp.water && !hasLocalWater(b)) reason = 'water';
@@ -818,6 +866,19 @@ export function createEconomy(
       if (ingredientShortages(b, sp).length) reason = 'inputs';
     } else if (b.blockedReason === 'resources') reason = 'resources';
     return reason;
+  }
+  /** Live scheduling constraints plus the last attempt's blockage; a pure presentation query. */
+  function buildingWorking(b: Building) {
+    const sp = game.BSPEC[b.type];
+    return !!(
+      b.done &&
+      sp.prod &&
+      sp.prod !== 'none' &&
+      !sp.store &&
+      !sp.guard &&
+      !b.blockedReason &&
+      !productionConstraint(b)
+    );
   }
   function productionProgress(b: Building): ProductionProgress | null {
     const sp = game.BSPEC[b.type];
@@ -833,13 +894,13 @@ export function createEconomy(
     )
       reason = 'resources';
     const output = sp.prod === 'gather' ? 2 : 1;
-    const explanations: Record<string, string> = {
+    const explanations: Partial<Record<ProductionBlockReason, string>> = {
       paused: 'Production paused by you.',
       exhausted: 'Deposit exhausted; no further output can be produced here.',
-      output: `Output blocked: the next batch needs space for ${output} ${sp.out ? game.GOODS[sp.out].name.toLowerCase() : 'goods'}; ${b.stock[sp.out] || 0} of 8 local output slots are occupied. Waiting for collection.`,
+      output: `Output blocked: the next batch needs space for ${output} ${sp.out ? game.GOODS[sp.out].name.toLowerCase() : 'goods'}; ${sp.out ? b.stock[sp.out] || 0 : 0} of ${productionOutputLimit} local output slots are occupied. Waiting for collection.`,
       demand: 'Production suspended: colony demand is satisfied by current reserves.',
       reserve: 'Production suspended by the colony stock reserve policy.',
-      water: 'Production suspended: no working connected local well within 6 tiles.',
+      water: `Production suspended: no working connected local well within ${wellRadius(game)} tiles.`,
       inputs: 'Production suspended: required ingredients are missing locally.',
       resources:
         'Natural resource availability will be checked at the next attempt; the retry countdown continues.',
@@ -859,18 +920,18 @@ export function createEconomy(
     };
   }
   function bTick(b: Building, dt: number) {
-    var sp = game.BSPEC[b.type];
+    const sp = game.BSPEC[b.type];
     if (!b.done) {
       if (!siteReady(b)) return;
-      b.prog += dt / 10;
-      if (b.prog >= 1) onDone(b);
+      b.constructionProgress += dt / 10;
+      if (b.constructionProgress >= 1) onDone(b);
       return;
     }
     if (sp.prod === 'none' || sp.store) return;
     if (!b.metrics) b.metrics = productionMetrics();
     ensureProductionHistory(b.metrics);
-    var reason = productionConstraint(b),
-      g: Good;
+    const reason = productionConstraint(b);
+    let g: Good;
     b.blockedReason = reason;
     b.metrics.elapsed += dt;
     if (reason) {
@@ -885,8 +946,8 @@ export function createEconomy(
     if (b.timer > 0) return;
     switch (sp.prod) {
       case 'gather': {
-        var tr = findTree(b, sp.rad);
-        if (tr >= 0) {
+        const tr = findTree(b, sp.rad);
+        if (tr !== undefined) {
           game.tiles[tr].tree = 0;
           gameEvent('tileChanged', { index: tr });
           addStock(b, 'logs', 2);
@@ -903,47 +964,48 @@ export function createEconomy(
         // chop zone (plant rad 5 around the LJ, gate on the LJ's own supply). Planting around the
         // forester itself can fill the un-choppable crescent of its circle, close the gate and
         // starve the pair (seen on ?autoplay&seed=2024).
-        var lb4 = null,
+        let lb4: Building | null = null,
           bd4 = 1e9;
-        for (var i6 = 0; i6 < game.buildings.length; i6++) {
-          var lb5 = game.buildings[i6];
+        for (let i6 = 0; i6 < game.buildings.length; i6++) {
+          const lb5 = game.buildings[i6];
           if (lb5.done && lb5.type === 'lumberjack') {
-            var dd4 = Math.abs(lb5.x - b.x) + Math.abs(lb5.y - b.y);
+            const dd4 = Math.abs(lb5.x - b.x) + Math.abs(lb5.y - b.y);
             if (dd4 < bd4) {
               bd4 = dd4;
               lb4 = lb5;
             }
           }
         }
-        var tgt6 = lb4 || b,
+        const tgt6 = lb4 || b,
           gt6 = lb4 ? 20 : 25,
           pr6 = lb4 ? 5 : sp.rad;
         if (countTrees(tgt6, lb4 ? 6 : 7) < gt6) {
-          var p = randPlantSpot(tgt6, pr6);
-          if (p >= 0) {
+          const p = randPlantSpot(tgt6, pr6);
+          if (p !== undefined) {
             game.tiles[p].tree = 3;
             gameEvent('tileChanged', { index: p });
           }
-          b.timer = 7;
+          b.timer = timing.base;
         } else b.timer = 5;
         break;
       }
       case 'rock': {
-        var rk = findRock(b, sp.rad);
-        if (rk >= 0) {
-          var t2 = game.tiles[rk];
-          t2.rock.amt--;
+        const rk = findRock(b, sp.rad);
+        const t2 = rk === undefined ? undefined : game.tiles[rk],
+          rock = t2?.rock;
+        if (rk !== undefined && t2 && rock) {
+          rock.amt--;
           addStock(b, 'stone', 1);
-          b.norock = false;
+          b.rocksExhaustedNoticeSent = false;
           b.blockedReason = '';
-          if (t2.rock.amt <= 0) {
+          if (rock.amt <= 0) {
             t2.rock = null;
             gameEvent('tileChanged', { index: rk });
           }
           b.timer += timing.base;
         } else {
-          if (!b.norock) {
-            b.norock = true;
+          if (!b.rocksExhaustedNoticeSent) {
+            b.rocksExhaustedNoticeSent = true;
             gameEvent('rocksExhausted', { building: b });
           }
           b.timer = 4;
@@ -961,13 +1023,13 @@ export function createEconomy(
           b.timer = 6;
           break;
         }
-        addStock(b, sp.out, 1);
+        if (sp.out) addStock(b, sp.out, 1);
         b.timer += timing.base;
         b.blockedReason = '';
         break;
       }
       case 'farm': {
-        addStock(b, sp.out, 1);
+        if (sp.out) addStock(b, sp.out, 1);
         b.timer += timing.base;
         break;
       }
@@ -975,13 +1037,13 @@ export function createEconomy(
       case 'mine': {
         if (ingredientShortages(b, sp).length) {
           b.timer = 1.5;
-          if (sp.prod === 'mine' && !b.nofood) {
-            b.nofood = true;
+          if (sp.prod === 'mine' && !b.foodBlockedNoticeSent) {
+            b.foodBlockedNoticeSent = true;
             gameEvent('foodBlocked', { building: b });
           }
           break;
         }
-        var inputs = ingredientsConsumedNext(b, sp);
+        const inputs = ingredientsConsumedNext(b, sp);
         if (sp.prod === 'mine' && !mineDeposit(b)) {
           b.exhausted = true;
           b.blockedReason = 'exhausted';
@@ -989,12 +1051,13 @@ export function createEconomy(
           break;
         }
         for (g in inputs) {
-          b.stock[g] -= inputs[g];
-          b.metrics.consumed[g] = (b.metrics.consumed[g] | 0) + inputs[g];
-          game.recordEconomicFlow('consumed', g, inputs[g]);
+          const amount = inputs[g] ?? 0;
+          b.stock[g] = (b.stock[g] ?? 0) - amount;
+          b.metrics.consumed[g] = ((b.metrics.consumed[g] ?? 0) | 0) + amount;
+          game.recordEconomicFlow('consumed', g, amount);
         }
-        b.nofood = false;
-        addStock(b, sp.out, 1);
+        b.foodBlockedNoticeSent = false;
+        if (sp.out) addStock(b, sp.out, 1);
         b.timer += timing.base;
         b.blockedReason = '';
         break;
@@ -1003,38 +1066,39 @@ export function createEconomy(
   }
   function forRadius<T>(
     b: Building,
-    r: number,
+    r: number | undefined,
     f: (i: number, x: number, y: number) => T | undefined,
   ) {
-    for (var y = b.y - r; y <= b.y + r; y++)
-      for (var x = b.x - r; x <= b.x + r; x++) {
+    if (r === undefined) return undefined;
+    for (let y = b.y - r; y <= b.y + r; y++)
+      for (let x = b.x - r; x <= b.x + r; x++) {
         if (!game.inB(x, y)) continue;
         if ((b.x - x) * (b.x - x) + (b.y - y) * (b.y - y) > r * r) continue;
-        var r2 = f(game.idx(x, y), x, y);
+        const r2 = f(game.idx(x, y), x, y);
         if (r2 !== undefined) return r2;
       }
     return undefined;
   }
-  function findTree(b: Building, r: number) {
+  function findTree(b: Building, r: number | undefined) {
     return forRadius(b, r, function (i) {
       return game.tiles[i].tree >= 3 ? i : undefined;
     });
   }
   function countTrees(b: Building, r: number) {
-    var n = 0;
+    let n = 0;
     forRadius(b, r, function (i) {
       if (game.tiles[i].tree >= 2) n++;
     });
     return n;
   }
-  function findRock(b: Building, r: number) {
+  function findRock(b: Building, r: number | undefined) {
     return forRadius(b, r, function (i) {
       return game.tiles[i].rock ? i : undefined;
     });
   }
-  function randPlantSpot(b: Building, r: number) {
+  function randPlantSpot(b: Building, r: number | undefined) {
     return forRadius(b, r, function (i, x, y) {
-      var tl = game.tiles[i];
+      const tl = game.tiles[i];
       return tl.t === game.GRASS &&
         !tl.tree &&
         !tl.rock &&
@@ -1047,19 +1111,24 @@ export function createEconomy(
     });
   }
   function hasWaterNear(b: Building) {
-    for (var y = b.y - 2; y <= b.y + 2; y++)
-      for (var x = b.x - 2; x <= b.x + 2; x++)
+    for (let y = b.y - 2; y <= b.y + 2; y++)
+      for (let x = b.x - 2; x <= b.x + 2; x++)
         if (game.inB(x, y) && game.tiles[game.idx(x, y)].t === game.WATER) return true;
     return false;
   }
   function mineDeposit(b: Building) {
-    for (var d = 0; d < 8; d++) {
-      var x = b.x + game.DX[d],
+    for (let d = 0; d < 8; d++) {
+      const x = b.x + game.DX[d],
         y = b.y + game.DY[d];
       if (!game.inB(x, y)) continue;
-      var t = game.tiles[game.idx(x, y)];
-      if (t.t === game.MTN && t.res && t.res.kind === game.BSPEC[b.type].resKind && t.res.amt > 0) {
-        t.res.amt--;
+      const t = game.tiles[game.idx(x, y)];
+      if (
+        t.t === game.MTN &&
+        t.deposit &&
+        t.deposit.kind === game.BSPEC[b.type].resKind &&
+        t.deposit.amt > 0
+      ) {
+        t.deposit.amt--;
         gameEvent('tileChanged', { index: game.idx(x, y) });
         return true;
       }
@@ -1067,143 +1136,130 @@ export function createEconomy(
     return false;
   }
   function incomingStock(g: Good, bid: number) {
-    var n = 0;
-    for (var i = 0; i < game.jobs.length; i++)
+    let n = 0;
+    for (let i = 0; i < game.jobs.length; i++)
       if (game.jobs[i].kind === 'transfer' && game.jobs[i].good === g && game.jobs[i].to === bid)
         n++;
-    for (i = 0; i < game.units.length; i++) {
-      var u = game.units[i];
+    for (let i = 0; i < game.units.length; i++) {
+      const u = game.units[i];
       if (u.carry === g && u.dropB === bid && (!u.job || u.job.kind !== 'transfer')) n++;
     }
     return n;
   }
   function collectedJob(job: Job) {
-    for (var i = 0; i < game.units.length; i++)
+    for (let i = 0; i < game.units.length; i++)
       if (game.units[i].job === job && game.units[i].carry) return true;
     return false;
   }
   function deliveryStorage(g: Good, ref: Pick<Building, 'x' | 'y'>): Building | null {
-    var ss = storages(),
-      best = null,
-      score = -Infinity,
-      nearest = null,
-      dist = Infinity;
-    for (var i = 0; i < ss.length; i++) {
-      var s = ss[i],
+    const ss = storages();
+    let best: Building | null = null,
+      score = -Infinity;
+    for (let i = 0; i < ss.length; i++) {
+      const s = ss[i],
         d = Math.hypot(s.x - ref.x, s.y - ref.y);
       if (!game.connectedLand(ref.x, ref.y, s.x, s.y)) continue;
-      if (d < dist) {
-        nearest = s;
-        dist = d;
-      }
-      var deficit = ((s.targets || {})[g] | 0) - (s.stock[g] | 0) - incomingStock(g, s.id);
-      var value = deficit / (1 + d * 0.15);
+      const deficit =
+        (((s.targets || {})[g] ?? 0) | 0) - ((s.stock[g] ?? 0) | 0) - incomingStock(g, s.id);
+      const value = deficit / (1 + d * 0.15);
       if (deficit > 0 && value > score) {
         best = s;
         score = value;
       }
     }
-    return best || nearest;
+    return best || nearestStorage(ref, { connected: true, euclidean: true });
   }
   function replenishTargets() {
-    var ss = storages();
-    var carried: Record<string, number> = {},
+    const ss = storages();
+    const carried: Record<string, number> = {},
       retained: Record<string, number> = {},
       exportBudget: Record<string, number> = {};
-    for (var ji = 0; ji < game.jobs.length; ji++) {
-      var pending = game.jobs[ji];
-      if (pending.kind !== 'transfer' || collectedJob(pending)) continue;
-      var source = byId(pending.s),
-        sourceKey = pending.s + '/' + pending.good;
+    for (let ji = 0; ji < game.jobs.length; ji++) {
+      const pending = game.jobs[ji];
+      if (pending.kind !== 'transfer' || !pending.good || collectedJob(pending)) continue;
+      const source = byId(pending.sourceId),
+        sourceKey = pending.sourceId + '/' + pending.good;
       if (exportBudget[sourceKey] === undefined)
         exportBudget[sourceKey] = source
-          ? (source.stock[pending.good] | 0) -
-            (source.res[pending.good] | 0) -
-            ((source.targets || {})[pending.good] | 0)
+          ? ((source.stock[pending.good] ?? 0) | 0) -
+            ((source.reservedStock[pending.good] ?? 0) | 0) -
+            (((source.targets || {})[pending.good] ?? 0) | 0)
           : 0;
       // Existing transfer reservations are eligible for reconsideration. Fetch
       // reservations still protect construction and production ingredients.
       exportBudget[sourceKey]++;
     }
-    for (var ui = 0; ui < game.units.length; ui++) {
-      var u = game.units[ui];
+    for (let ui = 0; ui < game.units.length; ui++) {
+      const u = game.units[ui];
       if (!u.carry || !u.dropB) continue;
-      var key = u.dropB + '/' + u.carry;
+      const key = u.dropB + '/' + u.carry;
       carried[key] = (carried[key] || 0) + 1;
     }
     cancelJobs(function (job) {
       if (job.kind !== 'transfer') return false;
+      if (!job.good) return true;
       if (collectedJob(job)) return false;
-      var target = byId(job.to),
-        source = byId(job.s),
+      const target = byId(job.to),
+        source = byId(job.sourceId),
         key = job.to + '/' + job.good,
-        sourceKey = job.s + '/' + job.good;
+        sourceKey = job.sourceId + '/' + job.good;
       if (!target || !source || !game.connectedLand(source.x, source.y, target.x, target.y))
         return true;
-      var needed = Math.max(
+      const needed = Math.max(
         0,
-        ((target.targets || {})[job.good] | 0) - (target.stock[job.good] | 0) - (carried[key] || 0),
+        (((target.targets || {})[job.good] ?? 0) | 0) -
+          ((target.stock[job.good] ?? 0) | 0) -
+          (carried[key] || 0),
       );
       if ((retained[key] || 0) >= needed || exportBudget[sourceKey] <= 0) return true;
       retained[key] = (retained[key] || 0) + 1;
       exportBudget[sourceKey]--;
       return false;
     });
-    for (var i = 0; i < ss.length; i++) {
-      var target = ss[i],
+    for (let i = 0; i < ss.length; i++) {
+      const target = ss[i],
         targets: Inventory = target.targets || {};
-      for (var g in targets) {
-        var missing = Math.max(
+      for (const g in targets) {
+        const missing = Math.max(
           0,
-          (targets[g as Good] | 0) -
-            (target.stock[g as Good] | 0) -
+          ((targets[g as Good] ?? 0) | 0) -
+            ((target.stock[g as Good] ?? 0) | 0) -
             incomingStock(g as Good, target.id),
         );
         // Keep a small queue: construction and producers retain first use of carriers.
-        for (var k = 0; k < Math.min(2, missing); k++) {
-          var source: Building = null,
-            dist = Infinity;
-          for (var j = 0; j < ss.length; j++) {
-            var candidate = ss[j];
-            if (candidate === target) continue;
-            if (!game.connectedLand(candidate.x, candidate.y, target.x, target.y)) continue;
-            var surplus =
-              (candidate.stock[g as Good] | 0) -
-              (candidate.res[g as Good] | 0) -
-              ((candidate.targets || {})[g as Good] | 0);
-            if (surplus <= 0) continue;
-            var d = Math.hypot(candidate.x - target.x, candidate.y - target.y);
-            if (d < dist) {
-              source = candidate;
-              dist = d;
-            }
-          }
+        for (let k = 0; k < Math.min(2, missing); k++) {
+          const source = nearestStorage(target, {
+            available: g as Good,
+            connected: true,
+            exclude: target,
+            retainTarget: true,
+            euclidean: true,
+          });
           if (!source) break;
-          source.res[g as Good] = (source.res[g as Good] | 0) + 1;
+          source.reservedStock[g as Good] = ((source.reservedStock[g as Good] ?? 0) | 0) + 1;
           game.jobs.push({
             kind: 'transfer',
             good: g as Good,
-            from: source.id,
-            s: source.id,
+            sourceId: source.id,
             to: target.id,
-            state: 'p',
+            status: 'pending',
           });
         }
       }
     }
   }
   function jobPriority(j: Job) {
-    var b = j.to ? byId(j.to) : null;
+    const b = j.to ? byId(j.to) : null;
     if (j.kind === 'fetch') return (b && !b.done ? 100 : 20) + 10 * (b ? b.priority || 0 : 0);
     if (j.kind === 'soldier') return 80;
     if (j.kind === 'deliver') {
-      var source = byId(j.from);
-      return 40 + (source ? source.stock[j.good] | 0 : 0);
+      const source = byId(j.sourceId);
+      return 40 + (source && j.good ? (source.stock[j.good] ?? 0) | 0 : 0);
     }
     return 5 + 10 * (b ? b.priority || 0 : 0);
   }
   function ensureJobs() {
-    var ordered = game.buildings
+    const ordered = game.buildings
       .slice()
       .sort(function (a, b) {
         return (
@@ -1214,13 +1270,13 @@ export function createEconomy(
         );
       })
       .reverse();
-    for (var bi = 0; bi < ordered.length; bi++) {
-      var b = ordered[bi],
-        sp = game.BSPEC[b.type],
-        g: Good;
+    for (let bi = 0; bi < ordered.length; bi++) {
+      const b = ordered[bi],
+        sp = game.BSPEC[b.type];
+      let g: Good;
       if (!b.done) {
         for (g in b.needs) {
-          var rem = b.needs[g] - (b.got[g] | 0);
+          const rem = (b.needs[g] ?? 0) - ((b.got[g] ?? 0) | 0);
           if (rem <= 0) {
             cancelJobs(
               (function (g2, g3) {
@@ -1231,26 +1287,32 @@ export function createEconomy(
             );
             continue;
           }
-          var pen = countFetch(g, b.id);
-          for (var c2 = pen; c2 < rem; c2++) {
-            var s = pickStorageFor(g, b);
+          const pen = incomingCount(g, b.id);
+          for (let c2 = pen; c2 < rem; c2++) {
+            let s = pickStorageFor(g, b);
             if (!s) {
-              var request: Inventory = {};
+              const request: Inventory = {};
               request[g] = 1;
               if (requestStock(request, b)) s = pickStorageFor(g, b);
             }
             if (!s) break;
-            s.res[g] = (s.res[g] | 0) + 1;
-            game.jobs.push({ kind: 'fetch', good: g as Good, to: b.id, s: s.id, state: 'p' });
+            s.reservedStock[g] = ((s.reservedStock[g] ?? 0) | 0) + 1;
+            game.jobs.push({
+              kind: 'fetch',
+              good: g as Good,
+              to: b.id,
+              sourceId: s.id,
+              status: 'pending',
+            });
           }
         }
         continue;
       }
       if (sp.in && !b.disabled && !b.exhausted) {
-        var fetchInputs = eligibleIngredients(b, sp);
+        const fetchInputs = eligibleIngredients(b, sp);
         for (g in fetchInputs) {
-          var want = 3,
-            have = b.stock[g] | 0;
+          const want = 3,
+            have = (b.stock[g] ?? 0) | 0;
           if (have >= want) {
             cancelJobs(
               (function (g4, g5) {
@@ -1261,12 +1323,18 @@ export function createEconomy(
             );
             continue;
           }
-          var toC = want - have - countFetch(g, b.id);
-          for (var c3 = 0; c3 < toC; c3++) {
-            var s3 = pickStorageFor(g, b);
+          const toC = want - have - incomingCount(g, b.id);
+          for (let c3 = 0; c3 < toC; c3++) {
+            const s3 = pickStorageFor(g, b);
             if (!s3) break;
-            s3.res[g] = (s3.res[g] | 0) + 1;
-            game.jobs.push({ kind: 'fetch', good: g as Good, to: b.id, s: s3.id, state: 'p' });
+            s3.reservedStock[g] = ((s3.reservedStock[g] ?? 0) | 0) + 1;
+            game.jobs.push({
+              kind: 'fetch',
+              good: g as Good,
+              to: b.id,
+              sourceId: s3.id,
+              status: 'pending',
+            });
           }
         }
       } else if (sp.in) {
@@ -1279,9 +1347,9 @@ export function createEconomy(
         (b.type === 'farm' || b.type === 'fisherman') &&
         (b.stock.food || 0) > countDeliver('food', b.id)
       )
-        game.jobs.push({ kind: 'deliver', good: 'food', from: b.id, state: 'p' });
+        game.jobs.push({ kind: 'deliver', good: 'food', sourceId: b.id, status: 'pending' });
       if (sp.out) {
-        var outN = b.stock[sp.out] | 0,
+        const outN = (b.stock[sp.out] ?? 0) | 0,
           dlMax = outN >= 4 ? 2 : 1,
           dl = countDeliver(sp.out, b.id);
         if (outN <= 0) {
@@ -1289,69 +1357,59 @@ export function createEconomy(
             cancelJobs(
               (function (g6, g7) {
                 return function (a) {
-                  if (a.kind !== 'deliver' || a.good !== g6 || a.from !== g7) return false;
-                  for (var ui = 0; ui < game.units.length; ui++)
+                  if (a.kind !== 'deliver' || a.good !== g6 || a.sourceId !== g7) return false;
+                  for (let ui = 0; ui < game.units.length; ui++)
                     if (game.units[ui].job === a && game.units[ui].carry) return false;
                   return true;
                 };
               })(sp.out, b.id),
             );
         } else if (dl < dlMax)
-          game.jobs.push({ kind: 'deliver', good: sp.out, from: b.id, state: 'p' });
+          game.jobs.push({ kind: 'deliver', good: sp.out, sourceId: b.id, status: 'pending' });
       }
-      if (sp.guard && !b.man && game.soldierPool > 0 && !countSoldier(b.id)) {
+      if (sp.guard && !b.manned && game.soldierPool > 0 && !countSoldier(b.id)) {
         game.soldierPool--;
-        game.jobs.push({ kind: 'soldier', to: b.id, state: 'p' });
+        game.jobs.push({ kind: 'soldier', to: b.id, status: 'pending' });
       }
     }
     replenishTargets();
   }
   function pickupPosOf(j: Job) {
+    if (j.kind === 'soldier') {
+      const store = anyStorage();
+      return store ? { x: store.x, y: store.y } : null;
+    }
+    if (!j.good) return null;
     if (j.kind === 'fetch' || j.kind === 'transfer') {
-      var s = byId(j.s);
-      if (!s || (s.stock[j.good] | 0) <= 0) {
-        var old = s,
-          nb = null,
-          bd = 1e9,
-          ss = storages();
-        for (var i = 0; i < ss.length; i++) {
-          if ((ss[i].stock[j.good] | 0) - (ss[i].res[j.good] | 0) <= 0) continue;
-          var ddx = ss[i].x - (old ? old.x : 0),
-            ddy = ss[i].y - (old ? old.y : 0),
-            d2 = ddx * ddx + ddy * ddy;
-          if (d2 < bd) {
-            bd = d2;
-            nb = ss[i];
-          }
-        }
+      const s = byId(j.sourceId);
+      if (!s || ((s.stock[j.good] ?? 0) | 0) <= 0) {
+        const old = s;
+        const nb = nearestStorage(old || { x: 0, y: 0 }, { available: j.good });
         if (!nb || j.kind === 'transfer') return null;
-        if (old && old !== nb) old.res[j.good] = Math.max(0, (old.res[j.good] | 0) - 1);
-        nb.res[j.good] = (nb.res[j.good] | 0) + 1;
-        j.s = nb.id;
+        if (old && old !== nb)
+          old.reservedStock[j.good] = Math.max(0, ((old.reservedStock[j.good] ?? 0) | 0) - 1);
+        nb.reservedStock[j.good] = ((nb.reservedStock[j.good] ?? 0) | 0) + 1;
+        j.sourceId = nb.id;
       }
-      var s2 = byId(j.s);
+      const s2 = byId(j.sourceId);
       return s2 ? { x: s2.x, y: s2.y } : null;
     }
     if (j.kind === 'deliver') {
-      var b = byId(j.from);
+      const b = byId(j.sourceId);
       return b ? { x: b.x, y: b.y } : null;
-    }
-    if (j.kind === 'soldier') {
-      var s3 = anyStorage();
-      return s3 ? { x: s3.x, y: s3.y } : null;
     }
     return null;
   }
   function nearestIdleCarrier(j: Job) {
-    var pp = pickupPosOf(j);
+    const pp = pickupPosOf(j);
     if (!pp) return null;
-    var best = null,
+    let best: Unit | null = null,
       bd = 1e9;
-    for (var i = 0; i < game.units.length; i++) {
-      var u = game.units[i];
+    for (let i = 0; i < game.units.length; i++) {
+      const u = game.units[i];
       if (u.kind !== 'carrier' || u.job || u.carry || u.phase !== 'idle') continue;
       if (!game.connectedLand(u.x, u.y, pp.x, pp.y)) continue;
-      var d = (u.x - pp.x) * (u.x - pp.x) + (u.y - pp.y) * (u.y - pp.y);
+      const d = (u.x - pp.x) * (u.x - pp.x) + (u.y - pp.y) * (u.y - pp.y);
       if (d < bd) {
         bd = d;
         best = u;
@@ -1360,11 +1418,11 @@ export function createEconomy(
     return best;
   }
   function startJob(u: Unit, j: Job) {
-    var pp = pickupPosOf(j);
+    const pp = pickupPosOf(j);
     if (!pp) return;
-    var p1 = game.findPath(Math.floor(u.x), Math.floor(u.y), pp.x, pp.y);
+    const p1 = game.findPath(Math.floor(u.x), Math.floor(u.y), pp.x, pp.y);
     if (!p1) return;
-    j.state = 't';
+    j.status = 'assigned';
     u.job = j;
     u.phase = 'p';
     u.path = p1;
@@ -1378,11 +1436,11 @@ export function createEconomy(
     game.jobs.sort(function (a, b) {
       return jobPriority(b) - jobPriority(a);
     });
-    for (var i = 0; i < game.jobs.length; i++) {
-      var j = game.jobs[i];
-      if (j.state !== 'p') continue;
+    for (let i = 0; i < game.jobs.length; i++) {
+      const j = game.jobs[i];
+      if (j.status !== 'pending') continue;
       if (j.kind === 'soldier') {
-        var g = byId(j.to),
+        const g = byId(j.to),
           s = g ? nearestStoragePos(g.x, g.y) : null;
         if (!s || !g) {
           game.soldierPool++;
@@ -1390,14 +1448,14 @@ export function createEconomy(
           i--;
           continue;
         }
-        var p = game.findPath(s.x, s.y, g.x, g.y);
+        const p = game.findPath(s.x, s.y, g.x, g.y);
         if (!p) {
           game.soldierPool++;
           game.jobs.splice(i, 1);
           i--;
           continue;
         }
-        j.state = 't';
+        j.status = 'assigned';
         game.units.push({
           id: game.nextId++,
           kind: 'soldier',
@@ -1416,13 +1474,13 @@ export function createEconomy(
         });
         continue;
       }
-      var u = nearestIdleCarrier(j);
+      const u = nearestIdleCarrier(j);
       if (!u) continue;
       startJob(u, j);
     }
   }
   function spawnCarrier(s: Building) {
-    var u: Unit = {
+    const u: Unit = {
       id: game.nextId++,
       kind: 'carrier',
       x: s.x + 0.5,
@@ -1443,33 +1501,37 @@ export function createEconomy(
     game.units.push(u);
     game.serfPool = Math.max(0, game.serfPool - 1);
   }
+  /** Resolving an arrival can replace the completed path with the next route. */
+  function finishPath(u: Unit) {
+    u.path = null;
+    if (u.kind === 'soldier') arriveSoldier(u);
+    else arrive(u);
+  }
   function stepUnit(u: Unit, dt: number) {
-    var remaining = dt,
+    let remaining = dt,
       guard = 0;
     u.moving = false;
     // Spend time per segment, rather than dropping distance at each waypoint. Using the
     // destination tile's cost matches navigation and stays independent of frame size.
     while (remaining > 1e-10 && !u.dead && guard++ < game.W * game.H * 2) {
       if (!u.path || u.pi >= u.path.length) {
-        u.path = null;
-        if (u.kind === 'soldier') arriveSoldier(u);
-        else arrive(u);
+        finishPath(u);
         if (!u.path || u.dead) break;
         // Pickup can create a valid empty drop route when already at its destination.
         // Resolve that arrival on the next iteration before reading a waypoint.
         if (u.pi >= u.path.length) continue;
       }
-      var n = u.path[u.pi],
+      const n = u.path[u.pi],
         tx = (n % game.W) + 0.5 + (u.lx || 0),
         ty = ((n / game.W) | 0) + 0.5 + (u.ly || 0);
-      var dx = tx - u.x,
+      const dx = tx - u.x,
         dy = ty - u.y,
         dl = Math.hypot(dx, dy);
       if (dl < 1e-10) {
         u.pi++;
         continue;
       }
-      var speed = speedOn(u, n),
+      const speed = speedOn(u, n),
         travel = Math.min(dl, speed * remaining);
       u.faceDX = dx / dl;
       u.faceDY = dy / dl;
@@ -1486,56 +1548,70 @@ export function createEconomy(
     }
     // Resolve an arrival even when the final segment used exactly the available time.
     if (u.path && u.pi >= u.path.length) {
-      u.path = null;
-      if (u.kind === 'soldier') arriveSoldier(u);
-      else arrive(u);
+      finishPath(u);
     }
   }
   function speedOn(u: Pick<Unit, 'x' | 'y'>, destination?: number) {
-    var i =
+    const i =
       destination === undefined
         ? game.idx(
             Math.min(game.W - 1, Math.max(0, Math.floor(u.x))),
             Math.min(game.H - 1, Math.max(0, Math.floor(u.y))),
           )
         : destination;
-    var haul = game.state.upgrades ? Math.min(3, game.state.upgrades.haul || 0) : 0;
+    const haul = game.state.upgrades ? Math.min(3, game.state.upgrades.haul || 0) : 0;
     return (2.7 / game.moveCost(i)) * (1 + 0.12 * haul);
   }
+  /** Preserve the narrower state transitions used by retries and cancelled pickups. */
+  function resetCarrier(
+    u: Unit,
+    scope: 'route' | 'assignment' | 'destination' | 'complete' = 'complete',
+  ) {
+    if (scope === 'complete') {
+      u.carry = null;
+      u.carryTransfer = false;
+      u.carryWarehouseTransfer = false;
+      u.carryProducer = null;
+    }
+    if (scope !== 'route') u.job = null;
+    u.phase = 'idle';
+    u.path = null;
+    if (scope === 'destination' || scope === 'complete') {
+      u.dropB = null;
+      u.dropIsSite = false;
+    }
+  }
   function dropFail(u: Unit) {
-    // delivery unreachable: unwind the job cleanly. Orphaning a taken job in the queue makes
-    // countFetch count it forever, so ensureJobs never recreates the fetch and the site stalls.
+    // Unreachable delivery must unwind its job. A taken job left in the queue keeps
+    // the fetch count elevated, so ensureJobs never replaces it and the site stalls.
     if (u.job) {
-      var ji2 = game.jobs.indexOf(u.job);
+      const ji2 = game.jobs.indexOf(u.job);
       if (ji2 >= 0) game.jobs.splice(ji2, 1);
-      if ((u.job.kind === 'fetch' || u.job.kind === 'transfer') && !u.carry) {
-        var source = byId(u.job.s);
-        if (source) source.res[u.job.good] = Math.max(0, (source.res[u.job.good] | 0) - 1);
+      if ((u.job.kind === 'fetch' || u.job.kind === 'transfer') && u.job.good && !u.carry) {
+        const source = byId(u.job.sourceId);
+        if (source)
+          source.reservedStock[u.job.good] = Math.max(
+            0,
+            ((source.reservedStock[u.job.good] ?? 0) | 0) - 1,
+          );
       }
       u.job = null;
     }
     if (u.carry) dumpGood(u, u.carry); // salvage the cargo into storage instead of losing it
-    u.carry = null;
-    u.carryTransfer = false;
-    u.carryWarehouseTransfer = false;
-    u.carryProducer = null;
-    u.phase = 'idle';
-    u.path = null;
-    u.dropB = null;
-    u.dropIsSite = false;
+    resetCarrier(u);
   }
   function goDrop(u: Unit) {
-    var dp = null,
+    let dp: Building | null = null,
       isSite = false;
     if (u.dropB) {
-      var b = byId(u.dropB);
+      const b = byId(u.dropB);
       if (b) {
         dp = b;
         isSite = u.dropIsSite;
       }
     }
     if (!dp) {
-      var s = nearestStoragePos(u.x, u.y);
+      const s = nearestStoragePos(u.x, u.y);
       if (s) dp = s;
     }
     if (!dp) {
@@ -1543,9 +1619,9 @@ export function createEconomy(
       return;
     }
     u.dropIsSite = isSite;
-    var p = game.findPath(Math.floor(u.x), Math.floor(u.y), dp.x, dp.y);
+    let p = game.findPath(Math.floor(u.x), Math.floor(u.y), dp.x, dp.y);
     if (!p) {
-      var s2 = nearestStoragePos(u.x, u.y);
+      const s2 = nearestStoragePos(u.x, u.y);
       if (s2 && s2 !== dp) {
         dp = s2;
         u.dropIsSite = false;
@@ -1563,8 +1639,8 @@ export function createEconomy(
     game.recordCargoArrival(g);
     if (!b.metrics) b.metrics = productionMetrics();
     ensureProductionHistory(b.metrics);
-    b.metrics.delivered[g] = (b.metrics.delivered[g] | 0) + 1;
-    var sp = game.BSPEC[b.type];
+    b.metrics.delivered[g] = ((b.metrics.delivered[g] ?? 0) | 0) + 1;
+    const sp = game.BSPEC[b.type];
     if (b.done && !sp.store && sp.in && eligibleIngredients(b, sp)[g]) {
       b.metrics.inputDelivered[g] = (b.metrics.inputDelivered[g] || 0) + 1;
       game.recordEconomicFlow('inputArrived', g, 1);
@@ -1575,7 +1651,7 @@ export function createEconomy(
     // The pickup source survives a cancelled delivery job. Never count recovered
     // fetch cargo or warehouse transfers as producer throughput.
     if (!u.carryProducer || u.carryTransfer) return;
-    var source = byId(u.carryProducer);
+    const source = byId(u.carryProducer);
     if (source) {
       if (!source.metrics) source.metrics = productionMetrics();
       ensureProductionHistory(source.metrics);
@@ -1584,12 +1660,12 @@ export function createEconomy(
     game.recordEconomicFlow('outputStored', g, 1);
   }
   function dumpGood(u: Unit, g: Good) {
-    var s = u.dropB && !u.dropIsSite ? byId(u.dropB) : null;
+    let s = u.dropB && !u.dropIsSite ? byId(u.dropB) : null;
     if (!s || !s.done || !game.BSPEC[s.type].store || !game.connectedLand(u.x, u.y, s.x, s.y))
       s = nearestStoragePos(u.x, u.y);
     if (s) {
-      s.stock[g] = (s.stock[g] | 0) + 1;
-      var transfer = !!u.carryTransfer || (u.job && u.job.kind === 'transfer');
+      s.stock[g] = ((s.stock[g] ?? 0) | 0) + 1;
+      const transfer = !!u.carryTransfer || u.job?.kind === 'transfer';
       recordDelivery(s, g, transfer);
       if (u.carryWarehouseTransfer) game.recordEconomicFlow('transferred', g, 1);
       recordOutputDelivery(u, g);
@@ -1602,33 +1678,36 @@ export function createEconomy(
     }
   }
   function arrive(u: Unit) {
-    var j = u.job;
+    const j = u.job;
     if (u.phase === 'p' && j) {
       if (j.kind === 'fetch' || j.kind === 'transfer') {
-        var s = byId(j.s);
-        if (!s || (s.stock[j.good] | 0) <= 0) {
-          s = nearestStorageWith(u.x, u.y, j.good);
+        if (!j.good) {
+          dropFail(u);
+          return;
+        }
+        let s = byId(j.sourceId);
+        if (!s || ((s.stock[j.good] ?? 0) | 0) <= 0) {
+          s = nearestStorage(u, { available: j.good, connected: true });
           if (!s || j.kind === 'transfer') {
-            j.state = 'p';
-            u.job = null;
-            u.phase = 'idle';
-            u.path = null;
+            j.status = 'pending';
+            resetCarrier(u, 'assignment');
             return;
           }
-          var old = byId(j.s);
-          if (old && old !== s) old.res[j.good] = Math.max(0, (old.res[j.good] | 0) - 1);
-          s.res[j.good] = (s.res[j.good] | 0) + 1;
-          j.s = s.id;
+          const old = byId(j.sourceId);
+          if (old && old !== s)
+            old.reservedStock[j.good] = Math.max(0, ((old.reservedStock[j.good] ?? 0) | 0) - 1);
+          s.reservedStock[j.good] = ((s.reservedStock[j.good] ?? 0) | 0) + 1;
+          j.sourceId = s.id;
         }
-        s.stock[j.good]--;
-        s.res[j.good] = Math.max(0, (s.res[j.good] | 0) - 1);
+        s.stock[j.good] = (s.stock[j.good] ?? 0) - 1;
+        s.reservedStock[j.good] = Math.max(0, ((s.reservedStock[j.good] ?? 0) | 0) - 1);
         u.carry = j.good;
         u.carryTransfer = true;
         u.carryWarehouseTransfer = j.kind === 'transfer';
         u.carryProducer = null;
-        var tgt = byId(j.to);
+        const tgt = byId(j.to);
         if (tgt) {
-          u.dropB = j.to;
+          u.dropB = tgt.id;
           u.dropIsSite = true;
         } else {
           u.dropB = null;
@@ -1638,21 +1717,23 @@ export function createEconomy(
         return;
       }
       if (j.kind === 'deliver') {
-        var b = byId(j.from);
-        if (!b || (b.stock[j.good] | 0) <= 0) {
-          var ji2 = game.jobs.indexOf(j);
-          if (ji2 >= 0) game.jobs.splice(ji2, 1);
-          u.job = null;
-          u.phase = 'idle';
-          u.path = null;
+        if (!j.good) {
+          dropFail(u);
           return;
         }
-        b.stock[j.good]--;
+        const b = byId(j.sourceId);
+        if (!b || ((b.stock[j.good] ?? 0) | 0) <= 0) {
+          const ji2 = game.jobs.indexOf(j);
+          if (ji2 >= 0) game.jobs.splice(ji2, 1);
+          resetCarrier(u, 'assignment');
+          return;
+        }
+        b.stock[j.good] = (b.stock[j.good] ?? 0) - 1;
         u.carryProducer = b.id;
         u.carry = j.good;
         u.carryTransfer = false;
         u.carryWarehouseTransfer = false;
-        var store = deliveryStorage(j.good, u);
+        const store = deliveryStorage(j.good, u);
         u.dropB = store ? store.id : null;
         u.dropIsSite = false;
         goDrop(u);
@@ -1660,15 +1741,15 @@ export function createEconomy(
       }
     }
     if (u.phase === 'd') {
-      var good = u.carry;
+      const good = u.carry;
       if (good) {
-        var dumped = false;
+        let dumped = false;
         if (u.dropIsSite && j && (j.kind === 'fetch' || j.kind === 'transfer')) {
-          var site = byId(j.to);
+          const site = byId(j.to);
           if (site) {
-            if (site.done) site.stock[good] = (site.stock[good] | 0) + 1;
+            if (site.done) site.stock[good] = ((site.stock[good] ?? 0) | 0) + 1;
             else {
-              site.got[good] = (site.got[good] | 0) + 1;
+              site.got[good] = ((site.got[good] ?? 0) | 0) + 1;
               game.recordEconomicFlow('constructionSpent', good, 1);
             }
             if (j.kind === 'transfer') game.recordEconomicFlow('transferred', good, 1);
@@ -1679,35 +1760,26 @@ export function createEconomy(
         if (!dumped) dumpGood(u, good);
       }
       if (j) {
-        var ji = game.jobs.indexOf(j);
+        const ji = game.jobs.indexOf(j);
         if (ji >= 0) game.jobs.splice(ji, 1);
       }
-      u.carry = null;
-      u.carryTransfer = false;
-      u.carryWarehouseTransfer = false;
-      u.carryProducer = null;
-      u.job = null;
-      u.phase = 'idle';
-      u.path = null;
-      u.dropB = null;
-      u.dropIsSite = false;
+      resetCarrier(u);
       return;
     }
-    u.phase = 'idle';
-    u.path = null;
+    resetCarrier(u, 'route');
   }
   function arriveSoldier(u: Unit) {
     u.dead = true;
     unitsDirty = true;
-    var j = u.job;
+    const j = u.job;
     if (j) {
-      var ji = game.jobs.indexOf(j);
+      const ji = game.jobs.indexOf(j);
       if (ji >= 0) game.jobs.splice(ji, 1);
       u.job = null;
     }
-    var g = u.dropB ? byId(u.dropB) : null;
-    if (g && !g.man) {
-      g.man = true;
+    const g = u.dropB ? byId(u.dropB) : null;
+    if (g && !g.manned) {
+      g.manned = true;
       game.recomputeTerritory();
       gameEvent('outpostManned', { building: g });
     } else game.soldierPool++;
@@ -1716,8 +1788,8 @@ export function createEconomy(
     game.treeGrowthT += dt;
     while (game.treeGrowthT >= 0.1 - 1e-10) {
       game.treeGrowthT = Math.max(0, game.treeGrowthT - 0.1);
-      for (var k = 0; k < 40; k++) {
-        var i = (game.SR() * game.W * game.H) | 0,
+      for (let k = 0; k < 40; k++) {
+        const i = (game.SR() * game.W * game.H) | 0,
           t = game.tiles[i];
         if (t.tree > 0 && t.tree < 4 && game.SR() < 0.5) {
           t.tree++;
@@ -1729,12 +1801,12 @@ export function createEconomy(
   function step(dt: number, planningSuspended = false) {
     if (dt <= 0) return;
     game.state.time += dt;
-    for (var i = 0; i < game.buildings.length; i++) bTick(game.buildings[i], dt);
-    for (var k = 0; k < game.units.length; k++) stepUnit(game.units[k], dt);
+    for (let i = 0; i < game.buildings.length; i++) bTick(game.buildings[i], dt);
+    for (let k = 0; k < game.units.length; k++) stepUnit(game.units[k], dt);
     // End-of-step samples include production AND successful carrier arrivals at
     // this simulation time. No HUD, wall clock, speed setting or RNG is involved.
-    for (i = 0; i < game.buildings.length; i++) {
-      var b = game.buildings[i],
+    for (let i = 0; i < game.buildings.length; i++) {
+      const b = game.buildings[i],
         sp = game.BSPEC[b.type];
       if (b.done && sp.prod && sp.prod !== 'none' && !sp.store && b.metrics)
         sampleProduction(b.metrics);
@@ -1756,11 +1828,11 @@ export function createEconomy(
     game.spawnT -= dt;
     if (game.spawnT <= 0) {
       game.spawnT = 15;
-      var cap = carrierCap();
-      var n = 0;
-      for (k = 0; k < game.units.length; k++) if (game.units[k].kind === 'carrier') n++;
+      const cap = carrierCap();
+      let n = 0;
+      for (let k = 0; k < game.units.length; k++) if (game.units[k].kind === 'carrier') n++;
       if (game.serfPool > 0 && n < cap) {
-        var s = anyStorage();
+        const s = anyStorage();
         if (s) {
           spawnCarrier(s);
           gameEvent('settlerSpawned', {});
@@ -1786,9 +1858,9 @@ export function createEconomy(
     gameEvent('simulationObserved', {});
   }
   function incomingCount(g: Good, bid: number) {
-    var n = 0;
-    for (var i = 0; i < game.jobs.length; i++) {
-      var j = game.jobs[i];
+    let n = 0;
+    for (let i = 0; i < game.jobs.length; i++) {
+      const j = game.jobs[i];
       if (j.kind === 'fetch' && j.good === g && j.to === bid) n++;
     }
     return n;
@@ -1807,9 +1879,9 @@ export function createEconomy(
         continue;
       const stage = deliveryStage(job, owner);
       // This is a per-good count: a carrier with different cargo has not picked up this good.
-      const countedStage = stage === 'carrying' && owner.carry !== good ? 'assigned' : stage;
+      const countedStage = stage === 'carrying' && owner?.carry !== good ? 'assigned' : stage;
       stages[countedStage] = (stages[countedStage] || 0) + 1;
-      if (countedStage === 'carrying') counted.add(owner.id);
+      if (countedStage === 'carrying' && owner) counted.add(owner.id);
     }
     for (const unit of game.units)
       if (!unit.dead && unit.carry === good && unit.dropB === bid && !counted.has(unit.id))
@@ -1830,14 +1902,14 @@ export function createEconomy(
     );
   }
   function buildingStatus(b: Building): BuildingStatus {
-    var sp = game.BSPEC[b.type],
-      lines = [],
-      g: Good;
+    const sp = game.BSPEC[b.type],
+      lines = [];
+    let g: Good;
     if (!b.done) {
-      var allIn = true;
+      let allIn = true;
       for (g in b.needs) {
-        var have = b.got[g] | 0,
-          need = b.needs[g],
+        const have = (b.got[g] ?? 0) | 0,
+          need = b.needs[g] ?? 0,
           inc = incomingCount(g, b.id);
         if (have < need) {
           allIn = false;
@@ -1867,18 +1939,18 @@ export function createEconomy(
     }
     if (sp.guard) {
       lines.push(
-        b.man
+        b.manned
           ? { t: 'Manned \u2014 border extended (radius ' + sp.rad + ')', w: false }
           : { t: 'Needs a soldier \u2014 sent automatically when one is available', w: true },
       );
-      if (!b.man) {
+      if (!b.manned) {
         let queued = 0,
           walking = 0,
           unavailable = 0;
         for (const job of game.jobs)
           if (job.kind === 'soldier' && job.to === b.id) {
             if (game.units.some((unit) => !unit.dead && unit.job === job)) walking++;
-            else if (job.state === 't') unavailable++;
+            else if (job.status === 'assigned') unavailable++;
             else queued++;
           }
         lines.push({
@@ -1895,7 +1967,7 @@ export function createEconomy(
           w: false,
         });
       }
-      return { lines: lines, bad: !b.man };
+      return { lines: lines, bad: !b.manned };
     }
     if (b.disabled) {
       lines.push({ t: 'Production paused by you', w: false });
@@ -1903,7 +1975,7 @@ export function createEconomy(
     }
     switch (sp.prod) {
       case 'gather': {
-        var trees = 0;
+        let trees = 0;
         forRadius(b, sp.rad, function (i) {
           if (game.tiles[i].tree >= 3) trees++;
         });
@@ -1913,13 +1985,15 @@ export function createEconomy(
             t: 'Chopping wood \u2014 ' + trees + ' tree' + (trees > 1 ? 's' : '') + ' in range',
             w: false,
           });
+        if (productionOutputBlocked(b, sp))
+          lines.push({ t: 'Output full \u2014 waiting for a carrier to collect', w: true });
         break;
       }
       case 'plant':
         lines.push({ t: 'Planting saplings for the future', w: false });
         break;
       case 'rock': {
-        var rocks = 0;
+        let rocks = 0;
         forRadius(b, sp.rad, function (i) {
           if (game.tiles[i].rock) rocks++;
         });
@@ -1964,7 +2038,7 @@ export function createEconomy(
           lines.push({ t: 'Deposit exhausted! Build a replacement mine elsewhere', w: true });
           return { lines: lines, bad: true };
         }
-        if (b.type === 'workshop' && totalGood('planks') < 4)
+        if (b.type === 'workshop' && totalGood('planks') < productionReserves.planks)
           lines.push({
             t: 'Paused \u2014 keeping a planks reserve for construction sites',
             w: false,
@@ -1976,11 +2050,14 @@ export function createEconomy(
             t: game.GOODS[sp.out].name + ' reserves are plentiful — production paused',
             w: false,
           });
-        if (sp.out === 'beer' && totalGood('beer') >= Math.max(12, stockTargetTotal('beer')))
+        if (
+          sp.out === 'beer' &&
+          totalGood('beer') >= Math.max(productionReserves.beer, stockTargetTotal('beer'))
+        )
           lines.push({ t: 'Beer reserves are plentiful — production paused', w: false });
         if (sp.water && !hasLocalWater(b))
-          lines.push({ t: 'Needs a working well within 6 tiles', w: true });
-        for (var shortage of ingredientShortages(b, sp)) {
+          lines.push({ t: `Needs a working well within ${wellRadius(game)} tiles`, w: true });
+        for (const shortage of ingredientShortages(b, sp)) {
           const alternatives = sp.prod === 'mine' ? edibleGoods : [shortage.good];
           const stages: DeliveryStages = { queued: 0, assigned: 0, carrying: 0 };
           for (const good of alternatives) {
@@ -1998,7 +2075,7 @@ export function createEconomy(
               Math.max(
                 0,
                 storages().reduce(
-                  (n, store) => n + (store.stock[good] || 0) - (store.res[good] || 0),
+                  (n, store) => n + (store.stock[good] || 0) - (store.reservedStock[good] || 0),
                   0,
                 ),
               ),
@@ -2024,13 +2101,13 @@ export function createEconomy(
             w: !incoming,
           });
         }
-        if ((b.stock[sp.out] | 0) >= 8)
+        if (productionOutputBlocked(b, sp))
           lines.push({ t: 'Output full \u2014 waiting for a carrier to collect', w: true });
         if (!lines.length)
           lines.push({
             t:
               (sp.prod === 'mine' ? 'Mining ' : 'Crafting ') +
-              game.GOODS[sp.out].name.toLowerCase() +
+              (sp.out ? game.GOODS[sp.out].name.toLowerCase() : 'goods') +
               ' at full capacity',
             w: false,
           });
@@ -2048,6 +2125,7 @@ export function createEconomy(
   // Test-only view of closure internals; never merged into the runtime.
   if (internals)
     Object.assign(internals, {
+      nearestStorage,
       ensureJobs,
       startJob,
       bTick,
@@ -2079,11 +2157,15 @@ export function createEconomy(
     buildingAffordability,
     hasLocalWater,
     suggestFor,
+    placementText,
     placeBuilding,
     demolish,
     demolitionQuote,
+    setBuildingPriority,
+    setStockTarget,
     incomingDeliveryStages,
     productionProgress,
+    buildingWorking,
     forRadius,
     spawnCarrier,
     speedOn,
@@ -2095,6 +2177,10 @@ export function createEconomy(
 
 /** Test-only view of closure internals; never merged into the runtime. */
 export interface EconomyInternals {
+  nearestStorage: (
+    ref: Pick<Building, 'x' | 'y'>,
+    options?: StorageSearchOptions,
+  ) => Building | null;
   ensureJobs: () => void;
   startJob: (u: Unit, j: Job) => void;
   bTick: (b: Building, dt: number) => void;
@@ -2106,7 +2192,7 @@ export interface EconomyInternals {
   stepUnit: (u: Unit, dt: number) => void;
 }
 
-/** Advice copy keyed by a placement failure reason (reason → advice). */
+/** Advice copy selected only by a placement refusal code. */
 export type PlacementAdvice =
   | ''
   | 'build more producers — or inspect a demolition quote for exact recoverable goods'
@@ -2117,7 +2203,7 @@ export type PlacementAdvice =
   | 'keep about 2 tiles of space between buildings';
 
 export interface ProductionProgress {
-  reason: string;
+  reason: ProductionBlockReason;
   explanation: string;
   suspended: boolean;
   remainingWork: number;
@@ -2129,8 +2215,9 @@ export interface ProductionProgress {
 }
 
 export interface EconomySubsystem {
+  buildingWorking: (b: Building) => boolean;
   productionProgress: (b: Building) => ProductionProgress | null;
-  byId: (id: number) => Building | null;
+  byId: (id: number | null | undefined) => Building | null;
   buildingAt: (x: number, y: number) => Building | null;
   storages: () => Building[];
   anyStorage: () => Building | null;
@@ -2149,15 +2236,18 @@ export interface EconomySubsystem {
     ref?: Pick<Building, 'x' | 'y'>,
   ) => BuildingAffordability;
   placementChecks: (type: BuildingType, x: number, y: number) => PlacementChecks;
-  canPlace: (type: BuildingType, x: number, y: number) => [boolean, string];
-  suggestFor: (reason: string) => PlacementAdvice;
+  canPlace: (type: BuildingType, x: number, y: number) => [boolean, PlacementRefusal | null];
+  suggestFor: (reason: PlacementRefusal | null) => PlacementAdvice;
+  placementText: (reason: PlacementRefusal | null) => string;
   placeBuilding: (type: BuildingType, x: number, y: number) => boolean;
   demolitionQuote: (b: Building) => DemolitionQuote;
+  setBuildingPriority: (b: Building, priority: unknown) => boolean;
+  setStockTarget: (b: Building, good: Good, amount: unknown) => boolean;
   incomingDeliveryStages: (good: Good, bid: number) => DeliveryStages;
   demolish: (b: Building) => void;
   forRadius: <T>(
     b: Building,
-    r: number,
+    r: number | undefined,
     f: (i: number, x: number, y: number) => T | undefined,
   ) => T | undefined;
   spawnCarrier: (s: Building) => void;
@@ -2216,11 +2306,11 @@ export interface EconomyDependencies
 /** Placement permission stays separate from click-time spending permission. */
 export interface PlacementCheck {
   ok: boolean | null;
-  reason: string;
+  reason: PlacementRefusal | null;
 }
 export interface PlacementChecks {
   ok: boolean;
-  reason: string;
+  reason: PlacementRefusal | null;
   terrain: PlacementCheck;
   ownership: PlacementCheck;
   resources: PlacementCheck;

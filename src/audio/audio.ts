@@ -34,18 +34,18 @@ async function loadTone(): Promise<ToneApi> {
 export function createAudio(game: GameRuntime, internals?: AudioInternals): AudioSubsystem {
   const load = internals?.loadTone ?? loadTone;
   if (internals) delete internals.loadTone;
-  let graph: AudioGraph = null;
-  let context: AudioGraph['context'] = null;
-  let nativeContext: AudioContext = null;
-  let contextStateChange: () => void = null;
+  let graph: AudioGraph | null = null;
+  let context: AudioGraph['context'] | null = null;
+  let nativeContext: AudioContext | null = null;
+  let contextStateChange: (() => void) | null = null;
   let phase: 'idle' | 'starting' | 'ready' | 'failed' = 'idle';
   let muted = false,
     musicOn = true,
     musVol = 0.42,
     sfxVol = 0.9,
     ambVol = 0.5;
-  let startup: Promise<void> = null,
-    transition: Promise<void> = null;
+  let startup: Promise<void> | null = null,
+    transition: Promise<void> | null = null;
   let cleanup: Promise<void> = Promise.resolve();
   let pageAway = false,
     playbackVersion = 0,
@@ -59,7 +59,7 @@ export function createAudio(game: GameRuntime, internals?: AudioInternals): Audi
     return (
       phase === 'ready' &&
       !!graph &&
-      context.state === 'running' &&
+      context?.state === 'running' &&
       visible() &&
       !muted &&
       (channel === 'effects'
@@ -83,6 +83,7 @@ export function createAudio(game: GameRuntime, internals?: AudioInternals): Audi
   }
   const runtime: AudioRuntime = {
     get graph() {
+      if (!graph) throw new Error('Audio graph is not ready');
       return graph;
     },
     canPlay,
@@ -100,6 +101,7 @@ export function createAudio(game: GameRuntime, internals?: AudioInternals): Audi
     },
     releaseAt(time, resources) {
       const owner = context;
+      if (!owner) return;
       const id = owner.setTimeout(
         () => {
           releases.delete(id);
@@ -110,6 +112,7 @@ export function createAudio(game: GameRuntime, internals?: AudioInternals): Audi
       releases.add(id);
     },
     duckMusic(t) {
+      if (!graph) return;
       const gain = graph.channels.music.gain;
       gain.cancelAndHoldAtTime(t);
       const level = musicOn ? musVol : 0;
@@ -188,7 +191,7 @@ export function createAudio(game: GameRuntime, internals?: AudioInternals): Audi
     }
   }
   function gain(channel: AudioChannel | 'master', target: number, fade: number) {
-    if (!graph) return;
+    if (!graph || !context) return;
     const value = graph.channels[channel].gain,
       t = context.immediate();
     value.cancelAndHoldAtTime(t);
@@ -199,12 +202,11 @@ export function createAudio(game: GameRuntime, internals?: AudioInternals): Audi
   }
   function playback() {
     if (!visible()) runtime.guard(() => music.suspend());
-    if (!graph || phase !== 'ready') return Promise.resolve();
+    if (!graph || !context || phase !== 'ready') return Promise.resolve();
     if (transition) return transition;
     const owner = context;
     let appliedVersion = -1;
-    let pending: Promise<void>;
-    pending = (async () => {
+    const pending: Promise<void> = (async () => {
       while (graph && context === owner && phase === 'ready') {
         const version = playbackVersion;
         if (visible()) {
@@ -237,7 +239,7 @@ export function createAudio(game: GameRuntime, internals?: AudioInternals): Audi
   function initAudio(): Promise<void> {
     if (startup) return startup;
     if (phase === 'ready') {
-      if (context.state !== 'closed') return playback();
+      if (context && context.state !== 'closed') return playback();
       fail(new Error('Audio context closed'));
     }
     phase = 'starting';
@@ -408,7 +410,7 @@ export function createAudio(game: GameRuntime, internals?: AudioInternals): Audi
 }
 
 export interface AudioSubsystem {
-  readonly AC: AudioContext;
+  readonly AC: AudioContext | null;
   readonly muted: boolean;
   readonly musicOn: boolean;
   musVol: number;

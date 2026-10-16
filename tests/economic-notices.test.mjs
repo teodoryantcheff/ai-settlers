@@ -57,16 +57,16 @@ test('world replacement resets notices against live state before the next produc
     t: game.GRASS,
     tree: 0,
     rock: null,
-    res: null,
+    deposit: null,
     road: false,
   }));
   const hq = game.newBuilding('hq', 48, 48);
   hq.done = true;
-  hq.prog = 1;
+  hq.constructionProgress = 1;
   hq.stock = { logs: 100, planks: 48, stone: 48, tools: 16 };
   const mill = game.newBuilding('sawmill', 50, 48);
   mill.done = true;
-  mill.prog = 1;
+  mill.constructionProgress = 1;
   mill.timer = 0;
   mill.stock.logs = 4;
   game.buildings.push(hq, mill);
@@ -105,7 +105,7 @@ test('world replacement resets notices against live state before the next produc
   assert.equal(game.msgs.length, 0, 'old-colony production cannot emit into a fresh colony');
   const freshMill = game.newBuilding('sawmill', 50, 48);
   freshMill.done = true;
-  freshMill.prog = 1;
+  freshMill.constructionProgress = 1;
   freshMill.timer = 0;
   freshMill.stock.logs = 4;
   game.buildings.push(freshMill);
