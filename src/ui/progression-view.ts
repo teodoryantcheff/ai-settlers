@@ -187,7 +187,7 @@ export function createProgressionView(game: GameRuntime): ProgressionViewSubsyst
     const settlers = game.units.filter((unit) => !unit.dead).length;
     const observed = game.economicWindow('lifetime');
     const stat = (label: string, value: string | number) =>
-      markup`<div><dt>${label}</dt><dd>${value}</dd></div>`;
+      trusted(markup`<div><dt>${label}</dt><dd>${value}</dd></div>`);
     let html = markup`<h2>Current settlement</h2><dl class="victory-grid">${stat(
       'Simulation age',
       Math.floor(game.state.time / 60) + 'm ' + (game.state.time % 60).toFixed(1) + 's',
