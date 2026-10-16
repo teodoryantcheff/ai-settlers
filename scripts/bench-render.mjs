@@ -153,7 +153,9 @@ try {
   const page = await context.newPage();
   page.on('pageerror', (error) => console.error('pageerror:', error.message));
   await page.addInitScript(instrument, DRAW_CALLS);
-  await page.goto(`${origin}/tests/game.html?seed=${seed}`);
+  // `renderbench` freezes the cosmetic clock at noon with no rain, so rain,
+  // night veils and dusk particles never differ between compared runs.
+  await page.goto(`${origin}/tests/game.html?seed=${seed}&renderbench`);
   await page.waitForFunction(() => window.productionArtPreview?.game, null, { timeout: 60000 });
   const boot = await page.evaluate(() => {
     const game = window.productionArtPreview.game;
@@ -166,9 +168,17 @@ try {
       gpu:
         gl && (info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)),
       zoomCount: game.zooms.length,
+      pinned: game.TESTMODE === true,
+      night: game.nightAmt(),
+      rain: game.rainAmt(),
     };
   });
   if (!boot.rendering) throw new Error('WebGL 2 rendering is unavailable in headless Chromium.');
+  // Verify the pinned cosmetic state instead of trusting the URL flag.
+  if (!boot.pinned || boot.night !== 0 || boot.rain !== 0)
+    throw new Error('Cosmetic state is not pinned: expected noon with no rain.');
+  const scene = { time: 'noon', rain: false };
+  console.log('Scene: noon, no rain (pinned)');
   const software = isSoftwareRenderer(boot.gpu);
   const softwareWarning = 'Warning: software rendering; GPU timings are not representative.';
   console.log('GPU:', boot.gpu);
@@ -291,6 +301,7 @@ try {
         minutes,
         speed,
         quality,
+        scene,
         viewport: { width, height },
         colony,
         rows,

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
 import test from 'node:test';
 import { benchOptions, isSoftwareRenderer, summarize } from '../scripts/bench-render-helpers.mjs';
 
@@ -104,4 +105,11 @@ test('a measurement window reports per-frame CPU, GPU and upload costs', () => {
     uploadKB: 2,
     texUploads: 2,
   });
+});
+
+test('the benchmark URL pins the cosmetic clock while ordinary play keeps it running', () => {
+  const { createGame } = createRequire(import.meta.url)('./helpers/game.cjs');
+  const world = (search) => createGame({ modules: ['world'], search }).game;
+  assert.equal(world('?seed=2024&renderbench').TESTMODE, true);
+  assert.equal(world('?seed=2024').TESTMODE, false);
 });

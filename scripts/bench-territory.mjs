@@ -60,7 +60,7 @@ try {
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.goto(origin + '/tests/game.html?seed=2024');
+  await page.goto(origin + '/tests/game.html?seed=2024&renderbench');
   await page.waitForFunction(() => window.productionArtPreview?.game, null, {
     polling: 100,
     timeout: 60000,
