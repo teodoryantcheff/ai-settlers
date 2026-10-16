@@ -31,14 +31,5 @@
     "unicorn/prefer-add-event-listener": "off",
     "unicorn/prefer-array-find": "off",
     "unicorn/prefer-set-has": "off"
-  },
-  "overrides": [
-    {
-      "files": [],
-      "rules": {
-        "no-var": "off",
-        "prefer-const": "off"
-      }
-    }
-  ]
+  }
 }

@@ -46,7 +46,7 @@ npm test
 
 Run only `npm test` for routine validation. It lints with oxlint, then runs typechecking, the null-check gate and Node tests, retaining per-step logs and a JSON summary under `output/validation/<run>/`; failures print the log tail and stop the sequence.
 
-Lint rules live in `.oxlintrc.json`. Its override exempting files from `no-var` and `prefer-const` lists exactly the files that still fail them and may only shrink; remove a file once its declarations are migrated.
+Lint rules live in `.oxlintrc.json`. `no-var` and `prefer-const` apply to source, scripts and tests without exemptions; use `const` for bindings that are never reassigned and `let` for mutable bindings.
 
 Run the slower `npm run check`, browser tests or visual captures only when explicitly requested. The full check adds formatting, the build and browser tests. Browser tests use one worker because software WebGL is load-sensitive; the suite can take about 25 minutes and retains browser failure artifacts alongside its logs.
 
