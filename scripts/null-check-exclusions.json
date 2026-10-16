@@ -15,7 +15,6 @@
   "src/gameplay/production-rules.ts",
   "src/gameplay/progression.ts",
   "src/observations/attention.ts",
-  "src/observations/production-condition.ts",
   "src/rendering/art.ts",
   "src/rendering/landscape.ts",
   "src/rendering/pixi-atmosphere.ts",

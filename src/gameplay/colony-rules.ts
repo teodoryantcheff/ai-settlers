@@ -1,4 +1,4 @@
-import type { Building, BuildingSpec, BuildingType } from '../types.ts';
+import type { Building, BuildingSpec, BuildingType, Inventory } from '../types.ts';
 
 /**
  * Colony rules shared by production, autoplay and the advisor. Each rule is a
@@ -42,5 +42,25 @@ export function wellReaches(world: ColonyRulesWorld, well: Site, x: number, y: n
 export function hasWellCoverage(world: ColonyRulesWorld, site: Site, coverage: WellCoverage) {
   return world.buildings.some(
     (well) => countsAsWell(well, coverage) && wellReaches(world, well, site.x, site.y),
+  );
+}
+
+/** Finished goods held at a producer before collection. */
+export const productionOutputLimit = 8;
+
+/** Colony-wide stored-stock thresholds; explicit storage targets may raise them. */
+export const intermediateReserves: Readonly<Inventory> = Object.freeze({
+  grain: 24,
+  flour: 12,
+  pigs: 12,
+  iron_bars: 12,
+});
+export const productionReserves = Object.freeze({ beer: 12, tools: 12, weapons: 15, planks: 4 });
+
+/** Space is reserved for the entire next batch, including a lumberjack's two logs. */
+export function productionOutputBlocked(building: Pick<Building, 'stock'>, spec: BuildingSpec) {
+  return !!(
+    spec.out &&
+    (building.stock[spec.out] || 0) + (spec.prod === 'gather' ? 2 : 1) > productionOutputLimit
   );
 }

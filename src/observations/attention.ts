@@ -1,3 +1,4 @@
+import { productionOutputLimit } from '../gameplay/colony-rules.ts';
 import type { Building, BuildingType, Good } from '../types.ts';
 import type { SimulationStateSubsystem } from '../simulation/state.ts';
 import type { EventsSubsystem } from '../core/events.ts';
@@ -364,7 +365,7 @@ export function createAttention(game: AttentionDependencies): AttentionSubsystem
           (b.stock[sp.out] || 0) +
             ' ' +
             game.GOODS[sp.out].name +
-            ' awaiting collection; the next batch would exceed the local output limit of 8.',
+            ` awaiting collection; the next batch would exceed the local output limit of ${productionOutputLimit}.`,
           rows.length
             ? rows
                 .map((row) =>

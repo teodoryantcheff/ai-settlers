@@ -496,6 +496,29 @@ test('clarity uses distinct working, waiting, paused and construction symbols', 
   assert.deepEqual(tags, ['HQ ·', 'SAW ▶', 'SAW !', 'SAW Ⅱ', 'SAW +']);
 });
 
+test('a producer blocked by colony reserves is drawn idle before its next simulation tick', () => {
+  const e = renderer();
+  e.vw = 1440;
+  e.vh = 900;
+  e.cam = { x: 40 * e.TS, y: 40 * e.TS };
+  e.presentationPrefs.clarity = true;
+  e.context.measureText = (text) => ({ width: text.length * 5 });
+  const mill = e.newBuilding('windmill', 50, 48);
+  Object.assign(mill, { done: true, timer: 4, stock: { grain: 2 }, blockedReason: '' });
+  e.buildings.push(mill);
+  e.anyStorage().stock.flour = 12;
+  const before = e.exportSave();
+  const rng = e.SR.getState();
+  assert.equal(e.productionProgress(mill).reason, 'demand');
+  e.clarityBuildings(e.context);
+  assert.deepEqual(
+    e.calls.filter((call) => call.method === 'fillText').map((call) => call.args[0]),
+    ['HQ ·', 'FLOUR ·'],
+  );
+  assert.equal(e.exportSave(), before, 'drawing idle cannot advance the colony');
+  assert.equal(e.SR.getState(), rng);
+});
+
 test('a paused placement preview refreshes affordability immediately while unchanged frames reuse it', () => {
   const e = renderer();
   e.anyStorage().stock = { planks: 3, stone: 1, tools: 1 };

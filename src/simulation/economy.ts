@@ -1,4 +1,11 @@
-import { hasWellCoverage, wellRadius } from '../gameplay/colony-rules.ts';
+import {
+  hasWellCoverage,
+  wellRadius,
+  productionOutputLimit,
+  productionOutputBlocked,
+  intermediateReserves,
+  productionReserves,
+} from '../gameplay/colony-rules.ts';
 import { deliveryStage } from './delivery-stage.ts';
 import type { ObservationSubsystem } from './observations.ts';
 import {
@@ -177,7 +184,7 @@ export function createEconomy(
     );
   }
   function intermediateSaturated(good: Good) {
-    const reserve = good === 'grain' ? 24 : ['flour', 'pigs', 'iron_bars'].includes(good) ? 12 : 0;
+    const reserve = intermediateReserves[good] || 0;
     return reserve > 0 && totalGood(good) >= Math.max(reserve, stockTargetTotal(good));
   }
   function hasLocalWater(b: Pick<Building, 'x' | 'y'>) {
@@ -302,7 +309,7 @@ export function createEconomy(
     };
   }
   function addStock(b: Building, g: Good, n: number) {
-    const accepted = Math.min(n, Math.max(0, 8 - (b.stock[g] | 0)));
+    const accepted = Math.min(n, Math.max(0, productionOutputLimit - (b.stock[g] | 0)));
     b.stock[g] = (b.stock[g] | 0) + accepted;
     b.produced = (b.produced | 0) + accepted;
     if (!b.metrics) b.metrics = productionMetrics();
@@ -806,21 +813,23 @@ export function createEconomy(
     let reason = '';
     if (b.disabled) reason = 'paused';
     else if (b.exhausted) reason = 'exhausted';
-    else if (sp.out && (b.stock[sp.out] | 0) + (sp.prod === 'gather' ? 2 : 1) > 8)
-      reason = 'output';
+    else if (productionOutputBlocked(b, sp)) reason = 'output';
     else if (sp.out && edibleGoods.includes(sp.out) && foodSaturated(sp.out)) reason = 'demand';
     else if (sp.out && intermediateSaturated(sp.out)) reason = 'demand';
-    else if (sp.out === 'beer' && totalGood('beer') >= Math.max(12, stockTargetTotal('beer')))
+    else if (
+      sp.out === 'beer' &&
+      totalGood('beer') >= Math.max(productionReserves.beer, stockTargetTotal('beer'))
+    )
       reason = 'demand';
     else if (
       (b.type === 'toolsmith' || b.type === 'workshop') &&
-      (totalGood('tools') >= Math.max(12, stockTargetTotal('tools')) ||
-        (b.type === 'workshop' && totalGood('planks') < 4))
+      (totalGood('tools') >= Math.max(productionReserves.tools, stockTargetTotal('tools')) ||
+        (b.type === 'workshop' && totalGood('planks') < productionReserves.planks))
     )
       reason = 'reserve';
     else if (
       b.type === 'armory' &&
-      totalGood('weapons') >= Math.max(15, stockTargetTotal('weapons'))
+      totalGood('weapons') >= Math.max(productionReserves.weapons, stockTargetTotal('weapons'))
     )
       reason = 'reserve';
     else if (sp.water && !hasLocalWater(b)) reason = 'water';
@@ -828,6 +837,19 @@ export function createEconomy(
       if (ingredientShortages(b, sp).length) reason = 'inputs';
     } else if (b.blockedReason === 'resources') reason = 'resources';
     return reason;
+  }
+  /** Live scheduling constraints plus the last attempt's blockage; a pure presentation query. */
+  function buildingWorking(b: Building) {
+    const sp = game.BSPEC[b.type];
+    return !!(
+      b.done &&
+      sp.prod &&
+      sp.prod !== 'none' &&
+      !sp.store &&
+      !sp.guard &&
+      !b.blockedReason &&
+      !productionConstraint(b)
+    );
   }
   function productionProgress(b: Building): ProductionProgress | null {
     const sp = game.BSPEC[b.type];
@@ -846,7 +868,7 @@ export function createEconomy(
     const explanations: Record<string, string> = {
       paused: 'Production paused by you.',
       exhausted: 'Deposit exhausted; no further output can be produced here.',
-      output: `Output blocked: the next batch needs space for ${output} ${sp.out ? game.GOODS[sp.out].name.toLowerCase() : 'goods'}; ${b.stock[sp.out] || 0} of 8 local output slots are occupied. Waiting for collection.`,
+      output: `Output blocked: the next batch needs space for ${output} ${sp.out ? game.GOODS[sp.out].name.toLowerCase() : 'goods'}; ${b.stock[sp.out] || 0} of ${productionOutputLimit} local output slots are occupied. Waiting for collection.`,
       demand: 'Production suspended: colony demand is satisfied by current reserves.',
       reserve: 'Production suspended by the colony stock reserve policy.',
       water: `Production suspended: no working connected local well within ${wellRadius(game)} tiles.`,
@@ -934,7 +956,7 @@ export function createEconomy(
             game.tiles[p].tree = 3;
             gameEvent('tileChanged', { index: p });
           }
-          b.timer = 7;
+          b.timer = timing.base;
         } else b.timer = 5;
         break;
       }
@@ -1923,6 +1945,8 @@ export function createEconomy(
             t: 'Chopping wood \u2014 ' + trees + ' tree' + (trees > 1 ? 's' : '') + ' in range',
             w: false,
           });
+        if (productionOutputBlocked(b, sp))
+          lines.push({ t: 'Output full \u2014 waiting for a carrier to collect', w: true });
         break;
       }
       case 'plant':
@@ -1974,7 +1998,7 @@ export function createEconomy(
           lines.push({ t: 'Deposit exhausted! Build a replacement mine elsewhere', w: true });
           return { lines: lines, bad: true };
         }
-        if (b.type === 'workshop' && totalGood('planks') < 4)
+        if (b.type === 'workshop' && totalGood('planks') < productionReserves.planks)
           lines.push({
             t: 'Paused \u2014 keeping a planks reserve for construction sites',
             w: false,
@@ -1986,7 +2010,10 @@ export function createEconomy(
             t: game.GOODS[sp.out].name + ' reserves are plentiful — production paused',
             w: false,
           });
-        if (sp.out === 'beer' && totalGood('beer') >= Math.max(12, stockTargetTotal('beer')))
+        if (
+          sp.out === 'beer' &&
+          totalGood('beer') >= Math.max(productionReserves.beer, stockTargetTotal('beer'))
+        )
           lines.push({ t: 'Beer reserves are plentiful — production paused', w: false });
         if (sp.water && !hasLocalWater(b))
           lines.push({ t: `Needs a working well within ${wellRadius(game)} tiles`, w: true });
@@ -2034,7 +2061,7 @@ export function createEconomy(
             w: !incoming,
           });
         }
-        if ((b.stock[sp.out] | 0) >= 8)
+        if (productionOutputBlocked(b, sp))
           lines.push({ t: 'Output full \u2014 waiting for a carrier to collect', w: true });
         if (!lines.length)
           lines.push({
@@ -2096,6 +2123,7 @@ export function createEconomy(
     setStockTarget,
     incomingDeliveryStages,
     productionProgress,
+    buildingWorking,
     forRadius,
     spawnCarrier,
     speedOn,
@@ -2141,6 +2169,7 @@ export interface ProductionProgress {
 }
 
 export interface EconomySubsystem {
+  buildingWorking: (b: Building) => boolean;
   productionProgress: (b: Building) => ProductionProgress | null;
   byId: (id: number) => Building | null;
   buildingAt: (x: number, y: number) => Building | null;

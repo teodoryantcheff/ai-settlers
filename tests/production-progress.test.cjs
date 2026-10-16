@@ -63,15 +63,19 @@ test('countdown uses actual upgraded mine work speed and preserves recipe, water
   assert.equal(deposit.res.amt, 3);
   b.stock = {};
   assert.equal(g.productionProgress(b).reason, 'inputs');
+  assert.equal(g.buildingWorking(b), false);
   const bakery = g.newBuilding('bakery', 54, 48);
   Object.assign(bakery, { done: true, timer: 2, stock: { flour: 2 } });
   g.buildings.push(bakery);
   assert.equal(g.productionProgress(bakery).reason, 'water');
+  assert.equal(g.buildingWorking(bakery), false);
   const armory = g.newBuilding('armory', 55, 48);
   Object.assign(armory, { done: true, legacyIndustry: true, stock: { iron: 1, coal: 1 } });
   assert.equal(g.productionProgress(armory).reason, '');
+  assert.equal(g.buildingWorking(armory), true, 'legacy recipes count their real ingredients');
   armory.stock = { iron_bars: 1, coal: 1 };
   assert.equal(g.productionProgress(armory).reason, 'inputs');
+  assert.equal(g.buildingWorking(armory), false);
   const quarry = g.newBuilding('quarry', 90, 90);
   Object.assign(quarry, { done: true, stock: {}, timer: 4, blockedReason: 'resources' });
   assert.equal(
@@ -80,4 +84,40 @@ test('countdown uses actual upgraded mine work speed and preserves recipe, water
     'resource retry is not a frozen timer',
   );
   assert.equal(g.productionProgress(quarry).remainingWork, 4);
+});
+
+test('producer countdowns use the building table base time for every production mode', () => {
+  for (const [type, seconds] of [
+    ['lumberjack', 7],
+    ['forester', 7],
+    ['quarry', 8],
+    ['fisherman', 9],
+    ['farm', 15],
+  ]) {
+    const { game, b, hooks } = colony(type);
+    assert.equal(game.BSPEC[type].time, seconds, type + ' publishes its base cycle');
+    game.BSPEC[type].time = 19;
+    assert.equal(game.productionProgress(b).duration, 19, type + ' reports the table cycle');
+    game.tiles[game.idx(52, 48)].rock = { amt: 10 };
+    game.tiles[game.idx(51, 49)].t = game.WATER;
+    b.timer = 1;
+    hooks.bTick(b, 1);
+    assert.equal(b.timer, 19, type + ' schedules its next cycle from the table');
+  }
+});
+
+test('the working query and status block the whole next output batch without changing state', () => {
+  const { game, b, hooks } = colony();
+  b.stock.logs = 7;
+  const before = game.exportSave();
+  const rng = game.SR.getState();
+  assert.equal(game.buildingWorking(b), false, 'seven logs leave no room for a two-log batch');
+  assert.ok(game.buildingStatus(b).lines.some((line) => /Output full/.test(line.t)));
+  assert.equal(game.exportSave(), before);
+  assert.equal(game.SR.getState(), rng);
+  hooks.bTick(b, 1);
+  assert.equal(b.timer, 3);
+  b.stock.logs = 6;
+  hooks.bTick(b, 0);
+  assert.equal(game.buildingWorking(b), true, 'collection releases the whole batch');
 });

@@ -1,3 +1,4 @@
+import { productionOutputBlocked } from '../gameplay/colony-rules.ts';
 import { ingredientShortages } from '../gameplay/production-rules.ts';
 import type { Building, BuildingSpec } from '../types.ts';
 export type BlockageReason = 'inputs' | 'output' | 'resources' | 'exhausted';
@@ -9,8 +10,7 @@ export function productionBlockage(b: Building, sp: BuildingSpec): BlockageReaso
   if (!b.done || deliberatePause(b)) return null;
   if (b.exhausted || b.blockedReason === 'exhausted') return 'exhausted';
   if (b.blockedReason === 'inputs' && ingredientShortages(b, sp).length) return 'inputs';
-  if (b.blockedReason === 'output' && (b.stock[sp.out] || 0) + (sp.prod === 'gather' ? 2 : 1) > 8)
-    return 'output';
+  if (b.blockedReason === 'output' && productionOutputBlocked(b, sp)) return 'output';
   if (b.blockedReason === 'resources') return 'resources';
   return null;
 }
