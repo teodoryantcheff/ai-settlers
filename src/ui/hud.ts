@@ -754,7 +754,9 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     } catch (e) {
       reportPreferences(
         'failed',
-        'Saved settings unavailable: ' + e.message + '. Current defaults apply for this session.',
+        'Saved settings unavailable: ' +
+          (e instanceof Error ? e.message : String(e)) +
+          '. Current defaults apply for this session.',
       );
     }
     applyPresentationPrefs();
@@ -818,7 +820,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
       reportPreferences(
         'failed',
         'Settings could not be remembered: ' +
-          e.message +
+          (e instanceof Error ? e.message : String(e)) +
           '. Current choices still apply for this session.',
       );
       return false;
@@ -1028,60 +1030,52 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
   function volLbl(id: string, v: number) {
     document.getElementById(id).textContent = Math.round(v * 100) + '%';
   }
-  (document.getElementById('musvol') as HTMLInputElement).oninput = function (
-    this: HTMLInputElement,
-  ) {
-    game.setMusVol(+this.value / 100);
-    volLbl('musvolv', +this.value / 100);
+  const musicVolume = document.getElementById('musvol') as HTMLInputElement;
+  musicVolume.oninput = function () {
+    game.setMusVol(+musicVolume.value / 100);
+    volLbl('musvolv', +musicVolume.value / 100);
     savePrefsSoon();
   };
-  (document.getElementById('sfxvol') as HTMLInputElement).oninput = function (
-    this: HTMLInputElement,
-  ) {
-    game.setSfxVol(+this.value / 100);
-    volLbl('sfxvolv', +this.value / 100);
+  const sfxVolume = document.getElementById('sfxvol') as HTMLInputElement;
+  sfxVolume.oninput = function () {
+    game.setSfxVol(+sfxVolume.value / 100);
+    volLbl('sfxvolv', +sfxVolume.value / 100);
     savePrefsSoon();
   };
-  (document.getElementById('ambvol') as HTMLInputElement).oninput = function (
-    this: HTMLInputElement,
-  ) {
-    game.setAmbVol(+this.value / 100);
-    volLbl('ambvolv', +this.value / 100);
+  const ambienceVolume = document.getElementById('ambvol') as HTMLInputElement;
+  ambienceVolume.oninput = function () {
+    game.setAmbVol(+ambienceVolume.value / 100);
+    volLbl('ambvolv', +ambienceVolume.value / 100);
     savePrefsSoon();
   };
-  (document.getElementById('motionpref') as HTMLInputElement).onchange = function (
-    this: HTMLInputElement,
-  ) {
-    game.presentationPrefs.reducedMotion = this.checked;
+  const motionPref = document.getElementById('motionpref') as HTMLInputElement;
+  motionPref.onchange = function () {
+    game.presentationPrefs.reducedMotion = motionPref.checked;
     applyPresentationPrefs();
     savePrefs();
   };
-  (document.getElementById('fpspref') as HTMLInputElement).onchange = function (
-    this: HTMLInputElement,
-  ) {
-    game.presentationPrefs.showFps = this.checked;
-    document.getElementById('fps').hidden = !this.checked;
+  const fpsPref = document.getElementById('fpspref') as HTMLInputElement;
+  fpsPref.onchange = function () {
+    game.presentationPrefs.showFps = fpsPref.checked;
+    document.getElementById('fps').hidden = !fpsPref.checked;
     game.resize?.();
     savePrefs();
   };
-  (document.getElementById('weatherpref') as HTMLInputElement).onchange = function (
-    this: HTMLInputElement,
-  ) {
-    game.presentationPrefs.weather = this.checked;
+  const weatherPref = document.getElementById('weatherpref') as HTMLInputElement;
+  weatherPref.onchange = function () {
+    game.presentationPrefs.weather = weatherPref.checked;
     savePrefs();
   };
-  (document.getElementById('qualitypref') as HTMLSelectElement).onchange = function (
-    this: HTMLInputElement,
-  ) {
-    if (+this.value !== 1 && +this.value !== 0.75) return;
-    game.presentationPrefs.quality = +this.value as 1 | 0.75;
+  const qualityPref = document.getElementById('qualitypref') as HTMLSelectElement;
+  qualityPref.onchange = function () {
+    if (+qualityPref.value !== 1 && +qualityPref.value !== 0.75) return;
+    game.presentationPrefs.quality = +qualityPref.value as 1 | 0.75;
     game.resize();
     savePrefs();
   };
-  (document.getElementById('claritypref') as HTMLInputElement).onchange = function (
-    this: HTMLInputElement,
-  ) {
-    game.presentationPrefs.clarity = this.checked;
+  const clarityPref = document.getElementById('claritypref') as HTMLInputElement;
+  clarityPref.onchange = function () {
+    game.presentationPrefs.clarity = clarityPref.checked;
     applyPresentationPrefs();
     savePrefs();
   };

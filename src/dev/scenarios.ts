@@ -1,6 +1,11 @@
 import type { GameRuntime } from '../runtime.ts';
 import type { BuildingType, Good } from '../types.ts';
 
+/** Scenario failure evidence: the message and the frame that threw. */
+function failureDetail(e: unknown) {
+  return e instanceof Error ? e.message + ' | ' + String(e.stack).split('\n')[1] : String(e);
+}
+
 export function runScenarios(game: GameRuntime) {
   if (/[?&]shortagefeedback(?:&|$)/.test(location.search)) {
     // A legacy producer with no suppliers isolates the real persistent-notice path.
@@ -369,7 +374,7 @@ export function runScenarios(game: GameRuntime) {
       } catch (e) {
         var d2 = document.createElement('div');
         d2.id = 'uitres';
-        d2.textContent = 'UITEST_ERR ' + e.message + ' | ' + String(e.stack).split('\n')[1];
+        d2.textContent = 'UITEST_ERR ' + failureDetail(e);
         document.body.appendChild(d2);
       }
     }, 100);
@@ -506,7 +511,7 @@ export function runScenarios(game: GameRuntime) {
       } catch (e) {
         var d2 = document.createElement('div');
         d2.id = 'brres';
-        d2.textContent = 'BUILD_RULES_ERR ' + e.message + ' | ' + String(e.stack).split('\n')[1];
+        d2.textContent = 'BUILD_RULES_ERR ' + failureDetail(e);
         document.body.appendChild(d2);
       }
     }, 100);
@@ -589,7 +594,7 @@ export function runScenarios(game: GameRuntime) {
         clearInterval(slIv);
         var d2 = document.createElement('div');
         d2.id = 'slres';
-        d2.textContent = 'SAVELOAD_ERR ' + e.message + ' | ' + String(e.stack).split('\n')[1];
+        d2.textContent = 'SAVELOAD_ERR ' + failureDetail(e);
         document.body.appendChild(d2);
       }
     }, 1);

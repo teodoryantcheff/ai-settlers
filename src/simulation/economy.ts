@@ -1017,7 +1017,7 @@ export function createEconomy(
   }
   function findTree(b: Building, r: number) {
     return forRadius(b, r, function (i) {
-      if (game.tiles[i].tree >= 3) return i;
+      return game.tiles[i].tree >= 3 ? i : undefined;
     });
   }
   function countTrees(b: Building, r: number) {
@@ -1029,22 +1029,21 @@ export function createEconomy(
   }
   function findRock(b: Building, r: number) {
     return forRadius(b, r, function (i) {
-      if (game.tiles[i].rock) return i;
+      return game.tiles[i].rock ? i : undefined;
     });
   }
   function randPlantSpot(b: Building, r: number) {
     return forRadius(b, r, function (i, x, y) {
       var tl = game.tiles[i];
-      if (
-        tl.t === game.GRASS &&
+      return tl.t === game.GRASS &&
         !tl.tree &&
         !tl.rock &&
         !tl.road &&
         !buildingAt(x, y) &&
         game.owned[i] &&
         game.SR() < 0.12
-      )
-        return i;
+        ? i
+        : undefined;
     });
   }
   function hasWaterNear(b: Building) {

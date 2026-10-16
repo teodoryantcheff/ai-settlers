@@ -225,10 +225,11 @@ export function createAudio(game: GameRuntime, internals?: AudioInternals): Audi
         if (context === owner) fail(error);
       })
       .finally(() => {
-        if (transition !== pending) return;
+        if (transition !== pending) return undefined;
         transition = null;
-        if (context === owner && phase === 'ready' && appliedVersion !== playbackVersion)
-          return playback();
+        return context === owner && phase === 'ready' && appliedVersion !== playbackVersion
+          ? playback()
+          : undefined;
       });
     transition = pending;
     return pending;
