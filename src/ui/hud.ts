@@ -419,9 +419,9 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
         const t4 = game.tiles[i];
         if (
           t4.t === game.MTN &&
-          t4.res &&
-          t4.res.kind === game.BSPEC[game.mode.bt].resKind &&
-          t4.res.amt > 0
+          t4.deposit &&
+          t4.deposit.kind === game.BSPEC[game.mode.bt].resKind &&
+          t4.deposit.amt > 0
         ) {
           hlTiles.push(i);
           for (let d13 = 0; d13 < 8; d13++) {

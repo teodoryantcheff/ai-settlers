@@ -118,16 +118,29 @@ export function validateSave(
     fail('Invalid entity arrays');
   const ids = new Set<number>();
   const positions = new Set();
+  const legacyBuildingFields = [
+    ['reservedStock', 'res'],
+    ['constructionProgress', 'prog'],
+    ['manned', 'man'],
+    ['foodBlockedNoticeSent', 'nofood'],
+    ['rocksExhaustedNoticeSent', 'norock'],
+  ] as const;
   for (const b of d.b) {
+    if (!object(b)) fail('Invalid building');
+    // Both historical save versions used these aliases. Migrate only missing
+    // fields on the detached import; canonical values still require validation.
+    const imported: Record<string, unknown> = b;
+    for (const [current, legacy] of legacyBuildingFields)
+      if (!Object.hasOwn(imported, current) && Object.hasOwn(imported, legacy))
+        imported[current] = imported[legacy];
     if (
-      !object(b) ||
       !int(b.id, 1) ||
       ids.has(b.id) ||
       !Object.hasOwn(specs, b.type) ||
       !int(b.x, 0, width - 1) ||
       !int(b.y, 0, height - 1) ||
       !bool(b.done) ||
-      !num(b.prog, 0, 2) ||
+      !num(b.constructionProgress, 0, 2) ||
       !num(b.timer, -100, 1e6)
     )
       fail('Invalid building');
@@ -137,15 +150,15 @@ export function validateSave(
     if (positions.has(pos) || [0, 3].includes(d.t[0][pos])) fail('Invalid building site');
     positions.add(pos);
     ids.add(b.id);
-    for (const key of ['needs', 'got', 'stock', 'res'] as const) b[key] = record(b[key]);
+    for (const key of ['needs', 'got', 'stock', 'reservedStock'] as const) b[key] = record(b[key]);
     b.targets = record(b.targets || {}, 500);
     b.priority = int(b.priority, 0, 2) ? b.priority : 0;
     b.disabled = !!b.disabled;
     b.produced = int(b.produced) ? b.produced : 0;
-    b.man = !!b.man;
+    b.manned = !!b.manned;
     b.exhausted = !!b.exhausted;
-    b.nofood = !!b.nofood;
-    b.norock = !!b.norock;
+    b.foodBlockedNoticeSent = !!b.foodBlockedNoticeSent;
+    b.rocksExhaustedNoticeSent = !!b.rocksExhaustedNoticeSent;
     const m: Record<string, unknown> = object(b.metrics) ? b.metrics : {};
     b.metrics = {} as ProductionMetrics;
     for (const key of ['elapsed', 'active', 'blocked', 'inputBlocked', 'outputBlocked'] as const)
@@ -276,7 +289,7 @@ export function validateSave(
     }
     if (j.kind === 'soldier') {
       const target = buildings.get(j.to);
-      if (!target.done || !specs[target.type].guard || target.man)
+      if (!target.done || !specs[target.type].guard || target.manned)
         fail('Invalid soldier destination');
     }
   }
@@ -393,8 +406,8 @@ export function validateSave(
   for (const b of d.b) {
     for (const good of Object.keys(goods) as Good[]) {
       if (
-        (b.res[good] || 0) !== (reservations.get(b.id + '/' + good) || 0) ||
-        (b.res[good] || 0) > (b.stock[good] || 0)
+        (b.reservedStock[good] || 0) !== (reservations.get(b.id + '/' + good) || 0) ||
+        (b.reservedStock[good] || 0) > (b.stock[good] || 0)
       )
         fail('Invalid resource reservations');
     }
@@ -441,18 +454,18 @@ export function validateSave(
       'x',
       'y',
       'done',
-      'prog',
+      'constructionProgress',
       'needs',
       'got',
       'stock',
-      'res',
-      'man',
+      'reservedStock',
+      'manned',
       'exhausted',
       'produced',
       'timer',
-      'nofood',
+      'foodBlockedNoticeSent',
       'legacyIndustry',
-      'norock',
+      'rocksExhaustedNoticeSent',
       'metrics',
       'blockedReason',
       'priority',

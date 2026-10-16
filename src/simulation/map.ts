@@ -26,7 +26,14 @@ export function createMap(game: MapDependencies, internals?: MapInternals): MapS
       rn = game.fbm(game.seed + 303);
     const dr = game.mulberry32(game.seed + 404); // all map-gen rolls are seeded -> ?seed=N is fully reproducible
     for (i = 0; i < game.W * game.H; i++)
-      game.tiles[i] = { t: game.GRASS, tree: 0, rock: null, road: false, owned: false, res: null };
+      game.tiles[i] = {
+        t: game.GRASS,
+        tree: 0,
+        rock: null,
+        road: false,
+        owned: false,
+        deposit: null,
+      };
     for (y = 0; y < game.H; y++)
       for (x = 0; x < game.W; x++) {
         const u = x / game.W,
@@ -44,16 +51,16 @@ export function createMap(game: MapDependencies, internals?: MapInternals): MapS
         if (t === game.MTN) {
           mtn++;
           const r2 = dr();
-          if (r2 < 0.3) tl.res = null;
+          if (r2 < 0.3) tl.deposit = null;
           else if (r2 < 0.42) {
             const g0 = 60 + ((dr() * 40) | 0);
-            tl.res = { kind: 'gold', amt: g0, amt0: g0 };
+            tl.deposit = { kind: 'gold', amt: g0, amt0: g0 };
           } else if (r2 < 0.72) {
             const i0 = 60 + ((dr() * 50) | 0);
-            tl.res = { kind: 'iron', amt: i0, amt0: i0 };
+            tl.deposit = { kind: 'iron', amt: i0, amt0: i0 };
           } else {
             const c0 = 80 + ((dr() * 60) | 0);
-            tl.res = { kind: 'coal', amt: c0, amt0: c0 };
+            tl.deposit = { kind: 'coal', amt: c0, amt0: c0 };
           }
         }
         if (t !== game.WATER) land++;
@@ -67,7 +74,7 @@ export function createMap(game: MapDependencies, internals?: MapInternals): MapS
         tl2.t = game.GRASS;
         tl2.tree = 0;
         tl2.rock = null;
-        tl2.res = null;
+        tl2.deposit = null;
       }
     for (let a = 0; a < 360; a += 4) {
       const rr = 9 + dr() * 5,
@@ -102,7 +109,7 @@ export function createMap(game: MapDependencies, internals?: MapInternals): MapS
           tm.t = game.MTN;
           tm.tree = 0;
           tm.rock = null;
-          tm.res =
+          tm.deposit =
             y2 === cy - 3 || y2 === cy
               ? { kind: 'coal', amt: 120, amt0: 120 }
               : { kind: 'iron', amt: 90, amt0: 90 };
@@ -114,8 +121,8 @@ export function createMap(game: MapDependencies, internals?: MapInternals): MapS
       faceGold = Math.ceil(guaranteedGold / 2),
       gA = faceGold + ((dr() * 40) | 0),
       gB = faceGold + ((dr() * 40) | 0);
-    game.tiles[game.idx(cx + 26, cy - 2)].res = { kind: 'gold', amt: gA, amt0: gA };
-    game.tiles[game.idx(cx + 26, cy)].res = { kind: 'gold', amt: gB, amt0: gB };
+    game.tiles[game.idx(cx + 26, cy - 2)].deposit = { kind: 'gold', amt: gA, amt0: gA };
+    game.tiles[game.idx(cx + 26, cy)].deposit = { kind: 'gold', amt: gB, amt0: gB };
     for (y2 = cy - 5; y2 <= cy + 2; y2++)
       for (x2 = cx + 27; x2 <= cx + 29; x2++) {
         if (game.inB(x2, y2)) {
@@ -123,7 +130,7 @@ export function createMap(game: MapDependencies, internals?: MapInternals): MapS
           tg.t = game.GRASS;
           tg.tree = 0;
           tg.rock = null;
-          tg.res = null;
+          tg.deposit = null;
           tg.road = false;
         }
       }
@@ -150,7 +157,7 @@ export function createMap(game: MapDependencies, internals?: MapInternals): MapS
             lw.t = game.WATER;
             lw.tree = 0;
             lw.rock = null;
-            lw.res = null;
+            lw.deposit = null;
             lw.road = false;
           }
         }
@@ -192,7 +199,7 @@ export function createMap(game: MapDependencies, internals?: MapInternals): MapS
       let n2 = 0;
       for (let i2 = 0; i2 < game.tiles.length; i2++) {
         const t6 = game.tiles[i2];
-        if (t6.t !== game.MTN || !t6.res || t6.res.kind !== 'gold') continue;
+        if (t6.t !== game.MTN || !t6.deposit || t6.deposit.kind !== 'gold') continue;
         for (let d9 = 0; d9 < 8; d9++) {
           const nx7 = (i2 % game.W) + game.DX[d9],
             ny7 = ((i2 / game.W) | 0) + game.DY[d9];
@@ -213,7 +220,7 @@ export function createMap(game: MapDependencies, internals?: MapInternals): MapS
       let s2 = 0;
       for (let i5 = 0; i5 < game.tiles.length; i5++) {
         const t10 = game.tiles[i5];
-        if (t10.t !== game.MTN || !t10.res || t10.res.kind !== 'gold') continue;
+        if (t10.t !== game.MTN || !t10.deposit || t10.deposit.kind !== 'gold') continue;
         for (let d13 = 0; d13 < 8; d13++) {
           const nx12 = (i5 % game.W) + game.DX[d13],
             ny12 = ((i5 / game.W) | 0) + game.DY[d13];
@@ -222,7 +229,7 @@ export function createMap(game: MapDependencies, internals?: MapInternals): MapS
             reach[game.idx(nx12, ny12)] &&
             game.tiles[game.idx(nx12, ny12)].t === game.GRASS
           ) {
-            s2 += t10.res.amt;
+            s2 += t10.deposit.amt;
             break;
           }
         }
@@ -232,7 +239,7 @@ export function createMap(game: MapDependencies, internals?: MapInternals): MapS
     floodReach();
     for (let i3 = 0; i3 < game.tiles.length; i3++) {
       const t7 = game.tiles[i3];
-      if (t7.t !== game.MTN || !t7.res || t7.res.kind !== 'gold') continue;
+      if (t7.t !== game.MTN || !t7.deposit || t7.deposit.kind !== 'gold') continue;
       let ok7 = false;
       for (let d10 = 0; d10 < 8; d10++) {
         const nx8 = (i3 % game.W) + game.DX[d10],
@@ -246,7 +253,7 @@ export function createMap(game: MapDependencies, internals?: MapInternals): MapS
           break;
         }
       }
-      if (!ok7) t7.res = null;
+      if (!ok7) t7.deposit = null;
     }
     // All six upgrades cost 180 gold. Investing must still leave enough deposits
     // to win, with another 60 gold of margin even when no contracts are fulfilled.
@@ -257,7 +264,7 @@ export function createMap(game: MapDependencies, internals?: MapInternals): MapS
       for (let i4 = 0; i4 < game.tiles.length; i4++) {
         const t9 = game.tiles[i4];
         if (t9.t !== game.MTN) continue;
-        if (t9.res && t9.res.kind === 'gold') continue;
+        if (t9.deposit && t9.deposit.kind === 'gold') continue;
         for (let d11 = 0; d11 < 8; d11++) {
           const nx9 = (i4 % game.W) + game.DX[d11],
             ny9 = ((i4 / game.W) | 0) + game.DY[d11];
@@ -274,7 +281,7 @@ export function createMap(game: MapDependencies, internals?: MapInternals): MapS
       if (cands.length) {
         const pick = cands[(dr() * cands.length) | 0];
         const ga = 90 + ((dr() * 30) | 0);
-        game.tiles[pick].res = { kind: 'gold', amt: ga, amt0: ga };
+        game.tiles[pick].deposit = { kind: 'gold', amt: ga, amt0: ga };
         floodReach();
         continue;
       }
@@ -296,7 +303,7 @@ export function createMap(game: MapDependencies, internals?: MapInternals): MapS
         if (nb9 < 3) continue;
         const gb = 90 + ((dr() * 30) | 0);
         t8.t = game.MTN;
-        t8.res = { kind: 'gold', amt: gb, amt0: gb };
+        t8.deposit = { kind: 'gold', amt: gb, amt0: gb };
         mtn++;
         done9 = true;
         floodReach();
@@ -337,7 +344,7 @@ export function createMap(game: MapDependencies, internals?: MapInternals): MapS
     gpOwned.set(
       projectColonyTerritory(game, [
         ...game.buildings,
-        { type: 'guard', x, y, done: true, man: true },
+        { type: 'guard', x, y, done: true, manned: true },
       ]),
     );
     gpSegs.length = 0;

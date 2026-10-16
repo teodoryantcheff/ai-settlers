@@ -35,7 +35,8 @@ export function createAdvisor(game: AdvisorDependencies): AdvisorSubsystem {
       foodRate = 0,
       far = false;
     for (const b of game.buildings) {
-      if (b.exhausted || b.norock) continue;
+      // Retain the reported-exhaustion policy until the quarry produces again.
+      if (b.exhausted || b.rocksExhaustedNoticeSent) continue;
       const c = b.done ? counts : countsSite;
       c[b.type] = (c[b.type] || 0) + 1;
       if (b.done && !b.exhausted && game.BSPEC[b.type].prod === 'mine') {
@@ -195,7 +196,12 @@ export function createAdvisor(game: AdvisorDependencies): AdvisorSubsystem {
       let accessible = false;
       for (let ti = 0; ti < game.tiles.length && !accessible; ti++) {
         const tile = game.tiles[ti];
-        if (!tile.res || tile.res.kind !== game.BSPEC[r.bt].resKind || tile.res.amt <= 0) continue;
+        if (
+          !tile.deposit ||
+          tile.deposit.kind !== game.BSPEC[r.bt].resKind ||
+          tile.deposit.amt <= 0
+        )
+          continue;
         for (let d = 0; d < 8; d++) {
           const x = (ti % game.W) + game.DX[d],
             y = ((ti / game.W) | 0) + game.DY[d];

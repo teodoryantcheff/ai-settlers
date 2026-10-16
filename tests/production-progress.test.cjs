@@ -6,7 +6,7 @@ function colony(type = 'lumberjack') {
   const { game, internals } = createGame({ seed: 2024, modules: DEFAULT_MODULES });
   game.initializeColony();
   const b = game.newBuilding(type, 51, 48);
-  Object.assign(b, { done: true, prog: 1, timer: 3, stock: {} });
+  Object.assign(b, { done: true, constructionProgress: 1, timer: 3, stock: {} });
   game.buildings.push(b);
   game.tiles[game.idx(52, 48)].tree = 4;
   return { game, b, hooks: internals.economy };
@@ -50,7 +50,7 @@ test('countdown uses actual upgraded mine work speed and preserves recipe, water
   b.timer = 8;
   g.state.upgrades.production = 2;
   const deposit = g.tiles[g.idx(52, 48)];
-  Object.assign(deposit, { t: g.MTN, res: { kind: g.BSPEC.mine_gold.resKind, amt: 4 } });
+  Object.assign(deposit, { t: g.MTN, deposit: { kind: g.BSPEC.mine_gold.resKind, amt: 4 } });
   const p = g.productionProgress(b);
   assert.equal(p.variety, 0.1);
   assert.equal(p.duration, (16 * 0.81) / 1.1);
@@ -60,7 +60,7 @@ test('countdown uses actual upgraded mine work speed and preserves recipe, water
   hooks.bTick(b, 0.02);
   assert.equal(b.stock.gold, 1);
   assert.equal(b.stock.bread, 0, 'existing meal ordering remains intact');
-  assert.equal(deposit.res.amt, 3);
+  assert.equal(deposit.deposit.amt, 3);
   b.stock = {};
   assert.equal(g.productionProgress(b).reason, 'inputs');
   assert.equal(g.buildingWorking(b), false);

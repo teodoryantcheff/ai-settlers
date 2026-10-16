@@ -42,7 +42,12 @@ export function createAutoplay(
     const out: number[] = [];
     for (let i = 0; i < game.tiles.length; i++) {
       const tl = game.tiles[i];
-      if (tl.t === game.MTN && tl.res && tl.res.amt > 0 && kinds.indexOf(tl.res.kind) >= 0)
+      if (
+        tl.t === game.MTN &&
+        tl.deposit &&
+        tl.deposit.amt > 0 &&
+        kinds.indexOf(tl.deposit.kind) >= 0
+      )
         out.push(i);
     }
     return out;
@@ -260,7 +265,7 @@ export function createAutoplay(
       golds: number[] = [],
       others: number[] = [];
     for (let k = 0; k < deps.length; k++)
-      (game.tiles[deps[k]].res.kind === 'gold' ? golds : others).push(deps[k]);
+      (game.tiles[deps[k]].deposit.kind === 'gold' ? golds : others).push(deps[k]);
     function byDist(arr: number[]) {
       arr.sort(function (a, b) {
         const da =
@@ -277,7 +282,7 @@ export function createAutoplay(
     // gold is the victory resource - go for the biggest live gold deposit, not the nearest one;
     // small deposits exhaust too fast and the re-expansion churn eats the whole guard budget
     golds.sort(function (a, b) {
-      return game.tiles[b].res.amt - game.tiles[a].res.amt;
+      return game.tiles[b].deposit.amt - game.tiles[a].deposit.amt;
     });
     const take: number[] = [];
     if (golds.length && want.indexOf('gold') >= 0) take.push(golds[0]);
@@ -298,7 +303,7 @@ export function createAutoplay(
       if (dl < 0) continue;
       const p = game.findPath(s.x, s.y, dl % game.W, (dl / game.W) | 0);
       if (!p) continue;
-      if (!path || game.tiles[di].res.kind === 'gold') path = p;
+      if (!path || game.tiles[di].deposit.kind === 'gold') path = p;
     }
     return path;
   }
@@ -315,7 +320,8 @@ export function createAutoplay(
             ny = fy + game.DY[d];
           if (!game.inB(nx, ny)) continue;
           const t = game.tiles[game.idx(nx, ny)];
-          if (t.t === game.MTN && t.res && t.res.amt > 0 && want.includes(t.res.kind)) return true;
+          if (t.t === game.MTN && t.deposit && t.deposit.amt > 0 && want.includes(t.deposit.kind))
+            return true;
         }
       }
     return false;
@@ -355,7 +361,7 @@ export function createAutoplay(
           if (!game.owned[site] || isFaceTile(x, y, want) || !game.canPlace('guard', x, y)[0])
             continue;
           const projected = projectTerritory(game, [
-            { type: 'guard', x, y, done: true, man: true },
+            { type: 'guard', x, y, done: true, manned: true },
           ]);
           let advance = -1,
             criticalHits = 0;
@@ -398,7 +404,12 @@ export function createAutoplay(
       const tl = game.tiles[i],
         bAt = game.buildingAt(i % game.W, (i / game.W) | 0);
       if (bAt && game.BSPEC[bAt.type].prod === 'mine') keep = true;
-      else if (tl.t === game.MTN && tl.res && tl.res.amt > 0 && want.indexOf(tl.res.kind) >= 0)
+      else if (
+        tl.t === game.MTN &&
+        tl.deposit &&
+        tl.deposit.amt > 0 &&
+        want.indexOf(tl.deposit.kind) >= 0
+      )
         keep = true;
     });
     return !keep;
@@ -472,7 +483,7 @@ export function createAutoplay(
       frontQ = -1;
     for (let i = 0; i < game.buildings.length; i++) {
       const gb2 = game.buildings[i];
-      if (gb2.type !== 'guard' || !gb2.man) continue;
+      if (gb2.type !== 'guard' || !gb2.manned) continue;
       if (!newestGuard || gb2.id > newestGuard.id) newestGuard = gb2;
       if (cor) {
         const gq = pathPos(cor, gb2.x, gb2.y);
@@ -489,7 +500,7 @@ export function createAutoplay(
       if (
         !razed &&
         sp.guard &&
-        b.man &&
+        b.manned &&
         want.length &&
         b !== frontB &&
         b !== newestGuard &&
@@ -518,7 +529,7 @@ export function createAutoplay(
     // the previous guard is manned (its radius is what carries the next one forward)
     let unmanned = 0;
     for (let i = 0; i < game.buildings.length; i++)
-      if (game.buildings[i].type === 'guard' && !game.buildings[i].man) unmanned++;
+      if (game.buildings[i].type === 'guard' && !game.buildings[i].manned) unmanned++;
     if (expand && gcount < 18 && unmanned === 0 && game.soldierPool > 0 && afford('guard')) {
       const gs = spotOnCorridor(cor, want) || findSpot('guard', want);
       if (gs && game.placeBuilding('guard', gs[0], gs[1])) return;

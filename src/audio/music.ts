@@ -129,7 +129,15 @@ export function createMusic(game: GameRuntime, runtime: AudioRuntime, internals?
     for (let i = 0; i < game.buildings.length; i++) {
       const b = game.buildings[i],
         sp = game.BSPEC[b.type];
-      if (!b.done || sp.store || sp.prod === 'none' || b.exhausted || b.norock || b.disabled)
+      // A reported quarry exhaustion stays silent until successful production clears it.
+      if (
+        !b.done ||
+        sp.store ||
+        sp.prod === 'none' ||
+        b.exhausted ||
+        b.rocksExhaustedNoticeSent ||
+        b.disabled
+      )
         continue;
       if (sp.in) {
         inputCount++;

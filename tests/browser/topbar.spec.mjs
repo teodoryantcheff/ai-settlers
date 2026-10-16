@@ -152,7 +152,7 @@ test('two compact rows retain dense stock, banked objective and essential contro
     const hq = g.anyStorage();
     for (const good of Object.keys(g.GOODS)) hq.stock[good] = 98765;
     hq.stock.logs = 12345;
-    hq.res.logs = 345;
+    hq.reservedStock.logs = 345;
     g.state.gold = 37;
   });
   await page.waitForTimeout(280);
@@ -215,7 +215,7 @@ test('two compact rows retain dense stock, banked objective and essential contro
     await page.locator('#sp1').click();
     await page.evaluate(() => {
       const g = window.productionArtPreview.game;
-      g.anyStorage().res.logs = 0;
+      g.anyStorage().reservedStock.logs = 0;
       g.state.won = true;
       g.state.gold = 37;
       const original = Storage.prototype.setItem;

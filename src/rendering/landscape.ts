@@ -820,7 +820,7 @@ export function createLandscape(
     if (game.ART.paintedMountains) {
       paintLandscapeMaterial(g, x, y, game.GRASS, h);
       paintLandscapeCrags(g, x, y);
-      if (tl.res && tl.res.amt > 0) paintOreSeams(g, tl.res, x, y);
+      if (tl.deposit && tl.deposit.amt > 0) paintOreSeams(g, tl.deposit, x, y);
       return;
     }
     const wx = x * game.TS,
@@ -873,7 +873,7 @@ export function createLandscape(
       g.stroke();
     }
     paintLandscapeCrags(g, x, y);
-    if (tl.res && tl.res.amt > 0) paintOreSeams(g, tl.res, x, y);
+    if (tl.deposit && tl.deposit.amt > 0) paintOreSeams(g, tl.deposit, x, y);
     g.restore();
     paintMountainScree(g, c, h);
     // Edge lighting is restricted to actual exposed northern/western ridges.
@@ -894,15 +894,15 @@ export function createLandscape(
   }
   function paintOreSeams(
     g: CanvasRenderingContext2D,
-    res: Tile['res'],
+    deposit: Tile['deposit'],
     x: number,
     y: number,
   ): void {
-    const gold = res.kind === 'gold',
-      iron = res.kind === 'iron',
+    const gold = deposit.kind === 'gold',
+      iron = deposit.kind === 'iron',
       shade = gold ? '#78602d' : iron ? '#89523b' : '#293c34',
       light = gold ? '#e4bf59' : iron ? '#ce8d60' : '#586c5e',
-      amount = Math.max(1, Math.ceil(2 * Math.min(1, res.amt / (res.amt0 || res.amt))));
+      amount = Math.max(1, Math.ceil(2 * Math.min(1, deposit.amt / (deposit.amt0 || deposit.amt))));
     const angle = 0.15 + landscapeNoise((x + 0.5) * game.TS, (y + 0.5) * game.TS, 76, 714) * 2.3,
       cosine = Math.cos(angle),
       sine = Math.sin(angle);
@@ -1233,7 +1233,12 @@ export interface LandscapeSubsystem {
 /** Test-only view of closure internals; never merged into the runtime. */
 export interface LandscapeInternals {
   mountainContour: (x: number, y: number) => MountainContour;
-  paintOreSeams: (g: CanvasRenderingContext2D, res: Tile['res'], x: number, y: number) => void;
+  paintOreSeams: (
+    g: CanvasRenderingContext2D,
+    deposit: Tile['deposit'],
+    x: number,
+    y: number,
+  ) => void;
   landscapeRoadMask: (x: number, y: number) => number;
   traceLandscapeRoad: (g: CanvasRenderingContext2D, mask: number) => void;
 }

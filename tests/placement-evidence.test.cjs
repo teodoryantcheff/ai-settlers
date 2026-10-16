@@ -14,7 +14,7 @@ function colony() {
     t: game.GRASS,
     tree: 0,
     rock: null,
-    res: null,
+    deposit: null,
     road: false,
   }));
   game.owned.fill(1);
@@ -54,10 +54,10 @@ test('construction affordability names reachable free stock and optional transfe
   const g = colony();
   const hq = g.anyStorage();
   hq.stock = { planks: 5, stone: 3, tools: 1 };
-  hq.res = { planks: 4 };
+  hq.reservedStock = { planks: 4 };
   const warehouse = g.newBuilding('warehouse', 60, 48);
   warehouse.done = true;
-  warehouse.prog = 1;
+  warehouse.constructionProgress = 1;
   g.buildings.push(warehouse);
   const site = g.newBuilding('warehouse', 57, 52);
   g.buildings.push(site);
@@ -76,11 +76,11 @@ test('construction affordability names reachable free stock and optional transfe
     { good: 'planks', required: 3, free: 1, available: 3, optionalTransfers: 2, reclaim: 2 },
   );
   assert.equal(g.jobs.length, 4);
-  assert.equal(hq.res.planks, 4);
+  assert.equal(hq.reservedStock.planks, 4);
   assert.equal(g.placeBuilding('farm', 51, 48), true);
   assert.equal(g.jobs.length, 2);
   assert.ok(g.jobs.every((job) => job.kind === 'fetch'));
-  assert.equal(hq.res.planks, 2);
+  assert.equal(hq.reservedStock.planks, 2);
 });
 
 test('remote stored goods cannot make an isolated construction site affordable', () => {

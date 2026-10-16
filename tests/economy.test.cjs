@@ -57,7 +57,7 @@ function autoplay(seed) {
   e.genMap();
   const hq = e.newBuilding('hq', e.W >> 1, e.H >> 1);
   hq.done = true;
-  hq.prog = 1;
+  hq.constructionProgress = 1;
   hq.stock = {
     planks: 48,
     stone: 48,
@@ -95,8 +95,8 @@ function snapshot(e) {
           x: b.x,
           y: b.y,
           done: b.done,
-          man: b.man,
-          prog: b.prog,
+          manned: b.manned,
+          constructionProgress: b.constructionProgress,
           corridorIndex: corridor ? e.pathPos(corridor, b.x, b.y) : -1,
           redundant: e.guardCoverRedundant(b, wanted),
         }));
@@ -104,13 +104,13 @@ function snapshot(e) {
     ? []
     : e.tiles
         .map((t, i) => ({ t, i }))
-        .filter(({ t }) => t.res && t.res.kind === 'gold' && t.res.amt > 0)
-        .sort((a, b) => b.t.res.amt - a.t.res.amt)
+        .filter(({ t }) => t.deposit && t.deposit.kind === 'gold' && t.deposit.amt > 0)
+        .sort((a, b) => b.t.deposit.amt - a.t.deposit.amt)
         .slice(0, 3)
         .map(({ t, i }) => ({
           x: i % e.W,
           y: Math.floor(i / e.W),
-          amount: t.res.amt,
+          amount: t.deposit.amt,
           faces: e.DX.map((dx, d) => {
             const x = (i % e.W) + dx,
               y = Math.floor(i / e.W) + e.DY[d];
@@ -164,7 +164,7 @@ function checkEconomy(e) {
       assert.ok(Number.isInteger(delivered) && delivered >= 0, `nonnegative construction ${good}`);
     if (e.BSPEC[b.type].store) {
       for (const good of Object.keys(e.GOODS)) {
-        const reserved = b.res[good] || 0;
+        const reserved = b.reservedStock[good] || 0;
         assert.equal(
           reserved,
           reservationCounts.get(`${b.id}/${good}`) || 0,
@@ -177,7 +177,7 @@ function checkEconomy(e) {
   for (const u of e.units)
     if (u.job) assert.ok(e.jobs.includes(u.job), 'settlers have no orphaned jobs');
   for (const tile of e.tiles)
-    if (tile.res) assert.ok(tile.res.amt >= 0, 'deposits cannot go negative');
+    if (tile.deposit) assert.ok(tile.deposit.amt >= 0, 'deposits cannot go negative');
   const carriedBankedGold = e.units.filter((u) => u.carry === 'gold' && u.carryTransfer).length;
   assert.equal(
     e.totalGood('gold') + carriedBankedGold,
@@ -261,7 +261,7 @@ test('gold warehouse transfers preserve the treasury and remain saveable in tran
   const hq = e.storages()[0],
     warehouse = e.newBuilding('warehouse', hq.x + 5, hq.y);
   warehouse.done = true;
-  warehouse.prog = 1;
+  warehouse.constructionProgress = 1;
   warehouse.targets.gold = 10;
   e.buildings.push(warehouse);
   e.recomputeTerritory();
@@ -317,7 +317,11 @@ test('a manually built timber, food and mining chain delivers gold without autop
       const spot = e.findSpot('mine_gold', null);
       if (spot && e.placeBuilding('mine_gold', ...spot)) continue;
     }
-    if (mines < 2 && e.buildings.every((b) => b.type !== 'guard' || b.man) && e.afford('guard')) {
+    if (
+      mines < 2 &&
+      e.buildings.every((b) => b.type !== 'guard' || b.manned) &&
+      e.afford('guard')
+    ) {
       const spot = e.spotOnCorridor(e.buildCorridor(['gold']), ['gold']);
       if (spot) e.placeBuilding('guard', ...spot);
     }
@@ -327,5 +331,5 @@ test('a manually built timber, food and mining chain delivers gold without autop
   assert.ok(e.producedTotal('bread') > 0, 'the manual chain produces prepared food');
   assert.ok(e.state.goldDelivered > 0, JSON.stringify(snapshot(e)));
   assert.ok(e.state.gold > 0);
-  assert.ok(e.buildings.some((b) => b.type === 'guard' && b.man));
+  assert.ok(e.buildings.some((b) => b.type === 'guard' && b.manned));
 });

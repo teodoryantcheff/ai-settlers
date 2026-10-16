@@ -61,7 +61,7 @@ export function createInspectorView(
         .join(''),
     )}${trusted(work?.reason ? '</div>' : '')}</div>`;
     if (!b.done) {
-      html += markup`<p><strong>Construction ${Math.round(b.prog * 100)}%</strong></p><progress max="1" value="${b.prog}"></progress>`;
+      html += markup`<p><strong>Construction ${Math.round(b.constructionProgress * 100)}%</strong></p><progress max="1" value="${b.constructionProgress}"></progress>`;
       for (const good of Object.keys(b.needs) as Good[])
         html += markup`<p>${trusted(resourceIcon(good))}${game.GOODS[good].name}: ${b.got[good] || 0} / ${b.needs[good]} delivered</p>`;
     } else {
@@ -69,7 +69,7 @@ export function createInspectorView(
         html += markup`<section class="inspector-cycle" aria-label="Current production progress"><h3>Current work countdown</h3><p data-cycle-countdown><strong>${work.remaining.toFixed(1)}s ${work.suspended ? 'remaining · suspended' : simulationHeld ? 'remaining · simulation held' : 'of work remaining at current speed'}</strong></p><p>${work.suspended ? 'The countdown is preserved until the constraint clears.' : simulationHeld ? 'Simulation is paused or suspended. This active-work countdown resumes when play runs.' : 'Time to the next attempt if current conditions continue; output is not guaranteed.'}</p><p class="muted">Normal interval: ${work.duration.toFixed(1)}s (${work.base}s base · upgrade ${work.tier}/3${work.variety ? ' · meal variety +' + Math.round(work.variety * 100) + '%' : ''}). ${sp.prod === 'plant' ? 'Foresters use a 5s base check when the area is sufficiently planted, otherwise a 7s base attempt. ' : ''}Startup and resource retries can use different intervals; elapsed cycle progress is not recorded.</p></section>`;
       html += markup`<h3>${sp.store ? 'Stored goods' : 'Local stock'}</h3><p>${trusted(formatGoods(game.GOODS, b.stock, { positiveOnly: true, separator: ' · ', empty: 'None', icons: true }))}</p>`;
       if (sp.store)
-        html += markup`<p>Reserved (part of stored): ${trusted(formatGoods(game.GOODS, b.res, { positiveOnly: true, separator: ' · ', empty: 'None', icons: true }))}</p>`;
+        html += markup`<p>Reserved (part of stored): ${trusted(formatGoods(game.GOODS, b.reservedStock, { positiveOnly: true, separator: ' · ', empty: 'None', icons: true }))}</p>`;
       if (game.incomingDeliveryStages) {
         const relevant = sp.store
           ? Object.keys(game.GOODS)
@@ -88,7 +88,7 @@ export function createInspectorView(
       if (sp.water)
         html += markup`<p>Local water: ${game.hasLocalWater?.(b) ? 'working connected well within 6 tiles' : 'no working connected well within 6 tiles'}. Water is local coverage, not transported stock.</p>`;
       if (b.type === 'guard')
-        html += markup`<p>${b.man ? 'Manned' : 'Unmanned'} outpost · current claim radius ${territoryClaimRadius(sp, b.man)} tiles, restricted by traversable land.</p>`;
+        html += markup`<p>${b.manned ? 'Manned' : 'Unmanned'} outpost · current claim radius ${territoryClaimRadius(sp, b.manned)} tiles, restricted by traversable land.</p>`;
     }
     return html;
   }
@@ -441,8 +441,8 @@ export function createInspectorView(
     const tl = game.tiles[game.idx(ht.x, ht.y)];
     if (tl.t === game.WATER) return 'Water';
     if (tl.t === game.MTN)
-      return tl.res
-        ? game.GOODS[tl.res.kind].name + ' deposit: ' + tl.res.amt
+      return tl.deposit
+        ? game.GOODS[tl.deposit.kind].name + ' deposit: ' + tl.deposit.amt
         : 'Bare mountainside';
     let s = tl.tree
       ? tl.tree >= 4

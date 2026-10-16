@@ -607,7 +607,7 @@ export function createRenderer(
     try {
       const now = game.villageWorkTime(b);
       if (!b.done) {
-        const p = Math.min(1, Math.max(0, b.prog));
+        const p = Math.min(1, Math.max(0, b.constructionProgress));
         game.drawVillageConstruction(g, b, p);
         const bw = game.TS - 16;
         g.fillStyle = 'rgba(0,0,0,0.55)';
@@ -672,7 +672,7 @@ export function createRenderer(
         g.fill();
       }
       if (anc) {
-        if (anc.flag && (b.type !== 'guard' || b.man))
+        if (anc.flag && (b.type !== 'guard' || b.manned))
           drawFlag(
             g,
             b.x * game.TS + anc.flag.x,
@@ -1504,7 +1504,7 @@ export function createRenderer(
         ',' +
         (b.done ? 1 : 0) +
         ',' +
-        (b.man ? 1 : 0) +
+        (b.manned ? 1 : 0) +
         ',' +
         (b.disabled ? 1 : 0);
     }
@@ -1573,7 +1573,8 @@ export function createRenderer(
         else if (sp.prod === 'rock') hit = !!tl.rock;
         else if (sp.prod === 'fish')
           hit = tl.t === game.WATER && Math.max(Math.abs(dx), Math.abs(dy)) <= 2;
-        else if (sp.resKind) hit = tl.res && tl.res.kind === sp.resKind && tl.res.amt > 0;
+        else if (sp.resKind)
+          hit = tl.deposit && tl.deposit.kind === sp.resKind && tl.deposit.amt > 0;
         else if (sp.prod === 'plant')
           hit =
             tl.t === game.GRASS &&
@@ -1599,7 +1600,7 @@ export function createRenderer(
           ',' +
           (store.stock[good] || 0) +
           ',' +
-          (store.res[good] || 0);
+          (store.reservedStock[good] || 0);
     for (const job of game.jobs)
       if (job.kind === 'transfer' && goods.includes(job.good))
         key += ':' + job.s + ',' + job.to + ',' + job.good + ',' + job.state;
@@ -1626,7 +1627,7 @@ export function createRenderer(
     const checks = game.placementChecks(game.mode.bt, game.ghost.x, game.ghost.y);
     const spending = game.buildingAffordability(game.mode.bt, game.ghost);
     const sp = game.BSPEC[game.mode.bt],
-      res = resourceTilesAt(game.mode.bt, game.ghost.x, game.ghost.y),
+      resources = resourceTilesAt(game.mode.bt, game.ghost.x, game.ghost.y),
       storage = game.nearestStoragePos(game.ghost.x, game.ghost.y);
     const path =
       storage && game.passI(game.idx(game.ghost.x, game.ghost.y))
@@ -1634,14 +1635,15 @@ export function createRenderer(
         : null;
     const haul = path ? pathSeconds(path, storage.x, storage.y) : null;
     let supply = '';
-    if (sp.prod === 'gather') supply = res.length + ' mature trees';
-    else if (sp.prod === 'rock') supply = res.length + ' rock tiles';
+    if (sp.prod === 'gather') supply = resources.length + ' mature trees';
+    else if (sp.prod === 'rock') supply = resources.length + ' rock tiles';
     else if (sp.resKind) {
       let amount = 0;
-      for (let i = 0; i < res.length; i++) amount += game.tiles[res[i]].res.amt;
+      for (let i = 0; i < resources.length; i++) amount += game.tiles[resources[i]].deposit.amt;
       supply = amount + ' ' + game.GOODS[sp.resKind].name.toLowerCase() + ' in reach';
-    } else if (sp.prod === 'fish') supply = res.length ? 'Shore in reach' : 'No shore in reach';
-    else if (sp.prod === 'plant') supply = res.length + ' clear nursery tiles';
+    } else if (sp.prod === 'fish')
+      supply = resources.length ? 'Shore in reach' : 'No shore in reach';
+    else if (sp.prod === 'plant') supply = resources.length + ' clear nursery tiles';
     const summary =
       (supply ? supply + ' · ' : '') +
       (haul === null
@@ -1654,7 +1656,7 @@ export function createRenderer(
       key: key,
       x: game.ghost.x,
       y: game.ghost.y,
-      resources: res,
+      resources: resources,
       checks,
       spending,
       canBuild: checks.ok && spending.affordable,
@@ -1964,7 +1966,7 @@ export function createRenderer(
             (game.buildingWorking(b)
               ? 'Working'
               : sp.guard
-                ? b.man
+                ? b.manned
                   ? 'Manned'
                   : 'Awaiting soldier'
                 : sp.store
@@ -2524,7 +2526,8 @@ export function createRenderer(
     const site = [];
     for (let i = 0; i < game.buildings.length; i++) {
       const b3 = game.buildings[i];
-      if (!b3.done && b3.prog > 0 && game.siteReady(b3) && visibleAt(b3.x, b3.y)) site.push(b3);
+      if (!b3.done && b3.constructionProgress > 0 && game.siteReady(b3) && visibleAt(b3.x, b3.y))
+        site.push(b3);
     }
     if (site.length) {
       const b4 = site[(Math.random() * site.length) | 0];
@@ -2669,11 +2672,15 @@ export function createRenderer(
         else c = tl.tree ? '#4b7040' : '#6b8750';
         msctx.fillStyle = c;
         msctx.fillRect(x * s, y * s, s, s);
-        if (tl.res && tl.res.amt > 0) {
+        if (tl.deposit && tl.deposit.amt > 0) {
           msctx.fillStyle =
-            tl.res.kind === 'gold' ? '#ffd23f' : tl.res.kind === 'iron' ? '#d0763a' : '#565e68';
+            tl.deposit.kind === 'gold'
+              ? '#ffd23f'
+              : tl.deposit.kind === 'iron'
+                ? '#d0763a'
+                : '#565e68';
           msctx.fillRect(x * s, y * s, s, s);
-          const fr2 = tl.res.amt / (tl.res.amt0 || tl.res.amt);
+          const fr2 = tl.deposit.amt / (tl.deposit.amt0 || tl.deposit.amt);
           if (fr2 < 0.999) {
             msctx.fillStyle = 'rgba(0,0,0,' + ((1 - fr2) * 0.55).toFixed(2) + ')';
             msctx.fillRect(x * s, y * s, s, s);

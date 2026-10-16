@@ -15,7 +15,7 @@ function colony(type, stock, legacyIndustry = false, audio = false) {
     t: game.GRASS,
     tree: 0,
     rock: null,
-    res: null,
+    deposit: null,
     road: false,
   }));
   game.state.paused = false;
@@ -25,7 +25,7 @@ function colony(type, stock, legacyIndustry = false, audio = false) {
   if (type.startsWith('mine_')) {
     const tile = game.tiles[game.idx(13, 8)];
     tile.t = game.MTN;
-    tile.res = { kind: game.BSPEC[type].resKind, amt: 100 };
+    tile.deposit = { kind: game.BSPEC[type].resKind, amt: 100 };
   }
   return { game, hooks: internals.economy, audioHooks: internals.audio, b };
 }

@@ -10,13 +10,13 @@ function colony() {
     t: game.GRASS,
     tree: 0,
     rock: null,
-    res: null,
+    deposit: null,
     road: false,
   }));
   game.owned.fill(1);
   function building(type, x, y, stock = {}) {
     const b = game.newBuilding(type, x, y);
-    Object.assign(b, { done: true, prog: 1, stock: { ...stock } });
+    Object.assign(b, { done: true, constructionProgress: 1, stock: { ...stock } });
     game.buildings.push(b);
     return b;
   }
@@ -33,8 +33,8 @@ test('storage search preserves first-store ties and separates free stock, reserv
   const rng = game.SR.getState();
   assert.equal(hooks.nearestStorage(ref), first, 'equal distance retains storage order');
   assert.equal(hooks.nearestStorage(ref, { exclude: first }), second);
-  first.res.logs = 2;
-  second.res.logs = 1;
+  first.reservedStock.logs = 2;
+  second.reservedStock.logs = 1;
   assert.equal(hooks.nearestStorage(ref, { available: 'logs' }), second);
   second.targets.logs = 1;
   assert.equal(hooks.nearestStorage(ref, { available: 'logs', retainTarget: true }), island);
@@ -52,7 +52,7 @@ test('demolition applies its quote across disconnected salvage, equipment and di
   const hq = building('hq', 8, 10, { planks: 10, stone: 10, weapons: 3 });
   const island = building('warehouse', 10, 13, { gold: 1 });
   const guard = building('guard', 10, 11, { tools: 3, gold: 2 });
-  guard.man = true;
+  guard.manned = true;
   for (let x = 0; x < game.W; x++) game.tiles[game.idx(x, 12)].t = game.WATER;
   const queued = { kind: 'soldier', to: guard.id, state: 'p' };
   const dispatched = { kind: 'soldier', to: guard.id, state: 't' };
@@ -98,13 +98,13 @@ test('pickup fallback preserves its unrestricted first-store choice before route
   const site = building('windmill', 1, 2);
   for (let y = 0; y < game.H; y++) game.tiles[game.idx(3, y)].t = game.WATER;
   const job = { kind: 'fetch', good: 'grain', s: source.id, to: site.id, state: 'p' };
-  source.res.grain = 1;
+  source.reservedStock.grain = 1;
   game.jobs.push(job);
   game.spawnCarrier(source);
   hooks.startJob(game.units[0], job);
   assert.equal(job.s, first.id, 'fallback chooses by distance and storage order before routing');
-  assert.equal(source.res.grain, 0);
-  assert.equal(first.res.grain, 1);
+  assert.equal(source.reservedStock.grain, 0);
+  assert.equal(first.reservedStock.grain, 1);
   assert.equal(game.units[0].job, null, 'route validation still rejects the disconnected pickup');
   assert.equal(job.state, 'p');
 });

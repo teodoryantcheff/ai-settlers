@@ -16,13 +16,13 @@ export function runScenarios(game: GameRuntime) {
     for (let ty = y - 2; ty <= y + 2; ty++)
       for (let tx = x - 2; tx <= x + 2; tx++) {
         const index = game.idx(tx, ty);
-        Object.assign(game.tiles[index], { t: game.GRASS, tree: 0, rock: null, res: null });
+        Object.assign(game.tiles[index], { t: game.GRASS, tree: 0, rock: null, deposit: null });
         game.emitGameEvent('tileChanged', { index });
       }
     const armory = game.newBuilding('armory', x, y);
     Object.assign(armory, {
       done: true,
-      prog: 1,
+      constructionProgress: 1,
       legacyIndustry: true,
       stock: /[?&]missing=coal(?:&|$)/.test(location.search) ? { iron: 1 } : { coal: 1 },
     });
@@ -83,7 +83,7 @@ export function runScenarios(game: GameRuntime) {
       if (ps) {
         const nb = game.newBuilding(bt, ps[0], ps[1]);
         nb.done = true;
-        nb.prog = 1;
+        nb.constructionProgress = 1;
         game.buildings.push(nb);
         placed++;
       }
@@ -103,7 +103,7 @@ export function runScenarios(game: GameRuntime) {
     let nb2: Building;
     if (siteAt) {
       nb2 = game.newBuilding('lumberjack', siteAt[0], siteAt[1]);
-      nb2.prog = 0.4;
+      nb2.constructionProgress = 0.4;
       nb2.got = { planks: 2, tools: 1 };
       game.buildings.push(nb2);
     }
@@ -120,7 +120,7 @@ export function runScenarios(game: GameRuntime) {
           for (const ingredient in sampleSpec.in) sample.stock[ingredient as Good] = 4;
       }
       const stageMatch = location.search.match(/[?&]stage=(0|1|2|3)(?:&|$)/);
-      if (nb2 && stageMatch) nb2.prog = [0.1, 0.4, 0.7, 0.93][+stageMatch[1]];
+      if (nb2 && stageMatch) nb2.constructionProgress = [0.1, 0.4, 0.7, 0.93][+stageMatch[1]];
     }
     // a road for visual inspection
     let ra = null,
@@ -191,7 +191,7 @@ export function runScenarios(game: GameRuntime) {
         tile.t = game.GRASS;
         tile.tree = 0;
         tile.rock = null;
-        tile.res = null;
+        tile.deposit = null;
         tile.road = y === centerY - 3 || y === centerY + 4;
         game.emitGameEvent('tileChanged', { index: game.idx(x, y) });
       }
@@ -201,7 +201,7 @@ export function runScenarios(game: GameRuntime) {
       const y = centerY - 5 + Math.floor(index / 5) * 7;
       const building = game.newBuilding(type, x, y);
       building.done = true;
-      building.prog = 1;
+      building.constructionProgress = 1;
       const spec = game.BSPEC[type];
       if (spec.out) building.stock[spec.out] = 4;
       for (const good in spec.in) building.stock[good as Good] = 3;
@@ -445,9 +445,9 @@ export function runScenarios(game: GameRuntime) {
                       const mt = game.tiles[game.idx(x + game.DX[dd], y + game.DY[dd])];
                       if (
                         mt.t === game.MTN &&
-                        mt.res &&
-                        mt.res.kind === sp.resKind &&
-                        mt.res.amt > 0
+                        mt.deposit &&
+                        mt.deposit.kind === sp.resKind &&
+                        mt.deposit.amt > 0
                       )
                         dep = true;
                     }
@@ -534,7 +534,7 @@ export function runScenarios(game: GameRuntime) {
           (tl6.t * 7 +
             tl6.tree * 3 +
             (tl6.rock ? tl6.rock.amt : 0) +
-            (tl6.res ? tl6.res.amt : 0) +
+            (tl6.deposit ? tl6.deposit.amt : 0) +
             (tl6.road ? 5 : 0)) *
             31 +
           (i2 % 7);

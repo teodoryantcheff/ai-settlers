@@ -53,7 +53,7 @@ test('advisor reasons display markup characters from colony rules as text', (t) 
   });
   game.BSPEC.well.rad = '6 <well & "service">';
   const bakery = game.newBuilding('bakery', 51, 48);
-  Object.assign(bakery, { done: true, prog: 1, blockedReason: 'water' });
+  Object.assign(bakery, { done: true, constructionProgress: 1, blockedReason: 'water' });
   game.buildings.push(bakery);
   assert.equal(game.advisorDecision().action.bt, 'well');
   game.hudTick();
@@ -136,13 +136,13 @@ test('outpost descriptions and territory use the shared radius for each staffing
     game.BSPEC.guard.rad = original;
   });
   const guard = game.newBuilding('guard', 70, 70);
-  Object.assign(guard, { done: true, prog: 1 });
+  Object.assign(guard, { done: true, constructionProgress: 1 });
   game.buildings.push(guard);
   game.tiles = Array.from({ length: game.W * game.H }, () => ({
     t: game.GRASS,
     tree: 0,
     rock: null,
-    res: null,
+    deposit: null,
     road: false,
   }));
   const { game: reference } = createGame({
@@ -155,7 +155,7 @@ test('outpost descriptions and territory use the shared radius for each staffing
     [2, false, 2],
   ]) {
     game.BSPEC.guard.rad = configured;
-    guard.man = man;
+    guard.manned = man;
     assert.equal(territoryClaimRadius(game.BSPEC.guard, man), expected);
     game.recomputeTerritory();
     assert.equal(game.owned[game.idx(70 + expected, 70)], 1);

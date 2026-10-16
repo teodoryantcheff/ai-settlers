@@ -12,7 +12,7 @@ function colony() {
 
 function place(game, type, x, y, done = true) {
   const b = game.newBuilding(type, x, y);
-  Object.assign(b, { done, prog: done ? 1 : 0 });
+  Object.assign(b, { done, constructionProgress: done ? 1 : 0 });
   game.buildings.push(b);
   return b;
 }

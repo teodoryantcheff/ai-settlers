@@ -67,7 +67,7 @@ export function createPersistence(
       TR.push(tl.tree);
       RK.push(tl.rock ? tl.rock.amt : 0);
       RD.push(tl.road ? 1 : 0);
-      RS.push(tl.res ? [tl.res.kind, tl.res.amt, tl.res.amt0 || 0] : null);
+      RS.push(tl.deposit ? [tl.deposit.kind, tl.deposit.amt, tl.deposit.amt0 || 0] : null);
     }
     const B = game.buildings.map(function (b): Building {
       return {
@@ -76,18 +76,18 @@ export function createPersistence(
         x: b.x,
         y: b.y,
         done: b.done,
-        prog: b.prog,
+        constructionProgress: b.constructionProgress,
         needs: b.needs,
         got: b.got,
         stock: b.stock,
-        res: b.res,
-        man: b.man,
+        reservedStock: b.reservedStock,
+        manned: b.manned,
         exhausted: b.exhausted,
         produced: b.produced,
         timer: b.timer,
-        nofood: !!b.nofood,
+        foodBlockedNoticeSent: !!b.foodBlockedNoticeSent,
         legacyIndustry: b.legacyIndustry,
-        norock: !!b.norock,
+        rocksExhaustedNoticeSent: !!b.rocksExhaustedNoticeSent,
         metrics: b.metrics,
         blockedReason: b.blockedReason,
         priority: b.priority || 0,
@@ -294,7 +294,7 @@ export function createPersistence(
         tree: TR[i],
         rock: RK[i] > 0 ? { amt: RK[i] } : null,
         road: !!RD[i],
-        res: RS[i] ? { kind: RS[i][0], amt: RS[i][1], amt0: RS[i][2] || RS[i][1] } : null,
+        deposit: RS[i] ? { kind: RS[i][0], amt: RS[i][1], amt0: RS[i][2] || RS[i][1] } : null,
         owned: false,
       };
     });

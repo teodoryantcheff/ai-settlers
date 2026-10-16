@@ -77,7 +77,7 @@ function inspector() {
   });
   game.initializeColony();
   const mill = game.newBuilding('sawmill', 51, 48);
-  Object.assign(mill, { done: true, prog: 1, stock: { logs: 1 } });
+  Object.assign(mill, { done: true, constructionProgress: 1, stock: { logs: 1 } });
   game.buildings.push(mill);
   game.selected = mill;
   const counts = () => ({ ...writes });

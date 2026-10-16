@@ -103,22 +103,24 @@ export interface Building {
   x: number;
   y: number;
   done: boolean;
-  prog: number;
+  constructionProgress: number;
   needs: Inventory;
   got: Inventory;
   stock: Inventory;
-  res: Inventory;
+  reservedStock: Inventory;
   timer: number;
   priority: 0 | 1 | 2;
   targets: Inventory;
   disabled: boolean;
   metrics: ProductionMetrics;
   blockedReason: ProductionBlockReason;
-  man: boolean;
+  manned: boolean;
   exhausted: boolean;
-  nofood: boolean;
+  /** Suppress repeat notices until a successful production attempt clears the record. */
+  foodBlockedNoticeSent: boolean;
+  /** Records the quarry's reported exhaustion, cleared when it produces stone again. */
+  rocksExhaustedNoticeSent: boolean;
   legacyIndustry?: boolean;
-  norock: boolean;
   produced: number;
   /** Transient display cache; never serialized or accepted from imported saves. */
 }
@@ -217,7 +219,7 @@ export interface Tile {
   rock: { amt: number } | null;
   road: boolean;
   owned?: boolean;
-  res: { kind: 'gold' | 'iron' | 'coal'; amt: number; amt0?: number } | null;
+  deposit: { kind: 'gold' | 'iron' | 'coal'; amt: number; amt0?: number } | null;
 }
 export interface Random {
   (): number;

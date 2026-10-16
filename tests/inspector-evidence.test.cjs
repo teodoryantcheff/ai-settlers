@@ -16,7 +16,7 @@ test('demolition quotes match per-good rounded-down refunds and separate local-s
   const g = colony();
   const hq = g.anyStorage();
   const farm = g.newBuilding('farm', 51, 48);
-  Object.assign(farm, { done: true, prog: 1, stock: { grain: 4, gold: 2 } });
+  Object.assign(farm, { done: true, constructionProgress: 1, stock: { grain: 4, gold: 2 } });
   g.buildings.push(farm);
   const before = { ...hq.stock };
   const rng = g.SR.getState();
@@ -53,7 +53,7 @@ test('protected buildings expose reasons and outpost projection matches actual t
   g.buildings.push(warehouse);
   assert.match(g.demolitionQuote(warehouse).reason, /completed storehouse/);
   const guard = g.newBuilding('guard', 58, 48);
-  Object.assign(guard, { done: true, prog: 1, man: true });
+  Object.assign(guard, { done: true, constructionProgress: 1, manned: true });
   g.buildings.push(guard);
   g.recomputeTerritory();
   const owned = g.owned.slice();
@@ -73,7 +73,7 @@ test('protected buildings expose reasons and outpost projection matches actual t
 test('input evidence distinguishes queued, assigned and carrying work, including alternative mine meals', () => {
   const g = colony();
   const mill = g.newBuilding('sawmill', 51, 48);
-  Object.assign(mill, { done: true, prog: 1 });
+  Object.assign(mill, { done: true, constructionProgress: 1 });
   g.buildings.push(mill);
   const jobs = [0, 1, 2].map((i) => ({
     id: 100 + i,
@@ -108,7 +108,7 @@ test('input evidence distinguishes queued, assigned and carrying work, including
     /on the way/,
   );
   const mine = g.newBuilding('mine_coal', 54, 48);
-  Object.assign(mine, { done: true, prog: 1 });
+  Object.assign(mine, { done: true, constructionProgress: 1 });
   g.buildings.push(mine);
   g.jobs.push({
     id: 103,
@@ -129,7 +129,7 @@ test('input evidence distinguishes queued, assigned and carrying work, including
 test('unmanned outpost evidence distinguishes waiting dispatch from a walking soldier', () => {
   const g = colony();
   const b = g.newBuilding('guard', 57, 48);
-  Object.assign(b, { done: true, prog: 1 });
+  Object.assign(b, { done: true, constructionProgress: 1 });
   g.buildings.push(b);
   const job = { kind: 'soldier', to: b.id, state: 'p' };
   g.jobs.push(job);
@@ -154,7 +154,7 @@ test('unmanned outpost evidence distinguishes waiting dispatch from a walking so
 test('missing live carriers leave assignment evidence unavailable instead of inventing a queued delivery', () => {
   const g = colony();
   const b = g.newBuilding('sawmill', 51, 48);
-  Object.assign(b, { done: true, prog: 1 });
+  Object.assign(b, { done: true, constructionProgress: 1 });
   g.buildings.push(b);
   g.jobs.push({ kind: 'fetch', good: 'logs', to: b.id, s: g.anyStorage().id, state: 't' });
   assert.deepEqual(g.incomingDeliveryStages('logs', b.id), {
@@ -181,7 +181,7 @@ test('missing live carriers leave assignment evidence unavailable instead of inv
 test('all delivery evidence projections agree on live cargo and missing assignment records', () => {
   const g = colony();
   const b = g.newBuilding('sawmill', 51, 48);
-  Object.assign(b, { done: true, prog: 1 });
+  Object.assign(b, { done: true, constructionProgress: 1 });
   g.buildings.push(b);
   for (const [index, stage] of ['queued', 'assigned', 'carrying', 'unknown'].entries()) {
     const job = {

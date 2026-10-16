@@ -80,7 +80,7 @@ async function clearSites(page) {
     g.tiles = g.tiles.map((tile) => ({ ...tile }));
     for (let y = 46; y <= 52; y++)
       for (let x = 49; x <= 56; x++) {
-        Object.assign(g.tiles[g.idx(x, y)], { t: g.GRASS, tree: 0, rock: null, res: null });
+        Object.assign(g.tiles[g.idx(x, y)], { t: g.GRASS, tree: 0, rock: null, deposit: null });
         g.owned[g.idx(x, y)] = 1;
         g.emitGameEvent('tileChanged', { index: g.idx(x, y) });
       }
@@ -142,7 +142,7 @@ test('road plans show zero resource cost and rejection evidence before committin
   await page.mouse.click(next.x, next.y);
   await page.evaluate(() => {
     const g = window.productionArtPreview.game;
-    Object.assign(g.tiles[g.idx(52, 51)], { t: g.WATER, tree: 0, rock: null, res: null });
+    Object.assign(g.tiles[g.idx(52, 51)], { t: g.WATER, tree: 0, rock: null, deposit: null });
     g.emitGameEvent('tileChanged', { index: g.idx(52, 51) });
   });
   await move(page, 52, 51);

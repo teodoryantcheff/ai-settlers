@@ -47,7 +47,7 @@ export function createProgression(
       building: 'guard',
       check: function () {
         return game.buildings.some(function (b) {
-          return b.type === 'guard' && b.man;
+          return b.type === 'guard' && b.manned;
         });
       },
     },
@@ -107,7 +107,7 @@ export function createProgression(
       for (const store of game.storages()) {
         const take = Math.min(
           remaining,
-          Math.max(0, (store.stock[good as Good] || 0) - (store.res[good as Good] || 0)),
+          Math.max(0, (store.stock[good as Good] || 0) - (store.reservedStock[good as Good] || 0)),
         );
         store.stock[good as Good] = (store.stock[good as Good] || 0) - take;
         remaining -= take;
@@ -165,7 +165,7 @@ export function createProgression(
   }
   function pendingOutpost() {
     return game.buildings.find(function (b) {
-      return b.type === 'guard' && !b.man;
+      return b.type === 'guard' && !b.manned;
     });
   }
   function currentLesson() {

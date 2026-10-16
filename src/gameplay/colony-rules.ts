@@ -66,7 +66,7 @@ export function productionOutputBlocked(building: Pick<Building, 'stock'>, spec:
 }
 
 /** Completed territorial buildings, including hypothetical guard states. */
-export type TerritoryClaim = Pick<Building, 'type' | 'x' | 'y' | 'done' | 'man'>;
+export type TerritoryClaim = Pick<Building, 'type' | 'x' | 'y' | 'done' | 'manned'>;
 
 export interface TerritoryWorld extends Pick<ColonyRulesWorld, 'BSPEC'> {
   readonly W: number;
@@ -82,9 +82,9 @@ export interface TerritoryWorld extends Pick<ColonyRulesWorld, 'BSPEC'> {
 const unmannedGuardRadius = 3;
 
 /** Land-claim range: unmanned guards are capped, while staffed claims use full range. */
-export function territoryClaimRadius(spec: Pick<BuildingSpec, 'guard' | 'rad'>, man = false) {
+export function territoryClaimRadius(spec: Pick<BuildingSpec, 'guard' | 'rad'>, manned = false) {
   const radius = spec.rad || 0;
-  return spec.guard && !man ? Math.min(radius, unmannedGuardRadius) : radius;
+  return spec.guard && !manned ? Math.min(radius, unmannedGuardRadius) : radius;
 }
 
 /**
@@ -102,7 +102,7 @@ export function projectTerritory(
   for (const building of buildings) {
     if (!building.done || building.type === 'well') continue;
     const spec = world.BSPEC[building.type];
-    const radius = territoryClaimRadius(spec, building.man);
+    const radius = territoryClaimRadius(spec, building.manned);
     if (!radius) continue;
     stamp++;
     const start = world.idx(building.x, building.y);

@@ -4,9 +4,9 @@ const assert = require('node:assert/strict');
 const { createGame } = require('./helpers/game.cjs');
 const { projectTerritory } = require('../src/gameplay/colony-rules.ts');
 
-function place(game, type, x, y, man = false, done = true) {
+function place(game, type, x, y, manned = false, done = true) {
   const building = game.newBuilding(type, x, y);
-  Object.assign(building, { man, done, prog: done ? 1 : 0 });
+  Object.assign(building, { manned, done, constructionProgress: done ? 1 : 0 });
   game.buildings.push(building);
   return building;
 }
@@ -17,7 +17,7 @@ test('hypothetical guard claims can be added, removed or unmanned without changi
     t: game.GRASS,
     tree: 0,
     rock: null,
-    res: null,
+    deposit: null,
     road: false,
   }));
   const guard = place(game, 'guard', 20, 20, true);
@@ -30,11 +30,11 @@ test('hypothetical guard claims can be added, removed or unmanned without changi
     rng: game.SR.getState(),
   };
   const buildings = game.buildings.map((building) =>
-    building === guard ? { ...building, man: false } : building,
+    building === guard ? { ...building, manned: false } : building,
   );
   const projection = projectTerritory(game, [
     ...buildings,
-    { type: 'guard', x: 40, y: 40, done: true, man: true },
+    { type: 'guard', x: 40, y: 40, done: true, manned: true },
   ]);
   assert.equal(projection[game.idx(23, 20)], 1, 'an unmanned guard claims three steps');
   assert.equal(projection[game.idx(24, 20)], 0, 'unmanned claims stop after three steps');
@@ -68,7 +68,7 @@ test('the guard preview matches completed manned placement around water and ridg
     t: game.GRASS,
     tree: 0,
     rock: null,
-    res: null,
+    deposit: null,
     road: false,
   }));
   place(game, 'guard', 58, 48, true);
@@ -86,7 +86,7 @@ test('the guard preview matches completed manned placement around water and ridg
   assert.equal(game.SR.getState(), rng, 'preview consumes no simulation RNG');
   assert.equal(game.placeBuilding('guard', 63, 48), true);
   const guard = game.buildings.at(-1);
-  Object.assign(guard, { done: true, prog: 1, man: true });
+  Object.assign(guard, { done: true, constructionProgress: 1, manned: true });
   game.recomputeTerritory();
   assert.deepEqual(game.owned, preview);
   assert.deepEqual(

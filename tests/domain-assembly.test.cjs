@@ -28,7 +28,7 @@ test('shared colony assembly remains headless and delivers actual producer outpu
   game.gameEvents.on('goodsDelivered', (event) => arrivals.push(event));
   const logger = game.newBuilding('lumberjack', 51, 48);
   logger.done = true;
-  logger.prog = 1;
+  logger.constructionProgress = 1;
   game.buildings.push(logger);
   game.tiles[game.idx(52, 48)].tree = 4;
   step(game, 1800);

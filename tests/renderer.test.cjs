@@ -97,13 +97,13 @@ function renderer() {
     t: e.GRASS,
     tree: 0,
     rock: null,
-    res: null,
+    deposit: null,
     road: false,
   }));
   e.owned.fill(1);
   const hq = e.newBuilding('hq', 48, 48);
   hq.done = true;
-  hq.prog = 1;
+  hq.constructionProgress = 1;
   e.buildings.push(hq);
   e.state.paused = true;
   e.state.upgrades = { haul: 0, production: 0 };

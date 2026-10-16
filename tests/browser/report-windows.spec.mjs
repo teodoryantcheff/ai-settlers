@@ -128,7 +128,7 @@ test('Economy restores edited filters, useful focus, disclosures and scroll afte
   await page.evaluate(() => {
     const g = window.productionArtPreview.game,
       b = g.newBuilding('sawmill', 51, 48);
-    Object.assign(b, { done: true, prog: 1, stock: { logs: 2 } });
+    Object.assign(b, { done: true, constructionProgress: 1, stock: { logs: 2 } });
     g.buildings.push(b);
   });
   await page.locator('#goods [data-good="planks"]').press('Enter');
@@ -177,7 +177,7 @@ test('Inspect retains Economy and its camera; Locate cancels pending zoom and re
   const id = await page.evaluate(() => {
     const g = window.productionArtPreview.game,
       b = g.newBuilding('sawmill', 80, 80);
-    Object.assign(b, { done: true, prog: 1 });
+    Object.assign(b, { done: true, constructionProgress: 1 });
     g.buildings.push(b);
     return b.id;
   });

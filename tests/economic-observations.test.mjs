@@ -13,16 +13,16 @@ function colony() {
     t: game.GRASS,
     tree: 0,
     rock: null,
-    res: null,
+    deposit: null,
     road: false,
   }));
   const hq = game.newBuilding('hq', 48, 48);
   hq.done = true;
-  hq.prog = 1;
+  hq.constructionProgress = 1;
   hq.stock = { logs: 100, planks: 48, stone: 48, tools: 16 };
   const mill = game.newBuilding('sawmill', 50, 48);
   mill.done = true;
-  mill.prog = 1;
+  mill.constructionProgress = 1;
   mill.timer = 0;
   mill.stock.logs = 4;
   game.buildings.push(hq, mill);
@@ -55,7 +55,7 @@ test('colony lifetime measurements retain demolished production and reads do not
 test('stock categories reconcile without counting reservations or queued jobs twice', () => {
   const { game, hq, mill } = colony();
   hq.stock.logs = 10;
-  hq.res.logs = 3;
+  hq.reservedStock.logs = 3;
   mill.stock.logs = 4;
   game.jobs.push({ kind: 'transfer', good: 'logs', s: hq.id, from: hq.id, to: hq.id, state: 'p' });
   game.spawnCarrier(hq);
@@ -151,7 +151,7 @@ test('real cargo arrivals separate producer throughput, construction spending an
   const { game, hq, mill } = colony();
   const warehouse = game.newBuilding('warehouse', 54, 48);
   warehouse.done = true;
-  warehouse.prog = 1;
+  warehouse.constructionProgress = 1;
   warehouse.targets.planks = 6;
   const site = game.newBuilding('toolsmith', 50, 50);
   site.disabled = true;
@@ -226,7 +226,7 @@ test('cancelled warehouse-transfer cargo remains a transfer when returned to sto
   game.demolish(mill);
   const warehouse = game.newBuilding('warehouse', 62, 48);
   warehouse.done = true;
-  warehouse.prog = 1;
+  warehouse.constructionProgress = 1;
   warehouse.targets.planks = 1;
   game.buildings.push(warehouse);
   game.recomputeTerritory();

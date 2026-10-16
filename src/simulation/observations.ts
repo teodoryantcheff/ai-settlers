@@ -142,7 +142,7 @@ export function createObservations(game: ObservationDependencies): ObservationSu
         other = 0;
       if (b.done && spec.store) {
         stored = stock;
-        reserved = b.res[good] || 0;
+        reserved = b.reservedStock[good] || 0;
         result.stored += stored;
         result.reserved += reserved;
       } else {

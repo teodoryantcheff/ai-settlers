@@ -13,7 +13,7 @@ function colony() {
     t: game.WATER,
     tree: 0,
     rock: null,
-    res: null,
+    deposit: null,
     road: false,
   }));
   for (let x = 50; x <= 58; x++) game.tiles[game.idx(x, 50)].t = game.GRASS;

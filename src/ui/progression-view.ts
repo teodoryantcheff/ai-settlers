@@ -193,7 +193,7 @@ export function createProgressionView(game: GameRuntime): ProgressionViewSubsyst
       Math.floor(game.state.time / 60) + 'm ' + (game.state.time % 60).toFixed(1) + 's',
     )}${stat('Current treasury', game.state.gold + ' Gold')}${stat('Completed buildings', completed)}${stat('Construction sites', game.buildings.length - completed)}${stat(
       'Manned outposts',
-      guards.filter((building) => building.done && building.man).length + ' / ' + guards.length,
+      guards.filter((building) => building.done && building.manned).length + ' / ' + guards.length,
     )}${stat('Road tiles', game.tiles.filter((tile) => tile.road).length)}${stat('Mobile settlers', settlers)}${stat('Contracts fulfilled', game.state.contracts.length + ' / ' + game.contracts.length)}</dl><h2>Recorded economic achievements</h2>`;
     if (observed.available) {
       html += markup`<dl class="victory-grid">${stat('Gold produced', observed.totals.produced.gold || 0)}${stat('Produced gold delivered to storage', observed.totals.outputStored.gold || 0)}${stat('Gold received from contracts', observed.totals.contractReward.gold || 0)}${stat('Gold spent on upgrades', observed.totals.upgradeSpent.gold || 0)}</dl><p class="muted">Recorded from ${observed.from.toFixed(1)} to ${observed.to.toFixed(1)} simulation seconds (${observed.elapsed.toFixed(1)} seconds of coverage). Colony totals include demolished producers. These are current recorded totals; the original victory time is not recorded.</p>`;

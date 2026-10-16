@@ -168,7 +168,7 @@ export function createEconomy(
         const good = options.available;
         const free =
           (store.stock[good] | 0) -
-          (store.res[good] | 0) -
+          (store.reservedStock[good] | 0) -
           (options.retainTarget ? (store.targets || {})[good] | 0 : 0);
         if (free <= 0) continue;
       }
@@ -350,16 +350,16 @@ export function createEconomy(
       x: x,
       y: y,
       done: false,
-      prog: 0,
+      constructionProgress: 0,
       needs: copyObj(game.BSPEC[type].cost || {}),
       got: {},
       stock: {},
-      res: {},
+      reservedStock: {},
       timer: 1 + game.SR(),
-      man: false,
+      manned: false,
       exhausted: false,
-      nofood: false,
-      norock: false,
+      foodBlockedNoticeSent: false,
+      rocksExhaustedNoticeSent: false,
       produced: 0,
       priority: 0,
       targets: {},
@@ -395,7 +395,7 @@ export function createEconomy(
     for (let i = 0; i < ss.length; i++) {
       const store = ss[i];
       if (ref && !game.connectedLand(ref.x, ref.y, store.x, store.y)) continue;
-      let free = (store.stock[g] | 0) - (store.res[g] | 0);
+      let free = (store.stock[g] | 0) - (store.reservedStock[g] | 0);
       if (includeTransfers)
         for (let j = 0; j < game.jobs.length; j++) {
           const job = game.jobs[j];
@@ -472,7 +472,7 @@ export function createEconomy(
       }
     if ((j.kind === 'fetch' || j.kind === 'transfer') && (!assigned || !assigned.carry)) {
       const s = byId(j.s);
-      if (s) s.res[j.good] = Math.max(0, (s.res[j.good] | 0) - 1);
+      if (s) s.reservedStock[j.good] = Math.max(0, (s.reservedStock[j.good] | 0) - 1);
     }
     if (j.kind === 'soldier') {
       game.soldierPool++;
@@ -563,7 +563,12 @@ export function createEconomy(
             my = y + game.DY[dd];
           if (game.inB(mx, my)) {
             const mt = game.tiles[game.idx(mx, my)];
-            if (mt.t === game.MTN && mt.res && mt.res.kind === sp.resKind && mt.res.amt > 0)
+            if (
+              mt.t === game.MTN &&
+              mt.deposit &&
+              mt.deposit.kind === sp.resKind &&
+              mt.deposit.amt > 0
+            )
               ok = true;
           }
         }
@@ -711,7 +716,7 @@ export function createEconomy(
         if ((b.stock[name as Good] | 0) > 0) salvage[name as Good] = b.stock[name as Good] | 0;
     }
     const equipmentReceiver =
-      allowed && b.type === 'guard' && b.man ? nearestStoragePos(b.x, b.y) : null;
+      allowed && b.type === 'guard' && b.manned ? nearestStoragePos(b.x, b.y) : null;
     const touching = game.jobs.filter(
       (job) => job.from === b.id || job.to === b.id || job.s === b.id,
     );
@@ -746,7 +751,7 @@ export function createEconomy(
       salvage,
       receiver: location(receiver),
       returnedSoldiers: allowed
-        ? (b.type === 'guard' && b.man ? 1 : 0) +
+        ? (b.type === 'guard' && b.manned ? 1 : 0) +
           touching.filter((job) => job.kind === 'soldier').length
         : 0,
       equipment: equipmentReceiver ? { weapons: 1 } : {},
@@ -907,8 +912,8 @@ export function createEconomy(
     const sp = game.BSPEC[b.type];
     if (!b.done) {
       if (!siteReady(b)) return;
-      b.prog += dt / 10;
-      if (b.prog >= 1) onDone(b);
+      b.constructionProgress += dt / 10;
+      if (b.constructionProgress >= 1) onDone(b);
       return;
     }
     if (sp.prod === 'none' || sp.store) return;
@@ -979,7 +984,7 @@ export function createEconomy(
           const t2 = game.tiles[rk];
           t2.rock.amt--;
           addStock(b, 'stone', 1);
-          b.norock = false;
+          b.rocksExhaustedNoticeSent = false;
           b.blockedReason = '';
           if (t2.rock.amt <= 0) {
             t2.rock = null;
@@ -987,8 +992,8 @@ export function createEconomy(
           }
           b.timer += timing.base;
         } else {
-          if (!b.norock) {
-            b.norock = true;
+          if (!b.rocksExhaustedNoticeSent) {
+            b.rocksExhaustedNoticeSent = true;
             gameEvent('rocksExhausted', { building: b });
           }
           b.timer = 4;
@@ -1020,8 +1025,8 @@ export function createEconomy(
       case 'mine': {
         if (ingredientShortages(b, sp).length) {
           b.timer = 1.5;
-          if (sp.prod === 'mine' && !b.nofood) {
-            b.nofood = true;
+          if (sp.prod === 'mine' && !b.foodBlockedNoticeSent) {
+            b.foodBlockedNoticeSent = true;
             gameEvent('foodBlocked', { building: b });
           }
           break;
@@ -1038,7 +1043,7 @@ export function createEconomy(
           b.metrics.consumed[g] = (b.metrics.consumed[g] | 0) + inputs[g];
           game.recordEconomicFlow('consumed', g, inputs[g]);
         }
-        b.nofood = false;
+        b.foodBlockedNoticeSent = false;
         addStock(b, sp.out, 1);
         b.timer += timing.base;
         b.blockedReason = '';
@@ -1103,8 +1108,13 @@ export function createEconomy(
         y = b.y + game.DY[d];
       if (!game.inB(x, y)) continue;
       const t = game.tiles[game.idx(x, y)];
-      if (t.t === game.MTN && t.res && t.res.kind === game.BSPEC[b.type].resKind && t.res.amt > 0) {
-        t.res.amt--;
+      if (
+        t.t === game.MTN &&
+        t.deposit &&
+        t.deposit.kind === game.BSPEC[b.type].resKind &&
+        t.deposit.amt > 0
+      ) {
+        t.deposit.amt--;
         gameEvent('tileChanged', { index: game.idx(x, y) });
         return true;
       }
@@ -1157,7 +1167,7 @@ export function createEconomy(
       if (exportBudget[sourceKey] === undefined)
         exportBudget[sourceKey] = source
           ? (source.stock[pending.good] | 0) -
-            (source.res[pending.good] | 0) -
+            (source.reservedStock[pending.good] | 0) -
             ((source.targets || {})[pending.good] | 0)
           : 0;
       // Existing transfer reservations are eligible for reconsideration. Fetch
@@ -1208,7 +1218,7 @@ export function createEconomy(
             euclidean: true,
           });
           if (!source) break;
-          source.res[g as Good] = (source.res[g as Good] | 0) + 1;
+          source.reservedStock[g as Good] = (source.reservedStock[g as Good] | 0) + 1;
           game.jobs.push({
             kind: 'transfer',
             good: g as Good,
@@ -1269,7 +1279,7 @@ export function createEconomy(
               if (requestStock(request, b)) s = pickStorageFor(g, b);
             }
             if (!s) break;
-            s.res[g] = (s.res[g] | 0) + 1;
+            s.reservedStock[g] = (s.reservedStock[g] | 0) + 1;
             game.jobs.push({ kind: 'fetch', good: g as Good, to: b.id, s: s.id, state: 'p' });
           }
         }
@@ -1294,7 +1304,7 @@ export function createEconomy(
           for (let c3 = 0; c3 < toC; c3++) {
             const s3 = pickStorageFor(g, b);
             if (!s3) break;
-            s3.res[g] = (s3.res[g] | 0) + 1;
+            s3.reservedStock[g] = (s3.reservedStock[g] | 0) + 1;
             game.jobs.push({ kind: 'fetch', good: g as Good, to: b.id, s: s3.id, state: 'p' });
           }
         }
@@ -1328,7 +1338,7 @@ export function createEconomy(
         } else if (dl < dlMax)
           game.jobs.push({ kind: 'deliver', good: sp.out, from: b.id, state: 'p' });
       }
-      if (sp.guard && !b.man && game.soldierPool > 0 && !countSoldier(b.id)) {
+      if (sp.guard && !b.manned && game.soldierPool > 0 && !countSoldier(b.id)) {
         game.soldierPool--;
         game.jobs.push({ kind: 'soldier', to: b.id, state: 'p' });
       }
@@ -1342,8 +1352,9 @@ export function createEconomy(
         const old = s;
         const nb = nearestStorage(old || { x: 0, y: 0 }, { available: j.good });
         if (!nb || j.kind === 'transfer') return null;
-        if (old && old !== nb) old.res[j.good] = Math.max(0, (old.res[j.good] | 0) - 1);
-        nb.res[j.good] = (nb.res[j.good] | 0) + 1;
+        if (old && old !== nb)
+          old.reservedStock[j.good] = Math.max(0, (old.reservedStock[j.good] | 0) - 1);
+        nb.reservedStock[j.good] = (nb.reservedStock[j.good] | 0) + 1;
         j.s = nb.id;
       }
       const s2 = byId(j.s);
@@ -1546,7 +1557,11 @@ export function createEconomy(
       if (ji2 >= 0) game.jobs.splice(ji2, 1);
       if ((u.job.kind === 'fetch' || u.job.kind === 'transfer') && !u.carry) {
         const source = byId(u.job.s);
-        if (source) source.res[u.job.good] = Math.max(0, (source.res[u.job.good] | 0) - 1);
+        if (source)
+          source.reservedStock[u.job.good] = Math.max(
+            0,
+            (source.reservedStock[u.job.good] | 0) - 1,
+          );
       }
       u.job = null;
     }
@@ -1643,12 +1658,13 @@ export function createEconomy(
             return;
           }
           const old = byId(j.s);
-          if (old && old !== s) old.res[j.good] = Math.max(0, (old.res[j.good] | 0) - 1);
-          s.res[j.good] = (s.res[j.good] | 0) + 1;
+          if (old && old !== s)
+            old.reservedStock[j.good] = Math.max(0, (old.reservedStock[j.good] | 0) - 1);
+          s.reservedStock[j.good] = (s.reservedStock[j.good] | 0) + 1;
           j.s = s.id;
         }
         s.stock[j.good]--;
-        s.res[j.good] = Math.max(0, (s.res[j.good] | 0) - 1);
+        s.reservedStock[j.good] = Math.max(0, (s.reservedStock[j.good] | 0) - 1);
         u.carry = j.good;
         u.carryTransfer = true;
         u.carryWarehouseTransfer = j.kind === 'transfer';
@@ -1722,8 +1738,8 @@ export function createEconomy(
       u.job = null;
     }
     const g = u.dropB ? byId(u.dropB) : null;
-    if (g && !g.man) {
-      g.man = true;
+    if (g && !g.manned) {
+      g.manned = true;
       game.recomputeTerritory();
       gameEvent('outpostManned', { building: g });
     } else game.soldierPool++;
@@ -1883,11 +1899,11 @@ export function createEconomy(
     }
     if (sp.guard) {
       lines.push(
-        b.man
+        b.manned
           ? { t: 'Manned \u2014 border extended (radius ' + sp.rad + ')', w: false }
           : { t: 'Needs a soldier \u2014 sent automatically when one is available', w: true },
       );
-      if (!b.man) {
+      if (!b.manned) {
         let queued = 0,
           walking = 0,
           unavailable = 0;
@@ -1911,7 +1927,7 @@ export function createEconomy(
           w: false,
         });
       }
-      return { lines: lines, bad: !b.man };
+      return { lines: lines, bad: !b.manned };
     }
     if (b.disabled) {
       lines.push({ t: 'Production paused by you', w: false });
@@ -2019,7 +2035,7 @@ export function createEconomy(
               Math.max(
                 0,
                 storages().reduce(
-                  (n, store) => n + (store.stock[good] || 0) - (store.res[good] || 0),
+                  (n, store) => n + (store.stock[good] || 0) - (store.reservedStock[good] || 0),
                   0,
                 ),
               ),

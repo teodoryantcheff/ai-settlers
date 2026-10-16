@@ -13,7 +13,7 @@ function colony() {
     t: g.GRASS,
     tree: 0,
     rock: null,
-    res: null,
+    deposit: null,
     road: false,
   }));
   g.owned.fill(1);

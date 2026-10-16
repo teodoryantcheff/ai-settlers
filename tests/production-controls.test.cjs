@@ -18,7 +18,7 @@ function colony() {
 
 function warehouse(game) {
   const store = game.newBuilding('warehouse', 54, 48);
-  Object.assign(store, { done: true, prog: 1 });
+  Object.assign(store, { done: true, constructionProgress: 1 });
   game.buildings.push(store);
   return store;
 }
@@ -63,7 +63,7 @@ test('warehouse reserves are whole numbers from 0 to 500 and reject non-numbers'
     assert.equal(game.setStockTarget(store, 'planks', value), false, String(value));
   assert.equal(game.setStockTarget(store, 'wood', 5), false, 'unknown goods are rejected');
   const mill = game.newBuilding('sawmill', 51, 48);
-  Object.assign(mill, { done: true, prog: 1 });
+  Object.assign(mill, { done: true, constructionProgress: 1 });
   game.buildings.push(mill);
   assert.equal(game.setStockTarget(mill, 'planks', 5), false, 'only stores hold reserves');
   assert.equal(store.targets.planks, 12);

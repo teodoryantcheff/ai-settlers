@@ -53,6 +53,19 @@ function run(seed, auto, record = false) {
 }
 function historicalEconomySnapshot(value) {
   const copy = structuredClone(value);
+  // Keep the original byte hashes: only field names changed, not simulation.
+  const historicalFields = {
+    reservedStock: 'res',
+    constructionProgress: 'prog',
+    manned: 'man',
+    foodBlockedNoticeSent: 'nofood',
+    rocksExhaustedNoticeSent: 'norock',
+  };
+  copy.b = copy.b.map((building) =>
+    Object.fromEntries(
+      Object.entries(building).map(([key, value]) => [historicalFields[key] || key, value]),
+    ),
+  );
   delete copy.identity;
   delete copy.observations;
   delete copy.attention;
