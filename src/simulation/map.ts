@@ -1,3 +1,4 @@
+import { projectTerritory as projectColonyTerritory } from '../gameplay/colony-rules.ts';
 import type { SimulationStateSubsystem } from './state.ts';
 import type { WorldSubsystem } from '../core/world.ts';
 import type { EventsSubsystem } from '../core/events.ts';
@@ -313,40 +314,10 @@ export function createMap(game: MapDependencies, internals?: MapInternals): MapS
   }
   const owned = new Uint8Array(game.W * game.H);
   function projectTerritory(excludedId?: number) {
-    const projected = new Uint8Array(game.W * game.H);
-    for (let bi = 0; bi < game.buildings.length; bi++) {
-      const b = game.buildings[bi];
-      if (!b.done || b.type === 'well' || b.id === excludedId) continue;
-      const sp = game.BSPEC[b.type];
-      let rad = sp.rad || 0;
-      if (sp.guard && !b.man) rad = Math.min(rad, 3);
-      if (!rad) continue;
-      const sx = b.x,
-        sy = b.y,
-        dist: Record<number, number> = {},
-        q = [game.idx(sx, sy)],
-        ds = [0];
-      dist[game.idx(sx, sy)] = 0;
-      for (let qi = 0; qi < q.length; qi++) {
-        const i = q[qi],
-          d = ds[qi];
-        projected[i] = 1;
-        if (d >= rad) continue;
-        const x = i % game.W,
-          y = (i / game.W) | 0;
-        for (let dd = 0; dd < 4; dd++) {
-          const nx = x + game.DX[dd],
-            ny = y + game.DY[dd];
-          if (!game.inB(nx, ny)) continue;
-          const n = game.idx(nx, ny);
-          if (dist[n] !== undefined || !game.passI(n)) continue;
-          dist[n] = d + 1;
-          q.push(n);
-          ds.push(d + 1);
-        }
-      }
-    }
-    return projected;
+    return projectColonyTerritory(
+      game,
+      game.buildings.filter((building) => building.id !== excludedId),
+    );
   }
   function recomputeTerritory() {
     owned.set(projectTerritory());
@@ -354,52 +325,23 @@ export function createMap(game: MapDependencies, internals?: MapInternals): MapS
     game.emitGameEvent('territoryChanged', {});
   }
   // ---- guard-post territory preview (read-only projection; never mutates `owned`) ----
-  // Mirrors recomputeTerritory's flood exactly (manned radius) with a hypothetical guard at
-  // x,y, so the placement ghost can show the *actual* new border — the plain radius diamond
-  // in ghostDraw is wrong near water/ridges because territory floods around impassable tiles.
+  // Project a hypothetical manned guard so the ghost shows the eventual border,
+  // including detours around water and ridges, without changing the live colony.
   const gpOwned = new Uint8Array(game.W * game.H),
     gpSegs: GuardPreviewSegment[] = [],
     gpFill: number[] = [];
   let gpDirty = true,
     gpX = -1,
     gpY = -1;
-  function gpFlood(sx: number, sy: number, rad: number) {
-    const dist: Record<number, number> = {},
-      q = [game.idx(sx, sy)],
-      ds = [0];
-    dist[game.idx(sx, sy)] = 0;
-    for (let qi = 0; qi < q.length; qi++) {
-      const i = q[qi],
-        d = ds[qi];
-      gpOwned[i] = 1;
-      if (d >= rad) continue;
-      const x = i % game.W,
-        y = (i / game.W) | 0;
-      for (let dd = 0; dd < 4; dd++) {
-        const nx = x + game.DX[dd],
-          ny = y + game.DY[dd];
-        if (!game.inB(nx, ny)) continue;
-        const n = game.idx(nx, ny);
-        if (dist[n] !== undefined || !game.passI(n)) continue;
-        dist[n] = d + 1;
-        q.push(n);
-        ds.push(d + 1);
-      }
-    }
-  }
   function computeGuardPreview(x: number, y: number) {
-    gpOwned.fill(0);
+    gpOwned.set(
+      projectColonyTerritory(game, [
+        ...game.buildings,
+        { type: 'guard', x, y, done: true, man: true },
+      ]),
+    );
     gpSegs.length = 0;
     gpFill.length = 0;
-    for (let bi = 0; bi < game.buildings.length; bi++) {
-      const b = game.buildings[bi];
-      if (!b.done || b.type === 'well') continue;
-      const sp = game.BSPEC[b.type];
-      let rad = sp.rad || 0;
-      if (sp.guard && !b.man) rad = Math.min(rad, 3);
-      if (rad) gpFlood(b.x, b.y, rad);
-    }
-    gpFlood(x, y, game.BSPEC.guard.rad);
     for (let i = 0; i < game.W * game.H; i++) if (gpOwned[i] && !owned[i]) gpFill.push(i); // newly claimed tiles
     for (let y2 = 0; y2 < game.H; y2++)
       for (let x2 = 0; x2 < game.W; x2++) {

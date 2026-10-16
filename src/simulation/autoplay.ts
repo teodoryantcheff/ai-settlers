@@ -1,6 +1,7 @@
 import {
   countsAsWell,
   hasWellCoverage,
+  projectTerritory,
   wellRadius,
   wellReaches,
 } from '../gameplay/colony-rules.ts';
@@ -324,27 +325,21 @@ export function createAutoplay(
     // The road can pass through reserved mine faces or a narrow coastal bend. Search
     // nearby buildable land and score the territory its manned flood would add.
     // Repeating an already-covered route tile cannot advance an expansion chain.
-    const routeIndex = new Int16Array(game.W * game.H),
-      candidates = new Uint8Array(game.W * game.H);
-    routeIndex.fill(-1);
-    for (let q = 0; q < cor.length; q++) routeIndex[cor[q]] = q;
+    const candidates = new Uint8Array(game.W * game.H);
     const goal = cor[cor.length - 1],
       gx = goal % game.W,
       gy = (goal / game.W) | 0;
-    const critical = new Uint8Array(game.W * game.H);
+    const critical = [goal];
     let missing = 0;
-    critical[goal] = 1;
     if (!game.owned[goal]) missing++;
     for (let d = 0; d < 4; d++) {
       const nx = gx + game.DX[d],
         ny = gy + game.DY[d];
       if (!game.inB(nx, ny) || !game.passI(game.idx(nx, ny))) continue;
-      critical[game.idx(nx, ny)] = 1;
+      critical.push(game.idx(nx, ny));
       if (!game.owned[game.idx(nx, ny)]) missing++;
     }
-    const seen = new Int32Array(game.W * game.H);
-    let stamp = 0,
-      best: [number, number] = null,
+    let best: [number, number] = null,
       bestScore = -Infinity;
     for (let q = cor.length - 1; q >= 0; q--) {
       const px = cor[q] % game.W,
@@ -359,33 +354,20 @@ export function createAutoplay(
           candidates[site] = 1;
           if (!game.owned[site] || isFaceTile(x, y, want) || !game.canPlace('guard', x, y)[0])
             continue;
-          stamp++;
-          const queue = [site],
-            distances = [0];
+          const projected = projectTerritory(game, [
+            { type: 'guard', x, y, done: true, man: true },
+          ]);
           let advance = -1,
             criticalHits = 0;
-          seen[site] = stamp;
-          for (let qi = 0; qi < queue.length; qi++) {
-            const current = queue[qi],
-              distance = distances[qi];
-            if (!game.owned[current]) {
-              if (routeIndex[current] > advance) advance = routeIndex[current];
-              if (critical[current]) criticalHits++;
-            }
-            if (distance >= game.BSPEC.guard.rad) continue;
-            const cx = current % game.W,
-              cy = (current / game.W) | 0;
-            for (let d = 0; d < 4; d++) {
-              const nx = cx + game.DX[d];
-              const ny = cy + game.DY[d];
-              if (!game.inB(nx, ny)) continue;
-              const next = game.idx(nx, ny);
-              if (seen[next] === stamp || !game.passI(next)) continue;
-              seen[next] = stamp;
-              queue.push(next);
-              distances.push(distance + 1);
+          for (let route = cor.length - 1; route >= 0; route--) {
+            const current = cor[route];
+            if (!game.owned[current] && projected[current]) {
+              advance = route;
+              break;
             }
           }
+          for (const current of critical)
+            if (!game.owned[current] && projected[current]) criticalHits++;
           if (advance < 0 && !criticalHits) continue;
           let score = advance * 100 + criticalHits * 1000 - Math.hypot(x - gx, y - gy);
           if (missing > 0 && criticalHits === missing) score += 50000;
@@ -425,40 +407,10 @@ export function createAutoplay(
     // A route index cannot prove a claim is dispensable around winding coastlines.
     // Project territory without this outpost and retain it whenever any land would
     // leave the colony. This also protects the approach to the next construction site.
-    const covered = new Uint8Array(game.W * game.H),
-      seen = new Uint16Array(game.W * game.H);
-    let stamp = 0;
-    for (let bi = 0; bi < game.buildings.length; bi++) {
-      const b = game.buildings[bi];
-      if (b === guard || !b.done || b.type === 'well') continue;
-      const sp = game.BSPEC[b.type];
-      let radius = sp.rad || 0;
-      if (sp.guard && !b.man) radius = Math.min(radius, 3);
-      if (!radius) continue;
-      stamp++;
-      const start = game.idx(b.x, b.y),
-        queue = [start],
-        distances = [0];
-      seen[start] = stamp;
-      for (let qi = 0; qi < queue.length; qi++) {
-        const current = queue[qi],
-          distance = distances[qi];
-        covered[current] = 1;
-        if (distance >= radius) continue;
-        const x = current % game.W,
-          y = (current / game.W) | 0;
-        for (let d = 0; d < 4; d++) {
-          const nx = x + game.DX[d],
-            ny = y + game.DY[d];
-          if (!game.inB(nx, ny)) continue;
-          const next = game.idx(nx, ny);
-          if (seen[next] === stamp || !game.passI(next)) continue;
-          seen[next] = stamp;
-          queue.push(next);
-          distances.push(distance + 1);
-        }
-      }
-    }
+    const covered = projectTerritory(
+      game,
+      game.buildings.filter((building) => building !== guard),
+    );
     for (let i = 0; i < game.owned.length; i++) if (game.owned[i] && !covered[i]) return false;
     return true;
   }
