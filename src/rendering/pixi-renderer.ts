@@ -67,7 +67,9 @@ export async function createPixiRenderer() {
       width: 1,
       height: 1,
       resolution: 1,
-      antialias: true,
+      // The scene renders into the atmosphere pass's texture, so multisampling
+      // would only smooth its full-screen quad.
+      antialias: false,
       backgroundAlpha: 0,
       preserveDrawingBuffer: new URLSearchParams(location.search).has('capture'),
       powerPreference: 'high-performance',
@@ -87,6 +89,7 @@ export async function createPixiRenderer() {
   const scene = new Container();
   stage.addChild(scene);
   const atmosphere = createProductionAtmosphere(scene);
+  const screenTint: [number, number, number, number] = [0, 0, 0, 0];
   const images = new Map<CanvasImageSource, ImageEntry>();
   const frames = new Set<Texture>();
   const cachedCanvases = new WeakSet<CanvasImageSource>();
@@ -533,6 +536,9 @@ export async function createPixiRenderer() {
       });
     },
     reportFailure: loseGpu,
+    screenTint(tint) {
+      for (let i = 0; i < 4; i++) screenTint[i] = tint[i];
+    },
     invalidate(source, rect?: { x: number; y: number; width: number; height: number }) {
       cachedCanvases.add(source);
       guardGraphics(() => {
@@ -607,7 +613,8 @@ export async function createPixiRenderer() {
         if (!layer) {
           layer = { root: new Container(), slots: [], cursor: 0, order: 0 };
           layers.set(name, layer);
-          scene.addChild(layer.root);
+          // Lantern glows, rain and captions sit above the veiled, graded scene.
+          (name === 'above-atmosphere' ? stage : scene).addChild(layer.root);
         }
         activeLayer = layer;
         commands.capture(ctx, paint);
@@ -620,7 +627,7 @@ export async function createPixiRenderer() {
       }
       for (const entry of slots) if (entry.frame !== frame) entry.root.visible = false;
       guardGraphics(() => {
-        atmosphere.update(game, renderer.width, renderer.height);
+        atmosphere.update(game, renderer.width, renderer.height, screenTint);
         renderer.render({ container: stage });
         atmosphere.afterRender();
         commands.endFrame();

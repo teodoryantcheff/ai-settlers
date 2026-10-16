@@ -176,3 +176,29 @@ Controlled captures use hardware WebGL, 1440×900, seed 2024, installed painted 
 
 
 Final review found and corrected a split-clock regression: shared presentation time remains wall time for lightning expiry, new feedback effects, the minimap throttle and diagnostics. Only decorative painter inputs freeze while paused. Real-subsystem regressions cover a paused thunderstorm, feedback created during pause and minimap viewport movement.
+
+## Fewer full-screen GPU passes (#40)
+
+The WebGL context no longer multisamples. The night, dusk, rain and lightning veils are one premultiplied uniform applied in the atmosphere pass before grading and bloom sampling, instead of up to four full-viewport rectangles. Lantern glows, rain streaks and the logistics caption, formerly drawn above those rectangles, render in an `above-atmosphere` layer outside the filtered scene. The backdrop gradient fills only viewport bands outside the map, and the two drop shadows only their strips beyond the map's south and east edges. Reduced quality already skipped bloom and ran the pass at 0.75 resolution.
+
+Same-session A/B/A on the reference laptop: `node scripts/bench-render.mjs --modes running --ms 5000`, 1920×1080, quality 1, seed 2024, 20-minute colony, pinned noon without rain (so these numbers exclude the veil savings). GPU timer median / p95 in ms:
+
+| Zoom | Before (1st) | After | Before (2nd) |
+| --- | --- | --- | --- |
+| 0.55 | 7.5 / 15.5 | **7.0 / 13.6** | 7.7 / 14.3 |
+| 0.7 | 7.6 / 17.0 | **6.8 / 12.7** | 7.9 / 17.3 |
+| 0.85 | 7.9 / 18.1 | **6.8 / 15.6** | 7.9 / 17.5 |
+| 1.0 | 7.2 / 12.9 | **6.3 / 13.1** | 7.4 / 13.3 |
+| 1.3 | 6.6 / 12.4 | **5.9 / 9.9** | 7.1 / 13.0 |
+| 1.7 | 7.1 / 10.4 | **5.7 / 10.1** | 7.0 / 9.4 |
+| 2.2 | 6.8 / 9.3 | **5.4 / 9.2** | 6.8 / 9.0 |
+
+The median falls by 0.7–1.4 ms at every zoom. It meets 6 ms from zoom 1.3 inward, but zooms 0.55–1.0 remain at 6.3–7.0 ms. The earlier experiment with no filter and no MSAA measured 7.1–7.2 ms at far zoom, so the remaining cost is scene fill rate (3,574 sprites at 0.55) and the viewport-sized border overlay, not full-screen passes. Raw output: `output/issue40/bench-*.txt`.
+
+Deterministic captures (`output/issue40/capture.mjs`, 1600×900, hardware WebGL) step `requestAnimationFrame` on a fake clock, pin `Math.random` after boot and verify night and rain amounts for dawn, day, dusk, night, rain, lightning, night rain with lightning, Visual clarity (day; night rain with lightning), quality 0.75 (day, dusk), Reduced Motion lightning, far zoom and a map corner. Two baseline runs give the noise floor; cloud shadows and tree sway still vary with decorative time. Compared with the baseline:
+
+- Reduced Motion with full rain, which has no cloud or sway noise, differs by at most 2/255 over the whole frame: the in-shader rain veil matches the former rectangle to rounding, and the flash stays suppressed.
+- A lightning frame brightens the rain frame by a mean of 53.6/255 before and 54.1/255 after.
+- Backdrop bands, sun shafts on them and the map's drop-shadow strip are pixel-identical at far zoom.
+- Night, dusk, dawn, rain and quality 0.75 differences are within the baseline noise floor (cloud shadows, tree sway), apart from glows and rain streaks, which no longer receive the ≤6.5% vignette and residual grading; at quality 0.75 they also render at full rather than 0.75 resolution.
+- Visual clarity disables the atmosphere pass, so it was the only view drawn into the multisampled backbuffer. Its building-tag outlines now render without MSAA, like every vector edge in the filtered views.

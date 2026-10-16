@@ -838,18 +838,21 @@ test('an unavailable shadow context reports through the graphics failure boundar
 });
 
 function pausedScene(paintForeground = false) {
-  const flashes = [];
+  const viewportFills = [],
+    tints = [];
   const e = renderer({
     presentation: {
       available: true,
       invalidate() {},
       begin() {},
       end() {},
+      screenTint: (tint) => tints.push([...tint]),
       layer(name, ctx, paint) {
-        if (!paintForeground || name !== 'foreground-effects') return;
+        if (!paintForeground || (name !== 'foreground-effects' && name !== 'above-atmosphere'))
+          return;
         const fill = ctx.fillRect;
         ctx.fillRect = (...args) => {
-          if (String(ctx.fillStyle).startsWith('rgba(255,255,255,')) flashes.push(ctx.fillStyle);
+          if (args[2] >= e.vw && args[3] >= e.vh) viewportFills.push(ctx.fillStyle);
           fill(...args);
         };
         try {
@@ -870,7 +873,7 @@ function pausedScene(paintForeground = false) {
   e.vh = 600;
   e.cam = { x: 40 * e.TS, y: 40 * e.TS };
   e.SND.thunder = () => {};
-  return { e, flashes };
+  return { e, tints, viewportFills };
 }
 
 test('paused feedback starts on the current wall clock and still completes', (t) => {
@@ -912,17 +915,101 @@ test('lightning during pause expires on wall time', (t) => {
   t.after(() => {
     Math.random = random;
   });
-  const { e, flashes } = pausedScene(true);
+  const { e, tints, viewportFills } = pausedScene(true);
+  const close = (actual, expected, message) =>
+    assert.ok(
+      actual.length === 4 && actual.every((v, i) => Math.abs(v - expected[i]) < 1e-4),
+      `${message}: ${actual}`,
+    );
   e.draw();
   e.presentationPrefs.weather = true;
   e._rain = 1;
   Math.random = () => 0;
   clock.tick(1000);
+  tints.length = 0;
   e.draw();
-  assert.equal(flashes.length, 1, 'the thunderstorm produces a flash');
-  flashes.length = 0;
+  // A white 0.26 flash over the 0.16 rain veil, premultiplied.
+  close(tints.at(-1), [0.27718, 0.284144, 0.289716, 0.3784], 'the thunderstorm produces a flash');
   Math.random = () => 0.5;
   clock.tick(500);
   e.draw();
-  assert.equal(flashes.length, 0, 'the flash is gone after 180 ms even while paused');
+  close(tints.at(-1), [0.023216, 0.032627, 0.040157, 0.16], 'only the rain veil remains');
+  assert.deepEqual(
+    viewportFills,
+    [],
+    'veils are applied by the atmosphere pass, not viewport fills',
+  );
+});
+
+test('the backdrop and map shadows fill only viewport area the map leaves uncovered', (t) => {
+  const clock = pinClock(1000);
+  t.after(() => clock.restore());
+  const fills = [];
+  const e = renderer({
+    presentation: {
+      available: true,
+      invalidate() {},
+      begin() {},
+      end() {},
+      layer(name, ctx, paint) {
+        if (name !== 'backdrop') return;
+        const fill = ctx.fillRect;
+        ctx.fillRect = (...args) => {
+          fills.push({ style: ctx.fillStyle, rect: args });
+          fill(...args);
+        };
+        try {
+          paint();
+        } finally {
+          ctx.fillRect = fill;
+        }
+      },
+    },
+  });
+  e.staticDirty = false;
+  e.borderDirty = false;
+  e.vw = 800;
+  e.vh = 600;
+  e.cam = { x: 40 * e.TS, y: 40 * e.TS };
+  e.draw();
+  assert.deepEqual(fills, [], 'a covering map needs no backdrop');
+  const mapW = e.W * e.TS,
+    mapH = e.H * e.TS;
+  e.cam = { x: mapW - 700, y: 40 * e.TS };
+  e.draw();
+  const gradient = fills.filter((f) => typeof f.style !== 'string');
+  assert.deepEqual(
+    gradient.map((f) => f.rect),
+    [[700, 0, 100, 600]],
+    'only the band east of the map',
+  );
+  const shadows = fills.filter((f) => typeof f.style === 'string');
+  assert.ok(shadows.length > 0, 'the map still casts its drop shadow');
+  for (const { rect } of shadows) {
+    const [x, y, w, h] = rect;
+    assert.ok(x >= mapW || y >= mapH, `shadow ${rect} stays outside the map`);
+    assert.ok(x + w <= mapW + 4 && y + h <= mapH + 5);
+  }
+});
+
+test('the layer above the atmosphere follows the screen veil', (t) => {
+  const clock = pinClock(1000);
+  t.after(() => clock.restore());
+  const sequence = [];
+  const e = renderer({
+    presentation: {
+      available: true,
+      invalidate() {},
+      begin() {},
+      end() {},
+      screenTint: () => sequence.push('veil'),
+      layer: (name) => sequence.push(name),
+    },
+  });
+  e.staticDirty = false;
+  e.borderDirty = false;
+  e.vw = 800;
+  e.vh = 600;
+  e.draw();
+  assert.deepEqual(sequence.slice(-3), ['foreground-effects', 'veil', 'above-atmosphere']);
 });

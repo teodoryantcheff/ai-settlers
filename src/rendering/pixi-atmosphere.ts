@@ -1,5 +1,6 @@
 import { Container, Filter, Rectangle, Texture } from 'pixi.js';
 import type { GameRuntime } from '../runtime.ts';
+import type { PremultipliedTint } from './renderer.ts';
 
 const vertex = `
 precision highp float;
@@ -15,8 +16,10 @@ void main() {
   vTextureCoord = aPosition * uOutputFrame.zw * uInputSize.zw;
 }`;
 
-// A single GPU pass grades the painted artwork. Particles and weather remain
-// native scene commands, so lighting never requires a Canvas frame upload.
+// A single GPU pass veils and grades the painted artwork. Particles and weather
+// remain native scene commands, so lighting never requires a Canvas frame upload.
+// The premultiplied night, dusk, rain and lightning veil is composited
+// source-over first, so grading and bloom see the veiled scene.
 const fragment = `
 precision highp float;
 in vec2 vTextureCoord;
@@ -29,17 +32,22 @@ uniform vec2 uCamera;
 uniform float uScale;
 uniform float uSun;
 uniform float uBloom;
+uniform vec4 uTint;
+vec3 veiled(vec3 value) {
+  return uTint.rgb + value * (1.0 - uTint.a);
+}
 vec3 highlight(vec2 delta) {
   vec3 value = texture(uTexture, clamp(vTextureCoord + delta * uInputSize.zw,
     uInputClamp.xy, uInputClamp.zw)).rgb;
-  return max(value - vec3(0.77), vec3(0.0));
+  return max(veiled(value) - vec3(0.77), vec3(0.0));
 }
 void main() {
   vec4 source = texture(uTexture, vTextureCoord);
+  float alpha = uTint.a + source.a * (1.0 - uTint.a);
   vec2 pixel = vTextureCoord * uInputSize.xy;
   vec2 uv = pixel / uViewport;
   vec2 world = uCamera + pixel / max(uScale, 0.01);
-  vec3 c = source.rgb;
+  vec3 c = veiled(source.rgb);
   float luminance = dot(c, vec3(0.2126,0.7152,0.0722));
   vec3 graded = mix(vec3(luminance), c, 1.03);
   graded = (graded - vec3(0.27)) * 1.02 + vec3(0.27);
@@ -57,7 +65,7 @@ void main() {
   }
   float edge = smoothstep(0.35,0.8,length((uv-0.5)*vec2(1.0,0.85)));
   c *= 1.0-edge*0.065;
-  finalColor = vec4(clamp(c,vec3(0.0),vec3(source.a)),source.a);
+  finalColor = vec4(clamp(c,vec3(0.0),vec3(alpha)),alpha);
 }`;
 
 export function createProductionAtmosphere(scene: Container) {
@@ -65,6 +73,7 @@ export function createProductionAtmosphere(scene: Container) {
   // Persistent uniform arrays: mutated in place, never reallocated per frame.
   const viewport = [1, 1];
   const camera = [0, 0];
+  const tint = [0, 0, 0, 0];
   const filter = Filter.from({
     gl: { vertex, fragment },
     resources: {
@@ -74,6 +83,7 @@ export function createProductionAtmosphere(scene: Container) {
         uScale: { value: 1, type: 'f32' },
         uSun: { value: 1, type: 'f32' },
         uBloom: { value: 1, type: 'f32' },
+        uTint: { value: tint, type: 'vec4<f32>' },
       },
     },
   });
@@ -88,7 +98,7 @@ export function createProductionAtmosphere(scene: Container) {
     lastBloom = 1,
     lastResolution = 1;
   return {
-    update(game: GameRuntime, width: number, height: number) {
+    update(game: GameRuntime, width: number, height: number, veil: PremultipliedTint) {
       // Clarity preserves the painted colors without shafts, bloom or vignette.
       // Disabling this persistent filter does not allocate replacement textures.
       filter.enabled = !game.renderPrefs().clarity;
@@ -113,18 +123,24 @@ export function createProductionAtmosphere(scene: Container) {
         game.cam.y !== lastCamY ||
         scale !== lastScale ||
         sun !== lastSun ||
-        bloom !== lastBloom
+        bloom !== lastBloom ||
+        veil[0] !== tint[0] ||
+        veil[1] !== tint[1] ||
+        veil[2] !== tint[2] ||
+        veil[3] !== tint[3]
       ) {
         viewport[0] = width;
         viewport[1] = height;
         camera[0] = game.cam.x;
         camera[1] = game.cam.y;
+        for (let i = 0; i < 4; i++) tint[i] = veil[i];
         const uniforms = filter.resources.atmosphere.uniforms;
         uniforms.uViewport = viewport;
         uniforms.uCamera = camera;
         uniforms.uScale = scale;
         uniforms.uSun = sun;
         uniforms.uBloom = bloom;
+        uniforms.uTint = tint;
         filter.resources.atmosphere.update();
         lastWidth = width;
         lastHeight = height;

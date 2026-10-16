@@ -101,6 +101,9 @@ interface SortEntry {
 type LineSeg = [number, number, number, number];
 
 /** Ordered scene commands consumed by the PixiJS world renderer. */
+/** Premultiplied [r, g, b, alpha], each 0..1. */
+export type PremultipliedTint = readonly [number, number, number, number];
+
 export interface RendererPresentation {
   available: boolean;
   /** Surface observer/cache failures through the same visible GPU failure boundary. */
@@ -121,6 +124,8 @@ export interface RendererPresentation {
     castOpacity: number,
     contactOpacity: number,
   ) => void;
+  /** Premultiplied screen-space veil the atmosphere pass applies before grading. */
+  screenTint?: (tint: PremultipliedTint) => void;
 }
 
 export function createRenderer(
@@ -2544,6 +2549,29 @@ export function createRenderer(
     g.restore();
   }
 
+  // Premultiplied [r, g, b, alpha] of the screen-space veils stacked source-over.
+  const screenTint: [number, number, number, number] = [0, 0, 0, 0];
+  function veil(r: number, g: number, b: number, alpha: number) {
+    const keep = 1 - alpha;
+    screenTint[0] = (r / 255) * alpha + screenTint[0] * keep;
+    screenTint[1] = (g / 255) * alpha + screenTint[1] * keep;
+    screenTint[2] = (b / 255) * alpha + screenTint[2] * keep;
+    screenTint[3] = alpha + screenTint[3] * keep;
+  }
+  function composeScreenTint(): PremultipliedTint {
+    screenTint.fill(0);
+    // Visual clarity suppresses every veil; Reduced Motion suppresses the flash.
+    if (renderPrefs().clarity) return screenTint;
+    const cool = nightCool(),
+      warm = nightWarm();
+    if (cool > 0.01) veil(20, 34, 66, cool * 0.29);
+    if (warm > 0.01) veil(255, 177, 98, warm * 0.75);
+    if (_rain > 0.01) veil(37, 52, 64, _rain * 0.16);
+    if (!renderPrefs().reducedMotion && renderPrefs().weather && NOW - _flashT < 180)
+      veil(255, 255, 255, (1 - (NOW - _flashT) / 180) * 0.26);
+    return screenTint;
+  }
+
   // ---------- guard-post placement preview (the *actual* new border, not the naive radius) ----------
   function guardPreview(g: CanvasRenderingContext2D, now: number) {
     now = motionTime(now);
@@ -2750,13 +2778,33 @@ export function createRenderer(
         bgGrad.addColorStop(1, '#0a141d');
       }
       ctx.fillStyle = bgGrad;
-      ctx.fillRect(0, 0, vw, vh);
+      // The opaque terrain hides everything beneath it, so fill only the bands
+      // of the viewport the map leaves uncovered.
+      const mapW = game.W * game.TS,
+        mapH = game.H * game.TS;
+      const left = Math.min(vw, Math.max(0, -cam.x * z)),
+        right = Math.min(vw, Math.max(0, (mapW - cam.x) * z)),
+        top = Math.min(vh, Math.max(0, -cam.y * z)),
+        bottom = Math.min(vh, Math.max(0, (mapH - cam.y) * z));
+      if (right <= left || bottom <= top) ctx.fillRect(0, 0, vw, vh);
+      else {
+        if (top > 0) ctx.fillRect(0, 0, vw, top);
+        if (bottom < vh) ctx.fillRect(0, bottom, vw, vh - bottom);
+        if (left > 0) ctx.fillRect(0, top, left, bottom - top);
+        if (right < vw) ctx.fillRect(right, top, vw - right, bottom - top);
+      }
       ctx.setTransform(dpr * z, 0, 0, dpr * z, -cam.x * z * dpr, -cam.y * z * dpr);
       ctx.imageSmoothingEnabled = true;
-      ctx.fillStyle = 'rgba(4,8,12,0.5)';
-      ctx.fillRect(4, 5, game.W * game.TS, game.H * game.TS);
-      ctx.fillStyle = 'rgba(4,8,12,0.35)';
-      ctx.fillRect(2, 2, game.W * game.TS, game.H * game.TS);
+      // Drop shadows offset south-east; only their strips beyond the map show.
+      const mapShadow = (dx: number, dy: number, style: string) => {
+        ctx.fillStyle = style;
+        ctx.fillRect(mapW, dy, dx, mapH);
+        ctx.fillRect(dx, mapH, mapW - dx, dy);
+      };
+      if (right < vw || bottom < vh) {
+        mapShadow(4, 5, 'rgba(4,8,12,0.5)');
+        mapShadow(2, 2, 'rgba(4,8,12,0.35)');
+      }
     });
     layer('terrain', function () {
       // Blit only the visible terrain rectangle instead of submitting the 48 MB atlas.
@@ -2816,32 +2864,11 @@ export function createRenderer(
         cloudsDraw(ctx, decorativeNow);
         birdsDraw(ctx, decorativeNow);
       }
-      // day/night + weather tint (screen space)
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const cool = renderPrefs().clarity ? 0 : nightCool(),
-        warm = renderPrefs().clarity ? 0 : nightWarm();
-      if (cool > 0.01) {
-        ctx.fillStyle = 'rgba(20,34,66,' + (cool * 0.29).toFixed(3) + ')';
-        ctx.fillRect(0, 0, vw, vh);
-      }
-      if (warm > 0.01) {
-        ctx.fillStyle = 'rgba(255,177,98,' + (warm * 0.75).toFixed(3) + ')';
-        ctx.fillRect(0, 0, vw, vh);
-      }
-      if (!renderPrefs().clarity && _rain > 0.01) {
-        ctx.fillStyle = 'rgba(37,52,64,' + (_rain * 0.16).toFixed(3) + ')';
-        ctx.fillRect(0, 0, vw, vh);
-      }
-      if (
-        !renderPrefs().clarity &&
-        !renderPrefs().reducedMotion &&
-        renderPrefs().weather &&
-        NOW - _flashT < 180
-      ) {
-        ctx.fillStyle = 'rgba(255,255,255,' + ((1 - (NOW - _flashT) / 180) * 0.26).toFixed(3) + ')';
-        ctx.fillRect(0, 0, vw, vh);
-      }
-      if (cool > 0.04) {
+    });
+    // Night, dusk, rain and lightning veils reach the atmosphere pass as one tint.
+    presentation.screenTint?.(composeScreenTint());
+    layer('above-atmosphere', function () {
+      if (!renderPrefs().clarity && nightCool() > 0.04) {
         // lantern glows sit above the night tint
         ctx.setTransform(dpr * z, 0, 0, dpr * z, -cam.x * z * dpr, -cam.y * z * dpr);
         glowsDraw(ctx);
