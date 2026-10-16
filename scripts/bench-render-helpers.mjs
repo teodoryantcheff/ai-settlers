@@ -68,6 +68,15 @@ const round = (value, digits = 1) => Number(value.toFixed(digits));
 export const isSoftwareRenderer = (name) =>
   /swiftshader|llvmpipe|softpipe|basic render/i.test(name);
 
+/** Every WebGL 2 entry point that issues a draw call. */
+export const DRAW_CALLS = [
+  'drawElements',
+  'drawArrays',
+  'drawElementsInstanced',
+  'drawArraysInstanced',
+  'drawRangeElements',
+];
+
 /** Per-frame costs for one zoom/mode window; `before` holds the renderer stats at its start. */
 export function summarize(sample, before) {
   // Several rAF callbacks may share one frame timestamp; attribute them together.
@@ -94,7 +103,7 @@ export function summarize(sample, before) {
     sprites: sample.stats.nativeSprites,
     graphics: sample.stats.nativeGraphics,
     graphicsBuilds: round((sample.stats.graphicsBuilds - before.graphicsBuilds) / frames),
-    drawCalls: round((calls('drawElements') + calls('drawArrays')) / frames),
+    drawCalls: round(DRAW_CALLS.reduce((sum, name) => sum + calls(name), 0) / frames),
     uploadKB: round((bytes('bufferData') + bytes('bufferSubData')) / frames / 1024, 0),
     texUploads: round((calls('texImage2D') + calls('texSubImage2D')) / frames),
   };

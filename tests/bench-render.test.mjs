@@ -74,6 +74,9 @@ test('a measurement window reports per-frame CPU, GPU and upload costs', () => {
     gl: {
       drawElements: { calls: 9, bytes: 0 },
       drawArrays: { calls: 3, bytes: 0 },
+      drawElementsInstanced: { calls: 2, bytes: 0 },
+      drawArraysInstanced: { calls: 1, bytes: 0 },
+      drawRangeElements: { calls: 3, bytes: 0 },
       bufferData: { calls: 1, bytes: 2048 },
       bufferSubData: { calls: 4, bytes: 4096 },
       texImage2D: { calls: 1, bytes: 0 },
@@ -97,7 +100,7 @@ test('a measurement window reports per-frame CPU, GPU and upload costs', () => {
     sprites: 7066,
     graphics: 2503,
     graphicsBuilds: 10,
-    drawCalls: 4,
+    drawCalls: 6,
     uploadKB: 2,
     texUploads: 2,
   });

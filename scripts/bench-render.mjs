@@ -20,7 +20,12 @@ import { chromium } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { benchOptions, isSoftwareRenderer, summarize } from './bench-render-helpers.mjs';
+import {
+  DRAW_CALLS,
+  benchOptions,
+  isSoftwareRenderer,
+  summarize,
+} from './bench-render-helpers.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 let options;
@@ -57,17 +62,10 @@ server.on('exit', () => (serverExited = true));
 server.on('error', () => (serverExited = true));
 
 /** Installed before boot: per-frame rAF callback time, GPU timer queries and GL call counts. */
-function instrument() {
+function instrument(drawCalls) {
   const state = { recording: false, frames: [], gpu: [], gl: {} };
   window.__bench = state;
-  const counted = [
-    'drawElements',
-    'drawArrays',
-    'bufferData',
-    'bufferSubData',
-    'texImage2D',
-    'texSubImage2D',
-  ];
+  const counted = [...drawCalls, 'bufferData', 'bufferSubData', 'texImage2D', 'texSubImage2D'];
   const proto = WebGL2RenderingContext.prototype;
   for (const name of counted) {
     const original = proto[name];
@@ -154,7 +152,7 @@ try {
   }, quality);
   const page = await context.newPage();
   page.on('pageerror', (error) => console.error('pageerror:', error.message));
-  await page.addInitScript(instrument);
+  await page.addInitScript(instrument, DRAW_CALLS);
   await page.goto(`${origin}/tests/game.html?seed=${seed}`);
   await page.waitForFunction(() => window.productionArtPreview?.game, null, { timeout: 60000 });
   const boot = await page.evaluate(() => {
