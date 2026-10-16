@@ -310,8 +310,8 @@ export function createInspectorView(
       '</footer></section>';
     return h;
   }
-  var infoBody = document.getElementById('infobody'),
-    lastInfoHTML: string | null = null;
+  const infoBody = document.getElementById('infobody');
+  let lastInfoHTML: string | null = null;
   // Markup each section last received; browsers serialize it back differently.
   let rendered = new WeakMap<Element, string>();
   function rememberRendered(selector: string, html: string | undefined) {
@@ -326,8 +326,8 @@ export function createInspectorView(
   }
   function updateInfo() {
     game.updateReferenceContext?.();
-    var el = document.getElementById('info');
-    var b = game.selected;
+    const el = document.getElementById('info');
+    const b = game.selected;
     const dock = document.getElementById('inspectordock');
     if (dock) dock.hidden = !b && !game.selInfo && !game.removedContributor;
     const illustration = document.getElementById('inspector-art') as HTMLCanvasElement;
@@ -362,13 +362,18 @@ export function createInspectorView(
     }
     el.style.display = 'block';
     game.clearRemovedContributor?.();
-    var h = '';
+    let h = '';
+    let liveHTML: string,
+      quote: DemolitionQuote,
+      quoteHTML: string,
+      referenceHTML: string,
+      productionHTML: string;
     if (b) {
-      var sp = game.BSPEC[b.type];
+      const sp = game.BSPEC[b.type];
       const work = game.productionProgress?.(b);
-      var liveHTML = live(b, work);
-      var quote = game.demolitionQuote?.(b);
-      var quoteHTML = quote ? shortcut(b, quote) : '';
+      liveHTML = live(b, work);
+      quote = game.demolitionQuote?.(b);
+      quoteHTML = quote ? shortcut(b, quote) : '';
       h = '<div data-inspector-live>' + liveHTML + '</div><div data-inspector-controls>';
       const referenceStart = h.length;
       if (buildingHelp[b.type])
@@ -400,7 +405,7 @@ export function createInspectorView(
           's</span><br>';
       else if (sp.cost)
         h += '<span style="color:#c8b890">Cost: ' + formatCost(sp.cost, ', ') + '</span><br>';
-      var referenceHTML = h.substring(referenceStart);
+      referenceHTML = h.substring(referenceStart);
       h =
         h.substring(0, referenceStart) +
         '<div data-inspector-reference>' +
@@ -423,7 +428,7 @@ export function createInspectorView(
       if (b.done && sp.store) {
         h +=
           '<details><summary>Warehouse stock targets</summary><p class="muted">Carriers replenish targets from other stores. Food, beer, tool, and weapon producers work toward requested reserves. Zero means no request.</p>';
-        for (var good in game.GOODS)
+        for (const good in game.GOODS)
           h +=
             '<label>' +
             game.GOODS[good as Good].name +
@@ -434,7 +439,7 @@ export function createInspectorView(
             '"></label>';
         h += '</details>';
       }
-      var m = b.metrics;
+      const m = b.metrics;
       if (b.done && m && sp.out) {
         h +=
           '<label>Rate window<select data-rate-window><option value="30" ' +
@@ -446,7 +451,7 @@ export function createInspectorView(
           '>Last 10 minutes</option><option value="lifetime" ' +
           (productionRateWindow === 'lifetime' ? 'selected' : '') +
           '>Lifetime</option></select></label>';
-        var productionHTML = observedProduction(b);
+        productionHTML = observedProduction(b);
         h += '</div><div data-production-stats>' + productionHTML + '</div>';
       } else h += '</div>';
       if (game.demolitionQuote)
@@ -457,7 +462,7 @@ export function createInspectorView(
         tileInfo(game.selInfo) +
         '</span>';
     }
-    var editing = infoBody.contains(document.activeElement);
+    const editing = infoBody.contains(document.activeElement);
     const key = b ? b.id + ':' + b.type + ':' + b.done : 'terrain';
     const liveNode = infoBody.querySelector('[data-inspector-live]');
     if (
@@ -507,11 +512,11 @@ export function createInspectorView(
   infoBody.addEventListener('change', function (e) {
     if (!game.selected) return;
     if ((e.target as HTMLSelectElement).matches('[data-rate-window]')) {
-      var window = (e.target as HTMLSelectElement).value;
+      const window = (e.target as HTMLSelectElement).value;
       if (window === 'lifetime' || window === '30' || window === '120' || window === '600')
         productionRateWindow = window === 'lifetime' ? window : (+window as 30 | 120 | 600);
       // Refresh the numbers immediately without replacing the focused select.
-      var stats = infoBody.querySelector('[data-production-stats]');
+      const stats = infoBody.querySelector('[data-production-stats]');
       if (stats) render(stats, observedProduction(game.selected));
     }
     const input = e.target as HTMLInputElement;
@@ -530,7 +535,7 @@ export function createInspectorView(
   });
   function updateDzBtn(quote = game.selected && game.demolitionQuote?.(game.selected)) {
     // the panel raze button arms like map clicks: confirm before razing
-    var dz = document.getElementById('dz'),
+    const dz = document.getElementById('dz'),
       armed = game.demoArm && game.selected && game.demoArm === game.selected;
     dz.textContent =
       quote && !quote.allowed ? 'Demolition unavailable' : armed ? 'Review demolition' : 'Demolish';
@@ -555,13 +560,13 @@ export function createInspectorView(
     game.dismissInspector();
   };
   function tileInfo(ht: TilePoint) {
-    var tl = game.tiles[game.idx(ht.x, ht.y)];
+    const tl = game.tiles[game.idx(ht.x, ht.y)];
     if (tl.t === game.WATER) return 'Water';
     if (tl.t === game.MTN)
       return tl.res
         ? game.GOODS[tl.res.kind].name + ' deposit: ' + tl.res.amt
         : 'Bare mountainside';
-    var s = tl.tree
+    let s = tl.tree
       ? tl.tree >= 4
         ? 'Mature forest'
         : 'Young trees (' + tl.tree + '/4)'

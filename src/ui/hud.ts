@@ -27,7 +27,7 @@ export interface PanDrag {
 }
 
 export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsystem {
-  var advOn = true,
+  let advOn = true,
     started = false;
   const transientHelp = createTransientHelp({ canShow: () => !game.blockingLayerOpen?.() });
   const resourceHelp = new Map<Good, HTMLElement>();
@@ -53,8 +53,8 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
   const { updateInfo, tileInfo } = inspector;
   function observedFlows(record: Inventory, elapsed: number, allowed?: Inventory) {
     if (!elapsed) return '—';
-    var flows = [];
-    for (var g in record)
+    const flows = [];
+    for (const g in record)
       if ((!allowed || allowed[g as Good]) && record[g as Good])
         flows.push(
           ((record[g as Good] / elapsed) * 60).toFixed(1) +
@@ -70,10 +70,10 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     fallback: () => document.getElementById('advtoggle'),
   });
   function advTick() {
-    var decision = game.advisorDecision(),
+    const decision = game.advisorDecision(),
       action = decision.action,
       bottleneck = decision.bottleneck;
-    var h = '';
+    let h = '';
     if (decision.waiting) {
       h =
         '<button type="button" class="ar warn" data-focus="' +
@@ -93,7 +93,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
         game.BSPEC[bottleneck.type].name +
         ' needs inputs, but none are ready for delivery. Check its suppliers for exhausted resources or paused work.</div></button>';
     } else if (bottleneck) {
-      var pct = Math.round((bottleneck.metrics.inputBlocked / bottleneck.metrics.elapsed) * 100);
+      const pct = Math.round((bottleneck.metrics.inputBlocked / bottleneck.metrics.elapsed) * 100);
       h =
         '<button type="button" class="ar warn" data-focus="' +
         bottleneck.id +
@@ -128,12 +128,12 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
       replaceAdvice(document.getElementById('advrows'), h);
       lastAdvHTML = h;
     }
-    var details = '';
-    for (var b of game.buildings) {
-      var sp = game.BSPEC[b.type],
+    let details = '';
+    for (const b of game.buildings) {
+      const sp = game.BSPEC[b.type],
         m = b.metrics;
       if (!b.done || !sp.out) continue;
-      var elapsed = (m && m.elapsed) || 0,
+      const elapsed = (m && m.elapsed) || 0,
         rate = elapsed > 0 ? (((m.produced[sp.out] || 0) / elapsed) * 60).toFixed(1) : '—',
         waiting = elapsed > 0 ? Math.round((m.inputBlocked / elapsed) * 100) : 0;
       details +=
@@ -176,7 +176,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
       )[c];
     });
   }
-  var hudT = 0,
+  let hudT = 0,
     lastGoodsHTML: string | null = null,
     lastAdvHTML: string | null = null,
     lastSpeedBtn: string | null = null,
@@ -185,10 +185,10 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     lastGoal: string | null = null,
     lastGoalFill: string | null = null,
     _prevWon = false;
-  var messageNodes = new Map<object, HTMLDivElement>();
+  const messageNodes = new Map<object, HTMLDivElement>();
   function hudTick() {
     mapControls.update();
-    var now = performance.now();
+    const now = performance.now();
     if (now - hudT < 250) return;
     hudT = now;
     if (lastGoodsHTML === null) {
@@ -245,10 +245,10 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
         game.GOODS[good].name + ': ' + count + ' stored stock. Open resource accounting',
       );
     });
-    var n = 0;
-    for (var i = 0; i < game.units.length; i++) if (game.units[i].kind === 'carrier') n++;
-    var cap = game.carrierCap();
-    var pplTxt = n + ' carriers';
+    let n = 0;
+    for (let i = 0; i < game.units.length; i++) if (game.units[i].kind === 'carrier') n++;
+    const cap = game.carrierCap();
+    const pplTxt = n + ' carriers';
     if (pplTxt !== lastPpl) {
       populationControl.textContent = pplTxt;
       populationControl.setAttribute('aria-label', n + ' active carriers. Population details');
@@ -266,14 +266,14 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
       game.soldierPool;
     if (populationCopy && populationCopy.textContent !== populationText)
       populationCopy.textContent = populationText;
-    var gt = game.state.won
+    const gt = game.state.won
       ? '✓ Goal achieved · ' + game.state.gold + ' banked'
       : 'Banked gold ' + game.state.gold + ' / ' + game.GOAL;
     if (gt !== lastGoal) {
       document.getElementById('goaltxt').textContent = gt;
       lastGoal = gt;
     }
-    var pct =
+    const pct =
       (game.state.won
         ? 100
         : Math.min(100, Math.round((game.state.gold / game.GOAL) * 1000) / 10)) + '%';
@@ -289,14 +289,14 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
         game.anyStorage() ? game.anyStorage().y + 0.5 : game.H / 2,
       );
     }
-    var liveMessages = new Set<object>(),
+    const liveMessages = new Set<object>(),
       feed = document.getElementById('msgs');
-    for (i = 0; i < game.msgs.length; i++) {
-      var message = game.msgs[i],
+    for (let i = 0; i < game.msgs.length; i++) {
+      const message = game.msgs[i],
         age = (now - message.at) / 1000;
       if (age >= 7) continue;
       liveMessages.add(message);
-      var node = messageNodes.get(message);
+      let node = messageNodes.get(message);
       if (!node) {
         node = document.createElement('div');
         node.innerHTML = escapeMarkup(message.t);
@@ -320,7 +320,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
       // Five fully readable seconds before the two-second fade, including mute.
       node.style.opacity = String(Math.round(Math.max(0, Math.min(1, (7 - age) / 2)) * 10) / 10);
     }
-    for (var [cachedMessage, cachedNode] of messageNodes) {
+    for (const [cachedMessage, cachedNode] of messageNodes) {
       if (!liveMessages.has(cachedMessage)) {
         cachedNode.remove();
         messageNodes.delete(cachedMessage);
@@ -333,9 +333,9 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     game.updateAttentionView?.();
     updateInfo();
     updateHint();
-    var suspended = modalOpen();
-    var cur = 'sp' + (game.state.paused || suspended ? '0' : game.state.speed);
-    var speedKey = cur + ':' + suspended + ':' + game.state.paused + ':' + game.state.speed;
+    const suspended = modalOpen();
+    const cur = 'sp' + (game.state.paused || suspended ? '0' : game.state.speed);
+    const speedKey = cur + ':' + suspended + ':' + game.state.paused + ':' + game.state.speed;
     if (speedKey !== lastSpeedBtn) {
       ['sp0', 'sp1', 'sp2', 'sp4', 'sp8'].forEach(function (id) {
         document.getElementById(id).className = '';
@@ -364,8 +364,8 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
   function updateHint() {
     catalog.updatePlacement();
     inspector.tick();
-    var h = document.getElementById('hint'),
-      t = '';
+    const h = document.getElementById('hint');
+    let t = '';
     if (game.mode && game.mode.type === 'build') {
       if (game.ghost && !game.ghost.ok)
         t =
@@ -424,20 +424,20 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     }
   }
   function costStr(type: BuildingType | 'road' | 'demolish') {
-    var sp = game.BSPEC[type as BuildingType];
+    const sp = game.BSPEC[type as BuildingType];
     if (type === 'road') return 'free';
     if (type === 'demolish') return '';
-    var parts = [];
-    for (var g in sp.cost)
+    const parts = [];
+    for (const g in sp.cost)
       parts.push(sp.cost[g as Good] + ' ' + game.GOODS[g as Good].name.toLowerCase());
     return parts.join(', ');
   }
   function costStr2(o: Inventory) {
-    var parts = [];
-    for (var g in o) parts.push(o[g as Good] + ' ' + game.GOODS[g as Good].name.toLowerCase());
+    const parts = [];
+    for (const g in o) parts.push(o[g as Good] + ' ' + game.GOODS[g as Good].name.toLowerCase());
     return parts.join(' + ');
   }
-  var hlTiles: number[] | null = null,
+  let hlTiles: number[] | null = null,
     hlSpots: number[] | null = null;
   function refreshGhost() {
     // recompute the placement ghost for the current hover tile; also called from
@@ -473,8 +473,8 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     ) {
       hlTiles = [];
       hlSpots = [];
-      for (var i = 0; i < game.tiles.length; i++) {
-        var t4 = game.tiles[i];
+      for (let i = 0; i < game.tiles.length; i++) {
+        const t4 = game.tiles[i];
         if (
           t4.t === game.MTN &&
           t4.res &&
@@ -482,11 +482,11 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
           t4.res.amt > 0
         ) {
           hlTiles.push(i);
-          for (var d13 = 0; d13 < 8; d13++) {
-            var nx10 = (i % game.W) + game.DX[d13],
+          for (let d13 = 0; d13 < 8; d13++) {
+            const nx10 = (i % game.W) + game.DX[d13],
               ny10 = ((i / game.W) | 0) + game.DY[d13];
             if (!game.inB(nx10, ny10)) continue;
-            var n10 = game.idx(nx10, ny10);
+            const n10 = game.idx(nx10, ny10);
             if (
               game.passI(n10) &&
               game.owned[n10] &&
@@ -501,16 +501,16 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
   }
   const { cancelMode } = game;
   function refreshPalette() {
-    var ps = document.querySelectorAll<HTMLElement>('.pb');
-    for (var i = 0; i < ps.length; i++)
+    const ps = document.querySelectorAll<HTMLElement>('.pb');
+    for (let i = 0; i < ps.length; i++)
       ps[i].classList.toggle(
         'on',
         game.mode &&
           ps[i].dataset.b === (game.mode.type === 'build' ? game.mode.bt : game.mode.type),
       );
-    for (var btn of ps)
+    for (const btn of ps)
       btn.setAttribute('aria-pressed', btn.classList.contains('on') ? 'true' : 'false');
-    var active = game.mode && (game.mode.type === 'build' ? game.mode.bt : game.mode.type);
+    const active = game.mode && (game.mode.type === 'build' ? game.mode.bt : game.mode.type);
     document.getElementById('palettestatus').textContent = active
       ? active === 'road'
         ? 'Road selected'
@@ -520,10 +520,10 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
       : 'Choose a building';
   }
   function selectAt(ht: TilePoint) {
-    var best = null,
+    let best = null,
       bd = 1.6;
-    for (var i = 0; i < game.buildings.length; i++) {
-      var b = game.buildings[i],
+    for (let i = 0; i < game.buildings.length; i++) {
+      const b = game.buildings[i],
         d = Math.hypot(b.x - ht.x, b.y - ht.y);
       if (d < bd) {
         bd = d;
@@ -532,11 +532,11 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     }
     game.selectMapTarget(best, ht);
   }
-  var hoverCamX: number | null = null,
+  let hoverCamX: number | null = null,
     hoverCamY: number | null = null,
     hoverZoom: number | null = null;
   function syncHover(clientX: number, clientY: number, dwell: boolean) {
-    var r = game.view.getBoundingClientRect();
+    const r = game.view.getBoundingClientRect();
     game.mouse.x = clientX - r.left;
     game.mouse.y = clientY - r.top;
     game.mouseSeen = true;
@@ -546,7 +546,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     hoverCamX = game.cam.x;
     hoverCamY = game.cam.y;
     hoverZoom = game.z;
-    var w = game.screenToWorld(game.mouse.x, game.mouse.y);
+    const w = game.screenToWorld(game.mouse.x, game.mouse.y);
     game.ht.x = Math.floor(w.x / game.TS);
     game.ht.y = Math.floor(w.y / game.TS);
     game.hoverIn =
@@ -568,7 +568,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     }
     syncHover(e.clientX, e.clientY, true);
   });
-  var pan: PanDrag | null = null,
+  let pan: PanDrag | null = null,
     suppressCtx = false;
   function cancelMapGestures() {
     // The old drag's eventual contextmenu must not dismiss retained inspection.
@@ -589,17 +589,17 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     if (game.mode && game.mode.type === 'build') {
       game.placeBuilding(game.mode.bt, game.ht.x, game.ht.y);
     } else if (game.mode && game.mode.type === 'demolish') {
-      var tgt = null,
+      let tgt = null,
         td = 1.45;
-      for (var di5 = 0; di5 < game.buildings.length; di5++) {
-        var b4 = game.buildings[di5],
+      for (let di5 = 0; di5 < game.buildings.length; di5++) {
+        const b4 = game.buildings[di5],
           dd5 = Math.hypot(b4.x - game.ht.x, b4.y - game.ht.y);
         if (dd5 < td) {
           td = dd5;
           tgt = b4;
         }
       }
-      var action = game.demolitionInput(tgt, e.shiftKey);
+      const action = game.demolitionInput(tgt, e.shiftKey);
       if (action === 'missing') {
         game.msg(
           '\u2716 No building there to raze \u2014 click directly on one (raze-able buildings are marked with a red \u2715)',
@@ -652,10 +652,10 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     { passive: false },
   );
   function buildingNear(x: number, y: number, r: number) {
-    var best = null,
+    let best = null,
       bd = r;
-    for (var i = 0; i < game.buildings.length; i++) {
-      var b = game.buildings[i],
+    for (let i = 0; i < game.buildings.length; i++) {
+      const b = game.buildings[i],
         d = Math.hypot(b.x - x, b.y - y);
       if (d < bd) {
         bd = d;
@@ -665,15 +665,15 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     return best;
   }
   function jumpFlagged() {
-    var flagged = [];
-    for (var i = 0; i < game.buildings.length; i++)
+    const flagged = [];
+    for (let i = 0; i < game.buildings.length; i++)
       if (game.bStatus(game.buildings[i]).bad) flagged.push(game.buildings[i]);
     if (!flagged.length) {
       game.msg('Nothing needs attention right now');
       return;
     }
     game.flagIdx++;
-    var b = flagged[game.flagIdx % flagged.length];
+    const b = flagged[game.flagIdx % flagged.length];
     game.zoomAnim = null;
     game.cam.x = b.x * game.TS - game.vw / game.z / 2;
     game.cam.y = b.y * game.TS - game.vh / game.z / 2;
@@ -682,8 +682,8 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     game.msg('Needs attention: ' + game.BSPEC[b.type].name);
   }
   function centerHQ() {
-    var hq = null;
-    for (var i = 0; i < game.buildings.length; i++)
+    let hq = null;
+    for (let i = 0; i < game.buildings.length; i++)
       if (game.buildings[i].type === 'hq') hq = game.buildings[i];
     if (!hq) return;
     game.zoomAnim = null;
@@ -692,8 +692,8 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     game.clampCam();
   }
   function tooltipTick(now: number) {
-    var tt = document.getElementById('tt');
-    var show =
+    const tt = document.getElementById('tt');
+    const show =
       (!game.workspace || game.workspace === 'map') &&
       game.hoverIn &&
       game.mouseSeen &&
@@ -705,18 +705,18 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
       if (tt.style.display !== 'none') tt.style.display = 'none';
       return;
     }
-    var b = buildingNear(game.ht.x, game.ht.y, 1.0),
-      txt;
+    const b = buildingNear(game.ht.x, game.ht.y, 1.0);
+    let txt: string;
     if (b) {
       txt = game.BSPEC[b.type].name;
-      var st = game.bStatus(b);
+      const st = game.bStatus(b);
       if (st.bad && st.lines.length) txt += ' \u2014 ' + st.lines[0].t;
     } else txt = tileInfo(game.ht);
     if (txt !== game.ttStr) {
       tt.textContent = txt;
       game.ttStr = txt;
     }
-    var nx = Math.min(window.innerWidth - 240, game.hovX + 14) + 'px',
+    const nx = Math.min(window.innerWidth - 240, game.hovX + 14) + 'px',
       ny = Math.min(window.innerHeight - 40, game.hovY + 18) + 'px';
     if (tt.style.display !== 'block') tt.style.display = 'block';
     if (tt.style.left !== nx) tt.style.left = nx;
@@ -724,8 +724,8 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
   }
   function loadPrefs() {
     try {
-      var p = JSON.parse(localStorage.getItem('settlers.prefs') || '{}');
-      for (var key of ['musVol', 'sfxVol', 'ambVol'])
+      const p = JSON.parse(localStorage.getItem('settlers.prefs') || '{}');
+      for (const key of ['musVol', 'sfxVol', 'ambVol'])
         if (typeof p[key] === 'number' && p[key] >= 0 && p[key] <= 1) {
           if (key === 'musVol') game.musVol = p[key];
           if (key === 'sfxVol') game.sfxVol = p[key];
@@ -786,7 +786,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     mapControls.update();
     mapControls.paint();
   }
-  var prefsT: number | null = null;
+  let prefsT: number | null = null;
   function savePrefsSoon() {
     if (prefsT) return;
     reportPreferences('pending', 'Changes applied. Remembering settings…');
@@ -826,7 +826,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
       return false;
     }
   }
-  var miniDown = false;
+  let miniDown = false;
   game.mini.addEventListener('mousedown', function (e) {
     miniDown = true;
     game.miniClick(e);
@@ -843,7 +843,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
   });
   window.addEventListener('keydown', function (e) {
     if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
-    var k = e.key;
+    const k = e.key;
     if (
       (e.target as HTMLInputElement).matches('input,textarea,select') ||
       (e.target as HTMLInputElement).isContentEditable
@@ -902,7 +902,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     if (onMap && (k === '-' || k === '_')) game.zoomAt(game.zi - 1);
   });
   window.addEventListener('keyup', function (e) {
-    var k = e.key;
+    const k = e.key;
     if (k === 'ArrowLeft' || k === 'a' || k === 'A') game.keys.l = false;
     if (k === 'ArrowRight' || k === 'd' || k === 'D') game.keys.r = false;
     if (k === 'ArrowUp' || k === 'w' || k === 'W') game.keys.u = false;
@@ -913,7 +913,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     cancelMapGestures();
   });
   function keyPan(dt: number) {
-    var sp = (700 / game.z) * dt;
+    const sp = (700 / game.z) * dt;
     if (game.keys.l) game.cam.x -= sp;
     if (game.keys.r) game.cam.x += sp;
     if (game.keys.u) game.cam.y -= sp;
@@ -928,7 +928,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
   }
   function toggleMusic() {
     game.setMusicVol(!game.musicOn);
-    var b = document.getElementById('musicb');
+    const b = document.getElementById('musicb');
     if (b) b.classList.toggle('off', !game.musicOn);
     document.getElementById('mute').style.opacity = game.muted ? '0.4' : '1';
     savePrefs();
@@ -962,8 +962,8 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     (document.getElementById('utility') as HTMLDetailsElement).open = false;
   }
   function toggleAdvisorDetails() {
-    var compact = document.getElementById('adv').classList.toggle('compact');
-    var button = document.getElementById('advtoggle');
+    const compact = document.getElementById('adv').classList.toggle('compact');
+    const button = document.getElementById('advtoggle');
     button.setAttribute('aria-expanded', compact ? 'false' : 'true');
     button.title = compact ? 'Show advisor details' : 'Compact advisor';
   }
@@ -992,7 +992,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     (document.getElementById('utility') as HTMLDetailsElement).open = false;
     if (id === 'mix') {
       game.initAudio();
-      for (var data of [
+      for (const data of [
         ['musvol', game.musVol],
         ['sfxvol', game.sfxVol],
         ['ambvol', game.ambVol],
@@ -1080,7 +1080,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     savePrefs();
   };
   document.getElementById('economybody').onclick = function (e) {
-    var btn = (e.target as HTMLInputElement).closest('button');
+    const btn = (e.target as HTMLInputElement).closest('button');
     if (!btn) return;
     if (btn.dataset.upgrade === 'haul' || btn.dataset.upgrade === 'production')
       game.buyUpgrade(btn.dataset.upgrade);
@@ -1093,7 +1093,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
   });
   document.getElementById('advb').className = 'on';
   document.getElementById('adv').addEventListener('click', function (e) {
-    var el = e.target as HTMLElement;
+    let el = e.target as HTMLElement;
     while (el && el.id !== 'adv' && !el.classList.contains('ar')) el = el.parentElement;
     if (!el || !el.classList.contains('ar')) return;
     if (el.dataset.focus) {
@@ -1107,7 +1107,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
       }
       return;
     }
-    var bt = el.dataset.b as BuildingType | undefined;
+    const bt = el.dataset.b as BuildingType | undefined;
     if (!game.BSPEC[bt]) return;
     game.switchWorkspace('map');
     game.activateTool('build', bt);
@@ -1161,7 +1161,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     );
     document.getElementById('paletteitems').classList.toggle('hidden', !expanded);
     document.getElementById('catalog-controls')?.classList.toggle('hidden', !expanded);
-    var button = document.getElementById('paletteb');
+    const button = document.getElementById('paletteb');
     button.setAttribute('aria-expanded', expanded ? 'true' : 'false');
     button.title = expanded ? 'Close building palette' : 'Open building palette';
   }
@@ -1202,8 +1202,8 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
       setPaletteExpanded(document.getElementById('paletteitems').classList.contains('hidden'));
     };
   }
-  var fpsElement = document.getElementById('fps');
-  var fpsSampleStart: number | null = null,
+  const fpsElement = document.getElementById('fps');
+  let fpsSampleStart: number | null = null,
     fpsFrames = 0;
   function resetFps() {
     fpsSampleStart = null;
@@ -1220,9 +1220,9 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
       return;
     }
     fpsFrames++;
-    var elapsed = ts - fpsSampleStart;
+    const elapsed = ts - fpsSampleStart;
     if (elapsed >= 500) {
-      var text = Math.round((fpsFrames * 1000) / elapsed) + ' FPS';
+      const text = Math.round((fpsFrames * 1000) / elapsed) + ' FPS';
       if (fpsElement.textContent !== text) fpsElement.textContent = text;
       fpsSampleStart = ts;
       fpsFrames = 0;
