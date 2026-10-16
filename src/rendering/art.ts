@@ -22,11 +22,11 @@ interface BldPainterEntry {
 export function createArt(game: GameRuntime): ArtSubsystem {
   // Cached source artwork, directional settlers and cargo share stable anchors.
 
-  var SS = 3;
-  var ART = {} as ArtAtlas;
+  const SS = 3;
+  const ART = {} as ArtAtlas;
 
   function Acan(w: number, h: number): HTMLCanvasElement {
-    var c = document.createElement('canvas');
+    const c = document.createElement('canvas');
     c.width = Math.max(1, Math.round(w));
     c.height = Math.max(1, Math.round(h));
     // Offscreen art is prepared once and sampled/uploaded later. CPU backing
@@ -41,14 +41,14 @@ export function createArt(game: GameRuntime): ArtSubsystem {
         parseInt(c.substr(3, 2), 16),
         parseInt(c.substr(5, 2), 16),
       ];
-    var m = c.match(/(\d+)[, ]+(\d+)[, ]+(\d+)/);
+    const m = c.match(/(\d+)[, ]+(\d+)[, ]+(\d+)/);
     return m ? [+m[1], +m[2], +m[3]] : [255, 255, 255];
   }
   function hx(c: string): number[] {
     return prs(c);
   }
   function sh(c: string, f: number): string {
-    var r = hx(c);
+    const r = hx(c);
     return (
       'rgb(' +
       Math.round(Math.min(255, r[0] * f)) +
@@ -60,7 +60,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     );
   }
   function mix(a: string, b: string, t: number): string {
-    var x = hx(a),
+    const x = hx(a),
       y = hx(b);
     return (
       'rgb(' +
@@ -73,7 +73,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     );
   }
   function rgba(c: string, a: number): string {
-    var r = hx(c);
+    const r = hx(c);
     return 'rgba(' + r[0] + ',' + r[1] + ',' + r[2] + ',' + a + ')';
   }
   function rr(
@@ -98,7 +98,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     g.fill();
   }
 
-  var PAL = {
+  const PAL = {
     out: '#33251a',
     woodD: '#6b4a26',
     beam: '#b07a40',
@@ -130,19 +130,19 @@ export function createArt(game: GameRuntime): ArtSubsystem {
   // NOTE: no directional gradients inside terrain tiles — they produce a repeating
   // checkerboard across the tile grid. Flat base + world-space macro variation instead.
   function texGrass(v: number): HTMLCanvasElement {
-    var c = Acan(48, 48),
+    const c = Acan(48, 48),
       g = c.getContext('2d'),
       rnd = game.mulberry32(1234 + v * 77);
     // Every variant shares the edge/base hue. Wrapped microstrokes avoid tile seams;
     // large meadow patches are supplied by the world-space landscape painter.
     g.fillStyle = '#6b8750';
     g.fillRect(0, 0, 48, 48);
-    for (var i = 0; i < 9; i++) {
-      var x = 8 + rnd() * 32,
+    for (let i = 0; i < 9; i++) {
+      const x = 8 + rnd() * 32,
         y = 8 + rnd() * 32,
         r = 3 + rnd() * 7,
         patch = g.createRadialGradient(x, y, 0, x, y, r);
-      var tone = rnd() < 0.5 ? '#3f6032' : '#c5c78d';
+      const tone = rnd() < 0.5 ? '#3f6032' : '#c5c78d';
       patch.addColorStop(0, rgba(tone, 0.12));
       patch.addColorStop(1, rgba(tone, 0));
       g.fillStyle = patch;
@@ -150,15 +150,15 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     }
     // Small, broken brush marks read as blades rather than high-contrast noise.
     g.lineCap = 'round';
-    for (i = 0; i < 100; i++) {
-      var xx = rnd() * 48,
+    for (let i = 0; i < 100; i++) {
+      const xx = rnd() * 48,
         yy = rnd() * 48,
         len = 0.6 + rnd() * 2.6,
         bend = (rnd() - 0.5) * 2.4;
       g.strokeStyle = rgba(rnd() < 0.54 ? '#c4cc91' : '#36552c', 0.1 + rnd() * 0.12);
       g.lineWidth = 0.45 + rnd() * 0.4;
-      for (var ox = -48; ox <= 48; ox += 48)
-        for (var oy = -48; oy <= 48; oy += 48) {
+      for (let ox = -48; ox <= 48; ox += 48)
+        for (let oy = -48; oy <= 48; oy += 48) {
           g.beginPath();
           g.moveTo(xx + ox, yy + oy);
           g.quadraticCurveTo(
@@ -171,8 +171,8 @@ export function createArt(game: GameRuntime): ArtSubsystem {
         }
     }
     // Sparse seed heads keep paths, workers and resource icons easy to find.
-    for (i = 0; i < 3; i++) {
-      var sx = 8 + rnd() * 32,
+    for (let i = 0; i < 3; i++) {
+      const sx = 8 + rnd() * 32,
         sy = 8 + rnd() * 32;
       g.strokeStyle = rgba('#415d30', 0.35);
       g.lineWidth = 0.5;
@@ -191,15 +191,15 @@ export function createArt(game: GameRuntime): ArtSubsystem {
   // Dirt-and-cobble road menu icon.
   // Crossroad icon for the building menu. World roads use the landscape painter.
   function texRoad(): HTMLCanvasElement {
-    var c = Acan(48, 48),
+    const c = Acan(48, 48),
       g = c.getContext('2d'),
       rnd = game.mulberry32(895);
-    var cx = 24,
+    const cx = 24,
       cy = 24;
     function armPts(dir: string): number[][] {
-      var pts = [];
-      for (var k = 0; k <= 4; k++) {
-        var t = k / 4,
+      const pts = [];
+      for (let k = 0; k <= 4; k++) {
+        const t = k / 4,
           wob = (rnd() - 0.5) * 3;
         if (dir === 'n') pts.push([cx + wob, cy - cy * t - 2]);
         if (dir === 's') pts.push([cx + wob, cy + (48 - cy) * t]);
@@ -210,25 +210,25 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     }
     g.fillStyle = rgba('#a88858', 0.96);
     g.beginPath();
-    var p = armPts('n');
+    const p = armPts('n');
     g.moveTo(p[0][0], p[0][1]);
-    for (var k2 = 1; k2 < p.length; k2++) g.lineTo(p[k2][0], p[k2][1]);
+    for (let k2 = 1; k2 < p.length; k2++) g.lineTo(p[k2][0], p[k2][1]);
     g.lineTo(cx + 7, cy);
-    var p2 = armPts('e');
+    const p2 = armPts('e');
     g.lineTo(p2[p2.length - 1][0] - 5, p2[p2.length - 1][1]);
-    for (k2 = p2.length - 2; k2 >= 0; k2--) g.lineTo(p2[k2][0] + 5, p2[k2][1]);
-    var p3 = armPts('s');
+    for (let k2 = p2.length - 2; k2 >= 0; k2--) g.lineTo(p2[k2][0] + 5, p2[k2][1]);
+    const p3 = armPts('s');
     g.lineTo(p3[p3.length - 1][0] + 6, p3[p3.length - 1][1] - 1);
-    for (k2 = p3.length - 2; k2 >= 0; k2--) g.lineTo(p3[k2][0] + 6, p3[k2][1]);
-    var p4 = armPts('w');
+    for (let k2 = p3.length - 2; k2 >= 0; k2--) g.lineTo(p3[k2][0] + 6, p3[k2][1]);
+    const p4 = armPts('w');
     g.lineTo(p4[p4.length - 1][0] + 1, p4[p4.length - 1][1] + 6);
-    for (k2 = p4.length - 2; k2 >= 0; k2--) g.lineTo(p4[k2][0], p4[k2][1] + 6);
+    for (let k2 = p4.length - 2; k2 >= 0; k2--) g.lineTo(p4[k2][0], p4[k2][1] + 6);
     g.closePath();
     g.fill();
     g.strokeStyle = rgba('#785830', 0.65);
     g.lineWidth = 1.6;
     g.stroke();
-    var arms = ['n', 'e', 's', 'w'];
+    const arms = ['n', 'e', 's', 'w'];
     function cobble(x: number, y: number, r: number): void {
       g.fillStyle = rgba('#b09060', 0.95);
       g.beginPath();
@@ -243,10 +243,10 @@ export function createArt(game: GameRuntime): ArtSubsystem {
       g.ellipse(x - r * 0.3, y - r * 0.34, r * 0.28, r * 0.18, 0, 0, 7);
       g.fill();
     }
-    for (var i = 0; i < arms.length; i++) {
-      var p5 = armPts(arms[i]);
-      for (var k3 = 1; k3 < p5.length; k3++) {
-        var mx = (p5[k3][0] + p5[k3 - 1][0]) / 2,
+    for (let i = 0; i < arms.length; i++) {
+      const p5 = armPts(arms[i]);
+      for (let k3 = 1; k3 < p5.length; k3++) {
+        const mx = (p5[k3][0] + p5[k3 - 1][0]) / 2,
           my = (p5[k3][1] + p5[k3 - 1][1]) / 2;
         cobble(mx + (rnd() - 0.5) * 3, my + (rnd() - 0.5) * 3, 2 + rnd() * 1.8);
       }
@@ -254,16 +254,16 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     cobble(cx, cy, 3.2);
     // grass encroaching on the edges
     g.fillStyle = rgba('#4c8830', 0.55);
-    for (i = 0; i < 5; i++) g.fillRect(rnd() * 46, rnd() * 46, 1.5, 1);
+    for (let i = 0; i < 5; i++) g.fillRect(rnd() * 46, rnd() * 46, 1.5, 1);
     g.fillStyle = rgba('#4c3820', 0.32);
-    for (i = 0; i < 5; i++) g.fillRect(4 + rnd() * 40, 4 + rnd() * 40, 1.5, 1);
+    for (let i = 0; i < 5; i++) g.fillRect(4 + rnd() * 40, 4 + rnd() * 40, 1.5, 1);
     return c;
   }
 
   // ---------- trees ----------
   function texTree(st: number, v: number, f: number): HTMLCanvasElement {
     // The same seed in both sway frames keeps leaves attached to their branches.
-    var c = Acan(36 * SS, 42 * SS),
+    const c = Acan(36 * SS, 42 * SS),
       g = c.getContext('2d'),
       rnd = game.mulberry32(3719 + st * 137 + v * 997),
       mature = st === 4,
@@ -274,7 +274,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     g.lineJoin = 'round';
     g.lineCap = 'round';
     // Root flare and lit bark are visible under the canopy.
-    var bark = g.createLinearGradient(15, 0, 21, 0);
+    const bark = g.createLinearGradient(15, 0, 21, 0);
     bark.addColorStop(0, '#c09a5a');
     bark.addColorStop(0.4, '#836039');
     bark.addColorStop(1, '#453723');
@@ -297,26 +297,26 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     if (v === 2 && st > 1) {
       // Jagged boughs replace the old flat triangular tiers. Lower boughs retain
       // a dark gap so the species and growth stage read at normal zoom.
-      var tiers = mature ? 5 : st === 3 ? 4 : 3;
-      for (var tier = 0; tier < tiers; tier++) {
-        var cy = baseY - 7 * scale - tier * 5.7 * scale,
+      const tiers = mature ? 5 : st === 3 ? 4 : 3;
+      for (let tier = 0; tier < tiers; tier++) {
+        const cy = baseY - 7 * scale - tier * 5.7 * scale,
           breadth = (12 - tier * 1.7) * scale,
           top = cy - 9 * scale;
         g.beginPath();
         g.moveTo(18 + sway, top);
-        for (var edge = 0; edge < 7; edge++) {
-          var t = (edge + 1) / 7;
+        for (let edge = 0; edge < 7; edge++) {
+          const t = (edge + 1) / 7;
           g.lineTo(18 + sway + breadth * t * (0.9 + rnd() * 0.14), top + t * 10 * scale);
           g.lineTo(18 + sway + breadth * t * 0.72, top + t * 9.2 * scale);
         }
         g.lineTo(18 + sway, cy + 1.5 * scale);
-        for (edge = 7; edge >= 0; edge--) {
-          var tt = edge / 7;
+        for (let edge = 7; edge >= 0; edge--) {
+          const tt = edge / 7;
           g.lineTo(18 + sway - breadth * tt * (0.9 + rnd() * 0.14), top + tt * 10 * scale);
           g.lineTo(18 + sway - breadth * tt * 0.76, top + tt * 9 * scale);
         }
         g.closePath();
-        var pine = g.createLinearGradient(18 - breadth, top, 18 + breadth, cy + 2);
+        const pine = g.createLinearGradient(18 - breadth, top, 18 + breadth, cy + 2);
         pine.addColorStop(0, '#8b9e49');
         pine.addColorStop(0.4, '#4e7239');
         pine.addColorStop(1, '#173c28');
@@ -324,8 +324,8 @@ export function createArt(game: GameRuntime): ArtSubsystem {
         g.fill();
         g.save();
         g.clip();
-        for (var n = 0; n < 75; n++) {
-          var px = 18 + sway + (rnd() - 0.5) * breadth * 2,
+        for (let n = 0; n < 75; n++) {
+          const px = 18 + sway + (rnd() - 0.5) * breadth * 2,
             py = top + rnd() * 10 * scale;
           g.strokeStyle = rgba(px < 18 ? '#bbbf67' : '#244c2b', 0.25 + rnd() * 0.4);
           g.lineWidth = 0.45 * scale;
@@ -337,7 +337,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
         g.restore();
       }
     } else {
-      var R = 10.1 * scale * (0.94 + v * 0.09),
+      const R = 10.1 * scale * (0.94 + v * 0.09),
         cx = 18 + sway,
         cy0 = baseY - 11 * scale - R * 0.65,
         clumps = [
@@ -352,15 +352,15 @@ export function createArt(game: GameRuntime): ArtSubsystem {
         ];
       // Hundreds of little leaf masses provide a scalloped, organic silhouette.
       // Each mass has its own relief; no oversized circular highlight discs.
-      for (var layer = 0; layer < 2; layer++) {
-        for (var ci = 0; ci < clumps.length; ci++) {
-          var b = clumps[ci],
+      for (let layer = 0; layer < 2; layer++) {
+        for (let ci = 0; ci < clumps.length; ci++) {
+          const b = clumps[ci],
             bx = cx + b[0] * R,
             by = cy0 + b[1] * R,
             br = R * b[2];
-          var count = layer ? 28 : 13;
-          for (var j = 0; j < count; j++) {
-            var angle = rnd() * Math.PI * 2,
+          const count = layer ? 28 : 13;
+          for (let j = 0; j < count; j++) {
+            const angle = rnd() * Math.PI * 2,
               radius = Math.sqrt(rnd()) * br,
               lx = bx + Math.cos(angle) * radius,
               ly = by + Math.sin(angle) * radius,
@@ -385,8 +385,8 @@ export function createArt(game: GameRuntime): ArtSubsystem {
         }
       }
       if (mature && v === 1) {
-        for (var fruit = 0; fruit < 7; fruit++) {
-          var ax = cx + (rnd() - 0.5) * R * 1.6,
+        for (let fruit = 0; fruit < 7; fruit++) {
+          const ax = cx + (rnd() - 0.5) * R * 1.6,
             ay = cy0 + (rnd() - 0.35) * R;
           g.fillStyle = '#8e3f24';
           g.beginPath();
@@ -402,8 +402,8 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     // Low ground foliage grounds the trunk without changing the feet anchor.
     g.strokeStyle = rgba('#8b9852', 0.72);
     g.lineWidth = 0.55;
-    for (var tuft = 0; tuft < 6; tuft++) {
-      var gx = 14 + rnd() * 8;
+    for (let tuft = 0; tuft < 6; tuft++) {
+      const gx = 14 + rnd() * 8;
       g.beginPath();
       g.moveTo(gx, 39.5);
       g.lineTo(gx + (rnd() - 0.5) * 2, 37.7 + rnd());
@@ -414,7 +414,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
   // boulders
 
   function texRock(v: number): HTMLCanvasElement {
-    var c = Acan(32 * SS, 24 * SS),
+    const c = Acan(32 * SS, 24 * SS),
       g = c.getContext('2d'),
       rnd = game.mulberry32(8191 + v * 313);
     g.scale(SS, SS);
@@ -432,7 +432,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
       g.quadraticCurveTo(x + r * 1.02, y + r * 0.52, x + r * 0.35, y + r * 0.64);
       g.lineTo(x - r * 0.61, y + r * 0.54);
       g.closePath();
-      var stone = g.createLinearGradient(x - r, y - r, x + r, y + r * 0.5);
+      const stone = g.createLinearGradient(x - r, y - r, x + r, y + r * 0.5);
       stone.addColorStop(0, '#ede2c9');
       stone.addColorStop(0.45, '#b6b3a6');
       stone.addColorStop(1, '#666c60');
@@ -452,8 +452,8 @@ export function createArt(game: GameRuntime): ArtSubsystem {
       g.lineTo(x - r * 0.48, y - r * 0.05);
       g.closePath();
       g.fill();
-      for (var i = 0; i < r * 15; i++) {
-        var px = x + (rnd() - 0.5) * r * 2,
+      for (let i = 0; i < r * 15; i++) {
+        const px = x + (rnd() - 0.5) * r * 2,
           py = y + (rnd() - 0.35) * r * 1.5;
         g.fillStyle = rgba(rnd() < 0.5 ? '#fff4db' : '#5b6654', 0.08 + rnd() * 0.17);
         g.beginPath();
@@ -461,8 +461,8 @@ export function createArt(game: GameRuntime): ArtSubsystem {
         g.fill();
       }
       // Moss and lichen gather at the cooler foot of each boulder.
-      for (i = 0; i < 15; i++) {
-        var mx = x + (rnd() - 0.5) * r * 1.9,
+      for (let i = 0; i < 15; i++) {
+        const mx = x + (rnd() - 0.5) * r * 1.9,
           my = y + r * (0.15 + rnd() * 0.55);
         g.fillStyle = rgba(i % 3 ? '#536845' : '#b4b77c', 0.38 + rnd() * 0.2);
         g.beginPath();
@@ -492,8 +492,8 @@ export function createArt(game: GameRuntime): ArtSubsystem {
       boulder(27, 19, 2.2);
     }
     g.lineWidth = 0.45;
-    for (var blade = 0; blade < 18; blade++) {
-      var x = 5 + rnd() * 22,
+    for (let blade = 0; blade < 18; blade++) {
+      const x = 5 + rnd() * 22,
         y = 20 + rnd() * 2;
       g.strokeStyle = rgba(blade % 2 ? '#a5b16a' : '#51683b', 0.75);
       g.beginPath();
@@ -512,9 +512,9 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     opts: BldOptions,
   ): Sprite {
     opts = opts || {};
-    var w = opts.w || 34,
+    const w = opts.w || 34,
       h = opts.h || 44;
-    var c = Acan(w * SS, h * SS),
+    const c = Acan(w * SS, h * SS),
       g = c.getContext('2d');
     g.scale(SS, SS);
     g.lineJoin = 'round';
@@ -539,12 +539,12 @@ export function createArt(game: GameRuntime): ArtSubsystem {
   ): void {
     // A feathered contact patch grounds the walls without a second hard oval.
     // Rasterized only when the artwork is built, then reused as a texture.
-    var cx = fx + fw * 0.6,
+    const cx = fx + fw * 0.6,
       cy = fy + fh * 0.74;
     g.save();
     g.translate(cx, cy);
     g.scale(fw * 0.75, fh * 0.43);
-    var shade = g.createRadialGradient(0, 0, 0.1, 0, 0, 1);
+    const shade = g.createRadialGradient(0, 0, 0.1, 0, 0, 1);
     shade.addColorStop(0, 'rgba(24,31,25,0.32)');
     shade.addColorStop(0.45, 'rgba(24,31,25,0.23)');
     shade.addColorStop(0.78, 'rgba(24,31,25,0.09)');
@@ -562,19 +562,19 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     w: number,
     h: number,
   ): void {
-    var rnd = game.mulberry32(Math.round(x * 331 + y * 229 + w * 727));
+    const rnd = game.mulberry32(Math.round(x * 331 + y * 229 + w * 727));
     // An irregular compacted-earth apron and fitted stone footings replace a
     // perfectly rectangular slab. Entrance and cargo feet stay unobstructed.
     g.fillStyle = rgba('#867453', 0.32);
     g.beginPath();
     g.ellipse(x + w / 2, y + h / 2, w * 0.65, h * 0.45, 0, 0, 7);
     g.fill();
-    var rowHeight = 2.3;
-    for (var row = 0; row < 2; row++) {
-      var yy = y + h - 4.6 + row * rowHeight,
-        xx = x - (row % 2) * 1.4;
+    const rowHeight = 2.3;
+    for (let row = 0; row < 2; row++) {
+      const yy = y + h - 4.6 + row * rowHeight;
+      let xx = x - (row % 2) * 1.4;
       while (xx < x + w) {
-        var bw = Math.min(3.7 + rnd() * 2, x + w - xx),
+        const bw = Math.min(3.7 + rnd() * 2, x + w - xx),
           stone = g.createLinearGradient(xx, yy, xx + bw, yy + rowHeight);
         stone.addColorStop(0, '#e2d7bb');
         stone.addColorStop(0.45, '#b0ac9a');
@@ -593,8 +593,8 @@ export function createArt(game: GameRuntime): ArtSubsystem {
         xx += bw;
       }
     }
-    for (var tuft = 0; tuft < 8; tuft++) {
-      var tx = x + rnd() * w,
+    for (let tuft = 0; tuft < 8; tuft++) {
+      const tx = x + rnd() * w,
         ty = y + h - 0.3 + rnd() * 0.8;
       if (tx > x + w * 0.35 && tx < x + w * 0.65) continue;
       g.strokeStyle = rgba(tuft % 2 ? '#96a363' : '#527342', 0.7);
@@ -618,7 +618,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     c2: string,
     plank: boolean,
   ): void {
-    var rnd = game.mulberry32(Math.round(x * 91 + y * 113 + w * 197 + h * 311) + 7719),
+    const rnd = game.mulberry32(Math.round(x * 91 + y * 113 + w * 197 + h * 311) + 7719),
       stone = c1 === PAL.stoneL || c1 === PAL.stone,
       gr = g.createLinearGradient(x, y, x + w, y + h * 0.25);
     gr.addColorStop(0, c1);
@@ -632,11 +632,11 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     g.clip();
     if (stone) {
       // Staggered, subtly irregular ashlar blocks with lit bevels and mortar.
-      for (var row = 0; row < Math.ceil(h / 2.8); row++) {
-        var yy = y + row * 2.8,
-          xx = x - (row % 2) * 2.4;
+      for (let row = 0; row < Math.ceil(h / 2.8); row++) {
+        const yy = y + row * 2.8;
+        let xx = x - (row % 2) * 2.4;
         while (xx < x + w) {
-          var bw = 3.5 + rnd() * 2.5,
+          const bw = 3.5 + rnd() * 2.5,
             bh = 2.35 + rnd() * 0.35;
           g.fillStyle = rgba(rnd() < 0.5 ? '#fff3dc' : '#756e61', 0.12 + rnd() * 0.1);
           rr(g, xx + 0.18, yy + 0.25, bw - 0.35, bh - 0.25, 0.35);
@@ -658,7 +658,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
       }
     } else if (plank && c1 !== PAL.plasL && c1 !== PAL.plas) {
       g.lineWidth = 0.4;
-      for (var py = y + 2.8; py < y + h; py += 2.8) {
+      for (let py = y + 2.8; py < y + h; py += 2.8) {
         g.strokeStyle = rgba(sh(c2, 0.72), 0.48);
         g.beginPath();
         g.moveTo(x, py);
@@ -672,14 +672,14 @@ export function createArt(game: GameRuntime): ArtSubsystem {
       }
     }
     // Fine mineral flecks and broken brush strokes give plaster a matte finish.
-    for (var speck = 0; speck < w * h * 0.45; speck++) {
-      var sx = x + rnd() * w,
+    for (let speck = 0; speck < w * h * 0.45; speck++) {
+      const sx = x + rnd() * w,
         sy = y + rnd() * h;
       g.fillStyle = rgba(rnd() < 0.5 ? '#fff9db' : '#8c7758', 0.055 + rnd() * 0.1);
       g.fillRect(sx, sy, 0.22 + rnd() * 0.65, 0.18 + rnd() * 0.4);
     }
     // Dampness at the base, stronger occlusion below the eaves.
-    var weather = g.createLinearGradient(0, y, 0, y + h);
+    const weather = g.createLinearGradient(0, y, 0, y + h);
     weather.addColorStop(0, 'rgba(56,39,23,0.15)');
     weather.addColorStop(0.25, 'rgba(56,39,23,0)');
     weather.addColorStop(0.8, 'rgba(56,39,23,0)');
@@ -777,7 +777,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     over?: number,
   ): void {
     over = over === undefined ? 2 : over;
-    var cx = x + w / 2,
+    const cx = x + w / 2,
       half = w / 2 + over,
       rnd = game.mulberry32(Math.round(x * 211 + y * 377 + w * 97 + h * 313) + 2818),
       straw = cMain === PAL.thatch,
@@ -790,7 +790,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     g.quadraticCurveTo(cx, y + h + 1, x + w + over, y + h);
     g.quadraticCurveTo(cx + half * 0.38, y + h * 0.58, cx, y);
     g.closePath();
-    var gradient = g.createLinearGradient(x - over, y, x + w + over, y + h * 0.7);
+    const gradient = g.createLinearGradient(x - over, y, x + w + over, y + h * 0.7);
     gradient.addColorStop(0, cL);
     gradient.addColorStop(0.46, mix(cL, cMain, 0.3));
     gradient.addColorStop(0.52, cMain);
@@ -804,8 +804,8 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     g.clip();
     if (straw) {
       // Individually combed strands, bundles and broken bright straw ends.
-      for (var i = 0; i < 150; i++) {
-        var sx = x - over + rnd() * (w + over * 2),
+      for (let i = 0; i < 150; i++) {
+        const sx = x - over + rnd() * (w + over * 2),
           sy = y + rnd() * h,
           len = 1.4 + rnd() * 4.5,
           dir = (sx - cx) / half;
@@ -816,7 +816,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
         g.quadraticCurveTo(sx + dir * 0.6, sy + len * 0.6, sx + dir * 1.6, sy + len);
         g.stroke();
       }
-      for (var bundle = 1; bundle < 4; bundle++) {
+      for (let bundle = 1; bundle < 4; bundle++) {
         g.strokeStyle = rgba('#8b5e29', 0.3);
         g.lineWidth = 0.45;
         g.beginPath();
@@ -831,13 +831,13 @@ export function createArt(game: GameRuntime): ArtSubsystem {
       }
     } else {
       // Each terracotta/slate/shingle has a curved lip, shadow gap and bevel.
-      var rows = Math.max(4, Math.round(h / 1.7)),
+      const rows = Math.max(4, Math.round(h / 1.7)),
         rh = h / rows,
         tw = slate ? 2.5 : tile ? 2.1 : 2.9;
-      for (var row = 0; row < rows; row++) {
-        var yy = y + row * rh;
-        for (var xx = x - over - tw + (row % 2) * tw * 0.5; xx < x + w + over; xx += tw) {
-          var lit = xx < cx,
+      for (let row = 0; row < rows; row++) {
+        const yy = y + row * rh;
+        for (let xx = x - over - tw + (row % 2) * tw * 0.5; xx < x + w + over; xx += tw) {
+          const lit = xx < cx,
             base = lit ? mix(cL, cMain, 0.12 + rnd() * 0.3) : mix(cMain, cD, 0.28 + rnd() * 0.35);
           g.fillStyle = sh(base, 0.9 + rnd() * 0.18);
           g.beginPath();
@@ -867,7 +867,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
       }
     }
     // Roof moss is sparse and shaded, preserving the roof's identifying color.
-    for (var m = 0; m < (straw ? 0 : 8); m++) {
+    for (let m = 0; m < (straw ? 0 : 8); m++) {
       g.fillStyle = rgba('#687545', 0.22);
       g.beginPath();
       g.ellipse(
@@ -938,7 +938,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
   }
   // painters -----------------------------------------------------------------
   function paintHQ(g: CanvasRenderingContext2D, h: number): void {
-    var fx = 2,
+    const fx = 2,
       fy = h - 26,
       fw = 40,
       fh = 25;
@@ -1004,7 +1004,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     wallTex(g, fx - 2, fy - 8, 11, 28, PAL.stoneL, PAL.stoneD, false);
     g.strokeStyle = rgba(PAL.out, 0.5);
     g.lineWidth = 0.7;
-    for (var yy = fy - 6; yy < fy + 20; yy += 3.4) {
+    for (let yy = fy - 6; yy < fy + 20; yy += 3.4) {
       g.beginPath();
       g.moveTo(fx - 1, yy);
       g.lineTo(fx + 9, yy);
@@ -1029,7 +1029,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     bannerPole(g, fx + fw + 2.5, fy - 30, 15);
   }
   function paintWarehouse(g: CanvasRenderingContext2D, h: number): void {
-    var fx = 3,
+    const fx = 3,
       fy = h - 22,
       fw = 30,
       fh = 21;
@@ -1070,7 +1070,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     // thatch comb ridge
     g.strokeStyle = rgba(sh(PAL.thatchD, 0.8), 0.7);
     g.lineWidth = 0.7;
-    for (var i = 0; i < 6; i++) {
+    for (let i = 0; i < 6; i++) {
       g.beginPath();
       g.moveTo(fx - 1 + i * 5.4, fy - 12);
       g.lineTo(fx - 1 + i * 5.4 + 2.7, fy - 13.8);
@@ -1120,7 +1120,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     bannerPole(g, fx + fw - 1, fy - 22, 10);
   }
   function paintLumberjack(g: CanvasRenderingContext2D, h: number, o: BldOptions): void {
-    var fx = 3,
+    const fx = 3,
       fy = h - 21,
       fw = 26,
       fh = 20,
@@ -1128,9 +1128,9 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     bShadow(g, fx, fy, fw, fh);
     foundation(g, fx + 1.5, fy + 14, fw - 3, 6.5);
     // log-cabin walls: stacked logs with chinking
-    for (var i = 0; i < 5; i++) {
-      var yy = fy + 13 - i * 3;
-      var log = g.createLinearGradient(0, yy, 0, yy + 2.8);
+    for (let i = 0; i < 5; i++) {
+      const yy = fy + 13 - i * 3;
+      const log = g.createLinearGradient(0, yy, 0, yy + 2.8);
       log.addColorStop(0, '#dfb77b');
       log.addColorStop(0.25, i % 2 ? '#b18a56' : '#c49a60');
       log.addColorStop(0.6, '#a77e49');
@@ -1147,8 +1147,8 @@ export function createArt(game: GameRuntime): ArtSubsystem {
       g.stroke();
     }
     // log ends (circles) on right edge
-    for (i = 0; i < 5; i++) {
-      var yy2 = fy + 14 - i * 3;
+    for (let i = 0; i < 5; i++) {
+      const yy2 = fy + 14 - i * 3;
       g.fillStyle = '#c9a06a';
       g.beginPath();
       g.arc(fx + fw - 2.4, yy2 + 1.4, 1.2, 0, 7);
@@ -1191,7 +1191,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     g.fillStyle = '#c9ccd2';
     g.fillRect(fx + 30.4, fy + 4, 2.4, 2.6);
     g.fillStyle = '#a5774a';
-    for (i = 0; i < 3; i++) {
+    for (let i = 0; i < 3; i++) {
       rr(g, fx + 26, fy + 17 - i * 1.8, 7, 1.7, 0.8);
       F(g, '#a5774a');
     }
@@ -1202,7 +1202,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     g.fill();
   }
   function paintForester(g: CanvasRenderingContext2D, h: number, o: BldOptions): void {
-    var fx = 4,
+    const fx = 4,
       fy = h - 21,
       fw = 24,
       fh = 20,
@@ -1259,8 +1259,8 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     g.beginPath();
     g.ellipse(fx + 29.5, fy + 14.5, 3.4, 0.9, 0, 0, 7);
     g.fill();
-    for (var i = 0; i < 3; i++) {
-      var sx = fx + 27 + (i % 2) * 3.5,
+    for (let i = 0; i < 3; i++) {
+      const sx = fx + 27 + (i % 2) * 3.5,
         sy = fy + 9 + (i > 1 ? 5 : 0);
       g.strokeStyle = '#7a5630';
       g.lineWidth = 0.8;
@@ -1279,7 +1279,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     }
   }
   function paintSawmill(g: CanvasRenderingContext2D, h: number): void {
-    var fx = 3,
+    const fx = 3,
       fy = h - 22,
       fw = 29,
       fh = 21;
@@ -1328,7 +1328,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     g.fillRect(fx + 15.2, fy + 2, 1.8, 10);
   }
   function paintQuarry(g: CanvasRenderingContext2D, h: number): void {
-    var fx = 2,
+    const fx = 2,
       fy = h - 22,
       fw = 32,
       fh = 21;
@@ -1405,7 +1405,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     g.quadraticCurveTo(fx + 29.4, fy + 10.2, fx + 31, fy + 11.8);
     g.stroke();
     // rubble + tracks
-    for (var i = 0; i < 6; i++) {
+    for (let i = 0; i < 6; i++) {
       g.fillStyle = rgba('#8a857b', 0.9);
       g.beginPath();
       g.arc(fx + 3 + i * 5.2, fy + 20.6, 1.5, 0, 7);
@@ -1413,7 +1413,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     }
   }
   function paintFisherman(g: CanvasRenderingContext2D, h: number, o: BldOptions): void {
-    var fx = 3,
+    const fx = 3,
       fy = h - 20,
       fw = 25,
       fh = 19,
@@ -1451,11 +1451,11 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     g.fillRect(fx + 13, fy + 11, 2, 8);
     // dock
     g.fillStyle = '#96703f';
-    for (var i = 0; i < 4; i++) {
+    for (let i = 0; i < 4; i++) {
       g.fillRect(fx + 16, fy + 4 + i * 4.6, 14, 2.8);
     }
     g.fillStyle = rgba(sh('#96703f', 0.66), 0.9);
-    for (i = 0; i < 4; i++) {
+    for (let i = 0; i < 4; i++) {
       g.fillRect(fx + 16, fy + 4 + i * 4.6, 14, 0.9);
     }
     g.fillStyle = '#5a3e22';
@@ -1497,7 +1497,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     F(g, rgba('#6a5638', 0.9));
     g.strokeStyle = rgba('#3c3020', 0.6);
     g.lineWidth = 0.5;
-    for (i = 0; i < 3; i++) {
+    for (let i = 0; i < 3; i++) {
       g.beginPath();
       g.moveTo(fx + 26.8 + i * 1.6, fy + 15);
       g.lineTo(fx + 26.8 + i * 1.6, fy + 18.4);
@@ -1505,7 +1505,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     }
   }
   function paintFarm(g: CanvasRenderingContext2D, h: number): void {
-    var fx = 2,
+    const fx = 2,
       fy = h - 24,
       fw = 38,
       fh = 23;
@@ -1513,15 +1513,15 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     // field: furrows with crop tufts
     g.fillStyle = '#b99b4e';
     g.fillRect(fx, fy + 9, fw, fh - 10);
-    for (var i = 0; i < 6; i++) {
-      var yy = fy + 10.5 + i * 2.2;
+    for (let i = 0; i < 6; i++) {
+      const yy = fy + 10.5 + i * 2.2;
       g.fillStyle = rgba('#8a6f34', 0.55);
       g.fillRect(fx, yy, fw, 1);
       g.fillStyle = rgba('#e8cc7c', 0.8);
       g.fillRect(fx, yy - 1, fw, 0.9);
     }
-    for (i = 0; i < 16; i++) {
-      var cx2 = fx + 2 + ((i * 7.3) % (fw - 4)),
+    for (let i = 0; i < 16; i++) {
+      const cx2 = fx + 2 + ((i * 7.3) % (fw - 4)),
         cy2 = fy + 10.8 + ((i * 2.7) % 9);
       g.strokeStyle = i % 3 ? '#8fae4a' : '#e2c96e';
       g.lineWidth = 0.8;
@@ -1541,7 +1541,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     g.moveTo(fx - 1, fy + 8.5);
     g.lineTo(fx + fw + 1, fy + 8.5);
     g.stroke();
-    for (i = 0; i < 7; i++) {
+    for (let i = 0; i < 7; i++) {
       g.beginPath();
       g.moveTo(fx + i * 6.4, fy + 7);
       g.lineTo(fx + i * 6.4, fy + 9.8);
@@ -1554,7 +1554,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     wallTex(g, fx + 2, fy - 4, 15, 12, '#b4552e', sh('#b4552e', 0.82), false);
     g.strokeStyle = rgba(sh('#b4552e', 0.7), 0.6);
     g.lineWidth = 0.5;
-    for (var byy = fy - 2; byy < fy + 7; byy += 2.4) {
+    for (let byy = fy - 2; byy < fy + 7; byy += 2.4) {
       g.beginPath();
       g.moveTo(fx + 2, byy);
       g.lineTo(fx + 17, byy);
@@ -1588,7 +1588,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     g.moveTo(fx + 24, fy + 7);
     g.quadraticCurveTo(fx + 27, fy - 0.5, fx + 30, fy + 7);
     g.stroke();
-    for (i = 0; i < 4; i++) {
+    for (let i = 0; i < 4; i++) {
       g.beginPath();
       g.moveTo(fx + 24 + i * 2, fy + 6.4 - i * 0.4);
       g.lineTo(fx + 23 + i * 2.4, fy + 4 - i * 0.5);
@@ -1612,9 +1612,9 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     g.stroke();
   }
   function paintMine(g: CanvasRenderingContext2D, h: number, o: BldOptions): void {
-    var kind: 'coal' | 'iron' | 'gold' = o.kind || 'gold';
-    var oc = { coal: '#33383f', iron: '#d0763a', gold: '#ffd23f' }[kind];
-    var fx = 3,
+    const kind: 'coal' | 'iron' | 'gold' = o.kind || 'gold';
+    const oc = { coal: '#33383f', iron: '#d0763a', gold: '#ffd23f' }[kind];
+    const fx = 3,
       fy = h - 22,
       fw = 28,
       fh = 21;
@@ -1661,8 +1661,8 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     g.fillStyle = '#c9a75c';
     g.fillRect(fx + 8, fy + 7.4, 10, 1);
     // ore spill at entrance
-    for (var i = 0; i < 6; i++) {
-      var sx = fx + 4 + ((i * 2.7) % 7),
+    for (let i = 0; i < 6; i++) {
+      const sx = fx + 4 + ((i * 2.7) % 7),
         sy = fy + 15 + ((i * 3.1) % 4);
       g.fillStyle = rgba(oc, 0.95);
       g.beginPath();
@@ -1724,7 +1724,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     bannerPole(g, fx + 26, fy - 8, 9);
   }
   function paintToolsmith(g: CanvasRenderingContext2D, h: number): void {
-    var fx = 3,
+    const fx = 3,
       fy = h - 22,
       fw = 28,
       fh = 21;
@@ -1781,7 +1781,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     g.fillRect(fx + 2.2, fy + 3, 1.4, 1.6);
   }
   function paintArmory(g: CanvasRenderingContext2D, h: number): void {
-    var fx = 3,
+    const fx = 3,
       fy = h - 24,
       fw = 28,
       fh = 23;
@@ -1791,13 +1791,13 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     wallTex(g, fx + 2, fy - 2, fw - 4, 19, PAL.stoneL, PAL.stoneD, false);
     g.strokeStyle = rgba(PAL.out, 0.45);
     g.lineWidth = 0.7;
-    for (var yy = fy + 3; yy < fy + 17; yy += 3.6) {
+    for (let yy = fy + 3; yy < fy + 17; yy += 3.6) {
       g.beginPath();
       g.moveTo(fx + 2, yy);
       g.lineTo(fx + fw - 2, yy);
       g.stroke();
     }
-    for (var i = 0; i < 5; i++) {
+    for (let i = 0; i < 5; i++) {
       g.beginPath();
       g.moveTo(fx + 4 + i * 5, fy - 2);
       g.lineTo(fx + 4 + i * 5 + (i % 2 ? 2 : -2), fy + 17);
@@ -1812,7 +1812,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     g.fillRect(fx + 23.4, fy + 8, 1.2, 4.4);
     // crenellated parapet
     g.fillStyle = PAL.stoneL;
-    for (i = 0; i < 5; i++) g.fillRect(fx + 2 + i * 5.2, fy - 5.4, 3.4, 3.6);
+    for (let i = 0; i < 5; i++) g.fillRect(fx + 2 + i * 5.2, fy - 5.4, 3.4, 3.6);
     g.fillStyle = PAL.stone;
     g.fillRect(fx + 2, fy - 2, fw - 4, 2);
     g.fillStyle = PAL.stoneD;
@@ -1837,7 +1837,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     bannerPole(g, fx + 26.5, fy - 14, 11);
   }
   function paintGuard(g: CanvasRenderingContext2D, h: number): void {
-    var fx = 5,
+    const fx = 5,
       fy = h - 22,
       fw = 24,
       fh = 21;
@@ -1855,7 +1855,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     g.lineTo(fx + fw - 1.5, fy + 20);
     g.closePath();
     g.fill();
-    var gr = g.createLinearGradient(fx, 0, fx + fw, 0);
+    const gr = g.createLinearGradient(fx, 0, fx + fw, 0);
     gr.addColorStop(0, rgba(PAL.stoneL, 0.75));
     gr.addColorStop(0.45, 'rgba(255,255,255,0)');
     gr.addColorStop(1, rgba(PAL.stoneD, 0.8));
@@ -1881,7 +1881,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     g.closePath();
     g.clip();
     wallTex(g, fx + 1.5, fy - 12, fw - 3, 32, PAL.stoneL, PAL.stoneD, false);
-    var round = g.createLinearGradient(fx, 0, fx + fw, 0);
+    const round = g.createLinearGradient(fx, 0, fx + fw, 0);
     round.addColorStop(0, 'rgba(254,242,209,0.3)');
     round.addColorStop(0.35, 'rgba(254,242,209,0.08)');
     round.addColorStop(0.6, 'rgba(46,55,39,0.08)');
@@ -1910,7 +1910,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     rr(g, fx + 2.2, fy - 15.4, fw - 4.4, 3.8, 1);
     F(g, PAL.stoneL);
     g.fillStyle = PAL.stone;
-    for (var i = 0; i < 4; i++) g.fillRect(fx + 2.6 + i * 5.4, fy - 18.4, 3.4, 3.6);
+    for (let i = 0; i < 4; i++) g.fillRect(fx + 2.6 + i * 5.4, fy - 18.4, 3.4, 3.6);
     g.fillStyle = 'rgba(255,255,255,0.3)';
     g.fillRect(fx + 2.6, fy - 18.4, 3.4, 0.9);
     g.fillStyle = PAL.stoneD;
@@ -1945,9 +1945,9 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     door2(g, 18, h - 14, 6, 9);
     g.strokeStyle = '#795633';
     g.lineWidth = 2;
-    var cx = 21,
+    const cx = 21,
       cy = h - 30;
-    for (var i = 0; i < 4; i++) {
+    for (let i = 0; i < 4; i++) {
       g.save();
       g.translate(cx, cy);
       g.rotate(Math.PI / 4 + (i * Math.PI) / 2);
@@ -1999,7 +1999,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
       g.strokeStyle = '#795431';
       g.lineWidth = 1.2;
       g.strokeRect(1, h - 12, 15, 8);
-      for (var i = 0; i < 2; i++) {
+      for (let i = 0; i < 2; i++) {
         g.fillStyle = '#e4a5a1';
         g.beginPath();
         g.ellipse(5 + i * 7, h - 7, 3, 1.7, 0, 0, 7);
@@ -2024,7 +2024,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
       g.fillStyle = '#aa5346';
       g.fillRect(1, h - 13, 11, 3);
       g.fillStyle = '#f2dec0';
-      for (var stripe = 0; stripe < 3; stripe++) g.fillRect(2 + stripe * 4, h - 13, 2, 3);
+      for (let stripe = 0; stripe < 3; stripe++) g.fillRect(2 + stripe * 4, h - 13, 2, 3);
       g.fillStyle = '#9d5041';
       rr(g, 3, h - 9, 7, 3, 1);
       g.fill();
@@ -2041,7 +2041,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
       g.stroke();
     }
   }
-  var PAINTERS: Record<BuildingType, BldPainterEntry> = {
+  const PAINTERS: Record<BuildingType, BldPainterEntry> = {
     hq: { f: paintHQ, w: 48, h: 56 },
     warehouse: { f: paintWarehouse, w: 38, h: 46 },
     lumberjack: { f: paintLumberjack, w: 36, h: 42, v: 1 },
@@ -2067,7 +2067,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
   };
   // construction scaffold
   function paintSite(g: CanvasRenderingContext2D, h: number): void {
-    var fx = 5,
+    const fx = 5,
       fy = h - 23,
       fw = 24,
       fh = 22;
@@ -2076,9 +2076,9 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     g.ellipse(fx + fw / 2, fy + fh / 2, fw * 0.56, fh * 0.4, 0, 0, 7);
     g.fill();
     g.fillStyle = '#6a4a28';
-    var ph = fy - 10;
-    for (var i = 0; i < 4; i++) {
-      var px = fx + (i % 2 ? fw - 2.4 : 0);
+    const ph = fy - 10;
+    for (let i = 0; i < 4; i++) {
+      const px = fx + (i % 2 ? fw - 2.4 : 0);
       g.fillRect(px, ph, 2.4, fh + 10 - ph);
       g.fillStyle = sh('#6a4a28', 0.78);
       g.fillRect(px + 1.8, ph, 0.6, fh + 10 - ph);
@@ -2115,7 +2115,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     g.ellipse(fx + fw - 3, fy + 17.4, 3.2, 1, 0, 0, 7);
     g.fill();
     g.fillStyle = '#a5774a';
-    for (i = 0; i < 3; i++) g.fillRect(fx + 1.6, fy + 15.4 - i * 1.7, 8 - i * 1.4, 1.5);
+    for (let i = 0; i < 3; i++) g.fillRect(fx + 1.6, fy + 15.4 - i * 1.7, 8 - i * 1.4, 1.5);
   }
   // Work yards remain visible even while a producer is waiting for deliveries.
   function paintWorkYard(
@@ -2124,15 +2124,15 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     w: number,
     h: number,
   ): void {
-    var x = w - 8,
+    const x = w - 8,
       y = h - 5;
     if (type === 'sawmill') {
       g.fillStyle = '#dfc18a';
-      for (var i = 0; i < 4; i++) g.fillRect(x - 6 + i * 0.5, y - i * 1.4, 9 - i, 1.1);
+      for (let i = 0; i < 4; i++) g.fillRect(x - 6 + i * 0.5, y - i * 1.4, 9 - i, 1.1);
     } else if (type === 'fisherman') {
       g.strokeStyle = '#cfb796';
       g.lineWidth = 0.55;
-      for (var j = 0; j < 3; j++) {
+      for (let j = 0; j < 3; j++) {
         g.beginPath();
         g.moveTo(x - 3 + j * 2, y - 8);
         g.lineTo(x - 3 + j * 2, y - 3);
@@ -2165,7 +2165,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
       g.stroke();
       g.strokeStyle = '#d6d9dc';
       g.lineWidth = 0.9;
-      for (var k = 0; k < 3; k++) {
+      for (let k = 0; k < 3; k++) {
         g.beginPath();
         g.moveTo(x - 7 + k * 3, y - 1);
         g.lineTo(x - 7 + k * 3, y - 9);
@@ -2179,18 +2179,18 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     dir: string,
     frame: number,
   ): HTMLCanvasElement {
-    var c = Acan(15 * SS, 19 * SS),
+    const c = Acan(15 * SS, 19 * SS),
       g = c.getContext('2d');
     g.scale(SS, SS);
     g.lineCap = 'round';
     g.lineJoin = 'round';
-    var soldier = kind === 'soldier',
+    const soldier = kind === 'soldier',
       side = dir === 'e' || dir === 'w',
       diagonal = dir.length === 2,
       back = dir.indexOf('n') !== -1,
       cx = 7.5;
-    var stride = frame < 0 ? 0 : Math.sin((frame * Math.PI) / 4) * 1.6;
-    var lift = frame < 0 ? 0 : Math.cos((frame * Math.PI) / 4) * 0.65;
+    const stride = frame < 0 ? 0 : Math.sin((frame * Math.PI) / 4) * 1.6;
+    const lift = frame < 0 ? 0 : Math.cos((frame * Math.PI) / 4) * 0.65;
     if (dir.indexOf('w') !== -1) {
       g.translate(15, 0);
       g.scale(-1, 1);
@@ -2210,7 +2210,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     g.fillRect(cx + 1, 7.5, side ? 1.7 : 2.2, 5.3);
     g.strokeStyle = '#e4c49d';
     g.lineWidth = 1.5;
-    var arm = side ? stride * 0.7 : stride * 0.3;
+    const arm = side ? stride * 0.7 : stride * 0.3;
     g.beginPath();
     g.moveTo(cx - 2.8, 8.2);
     g.lineTo(cx - 3.4 - arm, 12);
@@ -2274,14 +2274,14 @@ export function createArt(game: GameRuntime): ArtSubsystem {
   }
   // Cargo keeps each good recognizable both on a carrier and in a loading yard.
   function texCargo(good: Good): HTMLCanvasElement {
-    var c = Acan(16 * SS, 12 * SS),
+    const c = Acan(16 * SS, 12 * SS),
       g = c.getContext('2d');
     g.scale(SS, SS);
     g.lineJoin = 'round';
     g.lineCap = 'round';
     if (good === 'logs') {
-      for (var i = 0; i < 3; i++) {
-        var y = 4 + i * 2.6,
+      for (let i = 0; i < 3; i++) {
+        const y = 4 + i * 2.6,
           x = i === 1 ? 2.5 : 1;
         g.strokeStyle = '#593e26';
         g.lineWidth = 3.6;
@@ -2301,7 +2301,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
         g.stroke();
       }
     } else if (good === 'planks') {
-      for (var p = 0; p < 3; p++) {
+      for (let p = 0; p < 3; p++) {
         g.fillStyle = '#72512f';
         g.fillRect(1 + p * 0.6, 3 + p * 2.5, 13, 2.8);
         g.fillStyle = '#d0a66a';
@@ -2317,7 +2317,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
       g.beginPath();
       g.ellipse(8, 10, 5.8, 1.3, 0, 0, 7);
       g.fill();
-      var sack = g.createLinearGradient(3, 0, 12, 0);
+      const sack = g.createLinearGradient(3, 0, 12, 0);
       sack.addColorStop(0, '#e8d0a0');
       sack.addColorStop(1, '#a18358');
       g.fillStyle = sack;
@@ -2346,7 +2346,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
       g.fill();
       g.strokeStyle = '#9c6730';
       g.lineWidth = 0.7;
-      for (var cut = 0; cut < 3; cut++) {
+      for (let cut = 0; cut < 3; cut++) {
         g.beginPath();
         g.moveTo(5 + cut * 3, 4);
         g.lineTo(4 + cut * 3, 7);
@@ -2394,7 +2394,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     } else if (good === 'beer') {
       economyBarrel(g, 4, 11, 8, 9);
     } else if (good === 'iron_bars') {
-      for (var bar = 0; bar < 3; bar++) {
+      for (let bar = 0; bar < 3; bar++) {
         g.fillStyle = '#647880';
         g.fillRect(2 + bar, 4 + bar * 2, 10, 2.5);
         g.fillStyle = '#c4d1d0';
@@ -2408,7 +2408,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
       g.fillRect(2, 6.4, 12, 1);
       g.strokeStyle = '#574332';
       g.lineWidth = 1.2;
-      for (var k = 0; k < 2; k++) {
+      for (let k = 0; k < 2; k++) {
         g.beginPath();
         g.moveTo(4 + k * 6, 9);
         g.lineTo(7 + k * 3, 1.5);
@@ -2434,7 +2434,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
       }
       g.stroke();
     } else {
-      var colors =
+      const colors =
         good === 'stone'
           ? ['#e2e0ce', '#a09e90', '#696e68']
           : good === 'coal'
@@ -2442,8 +2442,8 @@ export function createArt(game: GameRuntime): ArtSubsystem {
             : good === 'iron'
               ? ['#e6a96c', '#ac7047', '#724c37']
               : ['#fff1a1', '#e0ac3e', '#966c23'];
-      for (var r = 0; r < 3; r++) {
-        var cx = 4 + r * 4.1,
+      for (let r = 0; r < 3; r++) {
+        const cx = 4 + r * 4.1,
           cy = 7.5 - (r % 2) * 3;
         g.fillStyle = colors[2];
         g.beginPath();
@@ -2474,7 +2474,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
   }
   // ---------- saw blade ----------
   function texBlade(): HTMLCanvasElement {
-    var c = Acan(9 * SS, 9 * SS),
+    const c = Acan(9 * SS, 9 * SS),
       g = c.getContext('2d');
     g.scale(SS, SS);
     g.fillStyle = '#c8ccd2';
@@ -2504,19 +2504,18 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     ART.grass = [];
     ART.tree = [];
     ART.rock = [];
-    var v;
-    for (v = 0; v < 4; v++) ART.grass.push(texGrass(v));
+    for (let v = 0; v < 4; v++) ART.grass.push(texGrass(v));
     ART.road = texRoad();
-    for (var st = 1; st <= 4; st++) {
-      var arr = [];
-      for (v = 0; v < 3; v++) arr.push([texTree(st, v, 0), texTree(st, v, 1)]);
+    for (let st = 1; st <= 4; st++) {
+      const arr = [];
+      for (let v = 0; v < 3; v++) arr.push([texTree(st, v, 0), texTree(st, v, 1)]);
       ART.tree.push(arr);
     }
-    for (v = 0; v < 2; v++) ART.rock.push(texRock(v));
+    for (let v = 0; v < 2; v++) ART.rock.push(texRock(v));
     ART.bld = {};
     ART.bld2 = {};
-    for (var t in PAINTERS) {
-      var spec = PAINTERS[t as BuildingType];
+    for (const t in PAINTERS) {
+      const spec = PAINTERS[t as BuildingType];
       ART.bld[t as BuildingType] = bldSprite(t as BuildingType, spec.f, {
         w: spec.w,
         h: spec.h,
@@ -2535,23 +2534,23 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     ART.blade = texBlade();
     ART.unitDirections = {};
     ART.cargo = {};
-    for (var good in game.GOODS) ART.cargo[good as Good] = texCargo(good as Good);
-    for (var uk = 0; uk < 2; uk++) {
-      var kind: 'carrier' | 'soldier' = uk ? 'soldier' : 'carrier',
+    for (const good in game.GOODS) ART.cargo[good as Good] = texCargo(good as Good);
+    for (let uk = 0; uk < 2; uk++) {
+      const kind: 'carrier' | 'soldier' = uk ? 'soldier' : 'carrier',
         dirs: Record<string, { walk: HTMLCanvasElement[]; idle: HTMLCanvasElement }> = {};
       ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw'].forEach(function (dir) {
-        var frames = [];
-        for (var uf = 0; uf < 8; uf++) frames.push(texDirectionalUnit(kind, dir, uf));
+        const frames = [];
+        for (let uf = 0; uf < 8; uf++) frames.push(texDirectionalUnit(kind, dir, uf));
         dirs[dir] = { walk: frames, idle: texDirectionalUnit(kind, dir, -1) };
       });
       ART.unitDirections[kind] = dirs;
     }
     // soft shadows
-    var sc = Acan(64, 32),
+    const sc = Acan(64, 32),
       sg = sc.getContext('2d');
     sg.save();
     sg.scale(1, 0.5);
-    var grd = sg.createRadialGradient(32, 32, 2, 32, 32, 30);
+    const grd = sg.createRadialGradient(32, 32, 2, 32, 32, 30);
     grd.addColorStop(0, 'rgba(24,31,25,0.34)');
     grd.addColorStop(0.55, 'rgba(24,31,25,0.17)');
     grd.addColorStop(1, 'rgba(24,31,25,0)');
@@ -2562,9 +2561,9 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     sg.restore();
     ART.shadowSoft = sc;
     // cloud blob
-    var cc = Acan(340, 220),
+    const cc = Acan(340, 220),
       cg = cc.getContext('2d');
-    var cg2 = cg.createRadialGradient(170, 110, 10, 170, 110, 160);
+    const cg2 = cg.createRadialGradient(170, 110, 10, 170, 110, 160);
     cg2.addColorStop(0, 'rgba(10,14,20,0.04)');
     cg2.addColorStop(0.55, 'rgba(10,14,20,0.025)');
     cg2.addColorStop(1, 'rgba(10,14,20,0)');
@@ -2574,9 +2573,9 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     cg.fill();
     ART.cloud = cc;
     // stronger ground shadow for the terrain-level cloud pass (drawn SE of the sky blob)
-    var csh = Acan(340, 220),
+    const csh = Acan(340, 220),
       csg = csh.getContext('2d');
-    var cg3 = csg.createRadialGradient(170, 110, 10, 170, 110, 160);
+    const cg3 = csg.createRadialGradient(170, 110, 10, 170, 110, 160);
     cg3.addColorStop(0, 'rgba(8,12,18,0.14)');
     cg3.addColorStop(0.55, 'rgba(8,12,18,0.065)');
     cg3.addColorStop(1, 'rgba(8,12,18,0)');
@@ -2586,9 +2585,9 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     csg.fill();
     ART.cloudShadow = csh;
     // warm lantern glow for night windows (drawn above the night tint)
-    var gl1 = Acan(64, 64),
+    const gl1 = Acan(64, 64),
       glg = gl1.getContext('2d');
-    var gr2 = glg.createRadialGradient(32, 32, 2, 32, 32, 31);
+    const gr2 = glg.createRadialGradient(32, 32, 2, 32, 32, 31);
     gr2.addColorStop(0, 'rgba(255,196,110,0.85)');
     gr2.addColorStop(0.35, 'rgba(255,170,80,0.32)');
     gr2.addColorStop(1, 'rgba(255,150,60,0)');
@@ -2598,11 +2597,11 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     glg.fill();
     ART.glow = gl1;
     // film grain for the DOM overlay
-    var gc = Acan(96, 96),
+    const gc = Acan(96, 96),
       gg = gc.getContext('2d'),
       img = gg.createImageData(96, 96);
-    for (var i = 0; i < img.data.length; i += 4) {
-      var n2 = (Math.random() * 255) | 0;
+    for (let i = 0; i < img.data.length; i += 4) {
+      const n2 = (Math.random() * 255) | 0;
       img.data[i] = img.data[i + 1] = img.data[i + 2] = n2;
       img.data[i + 3] = 6;
     }

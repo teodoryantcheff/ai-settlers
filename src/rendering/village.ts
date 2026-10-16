@@ -18,10 +18,10 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
   // ==================== VILLAGE PRESENTATION ====================
   // Small cached additions use the existing tile footprint and ground anchor.
   // The caches are bounded by building type, construction stage and crop stage.
-  var villageYards: Record<string, HTMLCanvasElement> = Object.create(null),
-    villageSurroundings: Record<string, HTMLCanvasElement> = Object.create(null),
-    villageSites: Record<string, Sprite> = Object.create(null),
-    villageCrops: HTMLCanvasElement[] = [],
+  const villageYards: Record<string, HTMLCanvasElement> = Object.create(null),
+    villageSurroundings: Record<string, HTMLCanvasElement> = Object.create(null);
+  let villageSites: Record<string, Sprite> = Object.create(null);
+  const villageCrops: HTMLCanvasElement[] = [],
     villageMotion: WeakMap<Building, { last: number; time: number }> = new WeakMap(),
     villageStockViews: WeakMap<Building, VillageStockView> = new WeakMap(),
     villageGoods: Good[] = [
@@ -48,12 +48,12 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
     // Screenshot scenarios reproduce the same pose after save/load or a different
     // wall-clock delay. Simulation time already stops while the colony is paused.
     if (game.TESTMODE) return game.renderPrefs().reducedMotion ? 0 : game.state.time * 1000;
-    var clock = villageMotion.get(b);
+    let clock = villageMotion.get(b);
     if (!clock) {
       clock = { last: game.NOW, time: 0 };
       villageMotion.set(b, clock);
     }
-    var elapsed = Math.max(0, Math.min(50, game.NOW - clock.last));
+    const elapsed = Math.max(0, Math.min(50, game.NOW - clock.last));
     clock.last = game.NOW;
     if (!game.state.paused && !game.renderPrefs().reducedMotion) clock.time += elapsed;
     return game.renderPrefs().reducedMotion ? 0 : clock.time;
@@ -63,7 +63,7 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
     h: number,
     paint: (g: CanvasRenderingContext2D) => void,
   ): HTMLCanvasElement {
-    var c = game.Acan(w * game.SS, h * game.SS),
+    const c = game.Acan(w * game.SS, h * game.SS),
       g = c.getContext('2d');
     g.scale(game.SS, game.SS);
     g.lineCap = 'round';
@@ -104,14 +104,14 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
     if (villageYards[type]) return villageYards[type];
     return (villageYards[type] = villageCanvas(36, 32, function (g) {
       g.translate(6, 4);
-      var industrial = type === 'quarry' || type.indexOf('mine_') === 0,
+      const industrial = type === 'quarry' || type.indexOf('mine_') === 0,
         store = type === 'hq' || type === 'warehouse',
         seed = Array.from(type).reduce(function (sum, letter) {
           return sum * 31 + letter.charCodeAt(0);
         }, 73),
         random = game.mulberry32(seed);
       // Cached ground wear extends beyond the tiny tile, grounding the full sprite.
-      var soil = g.createRadialGradient(11, 19, 1, 11, 19, 17);
+      const soil = g.createRadialGradient(11, 19, 1, 11, 19, 17);
       soil.addColorStop(0, industrial ? 'rgba(117,100,73,0.48)' : 'rgba(167,134,75,0.48)');
       soil.addColorStop(0.6, 'rgba(170,143,83,0.27)');
       soil.addColorStop(1, 'rgba(161,139,82,0)');
@@ -138,7 +138,7 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
       g.closePath();
       g.fill();
       if (store) {
-        for (var slab = 0; slab < 3; slab++) {
+        for (let slab = 0; slab < 3; slab++) {
           g.fillStyle = slab % 2 ? 'rgba(182,179,151,0.6)' : 'rgba(211,200,160,0.6)';
           g.fillRect(8.5, 18.5 + slab * 1.9, 6, 1.5);
           villageLine(g, 'rgba(83,80,64,0.28)', 0.45, 8.7, 20 + slab * 1.9, 14.2, 20 + slab * 1.9);
@@ -154,7 +154,7 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
         type === 'armory' ||
         type === 'smelter'
       ) {
-        for (var paving = 0; paving < 4; paving++) {
+        for (let paving = 0; paving < 4; paving++) {
           villageEllipse(
             g,
             'rgba(96,94,79,0.48)',
@@ -177,8 +177,8 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
         villageLine(g, 'rgba(112,87,45,0.25)', 1.4, 11.5, 19, 11.9, 24);
       }
       // Gentle wear and pebbles sit below buildings rather than floating above them.
-      for (var pebble = 0; pebble < 7; pebble++) {
-        var px = 1.5 + ((pebble * 7.7) % 21),
+      for (let pebble = 0; pebble < 7; pebble++) {
+        const px = 1.5 + ((pebble * 7.7) % 21),
           py = 20 + ((pebble * 2.3) % 3.5);
         villageEllipse(
           g,
@@ -189,8 +189,8 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
           0.3,
         );
       }
-      for (var fleck = 0; fleck < 75; fleck++) {
-        var fx = -3 + random() * 30,
+      for (let fleck = 0; fleck < 75; fleck++) {
+        const fx = -3 + random() * 30,
           fy = 14 + random() * 13,
           edge = Math.abs(fx - 11) / 15;
         if (Math.pow((fx - 11) / 16, 2) + Math.pow((fy - 20) / 7, 2) > 1) continue;
@@ -209,8 +209,8 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
       }
       if (!industrial) {
         // Small living borders stay away from the readable south-facing entrance.
-        for (var sprig = 0; sprig < 10; sprig++) {
-          var sx = sprig < 5 ? -2.5 + random() * 4 : 22 + random() * 4,
+        for (let sprig = 0; sprig < 10; sprig++) {
+          const sx = sprig < 5 ? -2.5 + random() * 4 : 22 + random() * 4,
             sy = 17 + random() * 7;
           villageEllipse(g, 'rgba(48,68,35,0.33)', sx + 0.7, sy + 0.3, 1.6, 0.55);
           villageLine(g, '#6b813f', 0.6, sx, sy, sx + 0.4, sy - 2);
@@ -238,11 +238,11 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
       g.translate(6, 4);
       function fence(left: number, right: number, y: number): void {
         villageLine(g, 'rgba(43,39,23,0.2)', 1.6, left + 1, y + 0.5, right + 1, y + 0.5);
-        for (var rail = 0; rail < 2; rail++) {
+        for (let rail = 0; rail < 2; rail++) {
           villageLine(g, '#81603a', 0.85, left, y - 1.6 - rail * 1.7, right, y - 1.6 - rail * 1.7);
           villageLine(g, '#c2a170', 0.35, left, y - 1.9 - rail * 1.7, right, y - 1.9 - rail * 1.7);
         }
-        for (var post = left; post <= right; post += 3.2) {
+        for (let post = left; post <= right; post += 3.2) {
           villageLine(g, '#715334', 1.05, post, y, post, y - 5);
           villageLine(g, '#d0b17a', 0.35, post - 0.25, y - 0.5, post - 0.25, y - 4.8);
         }
@@ -266,8 +266,8 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
       }
       function woodpile(x: number, y: number): void {
         villageEllipse(g, 'rgba(42,35,21,0.23)', x + 3, y + 0.4, 4.2, 1);
-        for (var log = 0; log < 5; log++) {
-          var lx = x + (log % 3) * 1.8,
+        for (let log = 0; log < 5; log++) {
+          const lx = x + (log % 3) * 1.8,
             ly = y - Math.floor(log / 3) * 1.7;
           villageLine(g, '#705032', 1.7, lx, ly, lx + 3.8, ly - 1.1);
           villageLine(g, '#af8450', 0.45, lx, ly - 0.5, lx + 3.7, ly - 1.5);
@@ -279,8 +279,8 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
         g.fillStyle = '#75633d';
         g.fillRect(x, y - 3.5, 4.8, 3.8);
         villageLine(g, '#b29663', 0.65, x, y + 0.4, x + 4.8, y + 0.4);
-        for (var plant = 0; plant < 6; plant++) {
-          var px = x + 0.7 + (plant % 3) * 1.6,
+        for (let plant = 0; plant < 6; plant++) {
+          const px = x + 0.7 + (plant % 3) * 1.6,
             py = y - Math.floor(plant / 3) * 1.7;
           villageLine(g, '#526638', 0.5, px, py, px, py - 1.7);
           villageEllipse(g, '#819748', px - 0.35, py - 1, 0.8, 0.4);
@@ -310,8 +310,8 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
         }
       } else if (type === 'quarry' || type.indexOf('mine_') === 0) {
         fence(-3, 5, 24);
-        for (var rock = 0; rock < 5; rock++) {
-          var rx = 21 + (rock % 3) * 1.9,
+        for (let rock = 0; rock < 5; rock++) {
+          const rx = 21 + (rock % 3) * 1.9,
             ry = 24 - Math.floor(rock / 3) * 1.5;
           villageEllipse(g, '#726e60', rx, ry, 1.7, 0.8);
           villageEllipse(g, '#a9a38a', rx - 0.4, ry - 0.6, 1.2, 0.7);
@@ -333,7 +333,7 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
         if (type === 'brewery') garden(20, 20, false);
         if (type === 'fisherman') {
           villageLine(g, '#82623e', 0.7, 20, 20, 25, 17);
-          for (var net = 0; net < 5; net++)
+          for (let net = 0; net < 5; net++)
             villageLine(g, '#c0b991', 0.4, 20 + net, 20 - net * 0.6, 21 + net, 23 - net * 0.6);
         }
       } else if (type === 'guard') {
@@ -350,33 +350,33 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
   // A small pile counts physical goods; reservations do not hide goods before pickup.
   // Large warehouse holdings are represented by four bundles so drawing cost is fixed.
   function villageStockPlan(b: Building): VillageStockSlot[] {
-    var view = villageStockViews.get(b),
-      physical = b.done ? b.stock : b.got,
-      changed = !view || view.done !== b.done;
+    let view = villageStockViews.get(b);
+    const physical = b.done ? b.stock : b.got;
+    let changed = !view || view.done !== b.done;
     if (!view) {
       view = { done: b.done, quantities: [], slots: [] };
       villageStockViews.set(b, view);
     }
-    for (var count = 0; count < villageGoods.length; count++) {
-      var quantity = physical[villageGoods[count]] | 0;
+    for (let count = 0; count < villageGoods.length; count++) {
+      const quantity = physical[villageGoods[count]] | 0;
       if (view.quantities[count] !== quantity) changed = true;
       view.quantities[count] = quantity;
     }
     if (!changed) return view.slots;
     view.done = b.done;
-    var sp = game.BSPEC[b.type],
+    const sp = game.BSPEC[b.type],
       slots = view.slots;
     slots.length = 0;
     if (!b.done) {
       (['planks', 'stone', 'tools', 'weapons'] as Good[]).forEach(function (good) {
-        var quantity = b.got[good] | 0;
+        const quantity = b.got[good] | 0;
         if (quantity > 0) slots.push({ good: good, quantity: quantity });
       });
       return slots;
     }
     if (sp.store) {
-      for (var goodIndex = 0; goodIndex < villageGoods.length; goodIndex++) {
-        var good = villageGoods[goodIndex],
+      for (let goodIndex = 0; goodIndex < villageGoods.length; goodIndex++) {
+        const good = villageGoods[goodIndex],
           stored = b.stock[good] | 0;
         if (stored > 0) slots.push({ good: good, quantity: stored });
       }
@@ -387,7 +387,7 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
       return slots;
     }
     if (sp.in) {
-      for (var input in sp.in) {
+      for (const input in sp.in) {
         if ((b.stock[input as Good] | 0) > 0) {
           slots.push({ good: input as Good, quantity: b.stock[input as Good] | 0 });
           break;
@@ -407,11 +407,11 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
     scale: number,
   ): void {
     if (quantity <= 0) return;
-    var bundles = Math.min(4, Math.ceil(quantity / 2)),
+    const bundles = Math.min(4, Math.ceil(quantity / 2)),
       size = scale || 1,
       img = game.ART.cargo && game.ART.cargo[good];
-    for (var pile = 0; pile < bundles; pile++) {
-      var px = x + (pile % 2) * size * 1.1,
+    for (let pile = 0; pile < bundles; pile++) {
+      const px = x + (pile % 2) * size * 1.1,
         py = y - Math.floor(pile / 2) * size * 2.3;
       if (img) g.drawImage(img, px, py - 5.5 * size, 7.4 * size, 5.5 * size);
       else {
@@ -424,9 +424,9 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
   }
   function drawVillageStock(g: CanvasRenderingContext2D, b: Building): void {
     if (game.z < 0.65) return;
-    var slots = villageStockPlan(b);
-    for (var slot = 0; slot < slots.length; slot++) {
-      var item = slots[slot],
+    const slots = villageStockPlan(b);
+    for (let slot = 0; slot < slots.length; slot++) {
+      const item = slots[slot],
         right = item.output || slot % 2 === 1,
         x = b.x * game.TS + (right ? 16 : 0.4),
         y = b.y * game.TS + 23.5 - Math.floor(slot / 2) * 3;
@@ -436,18 +436,18 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
   function villageCrop(stage: number): HTMLCanvasElement {
     if (villageCrops[stage]) return villageCrops[stage];
     return (villageCrops[stage] = villageCanvas(game.TS, 13, function (g) {
-      var random = game.mulberry32(3187 + stage * 41),
+      const random = game.mulberry32(3187 + stage * 41),
         soil = g.createLinearGradient(0, 0, 24, 13);
       soil.addColorStop(0, '#a0894e');
       soil.addColorStop(1, '#746037');
       g.fillStyle = soil;
       g.fillRect(0.7, 0.8, 22.5, 11.2);
-      for (var row = 0; row < 5; row++) {
-        var ry = 2.1 + row * 2;
+      for (let row = 0; row < 5; row++) {
+        const ry = 2.1 + row * 2;
         villageLine(g, 'rgba(71,55,26,0.45)', 0.8, 0.8, ry + 1.6, 23, ry + 1.6);
         villageLine(g, 'rgba(228,200,119,0.38)', 0.5, 1, ry + 2, 22.8, ry + 2);
-        for (var stalk = 0; stalk < 11; stalk++) {
-          var x = 1.3 + stalk * 1.9 + (row % 2) * 0.45 + random() * 0.5,
+        for (let stalk = 0; stalk < 11; stalk++) {
+          const x = 1.3 + stalk * 1.9 + (row % 2) * 0.45 + random() * 0.5,
             height = (stage === 0 ? 1.4 : stage === 1 ? 2.7 : 3.8) + random() * 0.6,
             y = ry + 1.2;
           villageLine(g, 'rgba(55,50,25,0.27)', 0.8, x + 0.5, y + 0.5, x + 1.2, y - height + 0.4);
@@ -490,20 +490,20 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
   }
   function drawVillageDetails(g: CanvasRenderingContext2D, b: Building): void {
     if (game.z < 0.8) return;
-    var x = b.x * game.TS,
+    const x = b.x * game.TS,
       y = b.y * game.TS;
     g.drawImage(villageSurrounding(b.type), x - 6, y - 4, 36, 32);
     if (b.type === 'farm') {
       // Timer follows the real fifteen-second harvest cycle and freezes when blocked.
-      var stage = b.timer > 10 ? 0 : b.timer > 5 ? 1 : 2;
+      const stage = b.timer > 10 ? 0 : b.timer > 5 ? 1 : 2;
       g.drawImage(villageCrop(stage), x, y + 10.5, game.TS, 13);
     } else if (b.type === 'forester') {
       g.fillStyle = '#87663e';
       g.fillRect(x + 0.5, y + 18.8, 5, 4.4);
       g.fillStyle = '#544c30';
       g.fillRect(x + 0.9, y + 19.2, 4.2, 3.6);
-      for (var seedling = 0; seedling < 4; seedling++) {
-        var sx = x + 1.5 + (seedling % 2) * 2.2,
+      for (let seedling = 0; seedling < 4; seedling++) {
+        const sx = x + 1.5 + (seedling % 2) * 2.2,
           sy = y + 20.5 + Math.floor(seedling / 2) * 1.9;
         villageLine(g, '#d5c19a', 0.5, sx, sy, sx, sy - 2);
         villageEllipse(g, '#617e39', sx, sy - 1.8, 1.3, 0.65);
@@ -538,15 +538,15 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
   function villageSite(type: BuildingType, stage: number): Sprite {
     if (stage === 1 && game.ART.paintedStatus?.state === 'loaded' && game.ART.site)
       return game.ART.site;
-    var key = type + ':' + stage;
+    const key = type + ':' + stage;
     if (villageSites[key]) return villageSites[key];
-    var art = game.ART.bld[type],
+    const art = game.ART.bld[type],
       width = Math.min(28, Math.max(18, art.w * 0.7)),
       body = Math.min(24, Math.max(13, art.h * 0.4)),
       site: Sprite = { img: null, w: 40, h: 50, ox: -8, oy: -26 };
     site.img = villageCanvas(site.w, site.h, function (g) {
       g.translate(8, 26);
-      var left = 12 - width / 2,
+      const left = 12 - width / 2,
         right = 12 + width / 2,
         floor = 19,
         top = floor - body;
@@ -555,7 +555,7 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
       g.fillRect(left, floor - 2, width, 4);
       g.fillStyle = '#b6ae8d';
       g.fillRect(left, floor - 2, width, 1.2);
-      for (var stone = 0; stone < 6; stone++)
+      for (let stone = 0; stone < 6; stone++)
         villageLine(
           g,
           'rgba(73,65,48,0.47)',
@@ -569,21 +569,21 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
         villageLine(g, '#b8a477', 0.55, left, top + 6, right, top + 6);
         villageLine(g, '#b8a477', 0.55, left, top + 6, left, floor);
         villageLine(g, '#b8a477', 0.55, right, top + 6, right, floor);
-        for (var peg = 0; peg < 4; peg++) {
-          var px = peg % 2 ? right : left,
+        for (let peg = 0; peg < 4; peg++) {
+          const px = peg % 2 ? right : left,
             py = peg > 1 ? floor : top + 6;
           villageLine(g, '#88623b', 1, px, py + 1, px, py - 2);
         }
         return;
       }
       if (stage >= 2) {
-        var stoneWall = type === 'guard' || type === 'warehouse',
+        const stoneWall = type === 'guard' || type === 'warehouse',
           woodWall = type === 'lumberjack' || type === 'farm';
         g.fillStyle = stoneWall ? '#aea899' : woodWall ? '#aa8051' : '#d9c99a';
         g.fillRect(left + 1, top, width - 2, body - 1.5);
         g.fillStyle = 'rgba(64,51,33,0.15)';
         g.fillRect(right - 5, top, 4, body - 1.5);
-        for (var seam = 0; seam < 5; seam++)
+        for (let seam = 0; seam < 5; seam++)
           villageLine(
             g,
             'rgba(81,62,42,0.26)',
@@ -607,8 +607,8 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
       villageLine(g, '#89633e', 1.1, 12, top - 8, right + 1, top + 0.5);
       villageLine(g, '#b08b56', 0.9, 12, top - 8, 12, top);
       if (stage >= 2) {
-        for (var slat = 0; slat < 3; slat++) {
-          var ratio = (slat + 1) / 4;
+        for (let slat = 0; slat < 3; slat++) {
+          const ratio = (slat + 1) / 4;
           villageLine(
             g,
             '#af8654',
@@ -625,15 +625,15 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
     return site;
   }
   function drawVillageScaffold(g: CanvasRenderingContext2D, b: Building, progress: number): void {
-    var x = b.x * game.TS,
+    const x = b.x * game.TS,
       y = b.y * game.TS,
       level = progress >= 0.74 ? 3 : progress >= 0.44 ? 2 : 1,
       top = y + 8 - level * 4;
     // Side scaffolding leaves the centre door and road approach unobstructed.
     villageLine(g, '#87613d', 1, x + 2, y + 18, x + 2, top);
     villageLine(g, '#87613d', 1, x + 7, y + 18, x + 7, top);
-    for (var step = 0; step < level + 2; step++) {
-      var sy = y + 15 - step * 4;
+    for (let step = 0; step < level + 2; step++) {
+      const sy = y + 15 - step * 4;
       villageLine(g, '#c4a16c', 0.7, x + 2, sy, x + 7, sy);
     }
     villageLine(g, '#ad8456', 1.4, x + 1, top + 1, x + 8, top + 1);
@@ -645,7 +645,7 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
     progress: number,
   ): void {
     drawVillageYard(g, b);
-    var stage = villageConstructionStage(progress),
+    const stage = villageConstructionStage(progress),
       img = stage === 3 ? game.bldImg(b) : villageSite(b.type, stage);
     g.drawImage(img.img, b.x * game.TS + img.ox, b.y * game.TS + img.oy, img.w, img.h);
     if (stage > 0) drawVillageScaffold(g, b, progress);
@@ -658,11 +658,11 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
     now: number,
   ): void {
     if (game.z < 0.85 || game.state.paused || game.renderPrefs().reducedMotion) return;
-    var phase = (now / 1100 + b.id * 0.23) % 1;
+    const phase = (now / 1100 + b.id * 0.23) % 1;
     if (phase > 0.32) return;
-    var x = b.x * game.TS + 24,
-      y = b.y * game.TS + 16,
-      forge =
+    let x = b.x * game.TS + 24,
+      y = b.y * game.TS + 16;
+    const forge =
         work === 'craft' &&
         (b.type === 'toolsmith' ||
           b.type === 'armory' ||
@@ -686,8 +686,8 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
       x = b.x * game.TS + 17.3;
       y = b.y * game.TS + 10.5;
     }
-    for (var particle = 0; particle < 3; particle++) {
-      var travel = phase / 0.32,
+    for (let particle = 0; particle < 3; particle++) {
+      const travel = phase / 0.32,
         px = x + (particle - 1) * travel * 4,
         py = y - travel * (forge ? 6 : 3) + travel * travel * 7;
       g.fillStyle = forge

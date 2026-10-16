@@ -118,8 +118,8 @@ export function createRenderer(
   scenePresentation: RendererPresentation,
   internals?: RendererInternals,
 ): RendererSubsystem {
-  var presentation = scenePresentation;
-  var staticDirty = true;
+  const presentation = scenePresentation;
+  let staticDirty = true;
   function layer(name: LayerName, paint: () => void) {
     presentation.layer(name, ctx, paint);
   }
@@ -129,14 +129,14 @@ export function createRenderer(
   //   bcan  — quiet territory survey line
   //   per-frame — animated water, y-sorted buildings/trees/rocks/units, effects, ghost
 
-  var scan = game.Acan(game.W * game.TS * game.ST, game.H * game.TS * game.ST),
+  const scan = game.Acan(game.W * game.TS * game.ST, game.H * game.TS * game.ST),
     sctx = scan.getContext('2d', { willReadFrequently: true });
-  var bcan = game.Acan(game.W * game.TS, game.H * game.TS),
+  const bcan = game.Acan(game.W * game.TS, game.H * game.TS),
     bctx = bcan.getContext('2d', { willReadFrequently: true });
-  var borderDirty = true,
-    borderSegs: LineSeg[] = [];
-  var FXL: FXEffect[] = [];
-  var NOW = 0,
+  let borderDirty = true;
+  const borderSegs: LineSeg[] = [];
+  const FXL: FXEffect[] = [];
+  let NOW = 0,
     BAR_H = 44,
     terrainRevision = 0;
   function renderPrefs(): PresentationPreferences {
@@ -156,7 +156,7 @@ export function createRenderer(
   function motionTime(now: number): number {
     return renderPrefs().reducedMotion ? 0 : now;
   }
-  var renderStats = {
+  const renderStats = {
     samples: 0,
     drawMs: 0,
     frameMs: 0,
@@ -165,8 +165,8 @@ export function createRenderer(
     effects: 0,
     resolution: 1,
   };
-  var _frameSamples: number[] = [],
-    _sampleCursor = 0,
+  const _frameSamples: number[] = [];
+  let _sampleCursor = 0,
     _sampleTotal = 0,
     _perfRefresh = 0;
   function sampleRender(frameMs: number, drawMs: number) {
@@ -179,7 +179,7 @@ export function createRenderer(
       _sampleTotal = Math.min(120, _sampleTotal + 1);
     }
     if (NOW - _perfRefresh > 1000 && _sampleTotal) {
-      var sorted = _frameSamples.slice(0, _sampleTotal).sort(function (a, b) {
+      const sorted = _frameSamples.slice(0, _sampleTotal).sort(function (a, b) {
         return a - b;
       });
       renderStats.p95Ms = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))];
@@ -204,7 +204,7 @@ export function createRenderer(
   // Static scenery is clipped to its tile. Neighbour-aware contours and world-space
   // marks meet at tile edges, so an isolated harvest or road redraw cannot leave a seam.
   function paintTileFull(g: CanvasRenderingContext2D, i: number) {
-    var x = i % game.W,
+    const x = i % game.W,
       y = (i / game.W) | 0,
       tl = game.tiles[i],
       TSS = game.TS * game.ST,
@@ -226,7 +226,7 @@ export function createRenderer(
     if (macroCan) paintMacroTile(g, i);
     miniDirty = true;
     // Both painters clip to the tile, so the upload can be limited to its rect.
-    var tss = game.TS * game.ST;
+    const tss = game.TS * game.ST;
     presentation?.invalidate(g.canvas, {
       x: (i % game.W) * tss,
       y: ((i / game.W) | 0) * tss,
@@ -234,19 +234,19 @@ export function createRenderer(
       height: tss,
     });
   }
-  var macroCan: HTMLCanvasElement | null = null;
+  let macroCan: HTMLCanvasElement | null = null;
   function buildMacro() {
     macroCan = game.Acan(game.W, game.H);
-    var g = macroCan.getContext('2d'),
+    const g = macroCan.getContext('2d'),
       n1 = game.fbm(game.seed + 777),
       n2 = game.fbm(game.seed + 555),
       img = g.createImageData(game.W, game.H);
-    for (var y = 0; y < game.H; y++)
-      for (var x = 0; x < game.W; x++) {
-        var v = n1(x / game.W, y / game.W),
+    for (let y = 0; y < game.H; y++)
+      for (let x = 0; x < game.W; x++) {
+        const v = n1(x / game.W, y / game.W),
           v2 = n2(x / game.W + 3, y / game.W + 3),
-          o = (y * game.W + x) * 4,
-          a = 0;
+          o = (y * game.W + x) * 4;
+        let a = 0;
         if (v > 0.56) {
           a = Math.min(0.13, (v - 0.56) * 0.8);
           img.data[o] = 235;
@@ -259,7 +259,7 @@ export function createRenderer(
           img.data[o + 2] = 44;
         }
         if (v2 > 0.62) {
-          var a2 = Math.min(0.08, (v2 - 0.62) * 0.7);
+          const a2 = Math.min(0.08, (v2 - 0.62) * 0.7);
           if (a2 > a) {
             a = a2;
             img.data[o] = 255;
@@ -274,7 +274,7 @@ export function createRenderer(
   function paintMacroTile(g: CanvasRenderingContext2D, i: number) {
     // Include surrounding source pixels in the resampling footprint. Enlarging only
     // the centre pixel changes a smooth wash into a conspicuous flat square.
-    var x = i % game.W,
+    const x = i % game.W,
       y = (i / game.W) | 0,
       size = game.TS * game.ST;
     g.save();
@@ -286,21 +286,21 @@ export function createRenderer(
     g.restore();
   }
   function drawBorders() {
-    var g = bctx;
+    const g = bctx;
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, game.W * game.TS, game.H * game.TS);
     borderSegs.length = 0;
-    for (var y2 = 0; y2 < game.H; y2++)
-      for (var x2 = 0; x2 < game.W; x2++) {
-        var i2 = game.idx(x2, y2);
+    for (let y2 = 0; y2 < game.H; y2++)
+      for (let x2 = 0; x2 < game.W; x2++) {
+        const i2 = game.idx(x2, y2);
         if (!game.owned[i2]) continue;
-        var px = x2 * game.TS,
+        const px = x2 * game.TS,
           py = y2 * game.TS;
-        for (var d2 = 0; d2 < 4; d2++) {
-          var nx2 = x2 + game.DX[d2],
+        for (let d2 = 0; d2 < 4; d2++) {
+          const nx2 = x2 + game.DX[d2],
             ny2 = y2 + game.DY[d2];
           if (game.inB(nx2, ny2) && game.owned[game.idx(nx2, ny2)]) continue;
-          var s2: LineSeg;
+          let s2: LineSeg;
           if (d2 === 0) s2 = [px + game.TS, py, px + game.TS, py + game.TS];
           else if (d2 === 1) s2 = [px, py, px, py + game.TS];
           else if (d2 === 2) s2 = [px, py + game.TS, px + game.TS, py + game.TS];
@@ -313,8 +313,8 @@ export function createRenderer(
       g.strokeStyle = col;
       g.lineWidth = w2;
       g.beginPath();
-      for (var i = 0; i < borderSegs.length; i++) {
-        var s3 = borderSegs[i];
+      for (let i = 0; i < borderSegs.length; i++) {
+        const s3 = borderSegs[i];
         g.moveTo(s3[0], s3[1]);
         g.lineTo(s3[2], s3[3]);
       }
@@ -332,8 +332,8 @@ export function createRenderer(
     terrainRevision++;
     sctx.setTransform(1, 0, 0, 1, 0, 0);
     sctx.imageSmoothingEnabled = true;
-    for (var y = 0; y < game.H; y++)
-      for (var x = 0; x < game.W; x++) paintTileFull(sctx, game.idx(x, y));
+    for (let y = 0; y < game.H; y++)
+      for (let x = 0; x < game.W; x++) paintTileFull(sctx, game.idx(x, y));
     if (!macroCan) buildMacro();
     sctx.imageSmoothingEnabled = true;
     sctx.drawImage(macroCan, 0, 0, game.W * game.TS * game.ST, game.H * game.TS * game.ST);
@@ -343,30 +343,30 @@ export function createRenderer(
   }
 
   // ---------- camera ----------
-  var view = document.getElementById('view') as HTMLCanvasElement,
+  const view = document.getElementById('view') as HTMLCanvasElement,
     ctx = game.Acan(1, 1).getContext('2d');
-  var mini = document.getElementById('mini') as HTMLCanvasElement,
+  const mini = document.getElementById('mini') as HTMLCanvasElement,
     mctx = mini.getContext('2d');
-  var dpr = window.devicePixelRatio || 1,
-    z = 1,
-    zooms = [0.55, 0.7, 0.85, 1, 1.3, 1.7, 2.2],
-    zi = 3;
-  var cam = { x: 0, y: 0 },
+  let dpr = window.devicePixelRatio || 1,
+    z = 1;
+  const zooms = [0.55, 0.7, 0.85, 1, 1.3, 1.7, 2.2];
+  let zi = 3;
+  let cam = { x: 0, y: 0 },
     vw = 0,
-    vh = 0,
-    mouse = { x: 0, y: 0 },
-    ht = { x: 0, y: 0 },
+    vh = 0;
+  const mouse = { x: 0, y: 0 };
+  let ht = { x: 0, y: 0 },
     hoverIn = false,
     mouseSeen = false;
-  var bgGrad: CanvasGradient | null = null;
+  let bgGrad: CanvasGradient | null = null;
   function resize() {
-    var centerX = cam.x + vw / z / 2,
+    const centerX = cam.x + vw / z / 2,
       centerY = cam.y + vh / z / 2,
       hadViewport = vw > 0 && vh > 0;
-    var bar = document.getElementById('bar'),
+    const bar = document.getElementById('bar'),
       prefs = renderPrefs();
     BAR_H = bar ? Math.ceil(bar.getBoundingClientRect().height) : 44;
-    var main = document.getElementById('main');
+    const main = document.getElementById('main');
     if (main) main.style.top = '0px';
     document.body.style.setProperty?.('--bar-height', BAR_H + 'px');
     dpr = Math.min(2, window.devicePixelRatio || 1) * (prefs.quality || 1);
@@ -391,7 +391,7 @@ export function createRenderer(
     clampCam();
   }
   function clampCam() {
-    var mx = game.W * game.TS - vw / z,
+    const mx = game.W * game.TS - vw / z,
       my = game.H * game.TS - vh / z;
     cam.x = Math.max(0, Math.min(mx, cam.x));
     cam.y = Math.max(0, Math.min(my, cam.y));
@@ -401,13 +401,13 @@ export function createRenderer(
   function screenToWorld(mx: number, my: number): TilePoint {
     return { x: cam.x + mx / z, y: cam.y + my / z };
   }
-  var zoomAnim: ZoomAnim | null = null;
+  let zoomAnim: ZoomAnim | null = null;
   function zoomAt(nzi: number, ax?: number, ay?: number) {
     ax = ax === undefined || ax === null ? vw / 2 : ax;
     ay = ay === undefined || ay === null ? vh / 2 : ay;
-    var w = screenToWorld(ax, ay);
+    const w = screenToWorld(ax, ay);
     zi = Math.max(0, Math.min(zooms.length - 1, nzi));
-    var nz = zooms[zi];
+    const nz = zooms[zi];
     if (game.TESTMODE || renderPrefs().reducedMotion) {
       z = nz;
       cam.x = w.x - ax / nz;
@@ -415,7 +415,7 @@ export function createRenderer(
       clampCam();
     } else
       zoomAnim = { t0: performance.now(), d: 150, fz: z, tz: nz, ax: ax, ay: ay, wx: w.x, wy: w.y };
-    var w2 = screenToWorld(mouse.x, mouse.y);
+    const w2 = screenToWorld(mouse.x, mouse.y);
     ht.x = Math.floor(w2.x / game.TS);
     ht.y = Math.floor(w2.y / game.TS);
     hoverIn = game.inB(ht.x, ht.y);
@@ -424,7 +424,7 @@ export function createRenderer(
   function stepZoom(now: number) {
     // eased zoom around the anchor point; cancels cleanly (zoomAnim=null)
     if (!zoomAnim) return;
-    var za = zoomAnim,
+    const za = zoomAnim,
       p = (now - za.t0) / za.d;
     if (p >= 1) {
       z = za.tz;
@@ -435,15 +435,15 @@ export function createRenderer(
     clampCam();
   }
   function miniClick(e: MouseEvent) {
-    var r = mini.getBoundingClientRect();
-    var fx2 = (e.clientX - r.left) / r.width,
+    const r = mini.getBoundingClientRect();
+    const fx2 = (e.clientX - r.left) / r.width,
       fy2 = (e.clientY - r.top) / r.height;
     zoomAnim = null;
     cam.x = fx2 * game.W * game.TS - vw / z / 2;
     cam.y = fy2 * game.H * game.TS - vh / z / 2;
     clampCam();
   }
-  var keys = { l: false, r: false, u: false, d: false };
+  const keys = { l: false, r: false, u: false, d: false };
 
   // ---------- objects ----------
   function bldImg(b: Building): Sprite {
@@ -453,10 +453,10 @@ export function createRenderer(
   }
   // Two small, reusable artwork variants per source. Only the alpha contour is
   // extended; the original pixels, entrance anchor and gameplay footprint stay put.
-  var buildingContours = new WeakMap<HTMLCanvasElement, HTMLCanvasElement[]>();
+  const buildingContours = new WeakMap<HTMLCanvasElement, HTMLCanvasElement[]>();
   function buildingContour(img: Sprite) {
-    var variants = buildingContours.get(img.img),
-      clarity = renderPrefs().clarity ? 1 : 0,
+    let variants = buildingContours.get(img.img);
+    const clarity = renderPrefs().clarity ? 1 : 0,
       pad = 3,
       scale = 2;
     if (!variants) {
@@ -464,7 +464,7 @@ export function createRenderer(
       buildingContours.set(img.img, variants);
     }
     if (variants[clarity]) return variants[clarity];
-    var mask = game.Acan((img.w + pad * 2) * scale, (img.h + pad * 2) * scale),
+    const mask = game.Acan((img.w + pad * 2) * scale, (img.h + pad * 2) * scale),
       mg = mask.getContext('2d'),
       canvas = game.Acan(mask.width, mask.height),
       cg = canvas.getContext('2d');
@@ -472,10 +472,10 @@ export function createRenderer(
     mg.globalCompositeOperation = 'source-in';
     mg.fillStyle = clarity ? '#f1e4b9' : '#233b2c';
     mg.fillRect(0, 0, mask.width, mask.height);
-    var radius = (clarity ? 1.5 : 0.65) * scale;
+    const radius = (clarity ? 1.5 : 0.65) * scale;
     cg.globalAlpha = clarity ? 0.95 : 0.7;
-    for (var d = 0; d < 8; d++) {
-      var angle = (d * Math.PI) / 4;
+    for (let d = 0; d < 8; d++) {
+      const angle = (d * Math.PI) / 4;
       cg.drawImage(mask, Math.cos(angle) * radius, Math.sin(angle) * radius);
     }
     cg.globalAlpha = 1;
@@ -484,7 +484,7 @@ export function createRenderer(
     return canvas;
   }
   function drawSprite(g: CanvasRenderingContext2D, type: BuildingType, cx: number, cy: number) {
-    var img = game.ART.bld[type];
+    const img = game.ART.bld[type];
     if (!img) return;
     g.drawImage(img.img, cx - 12 + img.ox, cy - 12 + img.oy, img.w, img.h);
   }
@@ -495,10 +495,10 @@ export function createRenderer(
     cy: number,
     size: number,
   ) {
-    var img = game.ART.bld[type] || game.ART.site;
+    const img = game.ART.bld[type] || game.ART.site;
     size = size || 30;
-    var s = Math.min(size / img.w, size / img.h);
-    var dw = img.w * s,
+    const s = Math.min(size / img.w, size / img.h);
+    const dw = img.w * s,
       dh = img.h * s;
     g.drawImage(img.img, cx - dw / 2, cy - dh / 2, dw, dh);
   }
@@ -521,7 +521,7 @@ export function createRenderer(
     g.beginPath();
     g.arc(ax, ay - 0.8, 1, 0, 7);
     g.fill();
-    var fw = Math.sin(now / 240 + ph) * 1.8,
+    const fw = Math.sin(now / 240 + ph) * 1.8,
       fw2 = Math.sin(now / 240 + ph + 1.2) * 1.2;
     g.fillStyle = col;
     g.beginPath();
@@ -551,10 +551,10 @@ export function createRenderer(
   }
   function drawSmoke(g: CanvasRenderingContext2D, x: number, y: number, now: number, sd: number) {
     if (renderPrefs().clarity || renderPrefs().reducedMotion || game.state.paused) return;
-    var count = renderPrefs().quality < 1 ? 3 : 5;
-    for (var k = 0; k < count; k++) {
-      var ph = (now / 2200 + (sd % 7) * 0.13 + k / count) % 1;
-      var r = 0.9 + ph * 3.4,
+    const count = renderPrefs().quality < 1 ? 3 : 5;
+    for (let k = 0; k < count; k++) {
+      const ph = (now / 2200 + (sd % 7) * 0.13 + k / count) % 1;
+      const r = 0.9 + ph * 3.4,
         a = 0.19 * Math.sin(Math.PI * ph);
       // Warm translucent smoke catches sunlight, then disperses downwind.
       g.fillStyle = 'rgba(235,220,189,' + a.toFixed(3) + ')';
@@ -564,14 +564,14 @@ export function createRenderer(
     }
   }
   function drawBadge(g: CanvasRenderingContext2D, cx: number, cy: number) {
-    var pulse = renderPrefs().reducedMotion ? 1 : 1 + Math.sin(NOW / 420 + cx * 0.3) * 0.035;
+    const pulse = renderPrefs().reducedMotion ? 1 : 1 + Math.sin(NOW / 420 + cx * 0.3) * 0.035;
     g.save();
     g.translate(cx, cy);
     g.scale(pulse, pulse);
     g.fillStyle = 'rgba(0,0,0,0.35)';
     game.rr(g, -5, -4, 12.6, 12.6, 3.4);
     g.fill();
-    var gr = g.createLinearGradient(0, -5.5, 0, 5.5);
+    const gr = g.createLinearGradient(0, -5.5, 0, 5.5);
     gr.addColorStop(0, '#ef5a4a');
     gr.addColorStop(1, '#a02525');
     g.fillStyle = gr;
@@ -589,11 +589,11 @@ export function createRenderer(
     g.restore();
   }
   function buildingActive(b: Building): boolean {
-    var sp = game.BSPEC[b.type];
+    const sp = game.BSPEC[b.type];
     if (!b.done || b.exhausted || b.disabled || b.blockedReason) return false;
     if (!sp.prod || sp.prod === 'none' || sp.store || sp.guard) return false;
     if (sp.prod === 'craft' || sp.prod === 'mine') {
-      for (var g2 in sp.in) if ((b.stock[g2 as Good] | 0) < sp.in[g2 as Good]) return false;
+      for (const g2 in sp.in) if ((b.stock[g2 as Good] | 0) < sp.in[g2 as Good]) return false;
     }
     if (sp.out && (b.stock[sp.out] | 0) >= 8) return false;
     if (sp.out && ['food', 'bread', 'meat', 'fish'].includes(sp.out) && game.foodSaturated(sp.out))
@@ -616,15 +616,15 @@ export function createRenderer(
     g.scale(1.06, 1.06);
     g.translate(-b.x * game.TS - 12, -b.y * game.TS - 22);
     try {
-      var now = game.villageWorkTime(b);
+      const now = game.villageWorkTime(b);
       if (!b.done) {
-        var p = Math.min(1, Math.max(0, b.prog));
+        const p = Math.min(1, Math.max(0, b.prog));
         game.drawVillageConstruction(g, b, p);
-        var bw = game.TS - 16;
+        const bw = game.TS - 16;
         g.fillStyle = 'rgba(0,0,0,0.55)';
         game.rr(g, b.x * game.TS + 8, b.y * game.TS + game.TS - 5, bw, 3.4, 1.6);
         g.fill();
-        var pgr = g.createLinearGradient(b.x * game.TS + 8, 0, b.x * game.TS + 8 + bw, 0);
+        const pgr = g.createLinearGradient(b.x * game.TS + 8, 0, b.x * game.TS + 8 + bw, 0);
         pgr.addColorStop(0, '#ffe08a');
         pgr.addColorStop(1, '#e8a53c');
         g.fillStyle = pgr;
@@ -636,14 +636,14 @@ export function createRenderer(
         if (p > 0 && game.siteReady(b)) drawWorker(g, b, now, 'build');
         return;
       }
-      var img2 = bldImg(b),
+      const img2 = bldImg(b),
         sp = game.BSPEC[b.type];
       game.drawVillageYard(g, b);
       // Shared restrained contact shade also grounds installed painted packs.
       // Keep it at the established south threshold, below the sprite/details.
       g.save();
       g.globalAlpha *= renderPrefs().clarity ? 0.28 : 0.5;
-      var contactWidth = Math.min(38, img2.w * 0.78);
+      const contactWidth = Math.min(38, img2.w * 0.78);
       g.drawImage(
         game.ART.shadowSoft,
         b.x * game.TS + 12 - contactWidth / 2,
@@ -660,10 +660,10 @@ export function createRenderer(
         img2.h + 6,
       );
       game.drawVillageDetails(g, b);
-      var active = buildingActive(b);
-      var anc = game.ART.anchors[b.type];
+      const active = buildingActive(b);
+      const anc = game.ART.anchors[b.type];
       if (active && anc && anc.blade) {
-        var an = anc.blade;
+        const an = anc.blade;
         g.save();
         g.translate(b.x * game.TS + an.x, b.y * game.TS + an.y);
         g.rotate((now / 130) % (Math.PI * 2));
@@ -671,7 +671,7 @@ export function createRenderer(
         g.restore();
       }
       if (active && anc && anc.bob) {
-        var bo = anc.bob,
+        const bo = anc.bob,
           bb = b.y * game.TS + bo.y + Math.sin(now / 700 + b.id) * 1.2;
         g.fillStyle = '#e05555';
         g.beginPath();
@@ -695,7 +695,7 @@ export function createRenderer(
         else if (b.type === 'guard')
           drawFlag(g, b.x * game.TS + anc.flag.x, b.y * game.TS + anc.flag.y, '#8f8f8f', now, b.id);
         if (anc.chim && active)
-          for (var ci = 0; ci < anc.chim.length; ci++)
+          for (let ci = 0; ci < anc.chim.length; ci++)
             drawSmoke(
               g,
               b.x * game.TS + anc.chim[ci].x,
@@ -706,9 +706,9 @@ export function createRenderer(
       }
       if (game.bStatus(b).bad) drawBadge(g, b.x * game.TS + game.TS - 5, b.y * game.TS + 5);
       if (active) drawWorker(g, b, now, sp.prod);
-      var pulse = workPulses[b.id];
+      const pulse = workPulses[b.id];
       if (pulse && NOW - pulse.t < 600 && !renderPrefs().reducedMotion) {
-        var fade = 1 - (NOW - pulse.t) / 600;
+        const fade = 1 - (NOW - pulse.t) / 600;
         g.globalAlpha = fade;
         chip(g, b.x * game.TS + 26, b.y * game.TS + 12 - fade * 5, game.GOODS[pulse.good].c);
         g.globalAlpha = 1;
@@ -729,8 +729,8 @@ export function createRenderer(
     work: BuildingSpec['prod'] | 'build',
   ) {
     if (z < 0.7) return;
-    var anim = renderPrefs().reducedMotion ? 0 : Math.sin(now / 420 + b.id * 1.7);
-    var x = b.x * game.TS + 25,
+    const anim = renderPrefs().reducedMotion ? 0 : Math.sin(now / 420 + b.id * 1.7);
+    let x = b.x * game.TS + 25,
       y = b.y * game.TS + 18;
     if (work === 'fish') {
       x = b.x * game.TS + 27;
@@ -774,8 +774,8 @@ export function createRenderer(
     g.beginPath();
     g.ellipse(x, y - 9.7, 2.4, 0.7, 0, 0, 7);
     g.fill();
-    var hammer = work === 'gather' || work === 'rock' || work === 'build' || work === 'craft';
-    var arm = hammer ? anim * 2.2 : anim * 0.8;
+    const hammer = work === 'gather' || work === 'rock' || work === 'build' || work === 'craft';
+    const arm = hammer ? anim * 2.2 : anim * 0.8;
     g.strokeStyle = '#d6b38e';
     g.lineWidth = 1.1;
     g.beginPath();
@@ -806,7 +806,7 @@ export function createRenderer(
       g.lineTo(x + 5, y + 1);
       g.stroke();
     } else if (work === 'mine') {
-      var cx = x - 3 + anim * 0.9;
+      const cx = x - 3 + anim * 0.9;
       g.fillStyle = '#6f6a61';
       g.fillRect(cx, y - 3.2, 6, 2.8);
       g.fillStyle = game.GOODS[game.BSPEC[b.type].out].c;
@@ -820,11 +820,11 @@ export function createRenderer(
     game.drawVillageWorkEffects(g, b, work, now);
     if (work === 'fish' && !game.state.paused && !renderPrefs().reducedMotion) {
       // Cast-line rings only where there really is water beside this fishery.
-      for (var side = 0; side < 4; side++) {
-        var wx = b.x + game.DX[side],
+      for (let side = 0; side < 4; side++) {
+        const wx = b.x + game.DX[side],
           wy = b.y + game.DY[side];
         if (!game.inB(wx, wy) || game.tiles[game.idx(wx, wy)].t !== game.WATER) continue;
-        var wave = (now / 1800 + b.id * 0.17) % 1;
+        const wave = (now / 1800 + b.id * 0.17) % 1;
         g.strokeStyle = 'rgba(240,232,191,' + (0.24 * Math.sin(wave * Math.PI)).toFixed(3) + ')';
         g.lineWidth = 0.55;
         g.beginPath();
@@ -843,13 +843,13 @@ export function createRenderer(
     }
   }
   function drawTree(g: CanvasRenderingContext2D, x: number, y: number, tl: Tile, now: number) {
-    var h = tileHash(game.idx(x, y)),
+    const h = tileHash(game.idx(x, y)),
       v = h % 3,
       sw = renderPrefs().reducedMotion ? 0 : ((now / 2400 + h * 0.61) | 0) % 2;
-    var spr = game.ART.tree[tl.tree - 1][v][sw];
-    var jx = ((h >> 2) % 7) - 3,
+    const spr = game.ART.tree[tl.tree - 1][v][sw];
+    const jx = ((h >> 2) % 7) - 3,
       jy = ((h >> 5) % 5) - 2;
-    var scale = 0.87 + ((h >> 3) % 15) / 100,
+    const scale = 0.87 + ((h >> 3) % 15) / 100,
       tw = 38 * scale,
       th = 46 * scale;
     g.save();
@@ -867,10 +867,10 @@ export function createRenderer(
     g.restore();
   }
   function drawRock(g: CanvasRenderingContext2D, x: number, y: number) {
-    var h = tileHash(game.idx(x, y));
+    const h = tileHash(game.idx(x, y));
     if (z < 0.75) {
       // LOD: scattered pebbles at far zoom
-      var rx2 = ((h >> 2) % 13) - 6,
+      const rx2 = ((h >> 2) % 13) - 6,
         ry2 = ((h >> 5) % 11) - 5;
       g.fillStyle = 'rgba(148,143,128,0.9)';
       g.beginPath();
@@ -892,17 +892,17 @@ export function createRenderer(
     );
     g.globalAlpha = 1;
   }
-  var unitPoses: Record<string, UnitPose> = {};
+  let unitPoses: Record<string, UnitPose> = {};
   function unitDirection(dx: number, dy: number): string {
-    var octant = (Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8;
+    const octant = (Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8;
     return ['e', 'se', 's', 'sw', 'w', 'nw', 'n', 'ne'][octant];
   }
   function drawUnit(g: CanvasRenderingContext2D, u: Unit, now: number) {
-    var px = u.x * game.TS,
+    const px = u.x * game.TS,
       py = u.y * game.TS;
-    var pose = unitPoses[u.id];
+    let pose = unitPoses[u.id];
     if (!pose) pose = unitPoses[u.id] = { x: u.x, y: u.y, distance: 0, dir: 's' };
-    var dx = u.x - pose.x,
+    const dx = u.x - pose.x,
       dy = u.y - pose.y,
       travel = Math.hypot(dx, dy);
     if (travel < 4) pose.distance += travel;
@@ -910,13 +910,13 @@ export function createRenderer(
     pose.y = u.y;
     // A zero component is an authoritative horizontal/vertical heading. Falling
     // back to displacement there can turn a walker back toward an earlier segment.
-    var fx = Number.isFinite(u.faceDX) ? u.faceDX : dx,
+    const fx = Number.isFinite(u.faceDX) ? u.faceDX : dx,
       fy = Number.isFinite(u.faceDY) ? u.faceDY : dy;
     if (Math.abs(fx) + Math.abs(fy) > 0.001) pose.dir = unitDirection(fx, fy);
     g.drawImage(game.ART.shadowSoft, px - 9, py - 2, 18, 9);
-    var distance = u.walkDistance === undefined ? pose.distance : u.walkDistance;
-    var moving = !game.state.paused && u.path && u.pi < u.path.length;
-    var dustStep = Math.floor(distance * 2);
+    const distance = u.walkDistance === undefined ? pose.distance : u.walkDistance;
+    const moving = !game.state.paused && u.path && u.pi < u.path.length;
+    const dustStep = Math.floor(distance * 2);
     if (pose.dustStep === undefined) pose.dustStep = dustStep;
     if (
       moving &&
@@ -927,15 +927,15 @@ export function createRenderer(
       dustStep !== pose.dustStep &&
       (renderPrefs().quality >= 1 || dustStep % 2 === 0)
     ) {
-      var groundX = Math.floor(u.x),
+      const groundX = Math.floor(u.x),
         groundY = Math.floor(u.y);
       if (game.inB(groundX, groundY) && game.tiles[game.idx(groundX, groundY)].t !== game.WATER)
         pushFX({ k: 'stepDust', x: u.x, y: u.y, t: now, i: u.id });
     }
     pose.dustStep = dustStep;
-    var dirset = game.ART.unitDirections[u.kind][pose.dir],
+    const dirset = game.ART.unitDirections[u.kind][pose.dir],
       fr = Math.floor(distance * 4) % dirset.walk.length;
-    var spr = moving && !renderPrefs().reducedMotion ? dirset.walk[fr] : dirset.idle;
+    const spr = moving && !renderPrefs().reducedMotion ? dirset.walk[fr] : dirset.idle;
     g.save();
     g.translate(
       px,
@@ -947,12 +947,12 @@ export function createRenderer(
     );
     g.drawImage(spr, -7.5, -18, 15, 19);
     if (u.carry && game.ART.cargo && game.ART.cargo[u.carry]) {
-      var rightFacing = pose.dir === 'e' || pose.dir === 'ne' || pose.dir === 'se';
-      var cargoX = rightFacing ? 0.4 : -9.2;
+      const rightFacing = pose.dir === 'e' || pose.dir === 'ne' || pose.dir === 'se';
+      let cargoX = rightFacing ? 0.4 : -9.2;
       if (pose.dir === 'n' || pose.dir === 's') cargoX = -5;
       g.drawImage(game.ART.cargo[u.carry], cargoX, -14, 10, 7.5);
     } else if (u.carry) {
-      var c = game.GOODS[u.carry].c;
+      const c = game.GOODS[u.carry].c;
       g.fillStyle = 'rgba(0,0,0,0.28)';
       game.rr(g, -7.4, -15.4, 7.6, 5, 1);
       g.fill();
@@ -968,10 +968,10 @@ export function createRenderer(
     }
     g.restore();
   }
-  var objPool: SortEntry[] = [],
-    objN = 0; // reused y-sort entries — no per-frame object churn
+  const objPool: SortEntry[] = [];
+  let objN = 0; // reused y-sort entries — no per-frame object churn
   function objGet(): SortEntry {
-    var o;
+    let o;
     if (objN < objPool.length) o = objPool[objN++];
     else {
       o = { k: 0, t: 0, x: 0, y: 0, tl: null, o: null };
@@ -982,41 +982,41 @@ export function createRenderer(
   }
   function drawObjects(g: CanvasRenderingContext2D, now: number) {
     objN = 0;
-    var vx0 = Math.max(0, Math.floor(cam.x / game.TS) - 1),
+    const vx0 = Math.max(0, Math.floor(cam.x / game.TS) - 1),
       vx1 = Math.min(game.W - 1, Math.ceil((cam.x + vw / z) / game.TS) + 1);
-    var vy0 = Math.max(0, Math.floor(cam.y / game.TS) - 1),
+    const vy0 = Math.max(0, Math.floor(cam.y / game.TS) - 1),
       vy1 = Math.min(game.H - 1, Math.ceil((cam.y + vh / z) / game.TS) + 1);
-    for (var wy = vy0; wy <= vy1; wy++)
-      for (var wx = vx0; wx <= vx1; wx++) {
-        var wi = game.idx(wx, wy),
+    for (let wy = vy0; wy <= vy1; wy++)
+      for (let wx = vx0; wx <= vx1; wx++) {
+        const wi = game.idx(wx, wy),
           tl = game.tiles[wi];
         if (tl.tree) {
-          var ot = objGet();
+          const ot = objGet();
           ot.k = wy * game.TS + 19;
           ot.t = 1;
           ot.x = wx;
           ot.y = wy;
           ot.tl = tl;
         } else if (tl.rock) {
-          var or2 = objGet();
+          const or2 = objGet();
           or2.k = wy * game.TS + 21;
           or2.t = 2;
           or2.x = wx;
           or2.y = wy;
         }
       }
-    for (var bi = 0; bi < game.buildings.length; bi++) {
-      var b = game.buildings[bi];
+    for (let bi = 0; bi < game.buildings.length; bi++) {
+      const b = game.buildings[bi];
       if (b.x < vx0 - 1 || b.x > vx1 + 1 || b.y < vy0 - 1 || b.y > vy1 + 1) continue;
-      var ob = objGet();
+      const ob = objGet();
       ob.k = b.y * game.TS + 22;
       ob.t = 0;
       ob.o = b;
     }
-    for (var ui2 = 0; ui2 < game.units.length; ui2++) {
-      var u = game.units[ui2];
+    for (let ui2 = 0; ui2 < game.units.length; ui2++) {
+      const u = game.units[ui2];
       if (u.x < vx0 - 1 || u.x > vx1 + 1 || u.y < vy0 - 1 || u.y > vy1 + 1) continue;
-      var ou = objGet();
+      const ou = objGet();
       ou.k = u.y * game.TS + 3;
       ou.t = 3;
       ou.o = u;
@@ -1029,8 +1029,8 @@ export function createRenderer(
     // the context interception per object. beginPath isolates path state between
     // painters, matching the per-capture reset they previously relied on.
     presentation.layer('objects', g, function () {
-      for (var i = 0; i < objPool.length; i++) {
-        var q = objPool[i];
+      for (let i = 0; i < objPool.length; i++) {
+        const q = objPool[i];
         g.beginPath();
         if (q.t === 0) drawBuilding(g, q.o as Building);
         else if (q.t === 1) drawTree(g, q.x, q.y, q.tl, now);
@@ -1041,11 +1041,11 @@ export function createRenderer(
   }
 
   function atmosphereHash(x: number, y: number, salt: number): number {
-    var value = Math.imul(x + salt * 173, 374761393) ^ Math.imul(y + (game.seed || 0), 668265263);
+    let value = Math.imul(x + salt * 173, 374761393) ^ Math.imul(y + (game.seed || 0), 668265263);
     value = Math.imul(value ^ (value >>> 13), 1274126177);
     return (value ^ (value >>> 16)) >>> 0;
   }
-  var atmosphereCount = 0;
+  let atmosphereCount = 0;
   function meadowParticles(g: CanvasRenderingContext2D, now: number) {
     atmosphereCount = 0;
     if (
@@ -1057,25 +1057,25 @@ export function createRenderer(
       return;
     // Sparse fixed world cells prevent camera panning from dragging particles along.
     // The maximum remains bounded even at the widest zoom and on a large monitor.
-    var cell = game.TS * 7,
-      count = 0,
-      butterflies = 0,
-      limit = renderPrefs().quality < 1 ? 20 : 56,
+    const cell = game.TS * 7;
+    let count = 0,
+      butterflies = 0;
+    const limit = renderPrefs().quality < 1 ? 20 : 56,
       time = game.state.paused ? 0 : now / 1000,
       x0 = Math.max(0, Math.floor((cam.x - 30) / cell)),
       x1 = Math.min(Math.floor((game.W * game.TS) / cell), Math.ceil((cam.x + vw / z + 30) / cell)),
       y0 = Math.max(0, Math.floor((cam.y - 30) / cell)),
       y1 = Math.min(Math.floor((game.H * game.TS) / cell), Math.ceil((cam.y + vh / z + 30) / cell));
-    for (var cy = y0; cy <= y1 && count < limit; cy++)
-      for (var cx = x0; cx <= x1 && count < limit; cx++) {
-        var hash = atmosphereHash(cx, cy, 23),
+    for (let cy = y0; cy <= y1 && count < limit; cy++)
+      for (let cx = x0; cx <= x1 && count < limit; cx++) {
+        const hash = atmosphereHash(cx, cy, 23),
           bx = cx * cell + (hash % (cell - 32)) + 16,
           by = cy * cell + ((hash >>> 9) % (cell - 32)) + 16,
           tx = Math.floor(bx / game.TS),
           ty = Math.floor(by / game.TS);
         if (!game.inB(tx, ty) || game.tiles[game.idx(tx, ty)].t !== game.GRASS) continue;
-        for (var mote = 0; mote < (renderPrefs().quality < 1 ? 1 : 2) && count < limit; mote++) {
-          var phase = (time / (9 + (hash % 7)) + (hash % 1000) / 1000 + mote * 0.5) % 1,
+        for (let mote = 0; mote < (renderPrefs().quality < 1 ? 1 : 2) && count < limit; mote++) {
+          const phase = (time / (9 + (hash % 7)) + (hash % 1000) / 1000 + mote * 0.5) % 1,
             px = bx + phase * 24 + Math.sin(time * 0.42 + hash + mote) * 5,
             py = by - phase * 13 + Math.sin(time * 0.3 + hash * 0.1) * 4;
           if (
@@ -1092,9 +1092,9 @@ export function createRenderer(
           g.fill();
         }
         if (renderPrefs().quality < 1 || z < 0.85 || hash % 4 || butterflies >= 3) continue;
-        var tile = game.tiles[game.idx(tx, ty)];
+        const tile = game.tiles[game.idx(tx, ty)];
         if (tile.tree || tile.road || tile.rock) continue;
-        var flutterX = bx + Math.sin(time * 0.3 + hash) * 12,
+        const flutterX = bx + Math.sin(time * 0.3 + hash) * 12,
           flutterY = by - 8 + Math.cos(time * 0.24 + hash) * 7;
         if (
           flutterX < cam.x ||
@@ -1104,7 +1104,7 @@ export function createRenderer(
         )
           continue;
         butterflies++;
-        var wing = 0.5 + Math.abs(Math.sin(time * 8 + hash)) * 1.6;
+        const wing = 0.5 + Math.abs(Math.sin(time * 8 + hash)) * 1.6;
         g.fillStyle = hash % 3 ? '#f4cf76' : '#e1dfc2';
         g.beginPath();
         g.ellipse(flutterX - wing * 0.6, flutterY, wing, 1.35, -0.4, 0, 7);
@@ -1120,7 +1120,7 @@ export function createRenderer(
   function pushFX(effect: FXEffect) {
     if (renderPrefs().clarity || renderPrefs().reducedMotion) return;
     // Bursts remain bounded at 8x speed and during a large wave of deliveries.
-    var limit = renderPrefs().quality < 1 ? 48 : 120;
+    const limit = renderPrefs().quality < 1 ? 48 : 120;
     while (FXL.length >= limit) FXL.shift();
     effect.i =
       effect.i === undefined
@@ -1128,11 +1128,11 @@ export function createRenderer(
         : effect.i;
     FXL.push(effect);
   }
-  var FX = {
+  const FX = {
     coin: function (x: number, y: number) {
-      var first = game.state.gold <= 1,
+      const first = game.state.gold <= 1,
         n = first ? 5 : 2;
-      for (var i = 0; i < n; i++) pushFX({ k: 'coin', x: x + 0.5, y: y + 0.5, t: NOW, i: i });
+      for (let i = 0; i < n; i++) pushFX({ k: 'coin', x: x + 0.5, y: y + 0.5, t: NOW, i: i });
       if (first || game.state.gold % 25 === 0)
         pushFX({ k: 'ring', x: x + 0.5, y: y + 0.6, t: NOW, c: '#ffd23f', r: first ? 28 : 16 });
     },
@@ -1162,14 +1162,11 @@ export function createRenderer(
       FXL.length = 0;
       return;
     }
-    for (var i = FXL.length - 1; i >= 0; i--) {
-      var f = FXL[i],
-        age = now - f.t,
-        p,
-        life,
-        cxp,
-        cyp;
-      var duration =
+    for (let i = FXL.length - 1; i >= 0; i--) {
+      const f = FXL[i],
+        age = now - f.t;
+      let p, life, cxp, cyp;
+      const duration =
         f.k === 'coin'
           ? 850
           : f.k === 'ring'
@@ -1196,7 +1193,7 @@ export function createRenderer(
       if (f.k === 'stepDust') {
         p = age / duration;
         g.fillStyle = 'rgba(224,205,151,' + (0.16 * Math.sin(Math.PI * p)).toFixed(3) + ')';
-        for (var puff = 0; puff < 2; puff++) {
+        for (let puff = 0; puff < 2; puff++) {
           g.beginPath();
           g.ellipse(
             f.x * game.TS + puff * 2.4 + p * 2.5,
@@ -1230,7 +1227,7 @@ export function createRenderer(
         p = age / life;
         cxp = f.x * game.TS + 2 + (f.i - 2.5) * 7 * p * 0.9;
         cyp = f.y * game.TS - 4 - 30 * Math.sin(Math.PI * Math.min(1, p * 1.05)) * 0.9 + 14 * p * p;
-        var r2 = 2.1 * (1 - p * 0.25);
+        const r2 = 2.1 * (1 - p * 0.25);
         g.globalAlpha = Math.max(0, 1 - p * p);
         g.fillStyle = '#c98a1e';
         g.beginPath();
@@ -1252,8 +1249,8 @@ export function createRenderer(
         p = age / life;
         g.strokeStyle = game.rgba(f.c, (1 - p) * 0.9);
         g.lineWidth = 1.2;
-        for (var k = 0; k < (f.n || 6); k++) {
-          var a2 = k * 2.39996 + f.i,
+        for (let k = 0; k < (f.n || 6); k++) {
+          const a2 = k * 2.39996 + f.i,
             sp2 = 14 + ((k * 53) % 9);
           cxp = f.x * game.TS + Math.cos(a2) * sp2 * p;
           cyp = f.y * game.TS + 3 + Math.sin(a2) * sp2 * p + p * 10;
@@ -1269,8 +1266,8 @@ export function createRenderer(
           continue;
         }
         p = age / life;
-        for (k = 0; k < 6; k++) {
-          var a3 = k * 1.047 + rnd0(f.i);
+        for (let k = 0; k < 6; k++) {
+          const a3 = k * 1.047 + rnd0(f.i);
           g.fillStyle = 'rgba(184,162,118,' + ((1 - p) * 0.22).toFixed(3) + ')';
           g.beginPath();
           g.arc(
@@ -1332,9 +1329,9 @@ export function createRenderer(
   function highlights(g: CanvasRenderingContext2D, now: number) {
     now = motionTime(now);
     if (game.mode && game.mode.type === 'build' && game.hlTiles && game.hlTiles.length) {
-      var pu = 0.5 + 0.5 * Math.sin(now / 260);
-      for (var hi = 0; hi < game.hlTiles.length; hi++) {
-        var hti = game.hlTiles[hi],
+      const pu = 0.5 + 0.5 * Math.sin(now / 260);
+      for (let hi = 0; hi < game.hlTiles.length; hi++) {
+        const hti = game.hlTiles[hi],
           hx2 = (hti % game.W) * game.TS,
           hy2 = ((hti / game.W) | 0) * game.TS;
         if (
@@ -1354,9 +1351,9 @@ export function createRenderer(
       }
     }
     if (game.mode && game.mode.type === 'build' && game.hlSpots && game.hlSpots.length) {
-      var pu2 = 0.5 + 0.5 * Math.sin(now / 260 + 2);
-      for (var si2 = 0; si2 < game.hlSpots.length; si2++) {
-        var sti = game.hlSpots[si2],
+      const pu2 = 0.5 + 0.5 * Math.sin(now / 260 + 2);
+      for (let si2 = 0; si2 < game.hlSpots.length; si2++) {
+        const sti = game.hlSpots[si2],
           sx4 = (sti % game.W) * game.TS,
           sy4 = ((sti / game.W) | 0) * game.TS;
         if (
@@ -1378,13 +1375,13 @@ export function createRenderer(
   }
   function demoMarkers(g: CanvasRenderingContext2D) {
     if (!game.mode || game.mode.type !== 'demolish') return;
-    for (var di4 = 0; di4 < game.buildings.length; di4++) {
-      var b5 = game.buildings[di4];
+    for (let di4 = 0; di4 < game.buildings.length; di4++) {
+      const b5 = game.buildings[di4];
       if (b5.type === 'hq') continue;
-      var bx = b5.x * game.TS,
+      const bx = b5.x * game.TS,
         by = b5.y * game.TS,
         armed = game.demoArm === b5;
-      var pu = renderPrefs().reducedMotion ? 0.5 : 0.5 + 0.5 * Math.sin(NOW / 420);
+      const pu = renderPrefs().reducedMotion ? 0.5 : 0.5 + 0.5 * Math.sin(NOW / 420);
       g.strokeStyle = armed ? '#ffd23f' : 'rgba(255,84,72,' + (0.75 + 0.25 * pu).toFixed(2) + ')';
       g.lineWidth = armed ? 3 : 2;
       game.rr(g, bx - 0.5, by - 0.5, game.TS + 1, game.TS + 1, 3);
@@ -1399,7 +1396,7 @@ export function createRenderer(
   }
   function selection(g: CanvasRenderingContext2D, now: number) {
     if (!game.selected) return;
-    var b = game.selected,
+    const b = game.selected,
       sp = game.BSPEC[b.type],
       rr2 = (sp.rad || 3) * game.TS,
       ccx = b.x * game.TS + game.TS / 2,
@@ -1427,12 +1424,12 @@ export function createRenderer(
   }
   function anchorDraw(g: CanvasRenderingContext2D, now: number) {
     if (!game.anchor) return;
-    var pu = renderPrefs().reducedMotion ? 0.5 : 0.5 + 0.5 * Math.sin(now / 420);
+    const pu = renderPrefs().reducedMotion ? 0.5 : 0.5 + 0.5 * Math.sin(now / 420);
     g.fillStyle = 'rgba(143,214,208,' + (0.1 + 0.1 * pu).toFixed(3) + ')';
     g.fillRect(game.anchor.x * game.TS, game.anchor.y * game.TS, game.TS, game.TS);
     g.strokeStyle = '#8fd6d0';
     g.lineWidth = 2;
-    var a = game.anchor.x * game.TS,
+    const a = game.anchor.x * game.TS,
       b2 = game.anchor.y * game.TS,
       L = 8;
     g.beginPath();
@@ -1452,7 +1449,7 @@ export function createRenderer(
   }
   function ghostDraw(g: CanvasRenderingContext2D) {
     if (!game.ghost || !game.ghost.in || !game.mode || game.mode.type !== 'build') return;
-    var gx = game.ghost.x,
+    const gx = game.ghost.x,
       gy = game.ghost.y,
       ok = game.ghost.ok;
     g.fillStyle = ok ? 'rgba(110,224,110,0.20)' : 'rgba(255,80,80,0.20)';
@@ -1466,9 +1463,9 @@ export function createRenderer(
     g.lineWidth = 2;
     game.rr(g, gx * game.TS - 1, gy * game.TS - 1, game.TS + 2, game.TS + 2, 3.5);
     g.stroke();
-    var sp2 = game.BSPEC[game.mode.bt];
+    const sp2 = game.BSPEC[game.mode.bt];
     if (ok && sp2.rad && sp2.rad >= 4) {
-      var grx = gx * game.TS + 12,
+      const grx = gx * game.TS + 12,
         gry = gy * game.TS + 12,
         gr = sp2.rad * game.TS;
       g.strokeStyle = 'rgba(110,224,110,0.35)';
@@ -1498,16 +1495,16 @@ export function createRenderer(
    * @property {number} afterSeconds Travel time along that route after paving.
    * @property {string} summary Player-facing benefit and count.
    */
-  var _placementCache: PlacementPreview | null = null,
+  let _placementCache: PlacementPreview | null = null,
     _roadCache: RoadPreview | null = null,
     _logisticsCaption = '';
-  var workloadSummary: { busy: number; carriers: number; waiting: number } | null = null;
+  let workloadSummary: { busy: number; carriers: number; waiting: number } | null = null;
   function logisticsWorldKey() {
-    var key = terrainRevision + ':' + (game.state.upgrades ? game.state.upgrades.haul || 0 : 0);
+    let key = terrainRevision + ':' + (game.state.upgrades ? game.state.upgrades.haul || 0 : 0);
     // Completion and manning alter storage choice and territory without changing
     // the building count. These states also need to refresh a paused preview.
-    for (var i = 0; i < game.buildings.length; i++) {
-      var b = game.buildings[i];
+    for (let i = 0; i < game.buildings.length; i++) {
+      const b = game.buildings[i];
       key +=
         ':' +
         b.id +
@@ -1525,14 +1522,14 @@ export function createRenderer(
     return key;
   }
   function pathSeconds(path: number[], sx: number, sy: number, paved?: Record<number, boolean>) {
-    var seconds = 0,
+    let seconds = 0,
       px = sx,
       py = sy;
-    for (var i = 0; i < path.length; i++) {
-      var n = path[i],
+    for (let i = 0; i < path.length; i++) {
+      const n = path[i],
         x = n % game.W,
         y = (n / game.W) | 0;
-      var speed =
+      let speed =
         typeof game.speedOn === 'function'
           ? game.speedOn({ x: px + 0.5, y: py + 0.5 }, n)
           : 2.7 / game.moveCost(n);
@@ -1545,15 +1542,15 @@ export function createRenderer(
     return seconds;
   }
   function resourceWorkArea(type: BuildingType, x: number, y: number) {
-    var sp = game.BSPEC[type],
-      r = sp.resKind ? 1 : sp.prod === 'fish' ? 2 : sp.rad || 0;
+    const sp = game.BSPEC[type];
+    let r = sp.resKind ? 1 : sp.prod === 'fish' ? 2 : sp.rad || 0;
     if (sp.prod === 'plant') {
-      var closest: Building | null = null,
+      let closest: Building | null = null,
         dist = Infinity;
-      for (var i = 0; i < game.buildings.length; i++) {
-        var b = game.buildings[i];
+      for (let i = 0; i < game.buildings.length; i++) {
+        const b = game.buildings[i];
         if (!b.done || b.type !== 'lumberjack') continue;
-        var d = Math.abs(b.x - x) + Math.abs(b.y - y);
+        const d = Math.abs(b.x - x) + Math.abs(b.y - y);
         if (d < dist) {
           dist = d;
           closest = b;
@@ -1568,21 +1565,21 @@ export function createRenderer(
     return { x: x, y: y, r: r };
   }
   function resourceTilesAt(type: BuildingType, x: number, y: number) {
-    var sp = game.BSPEC[type],
+    const sp = game.BSPEC[type],
       area = resourceWorkArea(type, x, y),
       found = [],
       r = area.r;
     x = area.x;
     y = area.y;
-    for (var yy = y - r; yy <= y + r; yy++)
-      for (var xx = x - r; xx <= x + r; xx++) {
+    for (let yy = y - r; yy <= y + r; yy++)
+      for (let xx = x - r; xx <= x + r; xx++) {
         if (!game.inB(xx, yy)) continue;
-        var dx = xx - x,
+        const dx = xx - x,
           dy = yy - y;
         if (!sp.resKind && sp.prod !== 'fish' && dx * dx + dy * dy > r * r) continue;
-        var i = game.idx(xx, yy),
-          tl = game.tiles[i],
-          hit = false;
+        const i = game.idx(xx, yy),
+          tl = game.tiles[i];
+        let hit = false;
         if (sp.prod === 'gather') hit = tl.tree >= 3;
         else if (sp.prod === 'rock') hit = !!tl.rock;
         else if (sp.prod === 'fish')
@@ -1624,7 +1621,7 @@ export function createRenderer(
   /** @returns {PlacementPreview|null} */
   function getPlacementPreview() {
     if (!game.mode || game.mode.type !== 'build' || !game.ghost || !game.ghost.in) return null;
-    var key =
+    const key =
       game.mode.bt +
       ':' +
       game.ghost.x +
@@ -1639,24 +1636,24 @@ export function createRenderer(
     if (_placementCache && _placementCache.key === key) return _placementCache;
     const checks = game.placementChecks(game.mode.bt, game.ghost.x, game.ghost.y);
     const spending = game.buildingAffordability(game.mode.bt, game.ghost);
-    var sp = game.BSPEC[game.mode.bt],
+    const sp = game.BSPEC[game.mode.bt],
       res = resourceTilesAt(game.mode.bt, game.ghost.x, game.ghost.y),
       storage = game.nearestStoragePos(game.ghost.x, game.ghost.y);
-    var path =
+    const path =
       storage && game.passI(game.idx(game.ghost.x, game.ghost.y))
         ? game.findPath(storage.x, storage.y, game.ghost.x, game.ghost.y)
         : null;
-    var haul = path ? pathSeconds(path, storage.x, storage.y) : null;
-    var supply = '';
+    const haul = path ? pathSeconds(path, storage.x, storage.y) : null;
+    let supply = '';
     if (sp.prod === 'gather') supply = res.length + ' mature trees';
     else if (sp.prod === 'rock') supply = res.length + ' rock tiles';
     else if (sp.resKind) {
-      var amount = 0;
-      for (var i = 0; i < res.length; i++) amount += game.tiles[res[i]].res.amt;
+      let amount = 0;
+      for (let i = 0; i < res.length; i++) amount += game.tiles[res[i]].res.amt;
       supply = amount + ' ' + game.GOODS[sp.resKind].name.toLowerCase() + ' in reach';
     } else if (sp.prod === 'fish') supply = res.length ? 'Shore in reach' : 'No shore in reach';
     else if (sp.prod === 'plant') supply = res.length + ' clear nursery tiles';
-    var summary =
+    const summary =
       (supply ? supply + ' · ' : '') +
       (haul === null
         ? 'No storage route'
@@ -1696,7 +1693,7 @@ export function createRenderer(
       !game.inB(ht.x, ht.y)
     )
       return null;
-    var key =
+    const key =
       game.anchor.x +
       ':' +
       game.anchor.y +
@@ -1709,7 +1706,7 @@ export function createRenderer(
       ':' +
       Math.floor(NOW / 600);
     if (_roadCache && _roadCache.key === key) return _roadCache;
-    var plan = game.planRoad(game.anchor, ht);
+    const plan = game.planRoad(game.anchor, ht);
     if (plan.ok === false)
       return (_roadCache = {
         key: key,
@@ -1729,10 +1726,10 @@ export function createRenderer(
             ? 'Road must start on clear ground inside your territory'
             : 'No route here',
       });
-    var { path, paved: pave, count } = plan;
-    var before = pathSeconds(path, game.anchor.x, game.anchor.y),
+    const { path, paved: pave, count } = plan;
+    const before = pathSeconds(path, game.anchor.x, game.anchor.y),
       after = pathSeconds(path, game.anchor.x, game.anchor.y, pave);
-    var pct = before > 0 ? Math.round(((before - after) / before) * 100) : 0;
+    const pct = before > 0 ? Math.round(((before - after) / before) * 100) : 0;
     return (_roadCache = {
       key: key,
       ok: true,
@@ -1765,8 +1762,8 @@ export function createRenderer(
     g.font = '600 11px system-ui,sans-serif';
     while (label.length > 8 && g.measureText(label).width > vw - 32)
       label = label.slice(0, -4) + '…';
-    var width = g.measureText(label).width + 14;
-    var screenX = (x - cam.x) * z,
+    const width = g.measureText(label).width + 14;
+    const screenX = (x - cam.x) * z,
       screenY = (y - cam.y) * z;
     x = cam.x + Math.max(width / 2 + 8, Math.min(vw - width / 2 - 8, screenX)) / z;
     y = cam.y + Math.max(28, Math.min(vh - 12, screenY)) / z;
@@ -1799,8 +1796,8 @@ export function createRenderer(
     function line() {
       g.beginPath();
       g.moveTo(x * game.TS, y * game.TS);
-      for (var p = start || 0; p < path.length; p++) {
-        var n = path[p];
+      for (let p = start || 0; p < path.length; p++) {
+        const n = path[p];
         g.lineTo(((n % game.W) + 0.5) * game.TS, (((n / game.W) | 0) + 0.5) * game.TS);
       }
       g.stroke();
@@ -1818,7 +1815,7 @@ export function createRenderer(
     y: number,
     resources: number[],
   ) {
-    var sp = game.BSPEC[type],
+    const sp = game.BSPEC[type],
       area = resourceWorkArea(type, x, y),
       r = area.r * game.TS;
     x = area.x;
@@ -1843,8 +1840,8 @@ export function createRenderer(
       g.fill();
       g.stroke();
     }
-    for (var i = 0; i < resources.length; i++) {
-      var n = resources[i],
+    for (let i = 0; i < resources.length; i++) {
+      const n = resources[i],
         px = (n % game.W) * game.TS,
         py = ((n / game.W) | 0) * game.TS;
       g.fillStyle = 'rgba(188,225,153,0.15)';
@@ -1855,7 +1852,7 @@ export function createRenderer(
       g.stroke();
     }
   }
-  var _reasonNames: Record<string, string> = {
+  const _reasonNames: Record<string, string> = {
     inputs: 'Waiting for inputs',
     output: 'Waiting for collection',
     reserve: 'Construction reserve',
@@ -1864,7 +1861,7 @@ export function createRenderer(
     paused: 'Production paused',
     demand: 'Stocks are sufficient',
   };
-  var clarityNames = {
+  const clarityNames = {
     hq: 'HQ',
     warehouse: 'STORE',
     lumberjack: 'WOOD',
@@ -1890,24 +1887,24 @@ export function createRenderer(
   };
   function clarityRoads(g: CanvasRenderingContext2D) {
     if (!renderPrefs().clarity) return;
-    var x0 = Math.max(0, Math.floor(cam.x / game.TS)),
+    const x0 = Math.max(0, Math.floor(cam.x / game.TS)),
       x1 = Math.min(game.W - 1, Math.ceil((cam.x + vw / z) / game.TS)),
       y0 = Math.max(0, Math.floor(cam.y / game.TS)),
       y1 = Math.min(game.H - 1, Math.ceil((cam.y + vh / z) / game.TS));
     g.save();
     g.lineCap = 'round';
     g.beginPath();
-    for (var y = y0; y <= y1; y++)
-      for (var x = x0; x <= x1; x++) {
+    for (let y = y0; y <= y1; y++)
+      for (let x = x0; x <= x1; x++) {
         if (!game.tiles[game.idx(x, y)].road) continue;
-        var cx = (x + 0.5) * game.TS,
+        const cx = (x + 0.5) * game.TS,
           cy = (y + 0.5) * game.TS;
         // Include isolated road tiles and exactly the same orthogonal joins as
         // the painted roads. No connectivity or movement rules change.
         g.moveTo(cx - 0.5, cy);
         g.lineTo(cx + 0.5, cy);
-        for (var d = 0; d < 4; d++) {
-          var nx = x + game.DX[d],
+        for (let d = 0; d < 4; d++) {
+          const nx = x + game.DX[d],
             ny = y + game.DY[d];
           if (!game.inB(nx, ny) || (!game.tiles[game.idx(nx, ny)].road && !game.buildingAt(nx, ny)))
             continue;
@@ -1923,9 +1920,9 @@ export function createRenderer(
   }
   function clarityBuildings(g: CanvasRenderingContext2D) {
     if (!renderPrefs().clarity) return;
-    for (var b of game.buildings) {
+    for (const b of game.buildings) {
       if (!visibleAt(b.x, b.y)) continue;
-      var sp = game.BSPEC[b.type],
+      const sp = game.BSPEC[b.type],
         reason = b.disabled ? 'paused' : b.blockedReason,
         warning =
           (reason && reason !== 'demand' && reason !== 'paused') ||
@@ -1959,7 +1956,7 @@ export function createRenderer(
       g.translate(x, y + 37);
       g.scale(1 / z, 1 / z);
       g.font = '700 8px system-ui,sans-serif';
-      var width = g.measureText(tag).width + 8;
+      const width = g.measureText(tag).width + 8;
       g.fillStyle = 'rgba(20,36,28,0.94)';
       game.rr(g, -width / 2, -7, width, 13, 3);
       g.fill();
@@ -1971,7 +1968,7 @@ export function createRenderer(
       g.fillText(tag, 0, 2);
       g.restore();
       if (game.selected === b || (game.hoverIn && game.ht.x === b.x && game.ht.y === b.y)) {
-        var status = !b.done
+        const status = !b.done
           ? 'Under construction'
           : _reasonNames[reason] ||
             (warning ? game.bStatus(b).lines.find((line) => line.w)?.t : '') ||
@@ -2029,13 +2026,13 @@ export function createRenderer(
     g.restore();
   }
   function logisticsDraw(g: CanvasRenderingContext2D) {
-    var overlay = renderPrefs().overlay || 'none';
+    const overlay = renderPrefs().overlay || 'none';
     _logisticsCaption = '';
     workloadSummary = null;
     if (overlay === 'routes') {
-      var busy = 0;
-      for (var i = 0; i < game.units.length; i++) {
-        var u = game.units[i];
+      let busy = 0;
+      for (let i = 0; i < game.units.length; i++) {
+        const u = game.units[i];
         if (!u.path || !u.path.length || u.kind !== 'carrier') continue;
         busy++;
         if (busy <= 48)
@@ -2052,9 +2049,9 @@ export function createRenderer(
       _logisticsCaption =
         'Delivery routes · ' + busy + ' carriers travelling · dashed: going to collect';
     } else if (overlay === 'workload') {
-      var busyN = 0,
+      let busyN = 0,
         carrierN = 0;
-      for (var ui = 0; ui < game.units.length; ui++)
+      for (let ui = 0; ui < game.units.length; ui++)
         if (game.units[ui].kind === 'carrier') {
           carrierN++;
           if (game.units[ui].job || game.units[ui].carry) busyN++;
@@ -2081,10 +2078,10 @@ export function createRenderer(
       workloadSummary = { busy: busyN, carriers: carrierN, waiting: waitingJobs };
       _logisticsCaption = 'Carrier workload';
     } else if (overlay === 'reach') {
-      var list = game.selected ? [game.selected] : game.buildings,
-        count = 0;
-      for (var ri = 0; ri < list.length; ri++) {
-        var rb = list[ri],
+      const list = game.selected ? [game.selected] : game.buildings;
+      let count = 0;
+      for (let ri = 0; ri < list.length; ri++) {
+        const rb = list[ri],
           spec = game.BSPEC[rb.type];
         if (spec.store || spec.guard || !spec.rad || !visibleAt(rb.x, rb.y)) continue;
         if (++count > 18) break;
@@ -2094,14 +2091,14 @@ export function createRenderer(
         ? 'Resource reach · pale tiles can supply the selected building'
         : 'Resource reach · select a building to focus';
     } else if (overlay === 'stalls') {
-      var stalled = 0;
-      for (var si = 0; si < game.buildings.length; si++) {
-        var sb = game.buildings[si],
+      let stalled = 0;
+      for (let si = 0; si < game.buildings.length; si++) {
+        const sb = game.buildings[si],
           reason = sb.blockedReason || (game.bStatus(sb).bad ? 'inputs' : '');
         if (!reason) continue;
         stalled++;
         if (!visibleAt(sb.x, sb.y)) continue;
-        var color = reason === 'demand' || reason === 'paused' ? '#d7d3b6' : '#ffc2a5';
+        const color = reason === 'demand' || reason === 'paused' ? '#d7d3b6' : '#ffc2a5';
         g.strokeStyle = color;
         g.lineWidth = 2 / z;
         game.rr(g, sb.x * game.TS - 2, sb.y * game.TS - 2, game.TS + 4, game.TS + 4, 3);
@@ -2116,7 +2113,7 @@ export function createRenderer(
       }
       _logisticsCaption = 'Production status · ' + stalled + ' buildings waiting or paused';
     }
-    var placement = getPlacementPreview();
+    const placement = getPlacementPreview();
     if (placement) {
       if (placement.resources.length)
         reachDraw(
@@ -2148,7 +2145,7 @@ export function createRenderer(
         placement.canBuild ? '#d3efd0' : '#ffd0b4',
       );
     }
-    var road = getRoadPreview();
+    const road = getRoadPreview();
     if (road) {
       if (road.path)
         traceRoute(g, game.anchor.x + 0.5, game.anchor.y + 0.5, road.path, 0, '#e6d49d', true);
@@ -2212,11 +2209,11 @@ export function createRenderer(
     g.save();
     g.translate(0, BAR_H);
     g.font = '600 12px system-ui,sans-serif';
-    var maxWidth = Math.min(vw - 24, 580),
-      label = _logisticsCaption;
+    const maxWidth = Math.min(vw - 24, 580);
+    let label = _logisticsCaption;
     while (label.length > 8 && g.measureText(label).width > maxWidth - 22)
       label = label.slice(0, -4) + '…';
-    var width = g.measureText(label).width + 22,
+    const width = g.measureText(label).width + 22,
       x = Math.max(12, (vw - width) / 2);
     g.fillStyle = 'rgba(18,31,28,0.92)';
     game.rr(g, x, 12, width, 28, 7);
@@ -2228,10 +2225,10 @@ export function createRenderer(
     g.fillText(label, x + 11, 31);
     g.restore();
   }
-  var clouds: { x0: number; y0: number; s: number; v: number; w: number }[] = [],
+  const clouds: { x0: number; y0: number; s: number; v: number; w: number }[] = [],
     birds: { x: number; y: number; vx: number; vy: number; f: number }[] = [];
   function initSky() {
-    for (var i = 0; i < 6; i++)
+    for (let i = 0; i < 6; i++)
       clouds.push({
         x0: Math.random() * (game.W * game.TS + 600),
         y0: Math.random() * (game.H * game.TS + 400),
@@ -2239,7 +2236,7 @@ export function createRenderer(
         v: 5 + Math.random() * 5,
         w: 300 + Math.random() * 260,
       });
-    for (i = 0; i < 3; i++)
+    for (let i = 0; i < 3; i++)
       birds.push({
         x: Math.random() * (game.W * game.TS + 700),
         y: 60 + Math.random() * (game.H * game.TS - 120),
@@ -2254,10 +2251,10 @@ export function createRenderer(
     g.beginPath();
     g.rect(0, 0, game.W * game.TS, game.H * game.TS);
     g.clip();
-    for (var i = 0; i < clouds.length; i++) {
-      var c = clouds[i];
-      var px = ((c.x0 + now * 0.001 * c.v) % (game.W * game.TS + c.w)) - c.w;
-      var py = c.y0 + Math.sin(now / 9000 + i) * 30;
+    for (let i = 0; i < clouds.length; i++) {
+      const c = clouds[i];
+      const px = ((c.x0 + now * 0.001 * c.v) % (game.W * game.TS + c.w)) - c.w;
+      const py = c.y0 + Math.sin(now / 9000 + i) * 30;
       g.globalAlpha = 0.8;
       g.drawImage(game.ART.cloud, px, py, c.w * c.s, c.w * 0.62 * c.s);
     }
@@ -2266,15 +2263,15 @@ export function createRenderer(
   }
   function birdsDraw(g: CanvasRenderingContext2D, now: number) {
     if (renderPrefs().reducedMotion || renderPrefs().quality < 1) return;
-    for (var i = 0; i < birds.length; i++) {
-      var b = birds[i];
-      var x = ((b.x + now * 0.001 * b.vx) % (game.W * game.TS + 800)) - 400;
-      var y = b.y + Math.sin(now / 4000 + i * 2) * 40;
-      var fl = Math.sin(now / 90 + b.f);
+    for (let i = 0; i < birds.length; i++) {
+      const b = birds[i];
+      const x = ((b.x + now * 0.001 * b.vx) % (game.W * game.TS + 800)) - 400;
+      const y = b.y + Math.sin(now / 4000 + i * 2) * 40;
+      const fl = Math.sin(now / 90 + b.f);
       g.strokeStyle = 'rgba(64,58,46,0.55)';
       g.lineWidth = 1.1;
-      for (var k = 0; k < 4; k++) {
-        var bx = x - k * 6,
+      for (let k = 0; k < 4; k++) {
+        const bx = x - k * 6,
           by = y + Math.abs(k) * 3.4 + (k % 2 ? 2 : 0);
         g.beginPath();
         g.moveTo(bx - 3.4, by - fl * 2.2);
@@ -2286,22 +2283,22 @@ export function createRenderer(
   }
 
   // ---------- day/night + weather (wall-clock, cosmetic only; frozen at noon in TESTMODE) ----------
-  var DAYLEN = 600000; // full cycle = 10 real minutes
+  const DAYLEN = 600000; // full cycle = 10 real minutes
   function nightAmt() {
     // 0 = noon, 1 = midnight (t=0 dawn start of the run)
     if (game.TESTMODE) return 0;
-    var t = (performance.now() / DAYLEN) % 1;
+    const t = (performance.now() / DAYLEN) % 1;
     return 0.5 - 0.5 * Math.cos(t * 6.28318);
   }
   function nightCool() {
-    var n = nightAmt();
+    const n = nightAmt();
     return n < 0.45 ? 0 : (n - 0.45) / 0.55;
   } // 0..1 blue tint driver
   function nightWarm() {
-    var n = nightAmt();
+    const n = nightAmt();
     return n <= 0 ? 0 : Math.exp(-Math.pow((n - 0.5) / 0.14, 2)) * 0.15;
   } // dawn/dusk bell
-  var _rain = 0,
+  let _rain = 0,
     _rainTarget = 0,
     _rainNext = 0,
     _flashT = -9999,
@@ -2329,17 +2326,17 @@ export function createRenderer(
     if (renderPrefs().reducedMotion) return;
     if (!RSEEDS) {
       RSEEDS = [];
-      for (var i = 0; i < 110; i++)
+      for (let i = 0; i < 110; i++)
         RSEEDS.push([Math.random(), Math.random(), 0.75 + Math.random() * 0.5]);
     }
     g.strokeStyle = 'rgba(190,214,232,' + (0.34 * _rain).toFixed(3) + ')';
     g.lineWidth = 1;
-    var n = (RSEEDS.length * _rain) | 0;
+    const n = (RSEEDS.length * _rain) | 0;
     g.beginPath();
-    for (var k = 0; k < n; k++) {
-      var r = RSEEDS[k],
+    for (let k = 0; k < n; k++) {
+      const r = RSEEDS[k],
         fall = now * 0.001 * r[2];
-      var y = (r[1] * vh + fall * 900) % vh,
+      const y = (r[1] * vh + fall * 900) % vh,
         x = (r[0] * vw + y * 0.22) % vw;
       g.moveTo(x, y);
       g.lineTo(x - 2.6, y - 10);
@@ -2349,19 +2346,19 @@ export function createRenderer(
   function glowsDraw(g: CanvasRenderingContext2D) {
     // warm window auras at night, above the tint
     if (!game.ART.glow) return;
-    var vx0 = Math.max(0, Math.floor(cam.x / game.TS) - 1),
+    const vx0 = Math.max(0, Math.floor(cam.x / game.TS) - 1),
       vx1 = Math.min(game.W - 1, Math.ceil((cam.x + vw / z) / game.TS) + 1);
-    var vy0 = Math.max(0, Math.floor(cam.y / game.TS) - 1),
+    const vy0 = Math.max(0, Math.floor(cam.y / game.TS) - 1),
       vy1 = Math.min(game.H - 1, Math.ceil((cam.y + vh / z) / game.TS) + 1);
-    var light = Math.min(0.7, nightCool() * 1.25);
+    const light = Math.min(0.7, nightCool() * 1.25);
     g.save();
     g.globalAlpha = light;
-    for (var bi = 0; bi < game.buildings.length; bi++) {
-      var b = game.buildings[bi];
+    for (let bi = 0; bi < game.buildings.length; bi++) {
+      const b = game.buildings[bi];
       if (!b.done) continue;
       if (UNLIT_AT_NIGHT.has(b.type)) continue;
       if (b.x < vx0 || b.x > vx1 || b.y < vy0 || b.y > vy1) continue;
-      var sc = game.BSPEC[b.type].store ? 34 : 24,
+      const sc = game.BSPEC[b.type].store ? 34 : 24,
         lx = b.x * game.TS + 12,
         ly = b.y * game.TS + 8;
       g.drawImage(game.ART.glow, lx - sc / 2, ly - sc / 2, sc, sc);
@@ -2387,20 +2384,19 @@ export function createRenderer(
       return;
     if (game.gpDirty || game.gpX !== game.ghost.x || game.gpY !== game.ghost.y)
       game.computeGuardPreview(game.ghost.x, game.ghost.y);
-    var i;
     g.fillStyle = 'rgba(255,210,63,0.07)';
-    for (i = 0; i < game.gpFill.length; i++) {
-      var fi = game.gpFill[i];
+    for (let i = 0; i < game.gpFill.length; i++) {
+      const fi = game.gpFill[i];
       g.fillRect((fi % game.W) * game.TS, ((fi / game.W) | 0) * game.TS, game.TS, game.TS);
     }
-    var pu = 0.5 + 0.5 * Math.sin(now / 240);
+    const pu = 0.5 + 0.5 * Math.sin(now / 240);
     g.strokeStyle = 'rgba(255,226,130,' + (0.5 + 0.35 * pu).toFixed(3) + ')';
     g.lineWidth = 2;
     g.setLineDash([7, 5]);
     g.lineDashOffset = -now / 40;
     g.beginPath();
-    for (i = 0; i < game.gpSegs.length; i++) {
-      var s2 = game.gpSegs[i];
+    for (let i = 0; i < game.gpSegs.length; i++) {
+      const s2 = game.gpSegs[i];
       g.moveTo(s2[0], s2[1]);
       g.lineTo(s2[2], s2[3]);
     }
@@ -2415,10 +2411,10 @@ export function createRenderer(
     g.beginPath();
     g.rect(0, 0, game.W * game.TS, game.H * game.TS);
     g.clip();
-    for (var i = 0; i < clouds.length; i++) {
-      var c = clouds[i];
-      var px = ((c.x0 + now * 0.001 * c.v) % (game.W * game.TS + c.w)) - c.w;
-      var py = c.y0 + Math.sin(now / 9000 + i) * 30;
+    for (let i = 0; i < clouds.length; i++) {
+      const c = clouds[i];
+      const px = ((c.x0 + now * 0.001 * c.v) % (game.W * game.TS + c.w)) - c.w;
+      const py = c.y0 + Math.sin(now / 9000 + i) * 30;
       g.globalAlpha = 0.9;
       g.drawImage(game.ART.cloudShadow, px + 46, py + 58, c.w * 0.78 * c.s, c.w * 0.5 * c.s);
     }
@@ -2427,23 +2423,23 @@ export function createRenderer(
   }
 
   // ---------- event reconciliation (fx for things the engine did) ----------
-  var _seen: Record<string, SeenBuilding> = {},
+  let _seen: Record<string, SeenBuilding> = {},
     _warmup = false,
     _nextHam = 0;
-  var workPulses: Record<string, WorkPulse> = {},
+  let workPulses: Record<string, WorkPulse> = {},
     _renderEventsReady = false;
   function initRenderEvents() {
     if (_renderEventsReady || typeof game.gameEvents === 'undefined') return;
     _renderEventsReady = true;
     observePresentation(game, 'goodsProduced', function (e) {
-      var b = e.building;
+      const b = e.building;
       if (!b) return;
       workPulses[b.id] = { t: performance.now(), good: e.good };
       if (visibleAt(b.x, b.y) && !renderPrefs().reducedMotion)
         FX.spark(b.x + 0.9, b.y + 0.65, game.GOODS[e.good].c, 3);
     });
     observePresentation(game, 'goodsDelivered', function (e) {
-      var b = e.building;
+      const b = e.building;
       if (!b || !visibleAt(b.x, b.y)) return;
       workPulses[b.id] = { t: performance.now(), good: e.good };
     });
@@ -2495,9 +2491,9 @@ export function createRenderer(
     );
   }
   function reconcileFx() {
-    for (var key in _seen) _seen[key].present = false;
-    for (var i = 0; i < game.buildings.length; i++) {
-      var b = game.buildings[i],
+    for (const key in _seen) _seen[key].present = false;
+    for (let i = 0; i < game.buildings.length; i++) {
+      const b = game.buildings[i],
         s = _seen[b.id];
       if (!s) {
         _seen[b.id] = { done: b.done, x: b.x, y: b.y, present: true };
@@ -2512,8 +2508,8 @@ export function createRenderer(
       s.y = b.y;
       s.present = true;
     }
-    for (var id in _seen) {
-      var s2 = _seen[id];
+    for (const id in _seen) {
+      const s2 = _seen[id];
       if (!s2.present) {
         if (visibleAt(s2.x, s2.y)) {
           FX.dust(s2.x + 0.5, s2.y + 0.5);
@@ -2524,9 +2520,9 @@ export function createRenderer(
       }
     }
     if (renderStats.samples % 120 === 0) {
-      var live: Record<string, boolean> = {};
-      for (var ui = 0; ui < game.units.length; ui++) live[game.units[ui].id] = true;
-      for (var uid in unitPoses) if (!live[uid]) delete unitPoses[uid];
+      const live: Record<string, boolean> = {};
+      for (let ui = 0; ui < game.units.length; ui++) live[game.units[ui].id] = true;
+      for (const uid in unitPoses) if (!live[uid]) delete unitPoses[uid];
     }
     _warmup = true;
   }
@@ -2536,22 +2532,22 @@ export function createRenderer(
     if (now < _nextHam) return;
     _nextHam = now + 620 + Math.random() * 760;
     // Production sounds are dispatched from goodsProduced by the audio system.
-    var site = [];
-    for (var i = 0; i < game.buildings.length; i++) {
-      var b3 = game.buildings[i];
+    const site = [];
+    for (let i = 0; i < game.buildings.length; i++) {
+      const b3 = game.buildings[i];
       if (!b3.done && b3.prog > 0 && game.siteReady(b3) && visibleAt(b3.x, b3.y)) site.push(b3);
     }
     if (site.length) {
-      var b4 = site[(Math.random() * site.length) | 0];
+      const b4 = site[(Math.random() * site.length) | 0];
       game.SND.hammer(b4.x, b4.y);
     }
   }
 
   // ---------- frame ----------
-  var _lastNow = 0;
+  let _lastNow = 0;
   function draw() {
     if (!presentation?.available) return;
-    var drawStart = performance.now(),
+    const drawStart = performance.now(),
       frameMs = _lastNow ? drawStart - _lastNow : 0;
     NOW = performance.now();
     initRenderEvents();
@@ -2580,7 +2576,7 @@ export function createRenderer(
     });
     layer('terrain', function () {
       // Blit only the visible terrain rectangle instead of submitting the 48 MB atlas.
-      var sx = Math.max(0, cam.x),
+      const sx = Math.max(0, cam.x),
         sy = Math.max(0, cam.y),
         sw = Math.min(game.W * game.TS - sx, cam.x + vw / z - sx),
         sh2 = Math.min(game.H * game.TS - sy, cam.y + vh / z - sy);
@@ -2627,7 +2623,7 @@ export function createRenderer(
       }
       // day/night + weather tint (screen space)
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      var cool = renderPrefs().clarity ? 0 : nightCool(),
+      const cool = renderPrefs().clarity ? 0 : nightCool(),
         warm = renderPrefs().clarity ? 0 : nightWarm();
       if (cool > 0.01) {
         ctx.fillStyle = 'rgba(20,34,66,' + (cool * 0.29).toFixed(3) + ')';
@@ -2665,19 +2661,19 @@ export function createRenderer(
   }
 
   // ---------- minimap ----------
-  var mscan = game.Acan(192, 192),
+  const mscan = game.Acan(192, 192),
     msctx = mscan.getContext('2d');
-  var miniDirty = true;
-  var _miniRendered = 0;
+  let miniDirty = true;
+  let _miniRendered = 0;
   function drawMiniStatic() {
-    var s = 192 / game.W;
+    const s = 192 / game.W;
     msctx.fillStyle = '#101418';
     msctx.fillRect(0, 0, 192, 192);
-    for (var y = 0; y < game.H; y++)
-      for (var x = 0; x < game.W; x++) {
-        var i = game.idx(x, y),
-          tl = game.tiles[i],
-          c;
+    for (let y = 0; y < game.H; y++)
+      for (let x = 0; x < game.W; x++) {
+        const i = game.idx(x, y),
+          tl = game.tiles[i];
+        let c;
         if (tl.t === game.WATER) c = '#447b89';
         else if (tl.t === game.SAND) c = '#d7c39b';
         else if (tl.t === game.MTN) c = '#aaa79a';
@@ -2688,7 +2684,7 @@ export function createRenderer(
           msctx.fillStyle =
             tl.res.kind === 'gold' ? '#ffd23f' : tl.res.kind === 'iron' ? '#d0763a' : '#565e68';
           msctx.fillRect(x * s, y * s, s, s);
-          var fr2 = tl.res.amt / (tl.res.amt0 || tl.res.amt);
+          const fr2 = tl.res.amt / (tl.res.amt0 || tl.res.amt);
           if (fr2 < 0.999) {
             msctx.fillStyle = 'rgba(0,0,0,' + ((1 - fr2) * 0.55).toFixed(2) + ')';
             msctx.fillRect(x * s, y * s, s, s);
@@ -2696,16 +2692,16 @@ export function createRenderer(
         }
       }
     msctx.fillStyle = 'rgba(255,214,110,0.16)';
-    for (y = 0; y < game.H; y++)
-      for (x = 0; x < game.W; x++)
+    for (let y = 0; y < game.H; y++)
+      for (let x = 0; x < game.W; x++)
         if (game.owned[game.idx(x, y)]) msctx.fillRect(x * s, y * s, s, s);
-    for (y = 0; y < game.H; y++)
-      for (x = 0; x < game.W; x++)
+    for (let y = 0; y < game.H; y++)
+      for (let x = 0; x < game.W; x++)
         if (game.tiles[game.idx(x, y)].road) {
           msctx.fillStyle = '#c2a878';
           msctx.fillRect(x * s, y * s, s, s);
         }
-    var vg = msctx.createRadialGradient(96, 96, 60, 96, 96, 140);
+    const vg = msctx.createRadialGradient(96, 96, 60, 96, 96, 140);
     vg.addColorStop(0, 'rgba(0,0,0,0)');
     vg.addColorStop(1, 'rgba(0,0,0,0.22)');
     msctx.fillStyle = vg;
@@ -2740,9 +2736,9 @@ export function createRenderer(
     if (miniDirty) drawMiniStatic();
     mctx.setTransform(1, 0, 0, 1, 0, 0);
     mctx.drawImage(mscan, 0, 0);
-    var s = 192 / game.W;
-    for (var i = 0; i < game.buildings.length; i++) {
-      var b = game.buildings[i],
+    const s = 192 / game.W;
+    for (let i = 0; i < game.buildings.length; i++) {
+      const b = game.buildings[i],
         cxm = b.x * s + s / 2,
         cym = b.y * s + s / 2;
       if (game.selected === b) {
@@ -2750,18 +2746,18 @@ export function createRenderer(
         miniDia(mctx, cxm, cym, 2, '#5ce8ff');
       } else miniDia(mctx, cxm, cym, 2.2, '#ffd23f', 'rgba(60,40,10,0.9)');
     }
-    for (var pi = 0; pi < game.buildings.length; pi++) {
+    for (let pi = 0; pi < game.buildings.length; pi++) {
       // red pulses for buildings needing attention
-      var pb = game.buildings[pi];
+      const pb = game.buildings[pi];
       if (!game.bStatus(pb).bad) continue;
-      var pu = renderPrefs().reducedMotion ? 0.5 : 0.5 + 0.5 * Math.sin(NOW / 230 + pb.id);
+      const pu = renderPrefs().reducedMotion ? 0.5 : 0.5 + 0.5 * Math.sin(NOW / 230 + pb.id);
       mctx.fillStyle = 'rgba(255,70,56,' + (0.3 + 0.6 * pu).toFixed(3) + ')';
       mctx.beginPath();
       mctx.arc(pb.x * s + s / 2, pb.y * s + s / 2, 2.2 + pu * 1.6, 0, 7);
       mctx.fill();
     }
-    for (i = 0; i < game.units.length; i++) {
-      var u = game.units[i];
+    for (let i = 0; i < game.units.length; i++) {
+      const u = game.units[i];
       mctx.fillStyle = u.kind === 'soldier' ? '#ff7a7a' : '#d8ecff';
       mctx.fillRect(u.x * s - 0.8, u.y * s - 0.8, 1.9, 1.9);
     }
@@ -2782,7 +2778,7 @@ export function createRenderer(
       Math.min(192 - (cam.y / (game.H * game.TS)) * 192, (vh / z / (game.H * game.TS)) * 192),
     );
     if (hoverIn) {
-      var cxm2 = ((cam.x + mouse.x / z) / (game.W * game.TS)) * 192,
+      const cxm2 = ((cam.x + mouse.x / z) / (game.W * game.TS)) * 192,
         cym2 = ((cam.y + mouse.y / z) / (game.H * game.TS)) * 192;
       mctx.strokeStyle = '#ffd23f';
       mctx.lineWidth = 1;
