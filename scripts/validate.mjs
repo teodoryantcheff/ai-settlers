@@ -29,6 +29,7 @@ export async function validationSteps(directory, { nodeOnly = false } = {}) {
         ]
       : []),
     node('typecheck', 'node_modules/typescript/bin/tsc', '--noEmit'),
+    node('null-check', 'scripts/null-check.mjs'),
     ...tests.map((name) => node(name, '--test-reporter=spec', path.join('tests', name))),
     ...(!nodeOnly
       ? [

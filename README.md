@@ -44,11 +44,11 @@ Reference searches buildings, actual recipes, resources, transport and diagnosti
 npm test
 ```
 
-Run only `npm test` for routine validation. It runs typechecking and Node tests, retaining per-step logs and a JSON summary under `output/validation/<run>/`; failures print the log tail and stop the sequence.
+Run only `npm test` for routine validation. It runs typechecking, the null-check gate and Node tests, retaining per-step logs and a JSON summary under `output/validation/<run>/`; failures print the log tail and stop the sequence.
 
 Run the slower `npm run check`, browser tests or visual captures only when explicitly requested. The full check adds formatting, the build and browser tests. Browser tests use one worker because software WebGL is load-sensitive; the suite can take about 25 minutes and retains browser failure artifacts alongside its logs.
 
-Tests and builds run TypeScript 7 checking through `npm run typecheck`, which invokes the TypeScript 7 compiler explicitly. Browser tests require Playwright Chromium (`npx playwright install chromium` once). If port 8765 is occupied by another server, use `PLAYWRIGHT_PORT=8766 npm run test:browser`. Development scenarios are available at `tests/game.html?uitest&buildrules&seed=2024`, `?saveload&seed=123`, and `?devshot&seed=2024`.
+Tests and builds run TypeScript 7 checking through `npm run typecheck`, which invokes the TypeScript 7 compiler explicitly. The main configuration still has strict null checks off; the null-check gate (`node scripts/null-check.mjs`) typechecks with them on and fails on any error in a file not listed in `scripts/null-check-exclusions.json`. It also fails when a listed file has no errors, so remove files from the list as you fix them and never add new ones. Browser tests require Playwright Chromium (`npx playwright install chromium` once). If port 8765 is occupied by another server, use `PLAYWRIGHT_PORT=8766 npm run test:browser`. Development scenarios are available at `tests/game.html?uitest&buildrules&seed=2024`, `?saveload&seed=123`, and `?devshot&seed=2024`.
 
 With the local server running, `npm run capture:production-art` exports images, diagnostics and a particle animation into `output/production-art/`. Capture additionally requires FFmpeg. Headless software-WebGL timings are diagnostics; profile target hardware for performance decisions.
 
