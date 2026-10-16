@@ -4,6 +4,9 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { nullCheck } from '../scripts/null-check.mjs';
+import { runSteps, validationSteps } from '../scripts/validate.mjs';
+
+const root = path.resolve(import.meta.dirname, '..');
 
 /** A throwaway TypeScript project whose files are given as name → source. */
 async function project(t, files) {
@@ -46,4 +49,94 @@ test('an excluded file without null errors must leave the list', async (t) => {
   assert.equal(result.passed, false);
   assert.deepEqual(result.unexpected, []);
   assert.deepEqual(result.stale, ['src/fixed.ts', 'src/gone.ts', 'src/legacy.ts']);
+});
+
+/** Run npm test's gate command and logger against an isolated project. */
+async function validation(t, files, exclusions) {
+  const directory = await project(t, files);
+  await fs.mkdir(path.join(directory, 'scripts'));
+  await fs.copyFile(
+    path.join(root, 'scripts/null-check.mjs'),
+    path.join(directory, 'scripts/null-check.mjs'),
+  );
+  await fs.writeFile(
+    path.join(directory, 'scripts/null-check-exclusions.json'),
+    JSON.stringify(exclusions),
+  );
+  await fs.symlink(
+    path.join(root, 'node_modules'),
+    path.join(directory, 'node_modules'),
+    'junction',
+  );
+  const gate = (await validationSteps(root, { nodeOnly: true })).find(
+    (step) => step.name === 'null-check',
+  );
+  assert.ok(gate, 'npm test must include the null-check gate');
+  const logDirectory = path.join(directory, 'logs');
+  let output = '';
+  return {
+    directory,
+    logDirectory,
+    run: () =>
+      runSteps(
+        [
+          gate,
+          {
+            name: 'later-step',
+            command: process.execPath,
+            args: ['-e', "require('node:fs').writeFileSync('later-step-ran', 'yes')"],
+          },
+        ],
+        { directory, logDirectory, output: { write: (chunk) => (output += chunk) } },
+      ),
+    output: () => output,
+  };
+}
+
+test('npm test gate stops on new null errors and retains the diagnostic log', async (t) => {
+  const context = await validation(
+    t,
+    { 'legacy.ts': nullError, 'fresh.ts': 'export function size(): number { return null; }\n' },
+    ['src/legacy.ts'],
+  );
+  await assert.rejects(context.run(), /Validation stopped at null-check/);
+  await assert.rejects(fs.access(path.join(context.directory, 'later-step-ran')));
+  const summary = JSON.parse(await fs.readFile(path.join(context.logDirectory, 'summary.json')));
+  assert.equal(summary.complete, false);
+  assert.equal(summary.passed, false);
+  assert.equal(summary.results.length, 1);
+  assert.equal(summary.results[0].name, 'null-check');
+  assert.equal(summary.results[0].code, 1);
+  assert.equal(summary.results[0].passed, false);
+  const diagnostic = /src\/fresh\.ts\(1,\d+\): error TS\d+: .*null/;
+  assert.match(await fs.readFile(summary.results[0].log, 'utf8'), diagnostic);
+  assert.match(context.output(), diagnostic);
+});
+
+test('npm test gate requires fixed files to leave the exclusions before validation continues', async (t) => {
+  const context = await validation(t, { 'legacy.ts': nullError, 'fixed.ts': clean }, [
+    'src/legacy.ts',
+    'src/fixed.ts',
+  ]);
+  await assert.rejects(context.run(), /Validation stopped at null-check/);
+  await assert.rejects(fs.access(path.join(context.directory, 'later-step-ran')));
+  const summary = JSON.parse(await fs.readFile(path.join(context.logDirectory, 'summary.json')));
+  const diagnostic = /src\/fixed\.ts has no strict null check errors.*remove it/;
+  assert.match(await fs.readFile(summary.results[0].log, 'utf8'), diagnostic);
+  assert.match(context.output(), diagnostic);
+
+  await fs.writeFile(
+    path.join(context.directory, 'scripts/null-check-exclusions.json'),
+    JSON.stringify(['src/legacy.ts']),
+  );
+  await context.run();
+  assert.equal(await fs.readFile(path.join(context.directory, 'later-step-ran'), 'utf8'), 'yes');
+  const passed = JSON.parse(await fs.readFile(path.join(context.logDirectory, 'summary.json')));
+  assert.equal(passed.complete, true);
+  assert.equal(passed.passed, true);
+  assert.ok(passed.results[0].durationMs > 0);
+  assert.match(
+    await fs.readFile(passed.results[0].log, 'utf8'),
+    /Strict null checks pass outside the exclusion list/,
+  );
 });
