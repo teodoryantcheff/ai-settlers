@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(import.meta.dirname, '..');
 const tsc = path.join(root, 'node_modules/typescript/bin/tsc');
-const located = /^(.+?)\(\d+,\d+\): error TS\d+:/;
+const diagnosticFile = /^(.+?)\(\d+,\d+\): error TS\d+:/;
 
 /**
  * Typechecks `directory` with strict null checks. Errors count only outside `exclusions`,
@@ -19,26 +19,36 @@ export function nullCheck({ directory, exclusions }) {
   );
   // tsc exits 1 or 2 when it reports diagnostics; anything else means it did not finish checking.
   if (run.error || ![0, 1, 2].includes(run.status))
-    return {
-      passed: false,
-      unexpected: [`tsc failed: ${run.error?.message || run.signal || run.status}\n${run.stderr}`],
-      stale: [],
-    };
-  const lines = run.stdout.split('\n').filter((line) => line && !/^\s/.test(line));
-  const erroneous = new Set(lines.map((line) => line.match(located)?.[1]));
-  const unexpected = lines.filter((line) => !exclusions.includes(line.match(located)?.[1]));
-  const stale = exclusions.filter((file) => !erroneous.has(file));
+    throw new Error(
+      `tsc failed (${run.error?.message || run.signal || run.status})\n${run.stderr}`,
+    );
+  const diagnostics = run.stdout
+    .split('\n')
+    .filter((line) => line && !/^\s/.test(line))
+    .map((line) => ({ line, file: line.match(diagnosticFile)?.[1] }));
+  const erroneous = new Set(diagnostics.map(({ file }) => file));
+  const unexpected = diagnostics
+    .filter(({ file }) => !exclusions.includes(file))
+    .map(({ line }) => line);
+  const stale = exclusions.filter(
+    (file, index) => !erroneous.has(file) || exclusions.indexOf(file) < index,
+  );
   return { passed: !unexpected.length && !stale.length, unexpected, stale };
 }
 
 function main() {
-  const list = path.join(root, 'scripts/null-check-exclusions.json');
-  const result = nullCheck({ directory: root, exclusions: JSON.parse(fs.readFileSync(list)) });
+  const exclusionsPath = path.join(root, 'scripts/null-check-exclusions.json');
+  const exclusions = JSON.parse(fs.readFileSync(exclusionsPath));
+  const result = nullCheck({ directory: root, exclusions });
   for (const line of result.unexpected) console.log(line);
   if (result.unexpected.length)
-    console.log(`${result.unexpected.length} strict null check errors outside ${list}`);
+    console.log(
+      `${result.unexpected.length} strict null check diagnostics outside ${exclusionsPath}`,
+    );
   for (const file of result.stale)
-    console.log(`${file} has no strict null check errors; remove it from ${list}`);
+    console.log(
+      `${file} has no strict null check errors or is repeated; remove it from ${exclusionsPath}`,
+    );
   if (result.passed) console.log('Strict null checks pass outside the exclusion list');
   else process.exitCode = 1;
 }

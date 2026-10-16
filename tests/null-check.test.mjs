@@ -41,9 +41,9 @@ test('errors in excluded files pass while every excluded file still has errors',
 
 test('an excluded file without null errors must leave the list', async (t) => {
   const directory = await project(t, { 'legacy.ts': nullError, 'fixed.ts': clean });
-  const exclusions = ['src/legacy.ts', 'src/fixed.ts', 'src/gone.ts'];
+  const exclusions = ['src/legacy.ts', 'src/fixed.ts', 'src/gone.ts', 'src/legacy.ts'];
   const result = nullCheck({ directory, exclusions });
   assert.equal(result.passed, false);
   assert.deepEqual(result.unexpected, []);
-  assert.deepEqual(result.stale, ['src/fixed.ts', 'src/gone.ts']);
+  assert.deepEqual(result.stale, ['src/fixed.ts', 'src/gone.ts', 'src/legacy.ts']);
 });
