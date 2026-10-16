@@ -50,6 +50,8 @@ Run the slower `npm run check`, browser tests or visual captures only when expli
 
 Tests and builds run TypeScript 7 checking through `npm run typecheck`, which invokes the TypeScript 7 compiler explicitly. Browser tests require Playwright Chromium (`npx playwright install chromium` once). If port 8765 is occupied by another server, use `PLAYWRIGHT_PORT=8766 npm run test:browser`. Development scenarios are available at `tests/game.html?uitest&buildrules&seed=2024`, `?saveload&seed=123`, and `?devshot&seed=2024`.
 
+`npm run bench:render` measures CPU and GPU frame time at every zoom on this machine's GPU (headless Chromium, real WebGL); add `-- --zooms 3 --profile 3` to narrow it and keep a CPU profile. Results go to `output/bench/`; see [performance notes](docs/performance-60fps.md).
+
 With the local server running, `npm run capture:production-art` exports images, diagnostics and a particle animation into `output/production-art/`. Capture additionally requires FFmpeg. Headless software-WebGL timings are diagnostics; profile target hardware for performance decisions.
 
 ## Deploy
