@@ -44,6 +44,8 @@ export interface EngineOptions {
   seed: number;
   search?: string;
   storage?: StoragePort;
+  /** Development builds only: test-only persistence hooks (see `src/dev/`). */
+  persistenceInternals?: PersistenceInternals;
 }
 
 /** One domain factory order shared by production and partial test assemblies. */
@@ -70,7 +72,7 @@ export const DOMAIN_SUBSYSTEMS = [
     createAutoplay(game, hooks),
   ),
   domainSubsystem('persistence', (game, options, hooks?: PersistenceInternals) =>
-    createPersistence(game, hooks, options.storage),
+    createPersistence(game, hooks ?? options.persistenceInternals, options.storage),
   ),
   domainSubsystem('startup', (game) => createEngineStartup(game)),
 ] as const;

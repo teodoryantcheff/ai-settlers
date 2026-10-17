@@ -2,9 +2,13 @@ import { createEngine } from './simulation/engine.ts';
 import { assemblePresentation } from './application/assembly.ts';
 import type { RendererPresentation } from './rendering/scene.ts';
 import type { GameRuntime } from './runtime.ts';
+import type { PersistenceInternals } from './core/persistence.ts';
 
 /** Assemble before starting: no module starts a frame loop when imported. */
-export function createGame(presentation: RendererPresentation): GameRuntime {
+export function createGame(
+  presentation: RendererPresentation,
+  persistenceInternals?: PersistenceInternals,
+): GameRuntime {
   const search = location.search;
   const seedMatch = search.match(/[?&]seed=(\d+)/);
   const seed = seedMatch ? +seedMatch[1] | 0 : (Math.random() * 1e9) | 0;
@@ -16,6 +20,7 @@ export function createGame(presentation: RendererPresentation): GameRuntime {
       setItem: (key, value) => localStorage.setItem(key, value),
       removeItem: (key) => localStorage.removeItem(key),
     },
+    persistenceInternals,
   }) as GameRuntime;
   assemblePresentation(game, { presentation });
   return game;
