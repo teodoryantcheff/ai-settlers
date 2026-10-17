@@ -1,6 +1,6 @@
 import { Container, Filter, Rectangle, Texture } from 'pixi.js';
 import type { GameRuntime } from '../runtime.ts';
-import type { PremultipliedTint } from './renderer.ts';
+import type { PremultipliedTint } from './scene.ts';
 
 const vertex = `
 precision highp float;

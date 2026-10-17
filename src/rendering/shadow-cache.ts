@@ -1,7 +1,7 @@
 import type { GameRuntime } from '../runtime.ts';
 import type { Sprite } from '../types.ts';
 import { requireCanvas2D } from './canvas-context.ts';
-import type { RendererPresentation } from './renderer.ts';
+import type { RendererPresentation } from './scene.ts';
 
 /** One world-space shadow layer. Casts and contacts keep separate planes so
  * moonlight/rain can fade the casts without lifting the shade at tree roots. */

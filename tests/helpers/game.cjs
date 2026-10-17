@@ -266,10 +266,50 @@ function recordingPresentation() {
     layers,
     invalidate() {},
     begin() {},
-    layer(name, ctx, paint) {
-      layers.push({ name, ctx, paint });
+    layer(name, paint) {
+      layers.push({ name, paint });
     },
     end() {},
+  };
+}
+
+/**
+ * Scene layer double. Every Pixi Graphics call on `g` (chainable) and every
+ * image, text, blit, shadow and clip lands in `calls` as `{ method, args }`;
+ * images and text also keep their `alpha`/`style`.
+ */
+function recordingScene(calls = []) {
+  const g = new Proxy(
+    {},
+    {
+      get:
+        (_, method) =>
+        (...args) => {
+          calls.push({ method, args });
+          return g;
+        },
+    },
+  );
+  return {
+    calls,
+    g,
+    texture: (source, frame) => ({ source, frame }),
+    image(source, x, y, width, height, alpha = 1, frame) {
+      calls.push({ method: 'image', args: [source, x, y, width, height], alpha, frame });
+    },
+    blit(...args) {
+      calls.push({ method: 'blit', args });
+    },
+    shadows(...args) {
+      calls.push({ method: 'shadows', args });
+    },
+    text(value, x, y, style) {
+      calls.push({ method: 'text', args: [value, x, y], style });
+    },
+    measureText: (value) => value.length * 5,
+    clip(rect) {
+      calls.push({ method: 'clip', args: [rect] });
+    },
   };
 }
 
@@ -296,5 +336,6 @@ module.exports = {
   fakeWindow,
   fakeStorage,
   recordingPresentation,
+  recordingScene,
   DEFAULT_MODULES,
 };

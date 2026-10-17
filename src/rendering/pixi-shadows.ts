@@ -13,6 +13,7 @@ void main() {
   vUV = aUV;
   gl_Position = vec4((uProjectionMatrix * uWorldTransformMatrix * uTransformMatrix * vec3(aPosition, 1.0)).xy, 0.0, 1.0);
 }`;
+// `cast` is a reserved GLSL word that strict compilers (SwiftShader) reject.
 const fragment = `
 in vec2 vUV;
 out vec4 finalColor;
@@ -21,9 +22,9 @@ uniform sampler2D uContacts;
 uniform float uCastOpacity;
 uniform float uContactOpacity;
 void main() {
-  vec4 cast = texture(uCast, vUV) * uCastOpacity;
+  vec4 casts = texture(uCast, vUV) * uCastOpacity;
   vec4 contact = texture(uContacts, vUV) * uContactOpacity;
-  finalColor = contact + cast * (1.0 - contact.a);
+  finalColor = contact + casts * (1.0 - contact.a);
 }`;
 
 export function createShadowQuad(cast: Texture, contacts: Texture, width: number, height: number) {

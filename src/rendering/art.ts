@@ -572,7 +572,6 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     },
     Acan,
     rgba,
-    rr,
   };
 }
 
@@ -581,5 +580,4 @@ export interface ArtSubsystem {
   readonly ART: ArtAtlas;
   Acan: (w: number, h: number) => HTMLCanvasElement;
   rgba: (c: string, a: number) => string;
-  rr: (g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) => void;
 }

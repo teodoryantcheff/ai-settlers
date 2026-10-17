@@ -1,5 +1,6 @@
 import { createEventBus } from '../../src/core/state.ts';
-import { UNLIT_AT_NIGHT, type RendererPresentation } from '../../src/rendering/renderer.ts';
+import { UNLIT_AT_NIGHT } from '../../src/rendering/renderer.ts';
+import type { RendererPresentation } from '../../src/rendering/scene.ts';
 import type { GameRuntime } from '../../src/runtime.ts';
 import type {
   Building,
@@ -61,7 +62,7 @@ const incompleteMode: InteractionMode = { type: 'build' };
 // @ts-expect-error Non-build modes expose no building type.
 const roadModeBt = mode.bt;
 // @ts-expect-error Scene layers are a closed set.
-presentation.layer('bogus-layer', null as unknown as CanvasRenderingContext2D, () => {});
+presentation.layer('bogus-layer', () => {});
 // @ts-expect-error Diagnostic overlays are a closed set.
 game.presentationPrefs.overlay = 'bogus-overlay';
 // @ts-expect-error Implicitly-any parameters are gone: tile hashes take tile indexes.

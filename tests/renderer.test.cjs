@@ -9,6 +9,7 @@ const {
   pinClock,
   DEFAULT_MODULES,
   fakeStorage,
+  recordingScene,
 } = require('./helpers/game.cjs');
 const { requireCanvas2D } = require('../src/rendering/canvas-context.ts');
 const { paintUtilityArtwork } = require('../src/ui/utility-art.ts');
@@ -83,7 +84,6 @@ function renderer(options = {}) {
     },
     stubs: {
       Acan: canvas,
-      rr: noop,
       rgba: (color, alpha) => color + ':' + alpha,
       ART: {
         paintedTerrain: { image: { width: 384, height: 384 }, worldSize: 384 },
@@ -128,6 +128,8 @@ function renderer(options = {}) {
   e.ghost = { x: 52, y: 48, ok: true, in: true };
   e.calls = calls;
   e.context = context;
+  // Native painters record into the same call log as the offscreen canvases.
+  e.scene = recordingScene(calls);
   return e;
 }
 
@@ -229,7 +231,7 @@ test('walkers follow the last segment after turning, including zero direction co
   e.state.paused = false;
   e.unitPoses[7] = { x: 49, y: 48, distance: 0, dir: 's' };
   e.drawUnit(
-    e.context,
+    e.scene,
     {
       id: 7,
       kind: 'carrier',
@@ -244,10 +246,10 @@ test('walkers follow the last segment after turning, including zero direction co
     100,
   );
   assert.equal(e.unitPoses[7].dir, 'e');
-  assert.equal(e.calls.filter((call) => call.method === 'drawImage')[1].args[0], 'e0');
+  assert.equal(e.calls.filter((call) => call.method === 'image')[1].args[0], 'e0');
   e.unitPoses[8] = { x: 48, y: 49, distance: 0, dir: 'e' };
   e.drawUnit(
-    e.context,
+    e.scene,
     {
       id: 8,
       kind: 'carrier',
@@ -306,9 +308,9 @@ test('diagonal walkers use all eight headings and recognizable cargo without cha
     };
     const before = JSON.stringify(u);
     e.calls.length = 0;
-    e.drawUnit(e.context, u, 100);
+    e.drawUnit(e.scene, u, 100);
     assert.equal(e.unitPoses[u.id].dir, headings[i]);
-    const sprites = e.calls.filter((c) => c.method === 'drawImage').map((c) => c.args[0]);
+    const sprites = e.calls.filter((c) => c.method === 'image').map((c) => c.args[0]);
     assert.deepEqual(sprites, ['shadow', headings[i] + '4', 'timber-bundle']);
     assert.equal(JSON.stringify(u), before);
   }
@@ -337,12 +339,13 @@ test('pause and Reduced Motion keep eight-direction settlers in their resting po
     e.state.paused = paused;
     e.presentationPrefs.reducedMotion = !paused;
     e.calls.length = 0;
-    e.drawUnit(e.context, u, 100);
+    e.drawUnit(e.scene, u, 100);
     assert.deepEqual(
-      e.calls.filter((c) => c.method === 'drawImage').map((c) => c.args[0]),
+      e.calls.filter((c) => c.method === 'image').map((c) => c.args[0]),
       ['shadow', 'nw-idle', 'grain-sack'],
     );
-    assert.equal(e.calls.find((c) => c.method === 'translate').args[1], u.y * e.TS - 1);
+    const sprite = e.calls.filter((c) => c.method === 'image')[1];
+    assert.equal(sprite.args[2] + 18, u.y * e.TS - 1, 'the resting pose keeps the ground line');
   }
 });
 
@@ -457,21 +460,21 @@ test('meadow particles are bounded, reproducible, and independent of simulation 
     throw new Error('particle RNG');
   };
   e.calls.length = 0;
-  e.meadowParticles(e.context, 2300);
-  const particles = e.calls.filter((call) => call.method === 'arc');
+  e.meadowParticles(e.scene, 2300);
+  const particles = e.calls.filter((call) => call.method === 'circle');
   assert.ok(particles.length > 0);
   assert.ok(particles.length <= 56);
   assert.ok(e.atmosphereCount >= particles.length && e.atmosphereCount <= 59);
   e.calls.length = 0;
-  e.meadowParticles(e.context, 2300);
+  e.meadowParticles(e.scene, 2300);
   assert.deepEqual(
-    e.calls.filter((call) => call.method === 'arc'),
+    e.calls.filter((call) => call.method === 'circle'),
     particles,
   );
   e.presentationPrefs.quality = 0.75;
   e.calls.length = 0;
-  e.meadowParticles(e.context, 2300);
-  assert.ok(e.calls.filter((call) => call.method === 'arc').length <= 20);
+  e.meadowParticles(e.scene, 2300);
+  assert.ok(e.calls.filter((call) => call.method === 'circle').length <= 20);
 });
 
 test('Reduced Motion disables cosmetic particles and weather removes airborne meadow particles', () => {
@@ -480,15 +483,15 @@ test('Reduced Motion disables cosmetic particles and weather removes airborne me
   e.vh = 800;
   e.presentationPrefs.reducedMotion = true;
   e.calls.length = 0;
-  e.meadowParticles(e.context, 2300);
-  e.drawSmoke(e.context, 20, 30, 2300, 7);
+  e.meadowParticles(e.scene, 2300);
+  e.drawSmoke(e.scene, 20, 30, 2300, 7);
   e.FX.dust(10, 10);
   assert.equal(e.calls.length, 0);
   assert.equal(e.FXL.length, 0);
   assert.equal(e.atmosphereCount, 0);
   e.presentationPrefs.reducedMotion = false;
   e._rain = 0.8;
-  e.meadowParticles(e.context, 2300);
+  e.meadowParticles(e.scene, 2300);
   assert.equal(e.calls.length, 0);
 });
 
@@ -500,9 +503,9 @@ test('burst effects stay capped at low quality and offscreen effects still expir
   for (let i = 0; i < 300; i++) e.FX.dust(80, 80);
   assert.equal(e.FXL.length, 48);
   e.calls.length = 0;
-  e.fxDraw(e.context, 100);
+  e.fxDraw(e.scene, 100);
   assert.equal(e.calls.length, 0);
-  e.fxDraw(e.context, 800);
+  e.fxDraw(e.scene, 800);
   assert.equal(e.FXL.length, 0);
 });
 
@@ -524,19 +527,19 @@ test('settler dust is tied to new footsteps and does not repeat when the same po
     path: [e.idx(52, 51)],
     pi: 0,
   };
-  e.drawUnit(e.context, u, 100);
+  e.drawUnit(e.scene, u, 100);
   assert.equal(e.FXL.length, 0);
   u.x += 0.1;
   u.walkDistance = 1.6;
-  e.drawUnit(e.context, u, 200);
+  e.drawUnit(e.scene, u, 200);
   assert.equal(e.FXL.length, 1);
   assert.equal(e.FXL[0].k, 'stepDust');
-  e.drawUnit(e.context, u, 210);
+  e.drawUnit(e.scene, u, 210);
   assert.equal(e.FXL.length, 1);
   e.presentationPrefs.reducedMotion = true;
   u.x += 0.1;
   u.walkDistance = 2.2;
-  e.drawUnit(e.context, u, 300);
+  e.drawUnit(e.scene, u, 300);
   assert.equal(e.FXL.length, 1);
 });
 
@@ -562,16 +565,16 @@ test('building contours are cached per artwork and view without changing sprite 
 test('clarity leaves tree roots and sizes unchanged and suppresses competing particles', () => {
   const e = renderer();
   e.ART.tree = Array.from({ length: 4 }, () => Array.from({ length: 3 }, () => ['tree', 'tree2']));
-  e.drawTree(e.context, 48, 49, { tree: 4 }, 1000);
-  const standard = e.calls.find((call) => call.method === 'drawImage').args;
+  e.drawTree(e.scene, 48, 49, { tree: 4 }, 1000);
+  const standard = e.calls.find((call) => call.method === 'image').args;
   const rng = e.SR.getState();
   e.presentationPrefs.clarity = true;
   e.calls.length = 0;
-  e.drawTree(e.context, 48, 49, { tree: 4 }, 1000);
-  assert.deepEqual(e.calls.find((call) => call.method === 'drawImage').args, standard);
+  e.drawTree(e.scene, 48, 49, { tree: 4 }, 1000);
+  assert.deepEqual(e.calls.find((call) => call.method === 'image').args, standard);
   e.calls.length = 0;
-  e.drawSmoke(e.context, 10, 20, 1000, 7);
-  e.meadowParticles(e.context, 1000);
+  e.drawSmoke(e.scene, 10, 20, 1000, 7);
+  e.meadowParticles(e.scene, 1000);
   assert.equal(e.calls.length, 0);
   assert.equal(e.atmosphereCount, 0);
   assert.equal(e.SR.getState(), rng);
@@ -583,7 +586,6 @@ test('clarity uses distinct working, waiting, paused and construction symbols', 
   e.vh = 900;
   e.cam = { x: 40 * e.TS, y: 40 * e.TS };
   e.presentationPrefs.clarity = true;
-  e.context.measureText = (text) => ({ width: text.length * 5 });
   for (const [offset, reason, done] of [
     [0, '', true],
     [2, 'inputs', true],
@@ -596,8 +598,8 @@ test('clarity uses distinct working, waiting, paused and construction symbols', 
     b.blockedReason = reason;
     e.buildings.push(b);
   }
-  e.clarityBuildings(e.context);
-  const tags = e.calls.filter((call) => call.method === 'fillText').map((call) => call.args[0]);
+  e.clarityBuildings(e.scene);
+  const tags = e.calls.filter((call) => call.method === 'text').map((call) => call.args[0]);
   assert.deepEqual(tags, ['HQ ·', 'SAW ▶', 'SAW !', 'SAW Ⅱ', 'SAW +']);
 });
 
@@ -607,7 +609,6 @@ test('a producer blocked by colony reserves is drawn idle before its next simula
   e.vh = 900;
   e.cam = { x: 40 * e.TS, y: 40 * e.TS };
   e.presentationPrefs.clarity = true;
-  e.context.measureText = (text) => ({ width: text.length * 5 });
   const mill = e.newBuilding('windmill', 50, 48);
   Object.assign(mill, { done: true, timer: 4, stock: { grain: 2 }, blockedReason: '' });
   e.buildings.push(mill);
@@ -615,9 +616,9 @@ test('a producer blocked by colony reserves is drawn idle before its next simula
   const before = e.exportSave();
   const rng = e.SR.getState();
   assert.equal(e.productionProgress(mill).reason, 'demand');
-  e.clarityBuildings(e.context);
+  e.clarityBuildings(e.scene);
   assert.deepEqual(
-    e.calls.filter((call) => call.method === 'fillText').map((call) => call.args[0]),
+    e.calls.filter((call) => call.method === 'text').map((call) => call.args[0]),
     ['HQ ·', 'FLOUR ·'],
   );
   assert.equal(e.exportSave(), before, 'drawing idle cannot advance the colony');
@@ -662,11 +663,11 @@ test('night glow lights domestic windows but leaves mines and open yards dark', 
   }
   const rng = e.SR.getState();
   e.calls.length = 0;
-  e.glowsDraw(e.context);
+  e.glowsDraw(e.scene);
   const lit = new Set(
     e.calls
       // The square window aura is centred over its building's tile.
-      .filter((call) => call.method === 'drawImage' && call.args[0] === 'glow')
+      .filter((call) => call.method === 'image' && call.args[0] === 'glow')
       .filter((call) => call.args[3] === call.args[4])
       .map((call) => Math.floor((call.args[1] + call.args[3] / 2) / e.TS)),
   );
@@ -848,19 +849,16 @@ function pausedScene(paintForeground = false) {
       begin() {},
       end() {},
       screenTint: (tint) => tints.push([...tint]),
-      layer(name, ctx, paint) {
-        if (!paintForeground || (name !== 'foreground-effects' && name !== 'above-atmosphere'))
+      layer(name, paint) {
+        if (
+          !paintForeground ||
+          !['foreground-effects', 'above-atmosphere', 'overlay'].includes(name)
+        )
           return;
-        const fill = ctx.fillRect;
-        ctx.fillRect = (...args) => {
-          if (args[2] >= e.vw && args[3] >= e.vh) viewportFills.push(ctx.fillStyle);
-          fill(...args);
-        };
-        try {
-          paint();
-        } finally {
-          ctx.fillRect = fill;
-        }
+        const scene = recordingScene();
+        paint(scene);
+        for (const { method, args } of scene.calls)
+          if (method === 'rect' && args[2] >= e.vw && args[3] >= e.vh) viewportFills.push(args);
       },
     },
   });
@@ -945,6 +943,7 @@ test('lightning during pause expires on wall time', (t) => {
 test('the backdrop and map shadows fill only viewport area the map leaves uncovered', (t) => {
   const clock = pinClock(1000);
   t.after(() => clock.restore());
+  // Rectangles collect into a path until a fill gives them their style.
   const fills = [];
   const e = renderer({
     presentation: {
@@ -952,17 +951,17 @@ test('the backdrop and map shadows fill only viewport area the map leaves uncove
       invalidate() {},
       begin() {},
       end() {},
-      layer(name, ctx, paint) {
+      layer(name, paint) {
         if (name !== 'backdrop') return;
-        const fill = ctx.fillRect;
-        ctx.fillRect = (...args) => {
-          fills.push({ style: ctx.fillStyle, rect: args });
-          fill(...args);
-        };
-        try {
-          paint();
-        } finally {
-          ctx.fillRect = fill;
+        const scene = recordingScene();
+        paint(scene);
+        let pending = [];
+        for (const { method, args } of scene.calls) {
+          if (method === 'rect') pending.push(args);
+          else if (method === 'fill') {
+            for (const rect of pending) fills.push({ style: args[0], rect });
+            pending = [];
+          }
         }
       },
     },
@@ -978,22 +977,24 @@ test('the backdrop and map shadows fill only viewport area the map leaves uncove
     mapH = e.H * e.TS;
   e.cam = { x: mapW - 700, y: 40 * e.TS };
   e.draw();
-  const gradient = fills.filter((f) => typeof f.style !== 'string');
+  const isGradient = (style) => Array.isArray(style?.colorStops);
+  const gradient = fills.filter((f) => isGradient(f.style));
   assert.deepEqual(
     gradient.map((f) => f.rect),
     [[700, 0, 100, 600]],
-    'only the band east of the map',
+    'only the band east of the map (screen pixels)',
   );
-  const shadows = fills.filter((f) => typeof f.style === 'string');
+  const shadows = fills.filter((f) => !isGradient(f.style));
   assert.ok(shadows.length > 0, 'the map still casts its drop shadow');
   for (const { rect } of shadows) {
-    const [x, y, w, h] = rect;
+    // Back to world pixels at zoom 1.
+    const [x, y, w, h] = [rect[0] + e.cam.x, rect[1] + e.cam.y, rect[2], rect[3]];
     assert.ok(x >= mapW || y >= mapH, `shadow ${rect} stays outside the map`);
     assert.ok(x + w <= mapW + 4 && y + h <= mapH + 5);
   }
 });
 
-test('the layer above the atmosphere follows the screen veil', (t) => {
+test('the layers above the atmosphere follow the screen veil', (t) => {
   const clock = pinClock(1000);
   t.after(() => clock.restore());
   const sequence = [];
@@ -1012,5 +1013,10 @@ test('the layer above the atmosphere follows the screen veil', (t) => {
   e.vw = 800;
   e.vh = 600;
   e.draw();
-  assert.deepEqual(sequence.slice(-3), ['foreground-effects', 'veil', 'above-atmosphere']);
+  assert.deepEqual(sequence.slice(-4), [
+    'foreground-effects',
+    'veil',
+    'above-atmosphere',
+    'overlay',
+  ]);
 });

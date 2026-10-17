@@ -189,8 +189,16 @@ export type InteractionMode =
   { type: 'build'; bt: BuildingType } | { type: 'road' } | { type: 'demolish' };
 export type InteractionModeType = InteractionMode['type'];
 /** Ordered scene layers produced by the renderer and consumed by the presentation. */
+/** Ordered scene layers. `backdrop` and `overlay` draw in screen pixels; the
+ * rest draw in world pixels. `above-atmosphere` and `overlay` skip grading. */
 export type LayerName =
-  'objects' | 'backdrop' | 'terrain' | 'ground-effects' | 'foreground-effects' | 'above-atmosphere';
+  | 'backdrop'
+  | 'terrain'
+  | 'ground-effects'
+  | 'objects'
+  | 'foreground-effects'
+  | 'above-atmosphere'
+  | 'overlay';
 /** Diagnostic map overlays; 'none' (no overlay) is a preference value, not a layer. */
 export type OverlayName = 'routes' | 'workload' | 'reach' | 'stalls';
 export interface TilePoint {

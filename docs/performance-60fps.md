@@ -2,6 +2,8 @@
 
 Measured on 2026-10-16 on the reference laptop: Intel Core i7-8550U (4C/8T, 15 W), Intel UHD Graphics 620, 1920×1080, Chromium with ANGLE on the hardware GPU. The initial diagnosis and follow-up plan below are retained as the baseline; the implementation measurements record the shipped changes. The work is tracked in [#35](https://github.com/teodoryantcheff/ai-settlers/issues/35) and its sub-issues.
 
+**Update, 2026-10-17.** The Canvas2D interception layer described below (`pixi-context.ts`) has been removed. Painters now draw straight into a few pooled PixiJS `Graphics` runs per layer, rebuilt each frame. On the same laptop with a 10-minute colony, CPU time per frame fell from 32/27/20 ms to 13/10/5.5 ms (zoom 0.55/1/2.2, running), every zoom reaches the 60 fps cap, and draw calls fell from about 44 to 15.
+
 **Verdict.** The frame is CPU-bound in rendering. The simulation, HUD and minimap together cost about 1 ms per frame at 1× speed. The world renderer re-describes every visible object each frame through intercepted Canvas2D calls, maps them onto a positional pool of PixiJS objects, and makes PixiJS re-batch the whole scene. That work grows with the number of visible objects (∝ 1/zoom²) and roughly doubles while the colony is running. Three cheap fixes halve the cost, but 60 fps at every zoom needs a retained world scene. A prototype of that scene on this machine costs 2–5 ms per frame.
 
 ## Method
