@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame } from './helpers/game.cjs';
+import { plainSave } from './helpers/saves.mjs';
 
 function colony() {
   const { game } = createGame({
@@ -82,7 +83,7 @@ test('stock categories reconcile without counting reservations or queued jobs tw
   assert.equal(game.resourceAccounting('logs').stored, 10);
 });
 
-test('colony windows survive exact save continuation and missing old observations begin at load', () => {
+test('colony windows survive exact save continuation', () => {
   const { game, mill } = colony();
   for (let i = 0; i < 2600; i++) {
     mill.stock.logs = 4;
@@ -96,13 +97,6 @@ test('colony windows survive exact save continuation and missing old observation
   game.importSave(checkpoint);
   for (let i = 0; i < 40; i++) game.step(0.25);
   assert.deepEqual(JSON.parse(game.exportSave()), JSON.parse(expected));
-  const legacy = JSON.parse(checkpoint);
-  delete legacy.observations;
-  game.importSave(JSON.stringify(legacy));
-  assert.equal(game.economicWindow('lifetime').available, false);
-  assert.deepEqual(game.economicWindow('lifetime').totals.produced, {});
-  game.step(0.25);
-  assert.equal(game.economicWindow('lifetime').elapsed, 0.25);
 });
 
 test('malformed or unbounded colony observations cannot replace a valid colony', () => {
@@ -133,7 +127,7 @@ test('malformed or unbounded colony observations cannot replace a valid colony',
     },
   ];
   for (const corrupt of corruptions) {
-    const bad = JSON.parse(valid);
+    const bad = plainSave(valid);
     corrupt(bad.observations);
     assert.throws(() => game.importSave(JSON.stringify(bad)), /observation|resource/i);
     assert.equal(game.exportSave(), valid);

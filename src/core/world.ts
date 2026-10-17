@@ -6,8 +6,9 @@ export function createWorld(search = '?seed=0'): WorldSubsystem {
     TS = 24,
     GOAL = 200;
   const ST = 1.5; // Static terrain texture supersampling.
-  // Development scenarios freeze cosmetic weather and lighting at noon.
-  const TESTMODE = /uitest|buildrules|saveload|devshot/.test(search);
+  // Development scenarios and the render benchmark freeze cosmetic weather and
+  // lighting at noon, so repeated runs draw the same scene.
+  const TESTMODE = /uitest|buildrules|saveload|devshot|renderbench/.test(search);
   const WATER = 0,
     SAND = 1,
     GRASS = 2,

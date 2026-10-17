@@ -9,6 +9,7 @@ const {
   pinClock,
   DEFAULT_MODULES,
   fakeStorage,
+  recordingScene,
 } = require('./helpers/game.cjs');
 const { requireCanvas2D } = require('../src/rendering/canvas-context.ts');
 const { paintUtilityArtwork } = require('../src/ui/utility-art.ts');
@@ -83,10 +84,10 @@ function renderer(options = {}) {
     },
     stubs: {
       Acan: canvas,
-      rr: noop,
       rgba: (color, alpha) => color + ':' + alpha,
       ART: {
-        grass: ['g0', 'g1', 'g2', 'g3'],
+        paintedTerrain: { image: { width: 384, height: 384 }, worldSize: 384 },
+        paintedMountains: { dry: [], snowy: [], foothill: { width: 120, height: 60 } },
       },
       presentationPrefs: {
         reducedMotion: false,
@@ -127,6 +128,8 @@ function renderer(options = {}) {
   e.ghost = { x: 52, y: 48, ok: true, in: true };
   e.calls = calls;
   e.context = context;
+  // Native painters record into the same call log as the offscreen canvases.
+  e.scene = recordingScene(calls);
   return e;
 }
 
@@ -228,7 +231,7 @@ test('walkers follow the last segment after turning, including zero direction co
   e.state.paused = false;
   e.unitPoses[7] = { x: 49, y: 48, distance: 0, dir: 's' };
   e.drawUnit(
-    e.context,
+    e.scene,
     {
       id: 7,
       kind: 'carrier',
@@ -243,10 +246,10 @@ test('walkers follow the last segment after turning, including zero direction co
     100,
   );
   assert.equal(e.unitPoses[7].dir, 'e');
-  assert.equal(e.calls.filter((call) => call.method === 'drawImage')[1].args[0], 'e0');
+  assert.equal(e.calls.filter((call) => call.method === 'image')[1].args[0], 'e0');
   e.unitPoses[8] = { x: 48, y: 49, distance: 0, dir: 'e' };
   e.drawUnit(
-    e.context,
+    e.scene,
     {
       id: 8,
       kind: 'carrier',
@@ -305,9 +308,9 @@ test('diagonal walkers use all eight headings and recognizable cargo without cha
     };
     const before = JSON.stringify(u);
     e.calls.length = 0;
-    e.drawUnit(e.context, u, 100);
+    e.drawUnit(e.scene, u, 100);
     assert.equal(e.unitPoses[u.id].dir, headings[i]);
-    const sprites = e.calls.filter((c) => c.method === 'drawImage').map((c) => c.args[0]);
+    const sprites = e.calls.filter((c) => c.method === 'image').map((c) => c.args[0]);
     assert.deepEqual(sprites, ['shadow', headings[i] + '4', 'timber-bundle']);
     assert.equal(JSON.stringify(u), before);
   }
@@ -336,12 +339,13 @@ test('pause and Reduced Motion keep eight-direction settlers in their resting po
     e.state.paused = paused;
     e.presentationPrefs.reducedMotion = !paused;
     e.calls.length = 0;
-    e.drawUnit(e.context, u, 100);
+    e.drawUnit(e.scene, u, 100);
     assert.deepEqual(
-      e.calls.filter((c) => c.method === 'drawImage').map((c) => c.args[0]),
+      e.calls.filter((c) => c.method === 'image').map((c) => c.args[0]),
       ['shadow', 'nw-idle', 'grain-sack'],
     );
-    assert.equal(e.calls.find((c) => c.method === 'translate').args[1], u.y * e.TS - 1);
+    const sprite = e.calls.filter((c) => c.method === 'image')[1];
+    assert.equal(sprite.args[2] + 18, u.y * e.TS - 1, 'the resting pose keeps the ground line');
   }
 });
 
@@ -456,21 +460,21 @@ test('meadow particles are bounded, reproducible, and independent of simulation 
     throw new Error('particle RNG');
   };
   e.calls.length = 0;
-  e.meadowParticles(e.context, 2300);
-  const particles = e.calls.filter((call) => call.method === 'arc');
+  e.meadowParticles(e.scene, 2300);
+  const particles = e.calls.filter((call) => call.method === 'circle');
   assert.ok(particles.length > 0);
   assert.ok(particles.length <= 56);
   assert.ok(e.atmosphereCount >= particles.length && e.atmosphereCount <= 59);
   e.calls.length = 0;
-  e.meadowParticles(e.context, 2300);
+  e.meadowParticles(e.scene, 2300);
   assert.deepEqual(
-    e.calls.filter((call) => call.method === 'arc'),
+    e.calls.filter((call) => call.method === 'circle'),
     particles,
   );
   e.presentationPrefs.quality = 0.75;
   e.calls.length = 0;
-  e.meadowParticles(e.context, 2300);
-  assert.ok(e.calls.filter((call) => call.method === 'arc').length <= 20);
+  e.meadowParticles(e.scene, 2300);
+  assert.ok(e.calls.filter((call) => call.method === 'circle').length <= 20);
 });
 
 test('Reduced Motion disables cosmetic particles and weather removes airborne meadow particles', () => {
@@ -479,15 +483,15 @@ test('Reduced Motion disables cosmetic particles and weather removes airborne me
   e.vh = 800;
   e.presentationPrefs.reducedMotion = true;
   e.calls.length = 0;
-  e.meadowParticles(e.context, 2300);
-  e.drawSmoke(e.context, 20, 30, 2300, 7);
+  e.meadowParticles(e.scene, 2300);
+  e.drawSmoke(e.scene, 20, 30, 2300, 7);
   e.FX.dust(10, 10);
   assert.equal(e.calls.length, 0);
   assert.equal(e.FXL.length, 0);
   assert.equal(e.atmosphereCount, 0);
   e.presentationPrefs.reducedMotion = false;
   e._rain = 0.8;
-  e.meadowParticles(e.context, 2300);
+  e.meadowParticles(e.scene, 2300);
   assert.equal(e.calls.length, 0);
 });
 
@@ -499,9 +503,9 @@ test('burst effects stay capped at low quality and offscreen effects still expir
   for (let i = 0; i < 300; i++) e.FX.dust(80, 80);
   assert.equal(e.FXL.length, 48);
   e.calls.length = 0;
-  e.fxDraw(e.context, 100);
+  e.fxDraw(e.scene, 100);
   assert.equal(e.calls.length, 0);
-  e.fxDraw(e.context, 800);
+  e.fxDraw(e.scene, 800);
   assert.equal(e.FXL.length, 0);
 });
 
@@ -523,19 +527,19 @@ test('settler dust is tied to new footsteps and does not repeat when the same po
     path: [e.idx(52, 51)],
     pi: 0,
   };
-  e.drawUnit(e.context, u, 100);
+  e.drawUnit(e.scene, u, 100);
   assert.equal(e.FXL.length, 0);
   u.x += 0.1;
   u.walkDistance = 1.6;
-  e.drawUnit(e.context, u, 200);
+  e.drawUnit(e.scene, u, 200);
   assert.equal(e.FXL.length, 1);
   assert.equal(e.FXL[0].k, 'stepDust');
-  e.drawUnit(e.context, u, 210);
+  e.drawUnit(e.scene, u, 210);
   assert.equal(e.FXL.length, 1);
   e.presentationPrefs.reducedMotion = true;
   u.x += 0.1;
   u.walkDistance = 2.2;
-  e.drawUnit(e.context, u, 300);
+  e.drawUnit(e.scene, u, 300);
   assert.equal(e.FXL.length, 1);
 });
 
@@ -561,16 +565,16 @@ test('building contours are cached per artwork and view without changing sprite 
 test('clarity leaves tree roots and sizes unchanged and suppresses competing particles', () => {
   const e = renderer();
   e.ART.tree = Array.from({ length: 4 }, () => Array.from({ length: 3 }, () => ['tree', 'tree2']));
-  e.drawTree(e.context, 48, 49, { tree: 4 }, 1000);
-  const standard = e.calls.find((call) => call.method === 'drawImage').args;
+  e.drawTree(e.scene, 48, 49, { tree: 4 }, 1000);
+  const standard = e.calls.find((call) => call.method === 'image').args;
   const rng = e.SR.getState();
   e.presentationPrefs.clarity = true;
   e.calls.length = 0;
-  e.drawTree(e.context, 48, 49, { tree: 4 }, 1000);
-  assert.deepEqual(e.calls.find((call) => call.method === 'drawImage').args, standard);
+  e.drawTree(e.scene, 48, 49, { tree: 4 }, 1000);
+  assert.deepEqual(e.calls.find((call) => call.method === 'image').args, standard);
   e.calls.length = 0;
-  e.drawSmoke(e.context, 10, 20, 1000, 7);
-  e.meadowParticles(e.context, 1000);
+  e.drawSmoke(e.scene, 10, 20, 1000, 7);
+  e.meadowParticles(e.scene, 1000);
   assert.equal(e.calls.length, 0);
   assert.equal(e.atmosphereCount, 0);
   assert.equal(e.SR.getState(), rng);
@@ -582,7 +586,6 @@ test('clarity uses distinct working, waiting, paused and construction symbols', 
   e.vh = 900;
   e.cam = { x: 40 * e.TS, y: 40 * e.TS };
   e.presentationPrefs.clarity = true;
-  e.context.measureText = (text) => ({ width: text.length * 5 });
   for (const [offset, reason, done] of [
     [0, '', true],
     [2, 'inputs', true],
@@ -595,8 +598,8 @@ test('clarity uses distinct working, waiting, paused and construction symbols', 
     b.blockedReason = reason;
     e.buildings.push(b);
   }
-  e.clarityBuildings(e.context);
-  const tags = e.calls.filter((call) => call.method === 'fillText').map((call) => call.args[0]);
+  e.clarityBuildings(e.scene);
+  const tags = e.calls.filter((call) => call.method === 'text').map((call) => call.args[0]);
   assert.deepEqual(tags, ['HQ ·', 'SAW ▶', 'SAW !', 'SAW Ⅱ', 'SAW +']);
 });
 
@@ -606,7 +609,6 @@ test('a producer blocked by colony reserves is drawn idle before its next simula
   e.vh = 900;
   e.cam = { x: 40 * e.TS, y: 40 * e.TS };
   e.presentationPrefs.clarity = true;
-  e.context.measureText = (text) => ({ width: text.length * 5 });
   const mill = e.newBuilding('windmill', 50, 48);
   Object.assign(mill, { done: true, timer: 4, stock: { grain: 2 }, blockedReason: '' });
   e.buildings.push(mill);
@@ -614,9 +616,9 @@ test('a producer blocked by colony reserves is drawn idle before its next simula
   const before = e.exportSave();
   const rng = e.SR.getState();
   assert.equal(e.productionProgress(mill).reason, 'demand');
-  e.clarityBuildings(e.context);
+  e.clarityBuildings(e.scene);
   assert.deepEqual(
-    e.calls.filter((call) => call.method === 'fillText').map((call) => call.args[0]),
+    e.calls.filter((call) => call.method === 'text').map((call) => call.args[0]),
     ['HQ ·', 'FLOUR ·'],
   );
   assert.equal(e.exportSave(), before, 'drawing idle cannot advance the colony');
@@ -661,11 +663,11 @@ test('night glow lights domestic windows but leaves mines and open yards dark', 
   }
   const rng = e.SR.getState();
   e.calls.length = 0;
-  e.glowsDraw(e.context);
+  e.glowsDraw(e.scene);
   const lit = new Set(
     e.calls
       // The square window aura is centred over its building's tile.
-      .filter((call) => call.method === 'drawImage' && call.args[0] === 'glow')
+      .filter((call) => call.method === 'image' && call.args[0] === 'glow')
       .filter((call) => call.args[3] === call.args[4])
       .map((call) => Math.floor((call.args[1] + call.args[3] / 2) / e.TS)),
   );
@@ -674,4 +676,347 @@ test('night glow lights domestic windows but leaves mines and open yards dark', 
     [placed.sawmill.x, placed.warehouse.x],
   );
   assert.equal(e.SR.getState(), rng, 'cosmetic glow consumes no simulation RNG');
+});
+
+test('territory caches upload only changed bounds and skip unchanged projections', () => {
+  const uploads = [];
+  const e = renderer({
+    presentation: {
+      available: true,
+      invalidate: (canvas, rect) => uploads.push({ canvas, rect }),
+      begin() {},
+      layer() {},
+      end() {},
+    },
+  });
+  e.drawBorders();
+  assert.equal(uploads.length, 1);
+  assert.equal(uploads[0].rect, undefined, 'first paint refreshes everything');
+  uploads.length = 0;
+  const before = e.SR.getState();
+  e.owned[e.idx(50, 50)] = 0;
+  e.emitGameEvent('territoryChanged', {});
+  e.drawBorders();
+  assert.deepEqual(
+    uploads.map(({ rect }) => rect),
+    [
+      {
+        x: 48 * e.TS,
+        y: 48 * e.TS,
+        width: 8 * e.TS,
+        height: 8 * e.TS,
+      },
+    ],
+  );
+  uploads.length = 0;
+  e.emitGameEvent('territoryChanged', {});
+  e.drawBorders();
+  assert.equal(uploads.length, 0, 'unchanged projection does not upload');
+  assert.equal(e.borderDirty, false);
+  assert.equal(e.SR.getState(), before);
+  e.emitGameEvent('worldLoaded', { reason: 'load' });
+  e.drawBorders();
+  assert.equal(uploads.length, 1);
+  assert.equal(uploads[0].rect, undefined, 'loads repaint everything');
+});
+
+test('minimap deduplicates changed cells and loads discard pending patches', () => {
+  const e = renderer();
+  e.drawBorders();
+  e.drawMiniStatic();
+  e.staticDirty = false;
+  e.calls.length = 0;
+  const i = e.idx(50, 50);
+  e.emitGameEvent('tileChanged', { index: i });
+  e.emitGameEvent('tileChanged', { index: i });
+  e.calls.length = 0;
+  e.drawMiniStatic();
+  const fills = e.calls.filter((call) => call.method === 'fillRect');
+  assert.equal(fills.length, 3, 'one cell gets base, ownership and vignette');
+  assert.ok(fills.every((call) => JSON.stringify(call.args) === JSON.stringify([100, 100, 2, 2])));
+  e.calls.length = 0;
+  e.drawMiniStatic();
+  assert.equal(e.calls.length, 0, 'unchanged cells are reused');
+  e.owned[i] = 0;
+  e.emitGameEvent('territoryChanged', {});
+  e.drawMiniStatic();
+  assert.equal(e.calls.filter((call) => call.method === 'fillRect').length, 2);
+  e.emitGameEvent('worldLoaded', { reason: 'load' });
+  e.calls.length = 0;
+  e.drawMiniStatic();
+  assert.ok(e.calls.some((call) => call.method === 'fillRect' && call.args[2] === 192));
+});
+
+test('shadow caches retain unchanged frames and patch felled, planted and grown trees locally', () => {
+  const uploads = [];
+  const e = renderer({
+    presentation: {
+      available: true,
+      invalidate: (canvas, rect) => uploads.push({ canvas, rect }),
+      begin() {},
+      layer() {},
+      end() {},
+    },
+  });
+  const art = { img: { width: 0 }, w: 48, h: 56, ox: -12, oy: -32 };
+  e.bldImg = () => art;
+  e.ART.tree = Array.from({ length: 4 }, () => Array.from({ length: 3 }, () => ['tree', 'tree']));
+  e.ART.shadowSoft = 'root';
+  const i = e.idx(50, 50);
+  e.tiles[i].tree = 4;
+  const rng = e.SR.getState(),
+    time = e.state.time;
+  const cache = e.shadowCache;
+  cache.refresh();
+  assert.equal(uploads.length, 2);
+  assert.ok(uploads.every((u) => u.rect === undefined));
+  const paints = cache.paints;
+  uploads.length = 0;
+  cache.refresh();
+  e.emitGameEvent('tileChanged', { index: i });
+  cache.refresh();
+  assert.equal(cache.paints, paints);
+  assert.equal(uploads.length, 0, 'unchanged tree notifications do no shadow work');
+  for (const tree of [0, 1, 2, 4]) {
+    e.tiles[i].tree = tree;
+    e.emitGameEvent('tileChanged', { index: i });
+    e.emitGameEvent('tileChanged', { index: i });
+    cache.refresh();
+    assert.ok(uploads.length > 0);
+    assert.ok(
+      uploads.every((u) => u.rect && u.rect.width <= 8 * e.TS && u.rect.height <= 8 * e.TS),
+    );
+    assert.ok(uploads.every((u) => u.rect.x <= 50 * e.TS && u.rect.x + u.rect.width > 50 * e.TS));
+    uploads.length = 0;
+  }
+  assert.equal(e.SR.getState(), rng);
+  assert.equal(e.state.time, time);
+  e.emitGameEvent('worldLoaded', { reason: 'load' });
+  cache.refresh();
+  assert.equal(uploads.length, 2);
+  assert.ok(uploads.every((u) => u.rect === undefined));
+});
+
+test('shadow caches reconcile completion, removal and replacement of the live building array', () => {
+  const uploads = [];
+  const e = renderer({
+    presentation: {
+      available: true,
+      invalidate: (canvas, rect) => uploads.push(rect),
+      begin() {},
+      layer() {},
+      end() {},
+    },
+  });
+  const art = { img: { width: 0 }, w: 48, h: 56, ox: -12, oy: -32 };
+  e.bldImg = () => art;
+  e.shadowCache.refresh();
+  const site = e.newBuilding('sawmill', 50, 50);
+  e.buildings.push(site);
+  uploads.length = 0;
+  e.shadowCache.refresh();
+  assert.equal(uploads.length, 0, 'construction has no projected finished-building shadow');
+  site.done = true;
+  e.shadowCache.refresh();
+  assert.ok(uploads.length > 0 && uploads.every((rect) => rect && rect.width <= 8 * e.TS));
+  uploads.length = 0;
+  e.buildings = e.buildings.filter((b) => b.id !== site.id);
+  e.shadowCache.refresh();
+  assert.ok(uploads.length > 0 && uploads.every((rect) => rect && rect.width <= 8 * e.TS));
+});
+
+test('an unavailable shadow context reports through the graphics failure boundary', () => {
+  let caches = 0;
+  const failures = [];
+  assert.throws(
+    () =>
+      renderer({
+        contextFor: (name, context) => (name === 'cache' && ++caches === 3 ? null : context),
+        presentation: { reportFailure: (reason) => failures.push(reason) },
+      }),
+    /Canvas 2D context is unavailable/,
+  );
+  assert.deepEqual(failures, ['Canvas 2D context is unavailable']);
+});
+
+function pausedScene(paintForeground = false) {
+  const viewportFills = [],
+    tints = [];
+  const e = renderer({
+    presentation: {
+      available: true,
+      invalidate() {},
+      begin() {},
+      end() {},
+      screenTint: (tint) => tints.push([...tint]),
+      layer(name, paint) {
+        if (
+          !paintForeground ||
+          !['foreground-effects', 'above-atmosphere', 'overlay'].includes(name)
+        )
+          return;
+        const scene = recordingScene();
+        paint(scene);
+        for (const { method, args } of scene.calls)
+          if (method === 'rect' && args[2] >= e.vw && args[3] >= e.vh) viewportFills.push(args);
+      },
+    },
+  });
+  e.staticDirty = false;
+  e.borderDirty = false;
+  e.buildings = [];
+  e.mode = null;
+  e.ghost = null;
+  e.presentationPrefs.weather = false;
+  e.vw = 800;
+  e.vh = 600;
+  e.cam = { x: 40 * e.TS, y: 40 * e.TS };
+  e.SND.thunder = () => {};
+  return { e, tints, viewportFills };
+}
+
+test('paused feedback starts on the current wall clock and still completes', (t) => {
+  const clock = pinClock(1000);
+  t.after(() => clock.restore());
+  const { e } = pausedScene(true);
+  e.draw();
+  clock.set(3000);
+  e.draw();
+  e.FX.ring(48, 48, '#ffd23f', 16);
+  e.draw();
+  assert.equal(e.FXL.length, 1, 'new feedback survives its first paused frame');
+  clock.tick(700);
+  e.draw();
+  assert.equal(e.FXL.length, 0, 'brief feedback finishes while paused');
+});
+
+test('paused camera movement still refreshes the minimap viewport', (t) => {
+  const clock = pinClock(1000);
+  t.after(() => clock.restore());
+  const { e } = pausedScene();
+  e.draw();
+  e.drawMini();
+  e.calls.length = 0;
+  clock.tick(1000);
+  e.cam.x += e.TS;
+  e.draw();
+  e.drawMini();
+  assert.ok(
+    e.calls.some((call) => call.method === 'strokeRect'),
+    'viewport redraw is not frozen with decorative time',
+  );
+});
+
+test('lightning during pause expires on wall time', (t) => {
+  const clock = pinClock(1000);
+  t.after(() => clock.restore());
+  const random = Math.random;
+  t.after(() => {
+    Math.random = random;
+  });
+  const { e, tints, viewportFills } = pausedScene(true);
+  const close = (actual, expected, message) =>
+    assert.ok(
+      actual.length === 4 && actual.every((v, i) => Math.abs(v - expected[i]) < 1e-4),
+      `${message}: ${actual}`,
+    );
+  e.draw();
+  e.presentationPrefs.weather = true;
+  e._rain = 1;
+  Math.random = () => 0;
+  clock.tick(1000);
+  tints.length = 0;
+  e.draw();
+  // A white 0.26 flash over the 0.16 rain veil, premultiplied.
+  close(tints.at(-1), [0.27718, 0.284144, 0.289716, 0.3784], 'the thunderstorm produces a flash');
+  Math.random = () => 0.5;
+  clock.tick(500);
+  e.draw();
+  close(tints.at(-1), [0.023216, 0.032627, 0.040157, 0.16], 'only the rain veil remains');
+  assert.deepEqual(
+    viewportFills,
+    [],
+    'veils are applied by the atmosphere pass, not viewport fills',
+  );
+});
+
+test('the backdrop and map shadows fill only viewport area the map leaves uncovered', (t) => {
+  const clock = pinClock(1000);
+  t.after(() => clock.restore());
+  // Rectangles collect into a path until a fill gives them their style.
+  const fills = [];
+  const e = renderer({
+    presentation: {
+      available: true,
+      invalidate() {},
+      begin() {},
+      end() {},
+      layer(name, paint) {
+        if (name !== 'backdrop') return;
+        const scene = recordingScene();
+        paint(scene);
+        let pending = [];
+        for (const { method, args } of scene.calls) {
+          if (method === 'rect') pending.push(args);
+          else if (method === 'fill') {
+            for (const rect of pending) fills.push({ style: args[0], rect });
+            pending = [];
+          }
+        }
+      },
+    },
+  });
+  e.staticDirty = false;
+  e.borderDirty = false;
+  e.vw = 800;
+  e.vh = 600;
+  e.cam = { x: 40 * e.TS, y: 40 * e.TS };
+  e.draw();
+  assert.deepEqual(fills, [], 'a covering map needs no backdrop');
+  const mapW = e.W * e.TS,
+    mapH = e.H * e.TS;
+  e.cam = { x: mapW - 700, y: 40 * e.TS };
+  e.draw();
+  const isGradient = (style) => Array.isArray(style?.colorStops);
+  const gradient = fills.filter((f) => isGradient(f.style));
+  assert.deepEqual(
+    gradient.map((f) => f.rect),
+    [[700, 0, 100, 600]],
+    'only the band east of the map (screen pixels)',
+  );
+  const shadows = fills.filter((f) => !isGradient(f.style));
+  assert.ok(shadows.length > 0, 'the map still casts its drop shadow');
+  for (const { rect } of shadows) {
+    // Back to world pixels at zoom 1.
+    const [x, y, w, h] = [rect[0] + e.cam.x, rect[1] + e.cam.y, rect[2], rect[3]];
+    assert.ok(x >= mapW || y >= mapH, `shadow ${rect} stays outside the map`);
+    assert.ok(x + w <= mapW + 4 && y + h <= mapH + 5);
+  }
+});
+
+test('the layers above the atmosphere follow the screen veil', (t) => {
+  const clock = pinClock(1000);
+  t.after(() => clock.restore());
+  const sequence = [];
+  const e = renderer({
+    presentation: {
+      available: true,
+      invalidate() {},
+      begin() {},
+      end() {},
+      screenTint: () => sequence.push('veil'),
+      layer: (name) => sequence.push(name),
+    },
+  });
+  e.staticDirty = false;
+  e.borderDirty = false;
+  e.vw = 800;
+  e.vh = 600;
+  e.draw();
+  assert.deepEqual(sequence.slice(-4), [
+    'foreground-effects',
+    'veil',
+    'above-atmosphere',
+    'overlay',
+  ]);
 });

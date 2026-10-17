@@ -127,7 +127,7 @@ test('storage failure preserves valid checkpoints, reports quiet autosave failur
   await page.evaluate(() => {
     const original = Storage.prototype.setItem;
     Storage.prototype.setItem = function (key, value) {
-      if (key === 'settlers.saves.v1')
+      if (key === 'settlers.saves.v1' || key === 'settlers.autosave.v1')
         throw new DOMException('Browser storage quota exhausted', 'QuotaExceededError');
       return original.call(this, key, value);
     };

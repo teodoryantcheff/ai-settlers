@@ -7,14 +7,23 @@ function worldWithoutAttention(text) {
 }
 import { createGame } from './helpers/game.cjs';
 
-function colony() {
-  const values = new Map();
+function colony(values = new Map()) {
+  const accesses = [];
   let blocked = false;
   const storage = {
-    getItem: (key) => values.get(key) ?? null,
+    getItem(key) {
+      accesses.push({ operation: 'get', key });
+      return values.get(key) ?? null;
+    },
     setItem(key, value) {
+      accesses.push({ operation: 'set', key });
       if (blocked) throw new Error('Storage quota exhausted');
       values.set(key, value);
+    },
+    removeItem(key) {
+      accesses.push({ operation: 'remove', key });
+      if (blocked) throw new Error('Storage quota exhausted');
+      values.delete(key);
     },
   };
   const { game } = createGame({
@@ -27,6 +36,7 @@ function colony() {
   return {
     game,
     values,
+    accesses,
     setBlocked(value) {
       blocked = value;
     },
@@ -87,15 +97,12 @@ test('named checkpoints keep metadata and identity, autosave remains separate, a
   );
 });
 
-test('failed overwrite, deletion, migration and import preserve the old catalog and live world', () => {
+test('failed creation, overwrite, deletion and import preserve the old catalog and live world', () => {
   const { game, values, setBlocked } = colony();
   game.setColonyName('Northbank');
-  const legacy = game.exportSave();
-  values.set('settlers.save', legacy);
-  assert.equal(game.listSaves()[0].kind, 'legacy');
+  const exported = game.exportSave();
   setBlocked(true);
-  assert.throws(() => game.saveCheckpoint('First migrated checkpoint'), /quota/i);
-  assert.equal(values.get('settlers.save'), legacy);
+  assert.throws(() => game.saveCheckpoint('First checkpoint'), /quota/i);
   assert.equal(values.has('settlers.saves.v1'), false);
   setBlocked(false);
   const saved = game.saveCheckpoint('Original');
@@ -105,9 +112,8 @@ test('failed overwrite, deletion, migration and import preserve the old catalog 
   setBlocked(true);
   assert.throws(() => game.saveCheckpoint('Replacement', saved.id), /quota/i);
   assert.throws(() => game.deleteCheckpoint(saved.id), /quota/i);
-  assert.throws(() => game.importSave(legacy), /quota/i);
+  assert.throws(() => game.importSave(exported), /quota/i);
   assert.equal(values.get('settlers.saves.v1'), catalog);
-  assert.equal(values.get('settlers.save'), legacy);
   assert.deepEqual(worldWithoutAttention(game.exportSave()), worldWithoutAttention(live));
   const events = game.activityHistory().events;
   assert.ok(events.some((event) => event.kind === 'storage-failed'));
@@ -164,4 +170,56 @@ test('catalog validation derives metadata and rejects malformed entries before a
   }
   values.set('settlers.saves.v1', original);
   assert.equal(game.listSaves()[0].buildingCount, 1);
+});
+
+test('autosave neither reads nor rewrites named checkpoints and still continues', () => {
+  const { game, values, accesses } = colony();
+  for (let i = 0; i < 10; i++) game.saveCheckpoint('Checkpoint ' + i);
+  const catalog = values.get('settlers.saves.v1');
+  game.step(0.25);
+  accesses.length = 0;
+  assert.equal(game.saveGame(true), true);
+  assert.deepEqual(
+    accesses.filter((access) => access.key === 'settlers.saves.v1'),
+    [],
+  );
+  assert.equal(values.get('settlers.saves.v1'), catalog);
+  assert.equal(game.hasUnsavedProgress(), false);
+  const saves = game.listSaves();
+  assert.equal(saves.length, 11);
+  assert.equal(saves[0].kind, 'autosave');
+  assert.equal(saves[0].simulationAge, 0.25);
+  game.step(0.25);
+  assert.equal(game.loadGame(), true);
+  assert.equal(game.state.time, 0.25);
+  assert.equal(game.hasUnsavedProgress(), false);
+  assert.equal(game.saveHealth.ok, true);
+});
+
+test('a damaged autosave is reported without hiding checkpoints and stays deletable', () => {
+  const { game, values } = colony();
+  game.saveCheckpoint('Kept');
+  game.saveGame(true);
+  values.set('settlers.autosave.v1', '{"v":1,"savedAt":1,"data":{}}');
+  const failures = [];
+  game.gameEvents.on('storageResult', (event) => failures.push(event));
+  const saves = game.listSaves();
+  assert.deepEqual(
+    saves.map((entry) => entry.name),
+    ['Kept'],
+  );
+  assert.equal(game.saveHealth.ok, false);
+  game.listSaves();
+  game.loadCheckpoint(saves[0].id);
+  assert.equal(failures.filter((event) => !event.ok).length, 1);
+  game.deleteCheckpoint('autosave');
+  assert.equal(values.has('settlers.autosave.v1'), false);
+  assert.equal(game.saveHealth.ok, true);
+  assert.equal(game.saveGame(true), true);
+  game.deleteCheckpoint('autosave');
+  assert.deepEqual(
+    game.listSaves().map((entry) => entry.kind),
+    ['manual'],
+  );
+  assert.throws(() => game.deleteCheckpoint('autosave'), /no longer exists/);
 });

@@ -1,6 +1,6 @@
 import { createEngine } from './simulation/engine.ts';
 import { assemblePresentation } from './application/assembly.ts';
-import type { RendererPresentation } from './rendering/renderer.ts';
+import type { RendererPresentation } from './rendering/scene.ts';
 import type { GameRuntime } from './runtime.ts';
 
 /** Assemble before starting: no module starts a frame loop when imported. */
@@ -14,6 +14,7 @@ export function createGame(presentation: RendererPresentation): GameRuntime {
     storage: {
       getItem: (key) => localStorage.getItem(key),
       setItem: (key, value) => localStorage.setItem(key, value),
+      removeItem: (key) => localStorage.removeItem(key),
     },
   }) as GameRuntime;
   assemblePresentation(game, { presentation });

@@ -30,7 +30,7 @@ test('nullable job references are rejected before file inspection or world and c
   const data = JSON.parse(game.exportSave());
   const job = data.j.find((candidate) => candidate.kind === 'fetch');
   assert.ok(job);
-  job.from = null;
+  job.sourceId = null;
   rejectsWithoutAdoption(game, storage, data, /Invalid job reference/);
 });
 
@@ -54,7 +54,8 @@ test('unknown save shapes fail without replacing a colony or its checkpoints', (
     null,
     [],
     { v: 2, t: null },
-    { v: 2, seed: 2024, nextId: 1, t: [null, [], [], [], []] },
+    { v: 2, economy: 2, t: null },
+    { v: 2, economy: 2, seed: 2024, nextId: 1, t: [null, [], [], [], []] },
   ])
     rejectsWithoutAdoption(
       game,

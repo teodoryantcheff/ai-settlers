@@ -38,7 +38,7 @@ export async function bootGame(): Promise<GameRuntime> {
   }
   let game: GameRuntime | undefined;
   try {
-    await stage(2, 'Preparing colony systems and standard artwork…');
+    await stage(2, 'Preparing colony systems and settler artwork…');
     game = createGame(presenter.presentation);
     await stage(3, 'Loading and validating painted artwork…');
     await loadPaintedAssets(game);

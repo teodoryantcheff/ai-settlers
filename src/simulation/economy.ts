@@ -265,27 +265,11 @@ export function createEconomy(
       inputBlocked: m.inputBlocked,
       produced: copyObj(m.produced),
       consumed: copyObj(m.consumed),
-      inputDelivered: copyObj(m.inputDelivered || {}),
-      outputDelivered: copyObj(m.outputDelivered || {}),
+      inputDelivered: copyObj(m.inputDelivered),
+      outputDelivered: copyObj(m.outputDelivered),
     };
   }
-  function ensureProductionHistory(
-    m: ProductionMetrics,
-  ): asserts m is ProductionMetrics &
-    Required<Pick<ProductionMetrics, 'recent' | 'inputDelivered' | 'outputDelivered'>> {
-    // Older saves retain their lifetime production/consumption, but cannot reconstruct
-    // arrivals separately from construction, or outgoing delivery completion.
-    if (m.deliveryStarted === undefined) {
-      m.deliveryStarted = m.elapsed;
-      m.inputDelivered = {};
-      m.outputDelivered = {};
-    }
-    if (!m.recent || !m.recent.length) m.recent = [productionSample(m)];
-    m.inputDelivered ??= {};
-    m.outputDelivered ??= {};
-  }
   function sampleProduction(m: ProductionMetrics) {
-    ensureProductionHistory(m);
     const samples = m.recent;
     if (m.elapsed - samples[samples.length - 1].elapsed >= 2 - 1e-9)
       samples.push(productionSample(m));
@@ -308,15 +292,12 @@ export function createEconomy(
     let baseline: ProductionSample = empty;
     if (window !== 'lifetime') {
       baseline =
-        (m.recent || []).find(function (sample) {
+        m.recent.find(function (sample) {
           return sample.elapsed >= m.elapsed - window - 1e-9;
         }) ?? productionSample(m);
     }
     const elapsed = Math.max(0, m.elapsed - baseline.elapsed),
-      deliveryElapsed =
-        m.deliveryStarted === undefined
-          ? 0
-          : Math.max(0, m.elapsed - Math.max(baseline.elapsed, m.deliveryStarted));
+      deliveryElapsed = Math.max(0, m.elapsed - Math.max(baseline.elapsed, m.deliveryStarted));
     function difference(current: Inventory, before: Inventory): Inventory {
       const out: Inventory = {};
       for (const good in current)
@@ -328,8 +309,8 @@ export function createEconomy(
       inputBlocked: Math.max(0, m.inputBlocked - baseline.inputBlocked),
       produced: difference(m.produced, baseline.produced),
       consumed: difference(m.consumed, baseline.consumed),
-      inputDelivered: difference(m.inputDelivered || {}, baseline.inputDelivered),
-      outputDelivered: difference(m.outputDelivered || {}, baseline.outputDelivered),
+      inputDelivered: difference(m.inputDelivered, baseline.inputDelivered),
+      outputDelivered: difference(m.outputDelivered, baseline.outputDelivered),
       deliveryElapsed: deliveryElapsed,
       sampleInterval: window === 'lifetime' ? 0 : 2,
     };
@@ -929,7 +910,6 @@ export function createEconomy(
     }
     if (sp.prod === 'none' || sp.store) return;
     if (!b.metrics) b.metrics = productionMetrics();
-    ensureProductionHistory(b.metrics);
     const reason = productionConstraint(b);
     let g: Good;
     b.blockedReason = reason;
@@ -1309,7 +1289,7 @@ export function createEconomy(
         continue;
       }
       if (sp.in && !b.disabled && !b.exhausted) {
-        const fetchInputs = eligibleIngredients(b, sp);
+        const fetchInputs = eligibleIngredients(sp);
         for (g in fetchInputs) {
           const want = 3,
             have = (b.stock[g] ?? 0) | 0;
@@ -1638,10 +1618,9 @@ export function createEconomy(
   function recordDelivery(b: Building, g: Good, transfer: boolean) {
     game.recordCargoArrival(g);
     if (!b.metrics) b.metrics = productionMetrics();
-    ensureProductionHistory(b.metrics);
     b.metrics.delivered[g] = ((b.metrics.delivered[g] ?? 0) | 0) + 1;
     const sp = game.BSPEC[b.type];
-    if (b.done && !sp.store && sp.in && eligibleIngredients(b, sp)[g]) {
+    if (b.done && !sp.store && sp.in && eligibleIngredients(sp)[g]) {
       b.metrics.inputDelivered[g] = (b.metrics.inputDelivered[g] || 0) + 1;
       game.recordEconomicFlow('inputArrived', g, 1);
     }
@@ -1654,7 +1633,6 @@ export function createEconomy(
     const source = byId(u.carryProducer);
     if (source) {
       if (!source.metrics) source.metrics = productionMetrics();
-      ensureProductionHistory(source.metrics);
       source.metrics.outputDelivered[g] = (source.metrics.outputDelivered[g] || 0) + 1;
     }
     game.recordEconomicFlow('outputStored', g, 1);

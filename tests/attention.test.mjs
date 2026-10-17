@@ -67,7 +67,7 @@ test('deliberate pauses and satisfied demand suppress issues even while the colo
   game.emitGameEvent('productionControlChanged', { building: producer });
   assert.equal(game.activeAttention().length, 0);
 });
-test('journal and issue baselines continue through saves, legacy loads are silent, and reads do not alter simulation', () => {
+test('journal and issue baselines continue through saves and reads do not alter simulation', () => {
   const { game } = colony();
   advance(game, 15);
   const saved = game.exportSave();
@@ -82,14 +82,6 @@ test('journal and issue baselines continue through saves, legacy loads are silen
   game.importSave(saved);
   advance(game, 10);
   assert.deepEqual(JSON.parse(game.exportSave()), JSON.parse(expected));
-  const legacy = JSON.parse(saved);
-  delete legacy.attention;
-  game.importSave(JSON.stringify(legacy));
-  assert.equal(game.activityHistory().events.length, 0);
-  assert.equal(game.activityHistory().started, legacy.st.time);
-  assert.equal(game.activeAttention().length, 0);
-  advance(game, 15);
-  assert.equal(game.activeAttention().length, 1);
 });
 test('significant history is bounded at 200 and preserves former locations after demolition', () => {
   const { game, producer } = colony();

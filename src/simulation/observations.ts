@@ -150,7 +150,7 @@ export function createObservations(game: ObservationDependencies): ObservationSu
         if (b.done && spec.out === good) {
           output = stock;
           result.awaitingCollection += output;
-        } else if (b.done && eligibleIngredients(b, spec)[good]) {
+        } else if (b.done && eligibleIngredients(spec)[good]) {
           input = stock;
           result.producerInputs += input;
         } else {

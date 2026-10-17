@@ -41,7 +41,7 @@ Goods produced throughout the colony's recorded history, including production by
 _Avoid_: Current producers' lifetime totals, when describing the entire colony's history.
 
 **Recipe requirements**:
-The kinds and quantities of ingredients required for one production cycle, including any alternatives. A mine requires one edible good; a legacy armory requires iron ore and coal.
+The kinds and quantities of ingredients required for one production cycle, including any alternatives. A mine requires one edible good.
 _Avoid_: Ingredients consumed next, when describing the general requirement.
 
 **Eligible ingredients**:
@@ -71,10 +71,6 @@ _Avoid_: Completed outpost, when the soldier has not yet arrived.
 **Sent notice**:
 A record that a particular condition has already been reported for a building, used to suppress repeat reports until successful production clears it.
 _Avoid_: Current shortage or resource availability, which may change after the report.
-
-**Legacy armory**:
-An armory retained from an earlier colony that uses iron ore and coal instead of iron bars and coal.
-_Avoid_: Current armory, when describing the retained recipe.
 
 **Road plan**:
 The preferred route between two endpoints and the clear, owned tiles that would gain road pavement in the current colony, or the reason the road cannot be built. A route can pass through occupied tiles without paving them, but its starting tile must be clear and owned.

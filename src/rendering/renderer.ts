@@ -1,3 +1,5 @@
+import { FillGradient } from 'pixi.js';
+import type { Graphics } from 'pixi.js';
 import type { PlacementChecks, BuildingAffordability } from '../simulation/economy.ts';
 import type {
   Building,
@@ -5,7 +7,6 @@ import type {
   BuildingType,
   Good,
   Inventory,
-  LayerName,
   PresentationPreferences,
   ProductionBlockReason,
   Sprite,
@@ -16,6 +17,9 @@ import type {
 import { observePresentation } from '../ui/domain-feedback.ts';
 import type { GameRuntime } from '../runtime.ts';
 import { requireCanvas2D } from './canvas-context.ts';
+import { createShadowCache } from './shadow-cache.ts';
+import { circlePoints, dashed, rotate, scale, translate } from './scene.ts';
+import type { PremultipliedTint, RendererPresentation, SceneLayer } from './scene.ts';
 
 /** Live display pose of one walker, keyed by unit id across frames. */
 export interface UnitPose {
@@ -99,22 +103,6 @@ interface SortEntry {
 /** Border/preview segment as four endpoints: x1, y1, x2, y2. */
 type LineSeg = [number, number, number, number];
 
-/** Ordered scene commands consumed by the PixiJS world renderer. */
-export interface RendererPresentation {
-  available: boolean;
-  /** Surface observer/cache failures through the same visible GPU failure boundary. */
-  reportFailure?: (reason: string) => void;
-  /** Refresh the GPU copy of a cached canvas. `rect` (canvas pixels) limits the
-   * upload to the changed region; omitting it refreshes the whole canvas. */
-  invalidate: (
-    canvas: HTMLCanvasElement,
-    rect?: { x: number; y: number; width: number; height: number },
-  ) => void;
-  begin: (ctx: CanvasRenderingContext2D) => void;
-  layer: (name: LayerName, ctx: CanvasRenderingContext2D, paint: () => void) => void;
-  end: (ctx: CanvasRenderingContext2D) => void;
-}
-
 export function createRenderer(
   game: GameRuntime,
   scenePresentation: RendererPresentation,
@@ -129,21 +117,21 @@ export function createRenderer(
     }
   }
   let staticDirty = true;
-  function layer(name: LayerName, paint: () => void) {
-    presentation.layer(name, ctx, paint);
-  }
   // ==================== RENDERER ====================
   // Layered presentation over the unchanged simulation:
   //   scan  — cached connected terrain, mineral seams, shadows and roads
   //   bcan  — quiet territory survey line
-  //   per-frame — animated water, y-sorted buildings/trees/rocks/units, effects, ghost
+  //   per-frame — native Pixi graphics for water, y-sorted buildings/trees/rocks/units,
+  //   effects and overlays, rebuilt each frame from simulation state
 
   const scan = game.Acan(game.W * game.TS * game.ST, game.H * game.TS * game.ST),
     sctx = requireCanvas2D(scan, reportGraphicsFailure, { willReadFrequently: true });
   const bcan = game.Acan(game.W * game.TS, game.H * game.TS),
     bctx = requireCanvas2D(bcan, reportGraphicsFailure, { willReadFrequently: true });
+  const shadowCache = createShadowCache(game, presentation, reportGraphicsFailure);
   let borderDirty = true;
-  const borderSegs: LineSeg[] = [];
+  const borderOwned = new Uint8Array(game.W * game.H);
+  let borderReady = false;
   const FXL: FXEffect[] = [];
   let NOW = 0,
     BAR_H = 44,
@@ -202,13 +190,8 @@ export function createRenderer(
   function tileHash(i: number): number {
     return game.landscapeHash(i % game.W, (i / game.W) | 0, 19) % 1000;
   }
-  function diaPath(g: CanvasRenderingContext2D, x: number, y: number, r: number) {
-    g.beginPath();
-    g.moveTo(x, y - r);
-    g.lineTo(x + r, y);
-    g.lineTo(x, y + r);
-    g.lineTo(x - r, y);
-    g.closePath();
+  function diamond(g: Graphics, x: number, y: number, r: number): Graphics {
+    return g.poly([x, y - r, x + r, y, x, y + r, x - r, y]);
   }
   // Static scenery is clipped to its tile. Neighbour-aware contours and world-space
   // marks meet at tile edges, so an isolated harvest or road redraw cannot leave a seam.
@@ -230,13 +213,14 @@ export function createRenderer(
     g.restore();
   }
   function drawTile(g: CanvasRenderingContext2D, i: number) {
+    shadowCache.tileChanged(i);
     terrainRevision++;
     paintTileFull(g, i);
     if (macroCan) paintMacroTile(g, i);
-    miniDirty = true;
+    miniTiles.add(i);
     // Both painters clip to the tile, so the upload can be limited to its rect.
     const tss = game.TS * game.ST;
-    presentation?.invalidate(g.canvas, {
+    presentation.invalidate(g.canvas, {
       x: (i % game.W) * tss,
       y: ((i / game.W) | 0) * tss,
       width: tss,
@@ -296,13 +280,31 @@ export function createRenderer(
     g.drawImage(macroCan, x - 1, y - 1, 3, 3, (x - 1) * size, (y - 1) * size, 3 * size, 3 * size);
     g.restore();
   }
-  function drawBorders() {
+  const borderChunkTiles = 8,
+    borderChunkSize = borderChunkTiles * game.TS,
+    borderColumns = Math.ceil(game.W / borderChunkTiles),
+    borderRows = Math.ceil(game.H / borderChunkTiles);
+  function paintBorderChunk(cx: number, cy: number) {
+    const rect = {
+      x: cx * borderChunkSize,
+      y: cy * borderChunkSize,
+      width: Math.min(borderChunkSize, bcan.width - cx * borderChunkSize),
+      height: Math.min(borderChunkSize, bcan.height - cy * borderChunkSize),
+    };
     const g = bctx;
+    g.save();
     g.setTransform(1, 0, 0, 1, 0, 0);
-    g.clearRect(0, 0, game.W * game.TS, game.H * game.TS);
-    borderSegs.length = 0;
-    for (let y2 = 0; y2 < game.H; y2++)
-      for (let x2 = 0; x2 < game.W; x2++) {
+    g.beginPath();
+    g.rect(rect.x, rect.y, rect.width, rect.height);
+    g.clip();
+    g.clearRect(rect.x, rect.y, rect.width, rect.height);
+    const borderSegs: LineSeg[] = [];
+    const minX = Math.max(0, cx * borderChunkTiles - 1),
+      minY = Math.max(0, cy * borderChunkTiles - 1),
+      maxX = Math.min(game.W - 1, (cx + 1) * borderChunkTiles),
+      maxY = Math.min(game.H - 1, (cy + 1) * borderChunkTiles);
+    for (let y2 = minY; y2 <= maxY; y2++)
+      for (let x2 = minX; x2 <= maxX; x2++) {
         const i2 = game.idx(x2, y2);
         if (!game.owned[i2]) continue;
         const px = x2 * game.TS,
@@ -335,11 +337,77 @@ export function createRenderer(
     strokeAll('rgba(49,52,27,0.30)', 3.4);
     strokeAll('rgba(244,218,144,0.50)', 1.6);
     strokeAll('rgba(255,239,186,0.72)', 0.65);
+    g.restore();
+    return rect;
+  }
+  function drawBorders(full = false) {
+    full ||= !borderReady;
+    const chunks = new Set<number>();
+    if (full) {
+      for (let i = 0; i < borderColumns * borderRows; i++) chunks.add(i);
+    } else {
+      for (let i = 0; i < game.owned.length; i++) {
+        if (game.owned[i] === borderOwned[i]) continue;
+        miniTiles.add(i);
+        const x = (i % game.W) * game.TS,
+          y = ((i / game.W) | 0) * game.TS;
+        // Include round caps and antialiasing on either side of a chunk edge.
+        const x0 = Math.floor(Math.max(0, x - 3) / borderChunkSize),
+          y0 = Math.floor(Math.max(0, y - 3) / borderChunkSize),
+          x1 = Math.floor(Math.min(bcan.width - 1, x + game.TS + 2) / borderChunkSize),
+          y1 = Math.floor(Math.min(bcan.height - 1, y + game.TS + 2) / borderChunkSize);
+        for (let cy = y0; cy <= y1; cy++)
+          for (let cx = x0; cx <= x1; cx++) chunks.add(cy * borderColumns + cx);
+      }
+    }
+    // Fixed integer clips and identical neighbouring paths make partial paints
+    // byte-identical to a full rebuild, including Canvas round-cap rasterization.
+    // Separate chunks also keep distant changes from uploading the whole map.
+    for (const chunk of chunks) {
+      paintBorderChunk(chunk % borderColumns, (chunk / borderColumns) | 0);
+    }
+    borderOwned.set(game.owned);
+    borderReady = true;
     borderDirty = false;
-    miniDirty = true;
-    presentation?.invalidate(bcan);
+    if (full) presentation.invalidate(bcan);
+    else {
+      // One upload per connected region avoids repeated driver synchronization
+      // for neighbouring chunks while keeping distant changes separate.
+      for (const first of chunks) {
+        const pending = [first];
+        chunks.delete(first);
+        let x0 = first % borderColumns,
+          x1 = x0,
+          y0 = (first / borderColumns) | 0,
+          y1 = y0;
+        while (pending.length) {
+          const chunk = pending.pop();
+          if (chunk === undefined) break;
+          const x = chunk % borderColumns,
+            y = (chunk / borderColumns) | 0;
+          x0 = Math.min(x0, x);
+          x1 = Math.max(x1, x);
+          y0 = Math.min(y0, y);
+          y1 = Math.max(y1, y);
+          for (let d = 0; d < 4; d++) {
+            const nx = x + game.DX[d],
+              ny = y + game.DY[d];
+            if (nx < 0 || ny < 0 || nx >= borderColumns || ny >= borderRows) continue;
+            const next = ny * borderColumns + nx;
+            if (chunks.delete(next)) pending.push(next);
+          }
+        }
+        presentation.invalidate(bcan, {
+          x: x0 * borderChunkSize,
+          y: y0 * borderChunkSize,
+          width: Math.min(bcan.width, (x1 + 1) * borderChunkSize) - x0 * borderChunkSize,
+          height: Math.min(bcan.height, (y1 + 1) * borderChunkSize) - y0 * borderChunkSize,
+        });
+      }
+    }
   }
   function drawStatic() {
+    shadowCache.reset();
     terrainRevision++;
     sctx.setTransform(1, 0, 0, 1, 0, 0);
     sctx.imageSmoothingEnabled = true;
@@ -348,14 +416,15 @@ export function createRenderer(
     const macro = macroCan || buildMacro();
     sctx.imageSmoothingEnabled = true;
     sctx.drawImage(macro, 0, 0, game.W * game.TS * game.ST, game.H * game.TS * game.ST);
-    drawBorders();
+    drawBorders(true);
+    miniDirty = true;
+    miniTiles.clear();
     game.staticDirty = false;
-    presentation?.invalidate(scan);
+    presentation.invalidate(scan);
   }
 
   // ---------- camera ----------
-  const view = document.getElementById('view') as HTMLCanvasElement,
-    ctx = requireCanvas2D(game.Acan(1, 1), reportGraphicsFailure);
+  const view = document.getElementById('view') as HTMLCanvasElement;
   const mini = document.getElementById('mini') as HTMLCanvasElement,
     mctx = requireCanvas2D(mini, reportGraphicsFailure);
   let dpr = window.devicePixelRatio || 1,
@@ -369,7 +438,7 @@ export function createRenderer(
   let ht = { x: 0, y: 0 },
     hoverIn = false,
     mouseSeen = false;
-  let bgGrad: CanvasGradient | null = null;
+  let backdropGradient: FillGradient | null = null;
   function resize() {
     const centerX = cam.x + vw / z / 2,
       centerY = cam.y + vh / z / 2,
@@ -384,12 +453,10 @@ export function createRenderer(
     // The DOM map host defines the viewport; input uses this same canvas rect.
     vw = main?.clientWidth || window.innerWidth;
     vh = Math.max(1, main?.clientHeight || window.innerHeight);
-    view.width = ctx.canvas.width = Math.round(vw * dpr);
-    view.height = ctx.canvas.height = Math.round(vh * dpr);
+    view.width = Math.round(vw * dpr);
+    view.height = Math.round(vh * dpr);
     view.style.width = vw + 'px';
     view.style.height = vh + 'px';
-    ctx.canvas.style.width = view.style.width;
-    ctx.canvas.style.height = view.style.height;
     if (!mouseSeen) {
       mouse.x = vw / 2;
       mouse.y = vh / 2;
@@ -398,7 +465,8 @@ export function createRenderer(
       cam.x = centerX - vw / z / 2;
       cam.y = centerY - vh / z / 2;
     }
-    bgGrad = null;
+    backdropGradient?.destroy();
+    backdropGradient = null;
     clampCam();
   }
   function clampCam() {
@@ -414,8 +482,8 @@ export function createRenderer(
   }
   let zoomAnim: ZoomAnim | null = null;
   function zoomAt(nzi: number, ax?: number, ay?: number) {
-    ax = ax === undefined || ax === null ? vw / 2 : ax;
-    ay = ay === undefined || ay === null ? vh / 2 : ay;
+    ax ??= vw / 2;
+    ay ??= vh / 2;
     const w = screenToWorld(ax, ay);
     zi = Math.max(0, Math.min(zooms.length - 1, nzi));
     const nz = zooms[zi];
@@ -458,8 +526,7 @@ export function createRenderer(
 
   // ---------- objects ----------
   function bldImg(b: Building): Sprite {
-    const variant = game.ART.bld2[b.type];
-    const image = variant && ((b.id * 2654435761) >>> 0) % 2 ? variant : game.ART.bld[b.type];
+    const image = game.ART.bld[b.type];
     if (!image) throw new Error('Missing building artwork: ' + b.type);
     return image;
   }
@@ -495,10 +562,10 @@ export function createRenderer(
     variants[clarity] = canvas;
     return canvas;
   }
-  function drawSprite(g: CanvasRenderingContext2D, type: BuildingType, cx: number, cy: number) {
+  function drawSprite(s: SceneLayer, type: BuildingType, cx: number, cy: number, alpha: number) {
     const img = game.ART.bld[type];
     if (!img) return;
-    g.drawImage(img.img, cx - 12 + img.ox, cy - 12 + img.oy, img.w, img.h);
+    s.image(img.img, cx - 12 + img.ox, cy - 12 + img.oy, img.w, img.h, alpha);
   }
   function drawSpriteIcon(
     g: CanvasRenderingContext2D,
@@ -508,13 +575,39 @@ export function createRenderer(
     size: number,
   ) {
     const img = game.ART.bld[type] || game.ART.site;
-    size = size || 30;
     const s = Math.min(size / img.w, size / img.h);
     const dw = img.w * s,
       dh = img.h * s;
     g.drawImage(img.img, cx - dw / 2, cy - dh / 2, dw, dh);
   }
-  function drawFlag(
+  const flagSheets = new Map<string, HTMLCanvasElement>();
+  function drawFlag(s: SceneLayer, ax: number, ay: number, col: string, now: number, ph: number) {
+    const count = 24,
+      size = 20,
+      resolution = 4;
+    let sheet = flagSheets.get(col);
+    if (!sheet) {
+      sheet = game.Acan(size * resolution * count, size * resolution);
+      const paint = requireCanvas2D(sheet, reportGraphicsFailure);
+      for (let i = 0; i < count; i++) {
+        paint.save();
+        paint.translate(i * size * resolution, 0);
+        paint.scale(resolution, resolution);
+        paintFlag(paint, 2, 3, col, (i / count) * Math.PI * 2 * 240, 0);
+        paint.restore();
+      }
+      flagSheets.set(col, sheet);
+    }
+    const phase = (motionTime(now) / 240 + ph) / (Math.PI * 2);
+    const frame = ((Math.round(phase * count) % count) + count) % count;
+    s.image(sheet, ax - 2, ay - 3, size, size, 1, {
+      x: frame * size * resolution,
+      y: 0,
+      width: size * resolution,
+      height: size * resolution,
+    });
+  }
+  function paintFlag(
     g: CanvasRenderingContext2D,
     ax: number,
     ay: number,
@@ -522,7 +615,6 @@ export function createRenderer(
     now: number,
     ph: number,
   ) {
-    now = motionTime(now);
     g.strokeStyle = '#5a3e22';
     g.lineWidth = 1.4;
     g.beginPath();
@@ -561,175 +653,160 @@ export function createRenderer(
     g.closePath();
     g.fill();
   }
-  function drawSmoke(g: CanvasRenderingContext2D, x: number, y: number, now: number, sd: number) {
+  function drawSmoke(s: SceneLayer, x: number, y: number, now: number, sd: number) {
     if (renderPrefs().clarity || renderPrefs().reducedMotion || game.state.paused) return;
-    const count = renderPrefs().quality < 1 ? 3 : 5;
+    const count = renderPrefs().quality < 1 ? 3 : 5,
+      g = s.g;
     for (let k = 0; k < count; k++) {
       const ph = (now / 2200 + (sd % 7) * 0.13 + k / count) % 1;
       const r = 0.9 + ph * 3.4,
         a = 0.19 * Math.sin(Math.PI * ph);
       // Warm translucent smoke catches sunlight, then disperses downwind.
-      g.fillStyle = 'rgba(235,220,189,' + a.toFixed(3) + ')';
-      g.beginPath();
-      g.ellipse(x + ph * 7 + Math.sin(ph * 5 + sd) * 1.6, y - ph * 24, r * 1.35, r, -0.3, 0, 7);
-      g.fill();
+      g.save();
+      translate(g, x + ph * 7 + Math.sin(ph * 5 + sd) * 1.6, y - ph * 24);
+      rotate(g, -0.3);
+      g.ellipse(0, 0, r * 1.35, r).fill({ color: 0xebdcbd, alpha: a });
+      g.restore();
     }
   }
-  function drawBadge(g: CanvasRenderingContext2D, cx: number, cy: number) {
-    const pulse = renderPrefs().reducedMotion ? 1 : 1 + Math.sin(NOW / 420 + cx * 0.3) * 0.035;
+  let badgeGradient: FillGradient | null = null,
+    progressGradient: FillGradient | null = null;
+  function drawBadge(s: SceneLayer, cx: number, cy: number) {
+    const pulse = renderPrefs().reducedMotion ? 1 : 1 + Math.sin(NOW / 420 + cx * 0.3) * 0.035,
+      g = s.g;
+    badgeGradient ??= new FillGradient({
+      type: 'linear',
+      start: { x: 0, y: -5.5 },
+      end: { x: 0, y: 5.5 },
+      colorStops: [
+        { offset: 0, color: '#ef5a4a' },
+        { offset: 1, color: '#a02525' },
+      ],
+      textureSpace: 'global',
+    });
     g.save();
-    g.translate(cx, cy);
-    g.scale(pulse, pulse);
-    g.fillStyle = 'rgba(0,0,0,0.35)';
-    game.rr(g, -5, -4, 12.6, 12.6, 3.4);
-    g.fill();
-    const gr = g.createLinearGradient(0, -5.5, 0, 5.5);
-    gr.addColorStop(0, '#ef5a4a');
-    gr.addColorStop(1, '#a02525');
-    g.fillStyle = gr;
-    game.rr(g, -5.5, -5.5, 11, 11, 3);
-    g.fill();
-    g.strokeStyle = '#ffd0c0';
-    g.lineWidth = 1;
-    game.rr(g, -5.5, -5.5, 11, 11, 3);
-    g.stroke();
-    g.fillStyle = '#fff';
-    g.font = 'bold 9px Verdana,sans-serif';
-    g.textAlign = 'center';
-    g.fillText('!', 0, 3.2);
-    g.textAlign = 'left';
+    translate(g, cx, cy);
+    scale(g, pulse);
+    g.roundRect(-5, -4, 12.6, 12.6, 3.4).fill({ color: 0x000000, alpha: 0.35 });
+    g.roundRect(-5.5, -5.5, 11, 11, 3).fill(badgeGradient).stroke({ color: 0xffd0c0, width: 1 });
+    // A drawn exclamation mark keeps the whole object pass in one graphics run.
+    g.roundRect(-0.8, -3.9, 1.6, 4.5, 0.7).fill(0xffffff);
+    g.circle(0, 2.1, 0.9).fill(0xffffff);
     g.restore();
   }
-  function chip(g: CanvasRenderingContext2D, x: number, y: number, c: string) {
-    g.fillStyle = 'rgba(0,0,0,0.38)';
-    game.rr(g, x, y, 5, 5, 1);
-    g.fill();
-    g.fillStyle = c;
-    game.rr(g, x + 0.5, y + 0.5, 4, 4, 0.8);
-    g.fill();
-    g.fillStyle = 'rgba(255,255,255,0.35)';
-    g.fillRect(x + 1, y + 0.9, 3.4, 0.9);
+  function chip(g: Graphics, x: number, y: number, c: string, alpha: number) {
+    g.roundRect(x, y, 5, 5, 1).fill({ color: 0x000000, alpha: 0.38 * alpha });
+    g.roundRect(x + 0.5, y + 0.5, 4, 4, 0.8).fill({ color: c, alpha });
+    g.rect(x + 1, y + 0.9, 3.4, 0.9).fill({ color: 0xffffff, alpha: 0.35 * alpha });
   }
-  function drawBuilding(g: CanvasRenderingContext2D, b: Building) {
+  function drawBuilding(s: SceneLayer, b: Building) {
+    const g = s.g,
+      bx = b.x * game.TS,
+      by = b.y * game.TS;
     g.save();
-    g.translate(b.x * game.TS + 12, b.y * game.TS + 22);
-    g.scale(1.06, 1.06);
-    g.translate(-b.x * game.TS - 12, -b.y * game.TS - 22);
+    translate(g, bx + 12, by + 22);
+    scale(g, 1.06);
+    translate(g, -bx - 12, -by - 22);
     try {
       const now = game.villageWorkTime(b);
       if (!b.done) {
         const p = Math.min(1, Math.max(0, b.constructionProgress));
-        game.drawVillageConstruction(g, b, p);
+        game.drawVillageConstruction(s, b, p);
         const bw = game.TS - 16;
-        g.fillStyle = 'rgba(0,0,0,0.55)';
-        game.rr(g, b.x * game.TS + 8, b.y * game.TS + game.TS - 5, bw, 3.4, 1.6);
-        g.fill();
-        const pgr = g.createLinearGradient(b.x * game.TS + 8, 0, b.x * game.TS + 8 + bw, 0);
-        pgr.addColorStop(0, '#ffe08a');
-        pgr.addColorStop(1, '#e8a53c');
-        g.fillStyle = pgr;
-        game.rr(g, b.x * game.TS + 8, b.y * game.TS + game.TS - 5, bw * Math.min(1, p), 3.4, 1.6);
-        g.fill();
-        g.fillStyle = 'rgba(255,255,255,0.3)';
-        g.fillRect(b.x * game.TS + 8, b.y * game.TS + game.TS - 5, bw, 1);
-        if (game.bStatus(b).bad) drawBadge(g, b.x * game.TS + game.TS - 6, b.y * game.TS + 4);
-        if (p > 0 && game.siteReady(b)) drawWorker(g, b, now, 'build');
+        progressGradient ??= new FillGradient({
+          type: 'linear',
+          start: { x: 0, y: 0 },
+          end: { x: bw, y: 0 },
+          colorStops: [
+            { offset: 0, color: '#ffe08a' },
+            { offset: 1, color: '#e8a53c' },
+          ],
+          textureSpace: 'global',
+        });
+        g.roundRect(bx + 8, by + game.TS - 5, bw, 3.4, 1.6).fill({ color: 0x000000, alpha: 0.55 });
+        if (p > 0) {
+          g.save();
+          translate(g, bx + 8, by + game.TS - 5);
+          g.roundRect(0, 0, bw * p, 3.4, 1.6).fill(progressGradient);
+          g.restore();
+        }
+        g.rect(bx + 8, by + game.TS - 5, bw, 1).fill({ color: 0xffffff, alpha: 0.3 });
+        if (game.bStatus(b).bad) drawBadge(s, bx + game.TS - 6, by + 4);
+        if (p > 0 && game.siteReady(b)) drawWorker(s, b, now, 'build');
         return;
       }
       const img2 = bldImg(b),
         sp = game.BSPEC[b.type];
-      game.drawVillageYard(g, b);
+      game.drawVillageYard(s, b);
       // Shared restrained contact shade also grounds installed painted packs.
       // Keep it at the established south threshold, below the sprite/details.
-      g.save();
-      g.globalAlpha *= renderPrefs().clarity ? 0.28 : 0.5;
       const contactWidth = Math.min(38, img2.w * 0.78);
-      g.drawImage(
+      s.image(
         game.ART.shadowSoft,
-        b.x * game.TS + 12 - contactWidth / 2,
-        b.y * game.TS + 19,
+        bx + 12 - contactWidth / 2,
+        by + 19,
         contactWidth,
         10,
+        renderPrefs().clarity ? 0.28 : 0.5,
       );
-      g.restore();
-      g.drawImage(
-        buildingContour(img2),
-        b.x * game.TS + img2.ox - 3,
-        b.y * game.TS + img2.oy - 3,
-        img2.w + 6,
-        img2.h + 6,
-      );
-      game.drawVillageDetails(g, b);
+      s.image(buildingContour(img2), bx + img2.ox - 3, by + img2.oy - 3, img2.w + 6, img2.h + 6);
+      game.drawVillageDetails(s, b);
       const active = game.buildingWorking(b);
       const anc = game.ART.anchors[b.type];
       if (active && anc && anc.blade) {
         const an = anc.blade;
         g.save();
-        g.translate(b.x * game.TS + an.x, b.y * game.TS + an.y);
-        g.rotate((now / 130) % (Math.PI * 2));
-        g.drawImage(game.ART.blade, -4.5, -4.5, 9, 9);
+        translate(g, bx + an.x, by + an.y);
+        rotate(g, (now / 130) % (Math.PI * 2));
+        s.image(game.ART.blade, -4.5, -4.5, 9, 9);
         g.restore();
       }
       if (active && anc && anc.bob) {
         const bo = anc.bob,
-          bb = b.y * game.TS + bo.y + Math.sin(now / 700 + b.id) * 1.2;
-        g.fillStyle = '#e05555';
-        g.beginPath();
-        g.arc(b.x * game.TS + bo.x, bb, 1.6, 0, 7);
-        g.fill();
-        g.fillStyle = '#f4f6f8';
-        g.beginPath();
-        g.arc(b.x * game.TS + bo.x, bb - 0.5, 0.8, 0, 7);
-        g.fill();
+          bb = by + bo.y + Math.sin(now / 700 + b.id) * 1.2;
+        g.circle(bx + bo.x, bb, 1.6).fill(0xe05555);
+        g.circle(bx + bo.x, bb - 0.5, 0.8).fill(0xf4f6f8);
       }
       if (anc) {
         if (anc.flag && (b.type !== 'guard' || b.manned))
           drawFlag(
-            g,
-            b.x * game.TS + anc.flag.x,
-            b.y * game.TS + anc.flag.y,
+            s,
+            bx + anc.flag.x,
+            by + anc.flag.y,
             b.type === 'warehouse' ? '#e8a030' : '#d84a3a',
             now,
             b.id,
           );
         else if (b.type === 'guard' && anc.flag)
-          drawFlag(g, b.x * game.TS + anc.flag.x, b.y * game.TS + anc.flag.y, '#8f8f8f', now, b.id);
+          drawFlag(s, bx + anc.flag.x, by + anc.flag.y, '#8f8f8f', now, b.id);
         if (anc.chim && active)
           for (let ci = 0; ci < anc.chim.length; ci++)
-            drawSmoke(
-              g,
-              b.x * game.TS + anc.chim[ci].x,
-              b.y * game.TS + anc.chim[ci].y,
-              now,
-              b.id * 7 + ci * 3,
-            );
+            drawSmoke(s, bx + anc.chim[ci].x, by + anc.chim[ci].y, now, b.id * 7 + ci * 3);
       }
-      if (game.bStatus(b).bad) drawBadge(g, b.x * game.TS + game.TS - 5, b.y * game.TS + 5);
-      if (active) drawWorker(g, b, now, sp.prod);
+      if (game.bStatus(b).bad) drawBadge(s, bx + game.TS - 5, by + 5);
+      if (active) drawWorker(s, b, now, sp.prod);
       const pulse = workPulses[b.id];
-      if (pulse && NOW - pulse.t < 600 && !renderPrefs().reducedMotion) {
-        const fade = 1 - (NOW - pulse.t) / 600;
-        g.globalAlpha = fade;
-        chip(g, b.x * game.TS + 26, b.y * game.TS + 12 - fade * 5, game.GOODS[pulse.good].c);
-        g.globalAlpha = 1;
+      if (pulse && performance.now() - pulse.t < 600 && !renderPrefs().reducedMotion) {
+        const fade = 1 - (performance.now() - pulse.t) / 600;
+        chip(g, bx + 26, by + 12 - fade * 5, game.GOODS[pulse.good].c, fade);
       }
       if (b.disabled) {
-        g.fillStyle = '#ead9b6';
-        g.fillRect(b.x * game.TS + 16, b.y * game.TS + 3, 2, 7);
-        g.fillRect(b.x * game.TS + 20, b.y * game.TS + 3, 2, 7);
+        g.rect(bx + 16, by + 3, 2, 7).fill(0xead9b6);
+        g.rect(bx + 20, by + 3, 2, 7).fill(0xead9b6);
       }
     } finally {
       g.restore();
     }
   }
   function drawWorker(
-    g: CanvasRenderingContext2D,
+    s: SceneLayer,
     b: Building,
     now: number,
     work: BuildingSpec['prod'] | 'build',
   ) {
     if (z < 0.7) return;
-    const anim = renderPrefs().reducedMotion ? 0 : Math.sin(now / 420 + b.id * 1.7);
+    const g = s.g,
+      anim = renderPrefs().reducedMotion ? 0 : Math.sin(now / 420 + b.id * 1.7);
     let x = b.x * game.TS + 25,
       y = b.y * game.TS + 18;
     if (work === 'fish') {
@@ -744,81 +821,51 @@ export function createRenderer(
       x = b.x * game.TS + 4 + (Math.floor(now / 5000 + b.id) % 3) * 5;
       y = b.y * game.TS + 20;
     }
-    g.fillStyle = 'rgba(32,28,20,0.20)';
-    g.beginPath();
-    g.ellipse(x, y, 4, 1.2, 0, 0, 7);
-    g.fill();
-    g.strokeStyle = '#514130';
-    g.lineWidth = 1.4;
-    g.beginPath();
-    g.moveTo(x - 1, y - 3);
-    g.lineTo(x - 1.5, y);
-    g.moveTo(x + 1, y - 3);
-    g.lineTo(x + 1.5, y);
-    g.stroke();
-    g.fillStyle =
+    g.ellipse(x, y, 4, 1.2).fill({ color: 0x201c14, alpha: 0.2 });
+    g.moveTo(x - 1, y - 3)
+      .lineTo(x - 1.5, y)
+      .moveTo(x + 1, y - 3)
+      .lineTo(x + 1.5, y)
+      .stroke({ color: 0x514130, width: 1.4 });
+    g.roundRect(x - 2.2, y - 7, 4.4, 4.8, 1).fill(
       work === 'rock' || work === 'mine'
-        ? '#907b68'
+        ? 0x907b68
         : work === 'plant'
-          ? '#6f8b61'
+          ? 0x6f8b61
           : work === 'build'
-            ? '#b89a60'
-            : '#6a91a0';
-    game.rr(g, x - 2.2, y - 7, 4.4, 4.8, 1);
-    g.fill();
-    g.fillStyle = '#e1bf94';
-    g.beginPath();
-    g.arc(x, y - 8.6, 1.7, 0, 7);
-    g.fill();
-    g.fillStyle = '#c9ad72';
-    g.beginPath();
-    g.ellipse(x, y - 9.7, 2.4, 0.7, 0, 0, 7);
-    g.fill();
+            ? 0xb89a60
+            : 0x6a91a0,
+    );
+    g.circle(x, y - 8.6, 1.7).fill(0xe1bf94);
+    g.ellipse(x, y - 9.7, 2.4, 0.7).fill(0xc9ad72);
     const hammer = work === 'gather' || work === 'rock' || work === 'build' || work === 'craft';
     const arm = hammer ? anim * 2.2 : anim * 0.8;
-    g.strokeStyle = '#d6b38e';
-    g.lineWidth = 1.1;
-    g.beginPath();
-    g.moveTo(x + 1.7, y - 6.1);
-    g.lineTo(x + 4, y - 5 + arm);
-    g.stroke();
-    if (work === 'gather' || work === 'rock' || work === 'build' || work === 'craft') {
-      g.strokeStyle = '#7b5d3b';
-      g.lineWidth = 1.0;
-      g.beginPath();
-      g.moveTo(x + 3.5, y - 4 + arm);
-      g.lineTo(x + 5.5, y - 8 + arm);
-      g.stroke();
-      g.fillStyle = work === 'gather' ? '#c3cbd0' : '#919da1';
-      g.fillRect(x + 4.7, y - 9 + arm, 3, 1.8);
+    g.moveTo(x + 1.7, y - 6.1)
+      .lineTo(x + 4, y - 5 + arm)
+      .stroke({ color: 0xd6b38e, width: 1.1 });
+    if (hammer) {
+      g.moveTo(x + 3.5, y - 4 + arm)
+        .lineTo(x + 5.5, y - 8 + arm)
+        .stroke({ color: 0x7b5d3b, width: 1 });
+      g.rect(x + 4.7, y - 9 + arm, 3, 1.8).fill(work === 'gather' ? 0xc3cbd0 : 0x919da1);
     } else if (work === 'fish') {
-      g.strokeStyle = '#785c39';
-      g.lineWidth = 0.8;
-      g.beginPath();
-      g.moveTo(x + 2, y - 5);
-      g.lineTo(x + 8, y - 11 + anim * 0.5);
-      g.stroke();
+      g.moveTo(x + 2, y - 5)
+        .lineTo(x + 8, y - 11 + anim * 0.5)
+        .stroke({ color: 0x785c39, width: 0.8 });
     } else if (work === 'plant' || work === 'farm') {
-      g.strokeStyle = '#775c37';
-      g.lineWidth = 0.9;
-      g.beginPath();
-      g.moveTo(x + 3, y - 5 + arm);
-      g.lineTo(x + 5, y + 1);
-      g.stroke();
+      g.moveTo(x + 3, y - 5 + arm)
+        .lineTo(x + 5, y + 1)
+        .stroke({ color: 0x775c37, width: 0.9 });
     } else if (work === 'mine') {
-      const cx = x - 3 + anim * 0.9;
-      g.fillStyle = '#6f6a61';
-      g.fillRect(cx, y - 3.2, 6, 2.8);
-      const output = game.BSPEC[b.type].out;
-      if (output) g.fillStyle = game.GOODS[output].c;
-      g.fillRect(cx + 0.6, y - 4.2, 4.8, 1.8);
-      g.fillStyle = '#403b35';
-      g.beginPath();
-      g.arc(cx + 1, y, 0.8, 0, 7);
-      g.arc(cx + 5, y, 0.8, 0, 7);
-      g.fill();
+      const cx = x - 3 + anim * 0.9,
+        output = game.BSPEC[b.type].out;
+      g.rect(cx, y - 3.2, 6, 2.8).fill(0x6f6a61);
+      g.rect(cx + 0.6, y - 4.2, 4.8, 1.8).fill(output ? game.GOODS[output].c : 0x6f6a61);
+      g.circle(cx + 1, y, 0.8)
+        .circle(cx + 5, y, 0.8)
+        .fill(0x403b35);
     }
-    if (work) game.drawVillageWorkEffects(g, b, work, now);
+    if (work) game.drawVillageWorkEffects(s, b, work, now);
     if (work === 'fish' && !game.state.paused && !renderPrefs().reducedMotion) {
       // Cast-line rings only where there really is water beside this fishery.
       for (let side = 0; side < 4; side++) {
@@ -826,79 +873,75 @@ export function createRenderer(
           wy = b.y + game.DY[side];
         if (!game.inB(wx, wy) || game.tiles[game.idx(wx, wy)].t !== game.WATER) continue;
         const wave = (now / 1800 + b.id * 0.17) % 1;
-        g.strokeStyle = 'rgba(240,232,191,' + (0.24 * Math.sin(wave * Math.PI)).toFixed(3) + ')';
-        g.lineWidth = 0.55;
-        g.beginPath();
         g.ellipse(
           (wx + 0.5) * game.TS,
           (wy + 0.5) * game.TS,
           1 + wave * 6,
           0.5 + wave * 2.2,
-          0,
-          0,
-          7,
-        );
-        g.stroke();
+        ).stroke({ color: 0xf0e8bf, alpha: 0.24 * Math.sin(wave * Math.PI), width: 0.55 });
         break;
       }
     }
   }
-  function drawTree(g: CanvasRenderingContext2D, x: number, y: number, tl: Tile, now: number) {
+  function drawTree(s: SceneLayer, x: number, y: number, tl: Tile, now: number) {
     const h = tileHash(game.idx(x, y)),
       v = h % 3,
       sw = renderPrefs().reducedMotion ? 0 : ((now / 2400 + h * 0.61) | 0) % 2;
     const spr = game.ART.tree[tl.tree - 1][v][sw];
     const jx = ((h >> 2) % 7) - 3,
       jy = ((h >> 5) % 5) - 2;
-    const scale = 0.87 + ((h >> 3) % 15) / 100,
-      tw = 38 * scale,
-      th = 46 * scale;
-    g.save();
-    if (renderPrefs().clarity) g.globalAlpha *= 0.62;
-    // The canopy cast shadow lives in the ground pass; this smaller cached
-    // patch stays attached to the root when sunlight and weather change.
-    g.drawImage(
-      game.ART.shadowSoft,
-      x * game.TS + 10.5 + jx - 9 * scale,
-      y * game.TS + 25.5 + jy,
-      20 * scale,
-      7 * scale,
+    const size = 0.87 + ((h >> 3) % 15) / 100,
+      tw = 38 * size,
+      th = 46 * size;
+    s.image(
+      spr,
+      x * game.TS + 10.5 + jx - tw / 2,
+      y * game.TS + 28.5 + jy - th,
+      tw,
+      th,
+      renderPrefs().clarity ? 0.62 : 1,
     );
-    g.drawImage(spr, x * game.TS + 10.5 + jx - tw / 2, y * game.TS + 28.5 + jy - th, tw, th);
-    g.restore();
   }
-  function drawRock(g: CanvasRenderingContext2D, x: number, y: number) {
+  const pebbles: HTMLCanvasElement[] = [];
+  function pebble(variant: number) {
+    if (pebbles[variant]) return pebbles[variant];
+    const canvas = game.Acan(44, 28),
+      g = requireCanvas2D(canvas, reportGraphicsFailure);
+    g.scale(4, 4);
+    g.fillStyle = 'rgba(148,143,128,0.9)';
+    g.beginPath();
+    g.ellipse(5, 3, 2.6 + variant * 0.5, 1.8, 0, 0, 7);
+    g.fill();
+    g.fillStyle = 'rgba(62,58,50,0.3)';
+    g.beginPath();
+    g.ellipse(6, 4, 2, 0.9, 0, 0, 7);
+    g.fill();
+    pebbles[variant] = canvas;
+    return canvas;
+  }
+  function drawRock(s: SceneLayer, x: number, y: number) {
     const h = tileHash(game.idx(x, y));
     if (z < 0.75) {
-      // LOD: scattered pebbles at far zoom
       const rx2 = ((h >> 2) % 13) - 6,
         ry2 = ((h >> 5) % 11) - 5;
-      g.fillStyle = 'rgba(148,143,128,0.9)';
-      g.beginPath();
-      g.ellipse(x * game.TS + 11 + rx2, y * game.TS + 14 + ry2, 2.6 + (h % 3) * 0.5, 1.8, 0, 0, 7);
-      g.fill();
-      g.fillStyle = 'rgba(62,58,50,0.3)';
-      g.beginPath();
-      g.ellipse(x * game.TS + 12 + rx2, y * game.TS + 15 + ry2, 2, 0.9, 0, 0, 7);
-      g.fill();
+      s.image(pebble(h % 3), x * game.TS + 6 + rx2, y * game.TS + 11 + ry2, 11, 7);
       return;
     }
-    g.globalAlpha = 0.96;
-    g.drawImage(
+    s.image(
       game.ART.rock[h % 2],
       x * game.TS - 1 + ((h >> 4) % 5) - 2,
       y * game.TS + 6.4 + ((h >> 6) % 5) - 2,
       24,
       18,
+      0.96,
     );
-    g.globalAlpha = 1;
   }
   let unitPoses: Record<string, UnitPose> = {};
   function unitDirection(dx: number, dy: number): string {
     const octant = (Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8;
     return ['e', 'se', 's', 'sw', 'w', 'nw', 'n', 'ne'][octant];
   }
-  function drawUnit(g: CanvasRenderingContext2D, u: Unit, now: number) {
+  function drawUnit(s: SceneLayer, u: Unit, now: number) {
     const px = u.x * game.TS,
       py = u.y * game.TS;
     let pose = unitPoses[u.id];
@@ -914,7 +957,7 @@ export function createRenderer(
     const fx = u.faceDX !== undefined && Number.isFinite(u.faceDX) ? u.faceDX : dx,
       fy = u.faceDY !== undefined && Number.isFinite(u.faceDY) ? u.faceDY : dy;
     if (Math.abs(fx) + Math.abs(fy) > 0.001) pose.dir = unitDirection(fx, fy);
-    g.drawImage(game.ART.shadowSoft, px - 9, py - 2, 18, 9);
+    s.image(game.ART.shadowSoft, px - 9, py - 2, 18, 9);
     const distance = u.walkDistance === undefined ? pose.distance : u.walkDistance;
     const moving = !game.state.paused && u.path && u.pi < u.path.length;
     const dustStep = Math.floor(distance * 2);
@@ -937,39 +980,23 @@ export function createRenderer(
     const dirset = game.ART.unitDirections[u.kind]?.[pose.dir];
     if (!dirset) throw new Error('Missing settler artwork: ' + u.kind + '/' + pose.dir);
     const fr = Math.floor(distance * 4) % dirset.walk.length;
-    const spr = moving && !renderPrefs().reducedMotion ? dirset.walk[fr] : dirset.idle;
-    g.save();
-    g.translate(
-      px,
-      py +
-        (moving && !renderPrefs().reducedMotion
-          ? Math.abs(Math.sin(distance * Math.PI)) * 0.25
-          : 0) -
-        1,
-    );
-    g.drawImage(spr, -7.5, -18, 15, 19);
-    const cargo = u.carry && game.ART.cargo?.[u.carry];
+    const walking = moving && !renderPrefs().reducedMotion;
+    const spr = walking ? dirset.walk[fr] : dirset.idle;
+    const footY = py + (walking ? Math.abs(Math.sin(distance * Math.PI)) * 0.25 : 0) - 1;
+    s.image(spr, px - 7.5, footY - 18, 15, 19);
+    const cargo = u.carry && game.ART.cargo[u.carry];
     if (cargo) {
       const rightFacing = pose.dir === 'e' || pose.dir === 'ne' || pose.dir === 'se';
       let cargoX = rightFacing ? 0.4 : -9.2;
       if (pose.dir === 'n' || pose.dir === 's') cargoX = -5;
-      g.drawImage(cargo, cargoX, -14, 10, 7.5);
+      s.image(cargo, px + cargoX, footY - 14, 10, 7.5);
     } else if (u.carry) {
-      const c = game.GOODS[u.carry].c;
-      g.fillStyle = 'rgba(0,0,0,0.28)';
-      game.rr(g, -7.4, -15.4, 7.6, 5, 1);
-      g.fill();
-      g.fillStyle = c;
-      game.rr(g, -7.8, -16, 7.4, 4.8, 1);
-      g.fill();
-      g.fillStyle = 'rgba(255,255,255,0.32)';
-      g.fillRect(-7, -15.5, 6.4, 1);
-      if (u.carry === 'gold') {
-        g.fillStyle = '#fff6c8';
-        g.fillRect(-4.4, -15.2, 1.4, 1);
-      }
+      const g = s.g;
+      g.roundRect(px - 7.4, footY - 15.4, 7.6, 5, 1).fill({ color: 0x000000, alpha: 0.28 });
+      g.roundRect(px - 7.8, footY - 16, 7.4, 4.8, 1).fill(game.GOODS[u.carry].c);
+      g.rect(px - 7, footY - 15.5, 6.4, 1).fill({ color: 0xffffff, alpha: 0.32 });
+      if (u.carry === 'gold') g.rect(px - 4.4, footY - 15.2, 1.4, 1).fill(0xfff6c8);
     }
-    g.restore();
   }
   const objPool: SortEntry[] = [];
   let objN = 0; // reused y-sort entries — no per-frame object churn
@@ -983,7 +1010,7 @@ export function createRenderer(
     }
     return o;
   }
-  function drawObjects(g: CanvasRenderingContext2D, now: number) {
+  function drawObjects(now: number) {
     objN = 0;
     const vx0 = Math.max(0, Math.floor(cam.x / game.TS) - 1),
       vx1 = Math.min(game.W - 1, Math.ceil((cam.x + vw / z) / game.TS) + 1);
@@ -1028,18 +1055,15 @@ export function createRenderer(
     objPool.sort(function (a, b2) {
       return a.k - b2.k;
     });
-    // One capture for the whole sorted pass: per-object captures would reinstall
-    // the context interception per object. beginPath isolates path state between
-    // painters, matching the per-capture reset they previously relied on.
-    presentation.layer('objects', g, function () {
+    // The whole sorted pass is one graphics run of sprites and small shapes.
+    presentation.layer('objects', function (s) {
       for (let i = 0; i < objPool.length; i++) {
         const q = objPool[i];
-        g.beginPath();
-        if (q.t === 0) drawBuilding(g, q.o as Building);
+        if (q.t === 0) drawBuilding(s, q.o as Building);
         else if (q.t === 1) {
-          if (q.tl) drawTree(g, q.x, q.y, q.tl, now);
-        } else if (q.t === 2) drawRock(g, q.x, q.y);
-        else drawUnit(g, q.o as Unit, now);
+          if (q.tl) drawTree(s, q.x, q.y, q.tl, now);
+        } else if (q.t === 2) drawRock(s, q.x, q.y);
+        else drawUnit(s, q.o as Unit, now);
       }
     });
   }
@@ -1050,7 +1074,7 @@ export function createRenderer(
     return (value ^ (value >>> 16)) >>> 0;
   }
   let atmosphereCount = 0;
-  function meadowParticles(g: CanvasRenderingContext2D, now: number) {
+  function meadowParticles(s: SceneLayer, now: number) {
     atmosphereCount = 0;
     if (
       renderPrefs().clarity ||
@@ -1061,7 +1085,8 @@ export function createRenderer(
       return;
     // Sparse fixed world cells prevent camera panning from dragging particles along.
     // The maximum remains bounded even at the widest zoom and on a large monitor.
-    const cell = game.TS * 7;
+    const cell = game.TS * 7,
+      g = s.g;
     let count = 0,
       butterflies = 0;
     const limit = renderPrefs().quality < 1 ? 20 : 56,
@@ -1090,10 +1115,10 @@ export function createRenderer(
           )
             continue;
           count++;
-          g.fillStyle = 'rgba(255,236,171,' + (0.55 * Math.sin(Math.PI * phase)).toFixed(3) + ')';
-          g.beginPath();
-          g.arc(px, py, mote ? 0.7 : 0.95, 0, 7);
-          g.fill();
+          g.circle(px, py, mote ? 0.7 : 0.95).fill({
+            color: 0xffecab,
+            alpha: 0.55 * Math.sin(Math.PI * phase),
+          });
         }
         if (renderPrefs().quality < 1 || z < 0.85 || hash % 4 || butterflies >= 3) continue;
         const tile = game.tiles[game.idx(tx, ty)];
@@ -1108,14 +1133,16 @@ export function createRenderer(
         )
           continue;
         butterflies++;
-        const wing = 0.5 + Math.abs(Math.sin(time * 8 + hash)) * 1.6;
-        g.fillStyle = hash % 3 ? '#f4cf76' : '#e1dfc2';
-        g.beginPath();
-        g.ellipse(flutterX - wing * 0.6, flutterY, wing, 1.35, -0.4, 0, 7);
-        g.ellipse(flutterX + wing * 0.6, flutterY, wing, 1.35, 0.4, 0, 7);
-        g.fill();
-        g.fillStyle = '#715c3e';
-        g.fillRect(flutterX - 0.25, flutterY - 1, 0.5, 2);
+        const wing = 0.5 + Math.abs(Math.sin(time * 8 + hash)) * 1.6,
+          color = hash % 3 ? 0xf4cf76 : 0xe1dfc2;
+        for (const side of [-1, 1]) {
+          g.save();
+          translate(g, flutterX + side * wing * 0.6, flutterY);
+          rotate(g, side * 0.4);
+          g.ellipse(0, 0, wing, 1.35).fill(color);
+          g.restore();
+        }
+        g.rect(flutterX - 0.25, flutterY - 1, 0.5, 2).fill(0x715c3e);
       }
     atmosphereCount = count + butterflies;
   }
@@ -1161,7 +1188,7 @@ export function createRenderer(
       });
     },
   };
-  function fxDraw(g: CanvasRenderingContext2D, now: number) {
+  function fxDraw(s: SceneLayer, now: number) {
     if (renderPrefs().clarity || renderPrefs().reducedMotion) {
       FXL.length = 0;
       return;
@@ -1169,7 +1196,6 @@ export function createRenderer(
     for (let i = FXL.length - 1; i >= 0; i--) {
       const f = FXL[i],
         age = now - f.t;
-      let p, life, cxp, cyp;
       const duration =
         f.k === 'coin'
           ? 850
@@ -1186,7 +1212,7 @@ export function createRenderer(
         FXL.splice(i, 1);
         continue;
       }
-      // Retire offscreen effects on schedule without submitting their paint calls.
+      // Retire offscreen effects on schedule without submitting their geometry.
       if (
         f.x * game.TS < cam.x - 60 ||
         f.x * game.TS > cam.x + vw / z + 60 ||
@@ -1194,107 +1220,54 @@ export function createRenderer(
         f.y * game.TS > cam.y + vh / z + 60
       )
         continue;
+      const g = s.g,
+        p = age / duration,
+        x = f.x * game.TS,
+        y = f.y * game.TS;
       if (f.k === 'stepDust') {
-        p = age / duration;
-        g.fillStyle = 'rgba(224,205,151,' + (0.16 * Math.sin(Math.PI * p)).toFixed(3) + ')';
-        for (let puff = 0; puff < 2; puff++) {
-          g.beginPath();
-          g.ellipse(
-            f.x * game.TS + puff * 2.4 + p * 2.5,
-            f.y * game.TS + 2 - p * 1.5,
-            0.7 + p * 2.2,
-            0.5 + p,
-            0,
-            0,
-            7,
-          );
-          g.fill();
-        }
+        for (let puff = 0; puff < 2; puff++)
+          g.ellipse(x + puff * 2.4 + p * 2.5, y + 2 - p * 1.5, 0.7 + p * 2.2, 0.5 + p).fill({
+            color: 0xe0cd97,
+            alpha: 0.16 * Math.sin(Math.PI * p),
+          });
       } else if (f.k === 'ring') {
-        life = 650;
-        if (age > life) {
-          FXL.splice(i, 1);
-          continue;
-        }
-        p = age / life;
-        g.strokeStyle = game.rgba(f.c ?? '#ffd23f', 0.55 * (1 - p));
-        g.lineWidth = 2.4 - 1.8 * p;
-        g.beginPath();
-        g.arc(f.x * game.TS, f.y * game.TS + 3, 4 + p * (f.r || 20), 0, 7);
-        g.stroke();
+        g.circle(x, y + 3, 4 + p * (f.r || 20)).stroke({
+          color: f.c ?? '#ffd23f',
+          alpha: 0.55 * (1 - p),
+          width: 2.4 - 1.8 * p,
+        });
       } else if (f.k === 'coin') {
-        life = 850;
-        if (age > life) {
-          FXL.splice(i, 1);
-          continue;
-        }
-        p = age / life;
-        cxp = f.x * game.TS + 2 + ((f.i ?? 0) - 2.5) * 7 * p * 0.9;
-        cyp = f.y * game.TS - 4 - 30 * Math.sin(Math.PI * Math.min(1, p * 1.05)) * 0.9 + 14 * p * p;
-        const r2 = 2.1 * (1 - p * 0.25);
-        g.globalAlpha = Math.max(0, 1 - p * p);
-        g.fillStyle = '#c98a1e';
-        g.beginPath();
-        g.arc(cxp + 0.7, cyp + 0.7, r2, 0, 7);
-        g.fill();
-        g.fillStyle = '#ffd23f';
-        g.beginPath();
-        g.arc(cxp, cyp, r2, 0, 7);
-        g.fill();
-        g.fillStyle = '#fff2b0';
-        g.fillRect(cxp - r2 * 0.4, cyp - r2 * 0.55, r2 * 0.8, 0.8);
-        g.globalAlpha = 1;
+        const cxp = x + 2 + ((f.i ?? 0) - 2.5) * 7 * p * 0.9,
+          cyp = y - 4 - 30 * Math.sin(Math.PI * Math.min(1, p * 1.05)) * 0.9 + 14 * p * p,
+          r2 = 2.1 * (1 - p * 0.25),
+          alpha = Math.max(0, 1 - p * p);
+        g.circle(cxp + 0.7, cyp + 0.7, r2).fill({ color: 0xc98a1e, alpha });
+        g.circle(cxp, cyp, r2).fill({ color: 0xffd23f, alpha });
+        g.rect(cxp - r2 * 0.4, cyp - r2 * 0.55, r2 * 0.8, 0.8).fill({ color: 0xfff2b0, alpha });
       } else if (f.k === 'spark') {
-        life = 520;
-        if (age > life) {
-          FXL.splice(i, 1);
-          continue;
-        }
-        p = age / life;
-        g.strokeStyle = game.rgba(f.c ?? '#ffd23f', (1 - p) * 0.9);
-        g.lineWidth = 1.2;
         for (let k = 0; k < (f.n || 6); k++) {
           const a2 = k * 2.39996 + (f.i ?? 0),
-            sp2 = 14 + ((k * 53) % 9);
-          cxp = f.x * game.TS + Math.cos(a2) * sp2 * p;
-          cyp = f.y * game.TS + 3 + Math.sin(a2) * sp2 * p + p * 10;
-          g.beginPath();
-          g.moveTo(cxp, cyp);
-          g.lineTo(cxp + Math.cos(a2) * 3, cyp + Math.sin(a2) * 3);
-          g.stroke();
+            sp2 = 14 + ((k * 53) % 9),
+            cxp = x + Math.cos(a2) * sp2 * p,
+            cyp = y + 3 + Math.sin(a2) * sp2 * p + p * 10;
+          g.moveTo(cxp, cyp).lineTo(cxp + Math.cos(a2) * 3, cyp + Math.sin(a2) * 3);
         }
+        g.stroke({ color: f.c ?? '#ffd23f', alpha: (1 - p) * 0.9, width: 1.2 });
       } else if (f.k === 'dust') {
-        life = 620;
-        if (age > life) {
-          FXL.splice(i, 1);
-          continue;
-        }
-        p = age / life;
         for (let k = 0; k < 6; k++) {
           const a3 = k * 1.047 + rnd0(f.i ?? 0);
-          g.fillStyle = 'rgba(184,162,118,' + ((1 - p) * 0.22).toFixed(3) + ')';
-          g.beginPath();
-          g.arc(
-            f.x * game.TS + Math.cos(a3) * (3 + p * 11),
-            f.y * game.TS + 12 + Math.sin(a3) * (1.5 + p * 4),
+          g.circle(
+            x + Math.cos(a3) * (3 + p * 11),
+            y + 12 + Math.sin(a3) * (1.5 + p * 4),
             1.6 + p * 3,
-            0,
-            7,
-          );
-          g.fill();
+          ).fill({ color: 0xb8a276, alpha: (1 - p) * 0.22 });
         }
       } else {
-        life = 700;
-        if (age > life) {
-          FXL.splice(i, 1);
-          continue;
-        }
-        p = age / life;
-        g.strokeStyle = 'rgba(255,80,70,' + (0.5 * (1 - p)).toFixed(3) + ')';
-        g.lineWidth = 2;
-        g.beginPath();
-        g.arc(f.x * game.TS + game.TS / 2, f.y * game.TS + game.TS / 2, 3 + p * 16, 0, 7);
-        g.stroke();
+        g.circle(x + game.TS / 2, y + game.TS / 2, 3 + p * 16).stroke({
+          color: 0xff5046,
+          alpha: 0.5 * (1 - p),
+          width: 2,
+        });
       }
     }
   }
@@ -1303,17 +1276,15 @@ export function createRenderer(
   }
 
   // ---------- animated overlays ----------
-  function waterAnim(g: CanvasRenderingContext2D, now: number) {
+  function waterAnim(s: SceneLayer, now: number) {
     // The full painted material is cached at both quality levels. Only a sparse
     // veil of curved reflections breathes; no texture swapping or raster uploads.
     if (renderPrefs().reducedMotion || renderPrefs().quality < 1) return;
     const vx0 = Math.max(0, Math.floor(cam.x / game.TS)),
       vx1 = Math.min(game.W - 1, Math.ceil((cam.x + vw / z) / game.TS)),
       vy0 = Math.max(0, Math.floor(cam.y / game.TS)),
-      vy1 = Math.min(game.H - 1, Math.ceil((cam.y + vh / z) / game.TS));
-    g.save();
-    g.lineCap = 'round';
-    g.lineWidth = 0.65;
+      vy1 = Math.min(game.H - 1, Math.ceil((cam.y + vh / z) / game.TS)),
+      g = s.g;
     for (let y = vy0; y <= vy1; y++)
       for (let x = vx0; x <= vx1; x++) {
         const i = game.idx(x, y),
@@ -1322,16 +1293,19 @@ export function createRenderer(
         const px = x * game.TS + 6,
           py = y * game.TS + 8 + (h % 8);
         const phase = now / 2600 + h * 0.17;
-        g.strokeStyle = 'rgba(222,226,184,' + (0.075 + 0.055 * Math.sin(phase)).toFixed(3) + ')';
-        g.beginPath();
-        g.moveTo(px, py);
-        g.quadraticCurveTo(px + 4, py - 0.7, px + 9 + (h % 4), py - 0.2);
-        g.stroke();
+        g.moveTo(px, py)
+          .quadraticCurveTo(px + 4, py - 0.7, px + 9 + (h % 4), py - 0.2)
+          .stroke({
+            color: 0xdee2b8,
+            alpha: 0.075 + 0.055 * Math.sin(phase),
+            width: 0.65,
+            cap: 'round',
+          });
       }
-    g.restore();
   }
-  function highlights(g: CanvasRenderingContext2D, now: number) {
+  function highlights(s: SceneLayer, now: number) {
     now = motionTime(now);
+    const g = s.g;
     if (game.mode && game.mode.type === 'build' && game.hlTiles && game.hlTiles.length) {
       const pu = 0.5 + 0.5 * Math.sin(now / 260);
       for (let hi = 0; hi < game.hlTiles.length; hi++) {
@@ -1345,13 +1319,12 @@ export function createRenderer(
           hy2 + game.TS < cam.y
         )
           continue;
-        g.fillStyle = 'rgba(255,214,64,' + (0.06 + 0.1 * pu).toFixed(3) + ')';
-        diaPath(g, hx2 + 12, hy2 + 12, 12.2);
-        g.fill();
-        g.strokeStyle = 'rgba(255,223,110,' + (0.55 + 0.4 * pu).toFixed(3) + ')';
-        g.lineWidth = 2;
-        diaPath(g, hx2 + 12, hy2 + 12, 11.4);
-        g.stroke();
+        diamond(g, hx2 + 12, hy2 + 12, 12.2).fill({ color: 0xffd640, alpha: 0.06 + 0.1 * pu });
+        diamond(g, hx2 + 12, hy2 + 12, 11.4).stroke({
+          color: 0xffdf6e,
+          alpha: 0.55 + 0.4 * pu,
+          width: 2,
+        });
       }
     }
     if (game.mode && game.mode.type === 'build' && game.hlSpots && game.hlSpots.length) {
@@ -1367,18 +1340,14 @@ export function createRenderer(
           sy4 + game.TS < cam.y
         )
           continue;
-        g.fillStyle = 'rgba(130,255,140,' + (0.14 + 0.16 * pu2).toFixed(3) + ')';
-        diaPath(g, sx4 + 12, sy4 + 12, 5.4);
-        g.fill();
-        g.fillStyle = 'rgba(190,255,190,' + (0.5 + 0.4 * pu2).toFixed(3) + ')';
-        g.beginPath();
-        g.arc(sx4 + 12, sy4 + 12, 1.5, 0, 7);
-        g.fill();
+        diamond(g, sx4 + 12, sy4 + 12, 5.4).fill({ color: 0x82ff8c, alpha: 0.14 + 0.16 * pu2 });
+        g.circle(sx4 + 12, sy4 + 12, 1.5).fill({ color: 0xbeffbe, alpha: 0.5 + 0.4 * pu2 });
       }
     }
   }
-  function demoMarkers(g: CanvasRenderingContext2D) {
+  function demoMarkers(s: SceneLayer) {
     if (!game.mode || game.mode.type !== 'demolish') return;
+    const g = s.g;
     for (let di4 = 0; di4 < game.buildings.length; di4++) {
       const b5 = game.buildings[di4];
       if (b5.type === 'hq') continue;
@@ -1386,98 +1355,92 @@ export function createRenderer(
         by = b5.y * game.TS,
         armed = game.demoArm === b5;
       const pu = renderPrefs().reducedMotion ? 0.5 : 0.5 + 0.5 * Math.sin(NOW / 420);
-      g.strokeStyle = armed ? '#ffd23f' : 'rgba(255,84,72,' + (0.75 + 0.25 * pu).toFixed(2) + ')';
-      g.lineWidth = armed ? 3 : 2;
-      game.rr(g, bx - 0.5, by - 0.5, game.TS + 1, game.TS + 1, 3);
-      g.stroke();
-      g.beginPath();
-      g.moveTo(bx + 7, by + 7);
-      g.lineTo(bx + game.TS - 7, by + game.TS - 7);
-      g.moveTo(bx + game.TS - 7, by + 7);
-      g.lineTo(bx + 7, by + game.TS - 7);
-      g.stroke();
+      const style = armed
+        ? { color: 0xffd23f, width: 3 }
+        : { color: 0xff5448, alpha: 0.75 + 0.25 * pu, width: 2 };
+      g.roundRect(bx - 0.5, by - 0.5, game.TS + 1, game.TS + 1, 3).stroke(style);
+      g.moveTo(bx + 7, by + 7)
+        .lineTo(bx + game.TS - 7, by + game.TS - 7)
+        .moveTo(bx + game.TS - 7, by + 7)
+        .lineTo(bx + 7, by + game.TS - 7)
+        .stroke(style);
     }
   }
-  function selection(g: CanvasRenderingContext2D, now: number) {
+  function selection(s: SceneLayer, now: number) {
     if (!game.selected) return;
-    const b = game.selected,
+    const g = s.g,
+      b = game.selected,
       sp = game.BSPEC[b.type],
       rr2 = (sp.rad || 3) * game.TS,
       ccx = b.x * game.TS + game.TS / 2,
       ccy = b.y * game.TS + game.TS / 2;
-    g.fillStyle = 'rgba(255,214,80,0.05)';
-    g.beginPath();
-    g.arc(ccx, ccy, rr2, 0, 7);
-    g.fill();
-    g.strokeStyle = 'rgba(255,210,63,0.55)';
-    g.lineWidth = 1.2;
-    g.setLineDash([5, 4]);
-    g.lineDashOffset = -motionTime(now) / 60;
-    g.beginPath();
-    g.arc(ccx, ccy, rr2, 0, 7);
-    g.stroke();
-    g.setLineDash([]);
-    g.save();
-    g.shadowColor = 'rgba(255,210,63,0.8)';
-    g.shadowBlur = 7;
-    g.strokeStyle = '#ffd23f';
-    g.lineWidth = 2;
-    game.rr(g, b.x * game.TS - 2, b.y * game.TS - 2, game.TS + 4, game.TS + 4, 4);
-    g.stroke();
-    g.restore();
+    g.circle(ccx, ccy, rr2).fill({ color: 0xffd650, alpha: 0.05 });
+    dashed(g, circlePoints(ccx, ccy, rr2), 5, 4, -motionTime(now) / 60).stroke({
+      color: 0xffd23f,
+      alpha: 0.55,
+      width: 1.2,
+    });
+    // Two soft, wider strokes stand in for a blurred glow; blur is screen-sized.
+    const device = Math.max(0.01, dpr * z);
+    for (const [spread, alpha] of [
+      [1, 0.064],
+      [0.5, 0.128],
+    ])
+      g.roundRect(b.x * game.TS - 2, b.y * game.TS - 2, game.TS + 4, game.TS + 4, 4).stroke({
+        color: 0xffd23f,
+        alpha,
+        width: 2 + (7 * spread) / device,
+      });
+    g.roundRect(b.x * game.TS - 2, b.y * game.TS - 2, game.TS + 4, game.TS + 4, 4).stroke({
+      color: 0xffd23f,
+      width: 2,
+    });
   }
-  function anchorDraw(g: CanvasRenderingContext2D, now: number) {
+  function anchorDraw(s: SceneLayer, now: number) {
     if (!game.anchor) return;
-    const pu = renderPrefs().reducedMotion ? 0.5 : 0.5 + 0.5 * Math.sin(now / 420);
-    g.fillStyle = 'rgba(143,214,208,' + (0.1 + 0.1 * pu).toFixed(3) + ')';
-    g.fillRect(game.anchor.x * game.TS, game.anchor.y * game.TS, game.TS, game.TS);
-    g.strokeStyle = '#8fd6d0';
-    g.lineWidth = 2;
-    const a = game.anchor.x * game.TS,
+    const g = s.g,
+      pu = renderPrefs().reducedMotion ? 0.5 : 0.5 + 0.5 * Math.sin(now / 420),
+      a = game.anchor.x * game.TS,
       b2 = game.anchor.y * game.TS,
-      L = 8;
-    g.beginPath();
-    g.moveTo(a, b2 + L);
-    g.lineTo(a, b2);
-    g.lineTo(a + L, b2);
-    g.moveTo(a + game.TS - L, b2);
-    g.lineTo(a + game.TS, b2);
-    g.lineTo(a + game.TS, b2 + L);
-    g.moveTo(a + game.TS, b2 + game.TS - L);
-    g.lineTo(a + game.TS, b2 + game.TS);
-    g.lineTo(a + game.TS - L, b2 + game.TS);
-    g.moveTo(a + L, b2 + game.TS);
-    g.lineTo(a, b2 + game.TS);
-    g.lineTo(a, b2 + game.TS - L);
-    g.stroke();
+      L = 8,
+      T = game.TS;
+    g.rect(a, b2, T, T).fill({ color: 0x8fd6d0, alpha: 0.1 + 0.1 * pu });
+    g.moveTo(a, b2 + L)
+      .lineTo(a, b2)
+      .lineTo(a + L, b2)
+      .moveTo(a + T - L, b2)
+      .lineTo(a + T, b2)
+      .lineTo(a + T, b2 + L)
+      .moveTo(a + T, b2 + T - L)
+      .lineTo(a + T, b2 + T)
+      .lineTo(a + T - L, b2 + T)
+      .moveTo(a + L, b2 + T)
+      .lineTo(a, b2 + T)
+      .lineTo(a, b2 + T - L)
+      .stroke({ color: 0x8fd6d0, width: 2 });
   }
-  function ghostDraw(g: CanvasRenderingContext2D) {
+  function ghostDraw(s: SceneLayer) {
     if (!game.ghost || !game.ghost.in || !game.mode || game.mode.type !== 'build') return;
     const gx = game.ghost.x,
       gy = game.ghost.y,
       ok = game.ghost.ok;
-    g.fillStyle = ok ? 'rgba(110,224,110,0.20)' : 'rgba(255,80,80,0.20)';
-    g.beginPath();
-    g.ellipse(gx * game.TS + 12, gy * game.TS + 16, 13, 5, 0, 0, 7);
-    g.fill();
-    g.globalAlpha = 0.66;
-    drawSprite(g, game.mode.bt, gx * game.TS + 12, gy * game.TS + 12);
-    g.globalAlpha = 1;
-    g.strokeStyle = ok ? '#6ee06e' : '#ff5050';
-    g.lineWidth = 2;
-    game.rr(g, gx * game.TS - 1, gy * game.TS - 1, game.TS + 2, game.TS + 2, 3.5);
-    g.stroke();
+    s.g.ellipse(gx * game.TS + 12, gy * game.TS + 16, 13, 5).fill({
+      color: ok ? 0x6ee06e : 0xff5050,
+      alpha: 0.2,
+    });
+    drawSprite(s, game.mode.bt, gx * game.TS + 12, gy * game.TS + 12, 0.66);
+    const g = s.g;
+    g.roundRect(gx * game.TS - 1, gy * game.TS - 1, game.TS + 2, game.TS + 2, 3.5).stroke({
+      color: ok ? 0x6ee06e : 0xff5050,
+      width: 2,
+    });
     const sp2 = game.BSPEC[game.mode.bt];
-    if (ok && sp2.rad && sp2.rad >= 4) {
-      const grx = gx * game.TS + 12,
-        gry = gy * game.TS + 12,
-        gr = sp2.rad * game.TS;
-      g.strokeStyle = 'rgba(110,224,110,0.35)';
-      g.lineWidth = 1;
-      g.beginPath();
-      g.arc(grx, gry, gr, 0, 7);
-      g.stroke();
-    }
+    if (ok && sp2.rad && sp2.rad >= 4)
+      g.circle(gx * game.TS + 12, gy * game.TS + 12, sp2.rad * game.TS).stroke({
+        color: 0x6ee06e,
+        alpha: 0.35,
+        width: 1,
+      });
   }
   // ---------- logistics and placement feedback ----------
   /**
@@ -1758,105 +1721,87 @@ export function createRenderer(
         '% faster along this route)',
     });
   }
-  function worldLabel(
-    g: CanvasRenderingContext2D,
-    x: number,
-    y: number,
-    label: string,
-    color: string,
-  ) {
-    g.save();
-    g.font = '600 11px system-ui,sans-serif';
-    while (label.length > 8 && g.measureText(label).width > vw - 32)
+  const LABEL_FONT = '600 11px system-ui,sans-serif';
+  function worldLabel(s: SceneLayer, x: number, y: number, label: string, color: string) {
+    while (label.length > 8 && s.measureText(label, LABEL_FONT) > vw - 32)
       label = label.slice(0, -4) + '…';
-    const width = g.measureText(label).width + 14;
+    const width = s.measureText(label, LABEL_FONT) + 14;
     const screenX = (x - cam.x) * z,
       screenY = (y - cam.y) * z;
     x = cam.x + Math.max(width / 2 + 8, Math.min(vw - width / 2 - 8, screenX)) / z;
     y = cam.y + Math.max(28, Math.min(vh - 12, screenY)) / z;
-    g.translate(x, y);
-    g.scale(1 / z, 1 / z);
-    g.fillStyle = 'rgba(16,27,25,0.90)';
-    game.rr(g, -width / 2, -18, width, 21, 5);
-    g.fill();
-    g.strokeStyle = game.rgba(color || '#dbc79b', 0.66);
-    g.lineWidth = 1;
-    g.stroke();
-    g.fillStyle = color || '#f4ead6';
-    g.textAlign = 'center';
-    g.fillText(label, 0, -4);
+    const g = s.g;
+    g.save();
+    translate(g, x, y);
+    scale(g, 1 / z);
+    g.roundRect(-width / 2, -18, width, 21, 5)
+      .fill({ color: 0x101b19, alpha: 0.9 })
+      .stroke({ color: color || '#dbc79b', alpha: 0.66, width: 1 });
     g.restore();
+    s.text(label, x, y - 4 / z, {
+      font: LABEL_FONT,
+      fill: color || '#f4ead6',
+      align: 'center',
+      scale: 1 / z,
+    });
   }
   function traceRoute(
-    g: CanvasRenderingContext2D,
+    s: SceneLayer,
     x: number,
     y: number,
     path: number[],
     start: number,
     color: string,
-    dashed: boolean,
+    isDashed: boolean,
   ) {
     if (!path || !path.length) return;
-    g.strokeStyle = 'rgba(17,31,29,0.72)';
-    g.lineWidth = 4 / z;
-    g.setLineDash(dashed ? [6 / z, 4 / z] : []);
-    function line() {
-      g.beginPath();
-      g.moveTo(x * game.TS, y * game.TS);
-      for (let p = start || 0; p < path.length; p++) {
-        const n = path[p];
-        g.lineTo(((n % game.W) + 0.5) * game.TS, (((n / game.W) | 0) + 0.5) * game.TS);
-      }
-      g.stroke();
+    const g = s.g,
+      points = [x * game.TS, y * game.TS];
+    for (let p = start || 0; p < path.length; p++) {
+      const n = path[p];
+      points.push(((n % game.W) + 0.5) * game.TS, (((n / game.W) | 0) + 0.5) * game.TS);
     }
-    line();
-    g.strokeStyle = color;
-    g.lineWidth = 1.7 / z;
-    line();
-    g.setLineDash([]);
+    for (const style of [
+      { color: 0x111f1d, alpha: 0.72, width: 4 / z },
+      { color, width: 1.7 / z },
+    ]) {
+      if (isDashed) dashed(g, points, 6 / z, 4 / z);
+      else g.poly(points, false);
+      g.stroke(style);
+    }
   }
-  function reachDraw(
-    g: CanvasRenderingContext2D,
-    type: BuildingType,
-    x: number,
-    y: number,
-    resources: number[],
-  ) {
-    const sp = game.BSPEC[type],
+  function reachDraw(s: SceneLayer, type: BuildingType, x: number, y: number, resources: number[]) {
+    const g = s.g,
+      sp = game.BSPEC[type],
       area = resourceWorkArea(type, x, y),
-      r = area.r * game.TS;
+      r = area.r * game.TS,
+      fill = { color: 0x89cfb1, alpha: 0.04 },
+      edge = { color: 0xb3e6c5, alpha: 0.72, width: 1 / z };
     x = area.x;
     y = area.y;
-    g.fillStyle = 'rgba(137,207,177,0.04)';
-    g.strokeStyle = 'rgba(179,230,197,0.72)';
-    g.lineWidth = 1 / z;
-    if (sp.resKind || sp.prod === 'fish') {
-      game.rr(
-        g,
+    if (sp.resKind || sp.prod === 'fish')
+      g.roundRect(
         (x - area.r) * game.TS,
         (y - area.r) * game.TS,
         (area.r * 2 + 1) * game.TS,
         (area.r * 2 + 1) * game.TS,
         3,
-      );
-      g.fill();
-      g.stroke();
-    } else {
-      g.beginPath();
-      g.arc((x + 0.5) * game.TS, (y + 0.5) * game.TS, r, 0, 7);
-      g.fill();
-      g.stroke();
-    }
+      )
+        .fill(fill)
+        .stroke(edge);
+    else
+      g.circle((x + 0.5) * game.TS, (y + 0.5) * game.TS, r)
+        .fill(fill)
+        .stroke(edge);
     for (let i = 0; i < resources.length; i++) {
       const n = resources[i],
         px = (n % game.W) * game.TS,
         py = ((n / game.W) | 0) * game.TS;
-      g.fillStyle = 'rgba(188,225,153,0.15)';
-      g.fillRect(px + 1, py + 1, game.TS - 2, game.TS - 2);
-      g.strokeStyle = '#c5dfaa';
-      g.lineWidth = 1.3 / z;
-      game.rr(g, px + 3, py + 3, game.TS - 6, game.TS - 6, 3);
-      g.stroke();
+      g.rect(px + 1, py + 1, game.TS - 2, game.TS - 2).fill({ color: 0xbce199, alpha: 0.15 });
+      g.roundRect(px + 3, py + 3, game.TS - 6, game.TS - 6, 3).stroke({
+        color: 0xc5dfaa,
+        width: 1.3 / z,
+      });
     }
   }
   const _reasonNames: Partial<Record<ProductionBlockReason, string>> = {
@@ -1892,40 +1837,36 @@ export function createRenderer(
     armory: 'ARMS',
     guard: 'POST',
   };
-  function clarityRoads(g: CanvasRenderingContext2D) {
+  function clarityRoads(s: SceneLayer) {
     if (!renderPrefs().clarity) return;
-    const x0 = Math.max(0, Math.floor(cam.x / game.TS)),
+    const g = s.g,
+      x0 = Math.max(0, Math.floor(cam.x / game.TS)),
       x1 = Math.min(game.W - 1, Math.ceil((cam.x + vw / z) / game.TS)),
       y0 = Math.max(0, Math.floor(cam.y / game.TS)),
       y1 = Math.min(game.H - 1, Math.ceil((cam.y + vh / z) / game.TS));
-    g.save();
-    g.lineCap = 'round';
-    g.beginPath();
+    let any = false;
     for (let y = y0; y <= y1; y++)
       for (let x = x0; x <= x1; x++) {
         if (!game.tiles[game.idx(x, y)].road) continue;
+        any = true;
         const cx = (x + 0.5) * game.TS,
           cy = (y + 0.5) * game.TS;
         // Include isolated road tiles and exactly the same orthogonal joins as
         // the painted roads. No connectivity or movement rules change.
-        g.moveTo(cx - 0.5, cy);
-        g.lineTo(cx + 0.5, cy);
+        g.moveTo(cx - 0.5, cy).lineTo(cx + 0.5, cy);
         for (let d = 0; d < 4; d++) {
           const nx = x + game.DX[d],
             ny = y + game.DY[d];
           if (!game.inB(nx, ny) || (!game.tiles[game.idx(nx, ny)].road && !game.buildingAt(nx, ny)))
             continue;
-          g.moveTo(cx, cy);
-          g.lineTo(cx + (game.DX[d] * game.TS) / 2, cy + (game.DY[d] * game.TS) / 2);
+          g.moveTo(cx, cy).lineTo(cx + (game.DX[d] * game.TS) / 2, cy + (game.DY[d] * game.TS) / 2);
         }
       }
     // Lift the earth surface in clarity mode without drawing a lane marking.
-    g.strokeStyle = 'rgba(229,204,151,0.16)';
-    g.lineWidth = 5;
-    g.stroke();
-    g.restore();
+    if (any) g.stroke({ color: 0xe5cc97, alpha: 0.16, width: 5, cap: 'round' });
   }
-  function clarityBuildings(g: CanvasRenderingContext2D) {
+  const TAG_FONT = '700 8px system-ui,sans-serif';
+  function clarityBuildings(s: SceneLayer) {
     if (!renderPrefs().clarity) return;
     for (const b of game.buildings) {
       if (!visibleAt(b.x, b.y)) continue;
@@ -1946,38 +1887,30 @@ export function createRenderer(
         color = warning ? '#ffcead' : reason === 'paused' ? '#e9dbb5' : '#e0efcb',
         tag = z < 0.85 ? symbol : clarityNames[b.type] + ' ' + symbol,
         x = (b.x + 0.5) * game.TS,
-        y = b.y * game.TS;
-      g.save();
+        y = b.y * game.TS,
+        width = s.measureText(tag, TAG_FONT) + 8,
+        g = s.g;
       // A U-shaped threshold marks the existing south-facing entrance.
-      g.beginPath();
-      g.moveTo(x - 3, y + 22);
-      g.lineTo(x - 3, y + 27);
-      g.lineTo(x + 3, y + 27);
-      g.lineTo(x + 3, y + 22);
-      g.strokeStyle = '#25392c';
-      g.lineWidth = 4 / z;
-      g.stroke();
-      g.strokeStyle = '#fff0b7';
-      g.lineWidth = 1.8 / z;
-      g.stroke();
-      g.translate(x, y + 37);
-      g.scale(1 / z, 1 / z);
-      g.font = '700 8px system-ui,sans-serif';
-      const width = g.measureText(tag).width + 8;
-      g.fillStyle = 'rgba(20,36,28,0.94)';
-      game.rr(g, -width / 2, -7, width, 13, 3);
-      g.fill();
-      g.strokeStyle = color;
-      g.lineWidth = 0.8;
-      g.stroke();
-      g.fillStyle = color;
-      g.textAlign = 'center';
-      g.fillText(tag, 0, 2);
+      const threshold = [x - 3, y + 22, x - 3, y + 27, x + 3, y + 27, x + 3, y + 22];
+      g.poly(threshold, false).stroke({ color: 0x25392c, width: 4 / z });
+      g.poly(threshold, false).stroke({ color: 0xfff0b7, width: 1.8 / z });
+      g.save();
+      translate(g, x, y + 37);
+      scale(g, 1 / z);
+      g.roundRect(-width / 2, -7, width, 13, 3)
+        .fill({ color: 0x14241c, alpha: 0.94 })
+        .stroke({ color, width: 0.8 });
       g.restore();
+      s.text(tag, x, y + 37 + 2 / z, {
+        font: TAG_FONT,
+        fill: color,
+        align: 'center',
+        scale: 1 / z,
+      });
       if (game.selected === b || (game.hoverIn && game.ht.x === b.x && game.ht.y === b.y)) {
         const status = !b.done
           ? 'Under construction'
-          : _reasonNames[reason] ||
+          : (reason && _reasonNames[reason]) ||
             (warning ? game.bStatus(b).lines.find((line) => line.w)?.t : '') ||
             (game.buildingWorking(b)
               ? 'Working'
@@ -1988,12 +1921,13 @@ export function createRenderer(
                 : sp.store
                   ? 'Storage'
                   : 'Idle');
-        worldLabel(g, x, y - 35, sp.name + ' · ' + status, color);
+        worldLabel(s, x, y - 35, sp.name + ' · ' + status, color);
       }
     }
   }
+  const BADGE_FONT = '700 9px system-ui,sans-serif';
   function workloadBadge(
-    g: CanvasRenderingContext2D,
+    s: SceneLayer,
     b: Building,
     waiting: number,
     assigned: number,
@@ -2002,37 +1936,37 @@ export function createRenderer(
     const width = 72;
     const screenX = ((b.x + 0.5) * game.TS - cam.x) * z;
     const screenY = (b.y * game.TS - 18 - cam.y) * z;
+    const x = cam.x + Math.max(width / 2 + 8, Math.min(vw - width / 2 - 8, screenX)) / z,
+      y = cam.y + Math.max(40, Math.min(vh - 8, screenY)) / z,
+      rows = [
+        [0, waiting, 'W', '#e3b475'],
+        [1, assigned, 'A', '#9bcbba'],
+      ] as const,
+      g = s.g;
     g.save();
-    g.translate(
-      cam.x + Math.max(width / 2 + 8, Math.min(vw - width / 2 - 8, screenX)) / z,
-      cam.y + Math.max(40, Math.min(vh - 8, screenY)) / z,
-    );
-    g.scale(1 / z, 1 / z);
-    g.fillStyle = 'rgba(16,27,25,0.94)';
-    game.rr(g, -36, -32, 72, 34, 5);
-    g.fill();
-    g.strokeStyle = waiting ? '#b78b58' : '#638f80';
-    g.lineWidth = 1;
-    g.stroke();
-    g.font = '700 9px system-ui,sans-serif';
-    for (const [row, count, label, color] of [
-      [0, waiting, 'W', '#e3b475'],
-      [1, assigned, 'A', '#9bcbba'],
-    ] as const) {
-      const y = -25 + row * 14;
-      g.textAlign = 'left';
-      g.fillStyle = color;
-      g.fillText(label, -30, y + 6);
-      g.fillStyle = '#25372f';
-      g.fillRect(-17, y, 31, 6);
-      g.fillStyle = color;
-      if (count) g.fillRect(-17, y, (31 * count) / max, 6);
-      g.textAlign = 'right';
-      g.fillText(String(count), 31, y + 6);
+    translate(g, x, y);
+    scale(g, 1 / z);
+    g.roundRect(-36, -32, 72, 34, 5)
+      .fill({ color: 0x101b19, alpha: 0.94 })
+      .stroke({ color: waiting ? 0xb78b58 : 0x638f80, width: 1 });
+    for (const [row, count, , color] of rows) {
+      const rowY = -25 + row * 14;
+      g.rect(-17, rowY, 31, 6).fill(0x25372f);
+      if (count) g.rect(-17, rowY, (31 * count) / max, 6).fill(color);
     }
     g.restore();
+    for (const [row, count, label, color] of rows) {
+      const rowY = y + (-25 + row * 14 + 6) / z;
+      s.text(label, x - 30 / z, rowY, { font: BADGE_FONT, fill: color, scale: 1 / z });
+      s.text(String(count), x + 31 / z, rowY, {
+        font: BADGE_FONT,
+        fill: color,
+        align: 'right',
+        scale: 1 / z,
+      });
+    }
   }
-  function logisticsDraw(g: CanvasRenderingContext2D) {
+  function logisticsDraw(s: SceneLayer) {
     const overlay = renderPrefs().overlay || 'none';
     _logisticsCaption = '';
     workloadSummary = null;
@@ -2044,7 +1978,7 @@ export function createRenderer(
         busy++;
         if (busy <= 48)
           traceRoute(
-            g,
+            s,
             u.x,
             u.y,
             u.path,
@@ -2080,7 +2014,7 @@ export function createRenderer(
       for (const b of game.buildings) {
         const count = counts.get(b.id);
         if (!count || !visibleAt(b.x, b.y)) continue;
-        workloadBadge(g, b, count.waiting, count.assigned, max);
+        workloadBadge(s, b, count.waiting, count.assigned, max);
       }
       workloadSummary = { busy: busyN, carriers: carrierN, waiting: waitingJobs };
       _logisticsCaption = 'Carrier workload';
@@ -2092,7 +2026,7 @@ export function createRenderer(
           spec = game.BSPEC[rb.type];
         if (spec.store || spec.guard || !spec.rad || !visibleAt(rb.x, rb.y)) continue;
         if (++count > 18) break;
-        reachDraw(g, rb.type, rb.x, rb.y, resourceTilesAt(rb.type, rb.x, rb.y));
+        reachDraw(s, rb.type, rb.x, rb.y, resourceTilesAt(rb.type, rb.x, rb.y));
       }
       _logisticsCaption = game.selected
         ? 'Resource reach · pale tiles can supply the selected building'
@@ -2106,12 +2040,11 @@ export function createRenderer(
         stalled++;
         if (!visibleAt(sb.x, sb.y)) continue;
         const color = reason === 'demand' || reason === 'paused' ? '#d7d3b6' : '#ffc2a5';
-        g.strokeStyle = color;
-        g.lineWidth = 2 / z;
-        game.rr(g, sb.x * game.TS - 2, sb.y * game.TS - 2, game.TS + 4, game.TS + 4, 3);
-        g.stroke();
+        s.g
+          .roundRect(sb.x * game.TS - 2, sb.y * game.TS - 2, game.TS + 4, game.TS + 4, 3)
+          .stroke({ color, width: 2 / z });
         worldLabel(
-          g,
+          s,
           (sb.x + 0.5) * game.TS,
           sb.y * game.TS - 21,
           _reasonNames[reason] || reason,
@@ -2124,7 +2057,7 @@ export function createRenderer(
     if (placement) {
       if (placement.resources.length)
         reachDraw(
-          g,
+          s,
           (game.mode as { type: 'build'; bt: BuildingType }).bt,
           placement.x,
           placement.y,
@@ -2132,7 +2065,7 @@ export function createRenderer(
         );
       if (placement.path && placement.storage)
         traceRoute(
-          g,
+          s,
           placement.storage.x + 0.5,
           placement.storage.y + 0.5,
           placement.path,
@@ -2141,7 +2074,7 @@ export function createRenderer(
           true,
         );
       worldLabel(
-        g,
+        s,
         (placement.x + 0.5) * game.TS,
         (placement.y + 2.1) * game.TS,
         (placement.canBuild
@@ -2155,9 +2088,9 @@ export function createRenderer(
     const road = getRoadPreview();
     if (road) {
       if (road.path && game.anchor)
-        traceRoute(g, game.anchor.x + 0.5, game.anchor.y + 0.5, road.path, 0, '#e6d49d', true);
+        traceRoute(s, game.anchor.x + 0.5, game.anchor.y + 0.5, road.path, 0, '#e6d49d', true);
       worldLabel(
-        g,
+        s,
         (ht.x + 0.5) * game.TS,
         (ht.y + 1.9) * game.TS,
         road.summary,
@@ -2165,72 +2098,57 @@ export function createRenderer(
       );
     }
   }
-  function logisticsCaption(g: CanvasRenderingContext2D) {
+  /** Screen-space caption above the atmosphere, in CSS pixels. */
+  function logisticsCaption(s: SceneLayer) {
     if (!_logisticsCaption) return;
+    let top = BAR_H;
     if (workloadSummary) {
       const { busy, carriers, waiting } = workloadSummary;
       const width = Math.min(vw - 24, 340),
         x = (vw - width) / 2;
-      g.save();
-      g.translate(0, BAR_H);
-      if (vw < 700) {
-        const advisor = document.getElementById('adv');
-        g.translate(0, (advisor?.offsetHeight || 54) + 12);
-      }
-      g.fillStyle = 'rgba(18,31,28,0.96)';
-      game.rr(g, x, 12, width, 94, 8);
-      g.fill();
-      g.strokeStyle = 'rgba(210,219,181,0.45)';
-      g.lineWidth = 1;
-      g.stroke();
-      g.font = '700 12px system-ui,sans-serif';
-      g.textAlign = 'left';
-      g.fillStyle = '#efe8cf';
-      g.fillText('Carrier workload', x + 12, 32);
-      g.textAlign = 'right';
-      g.fillStyle = '#e3b475';
-      g.fillText(waiting + ' waiting', x + width - 12, 32);
-      g.fillStyle = '#30443b';
-      g.fillRect(x + 12, 42, width - 24, 8);
-      g.fillStyle = '#9bcbba';
-      if (carriers && busy) g.fillRect(x + 12, 42, ((width - 24) * busy) / carriers, 8);
-      g.font = '600 11px system-ui,sans-serif';
-      g.textAlign = 'left';
-      g.fillText(busy + '/' + carriers + ' carriers busy', x + 12, 65);
-      g.textAlign = 'right';
-      g.fillStyle = '#c8d2c3';
-      g.fillText(
+      if (vw < 700) top += (document.getElementById('adv')?.offsetHeight || 54) + 12;
+      const g = s.g;
+      g.roundRect(x, top + 12, width, 94, 8)
+        .fill({ color: 0x121f1c, alpha: 0.96 })
+        .stroke({ color: 0xd2dbb5, alpha: 0.45, width: 1 });
+      g.rect(x + 12, top + 42, width - 24, 8).fill(0x30443b);
+      if (carriers && busy)
+        g.rect(x + 12, top + 42, ((width - 24) * busy) / carriers, 8).fill(0x9bcbba);
+      const bold = '700 12px system-ui,sans-serif',
+        body = '600 11px system-ui,sans-serif',
+        small = '600 10px system-ui,sans-serif';
+      s.text('Carrier workload', x + 12, top + 32, { font: bold, fill: '#efe8cf' });
+      s.text(waiting + ' waiting', x + width - 12, top + 32, {
+        font: bold,
+        fill: '#e3b475',
+        align: 'right',
+      });
+      s.text(busy + '/' + carriers + ' carriers busy', x + 12, top + 65, {
+        font: body,
+        fill: '#9bcbba',
+      });
+      s.text(
         carriers ? Math.round((busy / carriers) * 100) + '%' : 'No carriers',
         x + width - 12,
-        65,
+        top + 65,
+        { font: body, fill: '#c8d2c3', align: 'right' },
       );
-      g.font = '600 10px system-ui,sans-serif';
-      g.textAlign = 'left';
-      g.fillStyle = '#e3b475';
-      g.fillText('W  Waiting jobs', x + 12, 88);
-      g.fillStyle = '#9bcbba';
-      g.fillText('A  Assigned jobs', x + width / 2, 88);
-      g.restore();
+      s.text('W  Waiting jobs', x + 12, top + 88, { font: small, fill: '#e3b475' });
+      s.text('A  Assigned jobs', x + width / 2, top + 88, { font: small, fill: '#9bcbba' });
       return;
     }
-    g.save();
-    g.translate(0, BAR_H);
-    g.font = '600 12px system-ui,sans-serif';
-    const maxWidth = Math.min(vw - 24, 580);
+    const font = '600 12px system-ui,sans-serif',
+      maxWidth = Math.min(vw - 24, 580);
     let label = _logisticsCaption;
-    while (label.length > 8 && g.measureText(label).width > maxWidth - 22)
+    while (label.length > 8 && s.measureText(label, font) > maxWidth - 22)
       label = label.slice(0, -4) + '…';
-    const width = g.measureText(label).width + 22,
+    const width = s.measureText(label, font) + 22,
       x = Math.max(12, (vw - width) / 2);
-    g.fillStyle = 'rgba(18,31,28,0.92)';
-    game.rr(g, x, 12, width, 28, 7);
-    g.fill();
-    g.strokeStyle = 'rgba(210,219,181,0.45)';
-    g.lineWidth = 1;
-    g.stroke();
-    g.fillStyle = '#efe8cf';
-    g.fillText(label, x + 11, 31);
-    g.restore();
+    s.g
+      .roundRect(x, top + 12, width, 28, 7)
+      .fill({ color: 0x121f1c, alpha: 0.92 })
+      .stroke({ color: 0xd2dbb5, alpha: 0.45, width: 1 });
+    s.text(label, x + 11, top + 31, { font, fill: '#efe8cf' });
   }
   const clouds: { x0: number; y0: number; s: number; v: number; w: number }[] = [],
     birds: { x: number; y: number; vx: number; vy: number; f: number }[] = [];
@@ -2252,40 +2170,33 @@ export function createRenderer(
         f: Math.random() * 9,
       });
   }
-  function cloudsDraw(g: CanvasRenderingContext2D, now: number) {
+  function cloudsDraw(s: SceneLayer, now: number) {
     if (!renderPrefs().weather || renderPrefs().reducedMotion || renderPrefs().quality < 1) return;
-    g.save();
-    g.beginPath();
-    g.rect(0, 0, game.W * game.TS, game.H * game.TS);
-    g.clip();
+    s.clip({ x: 0, y: 0, width: game.W * game.TS, height: game.H * game.TS });
     for (let i = 0; i < clouds.length; i++) {
       const c = clouds[i];
       const px = ((c.x0 + now * 0.001 * c.v) % (game.W * game.TS + c.w)) - c.w;
       const py = c.y0 + Math.sin(now / 9000 + i) * 30;
-      g.globalAlpha = 0.8;
-      g.drawImage(game.ART.cloud, px, py, c.w * c.s, c.w * 0.62 * c.s);
+      s.image(game.ART.cloud, px, py, c.w * c.s, c.w * 0.62 * c.s, 0.8);
     }
-    g.globalAlpha = 1;
-    g.restore();
+    s.clip();
   }
-  function birdsDraw(g: CanvasRenderingContext2D, now: number) {
+  function birdsDraw(s: SceneLayer, now: number) {
     if (renderPrefs().reducedMotion || renderPrefs().quality < 1) return;
+    const g = s.g;
     for (let i = 0; i < birds.length; i++) {
       const b = birds[i];
       const x = ((b.x + now * 0.001 * b.vx) % (game.W * game.TS + 800)) - 400;
       const y = b.y + Math.sin(now / 4000 + i * 2) * 40;
       const fl = Math.sin(now / 90 + b.f);
-      g.strokeStyle = 'rgba(64,58,46,0.55)';
-      g.lineWidth = 1.1;
       for (let k = 0; k < 4; k++) {
         const bx = x - k * 6,
           by = y + Math.abs(k) * 3.4 + (k % 2 ? 2 : 0);
-        g.beginPath();
-        g.moveTo(bx - 3.4, by - fl * 2.2);
-        g.lineTo(bx, by + 1);
-        g.lineTo(bx + 3.4, by - fl * 2.2);
-        g.stroke();
+        g.moveTo(bx - 3.4, by - fl * 2.2)
+          .lineTo(bx, by + 1)
+          .lineTo(bx + 3.4, by - fl * 2.2);
       }
+      g.stroke({ color: 0x403a2e, alpha: 0.55, width: 1.1 });
     }
   }
 
@@ -2329,37 +2240,33 @@ export function createRenderer(
       if (!renderPrefs().reducedMotion) _flashT = now;
     }
   }
-  function rainDraw(g: CanvasRenderingContext2D, now: number) {
+  /** Screen-space rain streaks, in CSS pixels. */
+  function rainDraw(s: SceneLayer, now: number) {
     if (renderPrefs().reducedMotion) return;
     if (!RSEEDS) {
       RSEEDS = [];
       for (let i = 0; i < 110; i++)
         RSEEDS.push([Math.random(), Math.random(), 0.75 + Math.random() * 0.5]);
     }
-    g.strokeStyle = 'rgba(190,214,232,' + (0.34 * _rain).toFixed(3) + ')';
-    g.lineWidth = 1;
-    const n = (RSEEDS.length * _rain) | 0;
-    g.beginPath();
+    const g = s.g,
+      n = (RSEEDS.length * _rain) | 0;
+    if (!n) return;
     for (let k = 0; k < n; k++) {
       const r = RSEEDS[k],
         fall = now * 0.001 * r[2];
       const y = (r[1] * vh + fall * 900) % vh,
         x = (r[0] * vw + y * 0.22) % vw;
-      g.moveTo(x, y);
-      g.lineTo(x - 2.6, y - 10);
+      g.moveTo(x, y).lineTo(x - 2.6, y - 10);
     }
-    g.stroke();
+    g.stroke({ color: 0xbed6e8, alpha: 0.34 * _rain, width: 1 });
   }
-  function glowsDraw(g: CanvasRenderingContext2D) {
+  function glowsDraw(s: SceneLayer) {
     // warm window auras at night, above the tint
-    if (!game.ART.glow) return;
     const vx0 = Math.max(0, Math.floor(cam.x / game.TS) - 1),
       vx1 = Math.min(game.W - 1, Math.ceil((cam.x + vw / z) / game.TS) + 1);
     const vy0 = Math.max(0, Math.floor(cam.y / game.TS) - 1),
       vy1 = Math.min(game.H - 1, Math.ceil((cam.y + vh / z) / game.TS) + 1);
     const light = Math.min(0.7, nightCool() * 1.25);
-    g.save();
-    g.globalAlpha = light;
     for (let bi = 0; bi < game.buildings.length; bi++) {
       const b = game.buildings[bi];
       if (!b.done) continue;
@@ -2368,17 +2275,37 @@ export function createRenderer(
       const sc = game.BSPEC[b.type].store ? 34 : 24,
         lx = b.x * game.TS + 12,
         ly = b.y * game.TS + 8;
-      g.drawImage(game.ART.glow, lx - sc / 2, ly - sc / 2, sc, sc);
+      s.image(game.ART.glow, lx - sc / 2, ly - sc / 2, sc, sc, light);
       // A broad faint pool reaches the entrance without obscuring road traffic.
-      g.globalAlpha = light * 0.3;
-      g.drawImage(game.ART.glow, lx - 15, b.y * game.TS + 19, 30, 9);
-      g.globalAlpha = light;
+      s.image(game.ART.glow, lx - 15, b.y * game.TS + 19, 30, 9, light * 0.3);
     }
-    g.restore();
+  }
+
+  // Premultiplied [r, g, b, alpha] of the screen-space veils stacked source-over.
+  const screenTint: [number, number, number, number] = [0, 0, 0, 0];
+  function veil(r: number, g: number, b: number, alpha: number) {
+    const keep = 1 - alpha;
+    screenTint[0] = (r / 255) * alpha + screenTint[0] * keep;
+    screenTint[1] = (g / 255) * alpha + screenTint[1] * keep;
+    screenTint[2] = (b / 255) * alpha + screenTint[2] * keep;
+    screenTint[3] = alpha + screenTint[3] * keep;
+  }
+  function composeScreenTint(): PremultipliedTint {
+    screenTint.fill(0);
+    // Visual clarity suppresses every veil; Reduced Motion suppresses the flash.
+    if (renderPrefs().clarity) return screenTint;
+    const cool = nightCool(),
+      warm = nightWarm();
+    if (cool > 0.01) veil(20, 34, 66, cool * 0.29);
+    if (warm > 0.01) veil(255, 177, 98, warm * 0.75);
+    if (_rain > 0.01) veil(37, 52, 64, _rain * 0.16);
+    if (!renderPrefs().reducedMotion && renderPrefs().weather && NOW - _flashT < 180)
+      veil(255, 255, 255, (1 - (NOW - _flashT) / 180) * 0.26);
+    return screenTint;
   }
 
   // ---------- guard-post placement preview (the *actual* new border, not the naive radius) ----------
-  function guardPreview(g: CanvasRenderingContext2D, now: number) {
+  function guardPreview(s: SceneLayer, now: number) {
     now = motionTime(now);
     if (
       !game.mode ||
@@ -2391,42 +2318,33 @@ export function createRenderer(
       return;
     if (game.gpDirty || game.gpX !== game.ghost.x || game.gpY !== game.ghost.y)
       game.computeGuardPreview(game.ghost.x, game.ghost.y);
-    g.fillStyle = 'rgba(255,210,63,0.07)';
+    const g = s.g;
     for (let i = 0; i < game.gpFill.length; i++) {
       const fi = game.gpFill[i];
-      g.fillRect((fi % game.W) * game.TS, ((fi / game.W) | 0) * game.TS, game.TS, game.TS);
+      g.rect((fi % game.W) * game.TS, ((fi / game.W) | 0) * game.TS, game.TS, game.TS);
     }
+    if (game.gpFill.length) g.fill({ color: 0xffd23f, alpha: 0.07 });
+    // One dash pattern continues along every border segment.
     const pu = 0.5 + 0.5 * Math.sin(now / 240);
-    g.strokeStyle = 'rgba(255,226,130,' + (0.5 + 0.35 * pu).toFixed(3) + ')';
-    g.lineWidth = 2;
-    g.setLineDash([7, 5]);
-    g.lineDashOffset = -now / 40;
-    g.beginPath();
+    let offset = -now / 40;
     for (let i = 0; i < game.gpSegs.length; i++) {
       const s2 = game.gpSegs[i];
-      g.moveTo(s2[0], s2[1]);
-      g.lineTo(s2[2], s2[3]);
+      dashed(g, s2, 7, 5, offset);
+      offset += Math.hypot(s2[2] - s2[0], s2[3] - s2[1]);
     }
-    g.stroke();
-    g.setLineDash([]);
+    if (game.gpSegs.length) g.stroke({ color: 0xffe282, alpha: 0.5 + 0.35 * pu, width: 2 });
   }
-  function cloudsShadowDraw(g: CanvasRenderingContext2D, now: number) {
+  function cloudsShadowDraw(s: SceneLayer, now: number) {
     // drifting ground shadows under the sky blobs (sun NW -> SE offset)
     if (!renderPrefs().weather || renderPrefs().reducedMotion || renderPrefs().quality < 1) return;
-    if (!game.ART.cloudShadow) return;
-    g.save();
-    g.beginPath();
-    g.rect(0, 0, game.W * game.TS, game.H * game.TS);
-    g.clip();
+    s.clip({ x: 0, y: 0, width: game.W * game.TS, height: game.H * game.TS });
     for (let i = 0; i < clouds.length; i++) {
       const c = clouds[i];
       const px = ((c.x0 + now * 0.001 * c.v) % (game.W * game.TS + c.w)) - c.w;
       const py = c.y0 + Math.sin(now / 9000 + i) * 30;
-      g.globalAlpha = 0.9;
-      g.drawImage(game.ART.cloudShadow, px + 46, py + 58, c.w * 0.78 * c.s, c.w * 0.5 * c.s);
+      s.image(game.ART.cloudShadow, px + 46, py + 58, c.w * 0.78 * c.s, c.w * 0.5 * c.s, 0.9);
     }
-    g.globalAlpha = 1;
-    g.restore();
+    s.clip();
   }
 
   // ---------- event reconciliation (fx for things the engine did) ----------
@@ -2454,6 +2372,7 @@ export function createRenderer(
       game,
       'tileChanged',
       function (e) {
+        shadowCache.tileChanged(e.index);
         if (game.tiles[e.index] && !game.staticDirty) drawTile(sctx, e.index);
       },
       (error) => {
@@ -2469,12 +2388,16 @@ export function createRenderer(
   });
   observePresentation(game, 'territoryChanged', () => {
     borderDirty = true;
+    for (let i = 0; i < game.owned.length; i++)
+      if (game.owned[i] !== borderOwned[i]) miniTiles.add(i);
     _placementCache = null;
     _roadCache = null;
   });
   // A committed load clears every transient presentation cache through this one
   // sanctioned method; loaders never poke renderer internals field by field.
   function resetPresentation() {
+    shadowCache.reset();
+    _pausedNow = null;
     FXL.length = 0;
     _seen = {};
     _warmup = false;
@@ -2483,6 +2406,10 @@ export function createRenderer(
     _roadCache = null;
     unitPoses = {};
     workPulses = {};
+    borderReady = false;
+    borderDirty = true;
+    miniDirty = true;
+    miniTiles.clear();
   }
   function visibleAt(x: number, y: number) {
     return (
@@ -2547,118 +2474,129 @@ export function createRenderer(
   }
 
   // ---------- frame ----------
-  let _lastNow = 0;
+  let _lastNow = 0,
+    _pausedNow: number | null = null;
   function draw() {
-    if (!presentation?.available) return;
+    if (!presentation.available) return;
     const drawStart = performance.now(),
       frameMs = _lastNow ? drawStart - _lastNow : 0;
-    NOW = performance.now();
+    const wallNow = performance.now();
+    if (game.state.paused) _pausedNow ??= wallNow;
+    else _pausedNow = null;
+    NOW = wallNow;
+    const decorativeNow = _pausedNow ?? wallNow;
     initRenderEvents();
-    stepZoom(NOW);
-    weatherTick(NOW, Math.min(0.1, (NOW - _lastNow) / 1000) || 0.016);
-    _lastNow = NOW;
+    stepZoom(wallNow);
+    weatherTick(wallNow, Math.min(0.1, (wallNow - _lastNow) / 1000) || 0.016);
+    _lastNow = wallNow;
     if (game.staticDirty) drawStatic();
     else if (borderDirty) drawBorders();
     reconcileFx();
-    presentation.begin(ctx);
-    layer('backdrop', function () {
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      if (!bgGrad) {
-        bgGrad = ctx.createLinearGradient(0, 0, 0, vh);
-        bgGrad.addColorStop(0, '#12222e');
-        bgGrad.addColorStop(1, '#0a141d');
-      }
-      ctx.fillStyle = bgGrad;
-      ctx.fillRect(0, 0, vw, vh);
-      ctx.setTransform(dpr * z, 0, 0, dpr * z, -cam.x * z * dpr, -cam.y * z * dpr);
-      ctx.imageSmoothingEnabled = true;
-      ctx.fillStyle = 'rgba(4,8,12,0.5)';
-      ctx.fillRect(4, 5, game.W * game.TS, game.H * game.TS);
-      ctx.fillStyle = 'rgba(4,8,12,0.35)';
-      ctx.fillRect(2, 2, game.W * game.TS, game.H * game.TS);
+    presentation.begin({
+      width: Math.round(vw * dpr),
+      height: Math.round(vh * dpr),
+      cssWidth: vw,
+      cssHeight: vh,
+      dpr,
+      scale: dpr * z,
+      camX: cam.x,
+      camY: cam.y,
     });
-    layer('terrain', function () {
-      // Blit only the visible terrain rectangle instead of submitting the 48 MB atlas.
+    const mapW = game.W * game.TS,
+      mapH = game.H * game.TS;
+    presentation.layer('backdrop', function (s) {
+      // The opaque terrain hides everything beneath it, so fill only the bands
+      // of the viewport the map leaves uncovered (screen pixels).
+      const left = Math.min(vw, Math.max(0, -cam.x * z)),
+        right = Math.min(vw, Math.max(0, (mapW - cam.x) * z)),
+        top = Math.min(vh, Math.max(0, -cam.y * z)),
+        bottom = Math.min(vh, Math.max(0, (mapH - cam.y) * z));
+      if (left <= 0 && top <= 0 && right >= vw && bottom >= vh) return;
+      backdropGradient ??= new FillGradient({
+        type: 'linear',
+        start: { x: 0, y: 0 },
+        end: { x: 0, y: vh },
+        colorStops: [
+          { offset: 0, color: '#12222e' },
+          { offset: 1, color: '#0a141d' },
+        ],
+        textureSpace: 'global',
+      });
+      const g = s.g;
+      if (right <= left || bottom <= top) g.rect(0, 0, vw, vh);
+      else {
+        if (top > 0) g.rect(0, 0, vw, top);
+        if (bottom < vh) g.rect(0, bottom, vw, vh - bottom);
+        if (left > 0) g.rect(0, top, left, bottom - top);
+        if (right < vw) g.rect(right, top, vw - right, bottom - top);
+      }
+      g.fill(backdropGradient);
+      // Drop shadows offset south-east; only their strips beyond the map show.
+      for (const [dx, dy, alpha] of [
+        [4, 5, 0.5],
+        [2, 2, 0.35],
+      ]) {
+        g.rect((mapW - cam.x) * z, (dy - cam.y) * z, dx * z, mapH * z)
+          .rect((dx - cam.x) * z, (mapH - cam.y) * z, (mapW - dx) * z, dy * z)
+          .fill({ color: 0x04080c, alpha });
+      }
+    });
+    presentation.layer('terrain', function (s) {
+      // Show only the visible terrain rectangle instead of the whole 48 MB atlas.
       const sx = Math.max(0, cam.x),
         sy = Math.max(0, cam.y),
-        sw = Math.min(game.W * game.TS - sx, cam.x + vw / z - sx),
-        sh2 = Math.min(game.H * game.TS - sy, cam.y + vh / z - sy);
+        sw = Math.min(mapW - sx, cam.x + vw / z - sx),
+        sh2 = Math.min(mapH - sy, cam.y + vh / z - sy);
       if (sw > 0 && sh2 > 0) {
-        ctx.drawImage(
-          scan,
-          sx * game.ST,
-          sy * game.ST,
-          sw * game.ST,
-          sh2 * game.ST,
-          sx,
-          sy,
-          sw,
-          sh2,
-        );
-        ctx.drawImage(bcan, sx, sy, sw, sh2, sx, sy, sw, sh2);
-        if (renderPrefs().clarity) {
-          // Quiet the high-frequency ground material without rebuilding terrain.
-          ctx.fillStyle = 'rgba(158,175,125,0.20)';
-          ctx.fillRect(sx, sy, sw, sh2);
-        }
+        s.blit(scan, sx * game.ST, sy * game.ST, sw * game.ST, sh2 * game.ST, sx, sy, sw, sh2);
+        s.blit(bcan, sx, sy, sw, sh2, sx, sy, sw, sh2);
+        // Quiet the high-frequency ground material without rebuilding terrain.
+        if (renderPrefs().clarity) s.g.rect(sx, sy, sw, sh2).fill({ color: 0x9eaf7d, alpha: 0.2 });
       }
     });
-    layer('ground-effects', function () {
-      waterAnim(ctx, NOW);
-      highlights(ctx, NOW);
-      guardPreview(ctx, NOW);
-      demoMarkers(ctx);
-      clarityRoads(ctx);
-      if (!renderPrefs().clarity) cloudsShadowDraw(ctx, NOW);
+    presentation.layer('ground-effects', function (s) {
+      shadowCache.refresh();
+      const castOpacity = renderPrefs().clarity
+        ? 0.06 / 0.17
+        : (1 - nightCool()) * (1 - rainAmt() * 0.8);
+      s.shadows(
+        shadowCache.cast,
+        shadowCache.contacts,
+        castOpacity < 0.02 / 0.17 ? 0 : castOpacity,
+        renderPrefs().clarity ? 0.62 : 1,
+      );
+      waterAnim(s, decorativeNow);
+      highlights(s, decorativeNow);
+      guardPreview(s, decorativeNow);
+      demoMarkers(s);
+      clarityRoads(s);
+      if (!renderPrefs().clarity) cloudsShadowDraw(s, decorativeNow);
     });
-    drawObjects(ctx, NOW);
-    layer('foreground-effects', function () {
-      fxDraw(ctx, NOW);
-      meadowParticles(ctx, NOW);
-      clarityBuildings(ctx);
-      selection(ctx, NOW);
-      anchorDraw(ctx, NOW);
-      ghostDraw(ctx);
-      logisticsDraw(ctx);
+    drawObjects(decorativeNow);
+    presentation.layer('foreground-effects', function (s) {
+      fxDraw(s, wallNow);
+      meadowParticles(s, decorativeNow);
+      clarityBuildings(s);
+      selection(s, decorativeNow);
+      anchorDraw(s, decorativeNow);
+      ghostDraw(s);
+      logisticsDraw(s);
       if (!renderPrefs().clarity) {
-        cloudsDraw(ctx, NOW);
-        birdsDraw(ctx, NOW);
+        cloudsDraw(s, decorativeNow);
+        birdsDraw(s, decorativeNow);
       }
-      // day/night + weather tint (screen space)
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const cool = renderPrefs().clarity ? 0 : nightCool(),
-        warm = renderPrefs().clarity ? 0 : nightWarm();
-      if (cool > 0.01) {
-        ctx.fillStyle = 'rgba(20,34,66,' + (cool * 0.29).toFixed(3) + ')';
-        ctx.fillRect(0, 0, vw, vh);
-      }
-      if (warm > 0.01) {
-        ctx.fillStyle = 'rgba(255,177,98,' + (warm * 0.75).toFixed(3) + ')';
-        ctx.fillRect(0, 0, vw, vh);
-      }
-      if (!renderPrefs().clarity && _rain > 0.01) {
-        ctx.fillStyle = 'rgba(37,52,64,' + (_rain * 0.16).toFixed(3) + ')';
-        ctx.fillRect(0, 0, vw, vh);
-      }
-      if (
-        !renderPrefs().clarity &&
-        !renderPrefs().reducedMotion &&
-        renderPrefs().weather &&
-        NOW - _flashT < 180
-      ) {
-        ctx.fillStyle = 'rgba(255,255,255,' + ((1 - (NOW - _flashT) / 180) * 0.26).toFixed(3) + ')';
-        ctx.fillRect(0, 0, vw, vh);
-      }
-      if (cool > 0.04) {
-        // lantern glows sit above the night tint
-        ctx.setTransform(dpr * z, 0, 0, dpr * z, -cam.x * z * dpr, -cam.y * z * dpr);
-        glowsDraw(ctx);
-      }
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      if (!renderPrefs().clarity && _rain > 0.02) rainDraw(ctx, NOW);
-      logisticsCaption(ctx);
     });
-    presentation.end(ctx);
+    // Night, dusk, rain and lightning veils reach the atmosphere pass as one tint.
+    presentation.screenTint?.(composeScreenTint());
+    presentation.layer('above-atmosphere', function (s) {
+      // lantern glows sit above the night tint
+      if (!renderPrefs().clarity && nightCool() > 0.04) glowsDraw(s);
+    });
+    presentation.layer('overlay', function (s) {
+      if (!renderPrefs().clarity && _rain > 0.02) rainDraw(s, decorativeNow);
+      logisticsCaption(s);
+    });
+    presentation.end();
     ambFX(NOW);
     sampleRender(frameMs, performance.now() - drawStart);
   }
@@ -2668,51 +2606,56 @@ export function createRenderer(
     msctx = requireCanvas2D(mscan, reportGraphicsFailure);
   let miniDirty = true;
   let _miniRendered = 0;
-  function drawMiniStatic() {
-    const s = 192 / game.W;
-    msctx.fillStyle = '#101418';
-    msctx.fillRect(0, 0, 192, 192);
-    for (let y = 0; y < game.H; y++)
-      for (let x = 0; x < game.W; x++) {
-        const i = game.idx(x, y),
-          tl = game.tiles[i];
-        let c;
-        if (tl.t === game.WATER) c = '#447b89';
-        else if (tl.t === game.SAND) c = '#d7c39b';
-        else if (tl.t === game.MTN) c = '#aaa79a';
-        else c = tl.tree ? '#4b7040' : '#6b8750';
-        msctx.fillStyle = c;
-        msctx.fillRect(x * s, y * s, s, s);
-        if (tl.deposit && tl.deposit.amt > 0) {
-          msctx.fillStyle =
-            tl.deposit.kind === 'gold'
-              ? '#ffd23f'
-              : tl.deposit.kind === 'iron'
-                ? '#d0763a'
-                : '#565e68';
-          msctx.fillRect(x * s, y * s, s, s);
-          const fr2 = tl.deposit.amt / (tl.deposit.amt0 || tl.deposit.amt);
-          if (fr2 < 0.999) {
-            msctx.fillStyle = 'rgba(0,0,0,' + ((1 - fr2) * 0.55).toFixed(2) + ')';
-            msctx.fillRect(x * s, y * s, s, s);
-          }
-        }
+  const miniTiles = new Set<number>();
+  let miniVignette: CanvasGradient | null = null;
+  function paintMiniTile(i: number, vignette: CanvasGradient) {
+    const s = 192 / game.W,
+      x = (i % game.W) * s,
+      y = ((i / game.W) | 0) * s,
+      tl = game.tiles[i];
+    let c;
+    if (tl.t === game.WATER) c = '#447b89';
+    else if (tl.t === game.SAND) c = '#d7c39b';
+    else if (tl.t === game.MTN) c = '#aaa79a';
+    else c = tl.tree ? '#4b7040' : '#6b8750';
+    msctx.fillStyle = c;
+    msctx.fillRect(x, y, s, s);
+    if (tl.deposit && tl.deposit.amt > 0) {
+      msctx.fillStyle =
+        tl.deposit.kind === 'gold' ? '#ffd23f' : tl.deposit.kind === 'iron' ? '#d0763a' : '#565e68';
+      msctx.fillRect(x, y, s, s);
+      const fraction = tl.deposit.amt / (tl.deposit.amt0 || tl.deposit.amt);
+      if (fraction < 0.999) {
+        msctx.fillStyle = 'rgba(0,0,0,' + ((1 - fraction) * 0.55).toFixed(2) + ')';
+        msctx.fillRect(x, y, s, s);
       }
-    msctx.fillStyle = 'rgba(255,214,110,0.16)';
-    for (let y = 0; y < game.H; y++)
-      for (let x = 0; x < game.W; x++)
-        if (game.owned[game.idx(x, y)]) msctx.fillRect(x * s, y * s, s, s);
-    for (let y = 0; y < game.H; y++)
-      for (let x = 0; x < game.W; x++)
-        if (game.tiles[game.idx(x, y)].road) {
-          msctx.fillStyle = '#c2a878';
-          msctx.fillRect(x * s, y * s, s, s);
-        }
-    const vg = msctx.createRadialGradient(96, 96, 60, 96, 96, 140);
-    vg.addColorStop(0, 'rgba(0,0,0,0)');
-    vg.addColorStop(1, 'rgba(0,0,0,0.22)');
-    msctx.fillStyle = vg;
-    msctx.fillRect(0, 0, 192, 192);
+    }
+    if (game.owned[i]) {
+      msctx.fillStyle = 'rgba(255,214,110,0.16)';
+      msctx.fillRect(x, y, s, s);
+    }
+    if (tl.road) {
+      msctx.fillStyle = '#c2a878';
+      msctx.fillRect(x, y, s, s);
+    }
+    // Use the same world-aligned vignette on both full and incremental paints.
+    msctx.fillStyle = vignette;
+    msctx.fillRect(x, y, s, s);
+  }
+  function drawMiniStatic() {
+    if (!miniVignette) {
+      miniVignette = msctx.createRadialGradient(96, 96, 60, 96, 96, 140);
+      miniVignette.addColorStop(0, 'rgba(0,0,0,0)');
+      miniVignette.addColorStop(1, 'rgba(0,0,0,0.22)');
+    }
+    if (miniDirty) {
+      msctx.fillStyle = '#101418';
+      msctx.fillRect(0, 0, 192, 192);
+      for (let i = 0; i < game.tiles.length; i++) paintMiniTile(i, miniVignette);
+    } else {
+      for (const i of miniTiles) paintMiniTile(i, miniVignette);
+    }
+    miniTiles.clear();
     miniDirty = false;
   }
   function miniDia(
@@ -2738,9 +2681,9 @@ export function createRenderer(
     g.fill();
   }
   function drawMini() {
-    if (!miniDirty && NOW - _miniRendered < 100) return;
+    if (!miniDirty && !miniTiles.size && NOW - _miniRendered < 100) return;
     _miniRendered = NOW;
-    if (miniDirty) drawMiniStatic();
+    if (miniDirty || miniTiles.size) drawMiniStatic();
     mctx.setTransform(1, 0, 0, 1, 0, 0);
     mctx.drawImage(mscan, 0, 0);
     const s = 192 / game.W;
@@ -2809,8 +2752,11 @@ export function createRenderer(
     Object.assign(internals, {
       paintTileFull,
       drawStatic,
+      drawBorders,
+      drawMiniStatic,
       buildingContour,
       drawBuilding,
+      shadowCache,
       drawTree,
       drawSmoke,
       drawUnit,
@@ -3105,19 +3051,22 @@ export const UNLIT_AT_NIGHT: ReadonlySet<BuildingType> = new Set<BuildingType>([
 
 /** Test-only view of closure internals; never merged into the runtime. */
 export interface RendererInternals {
+  shadowCache: ReturnType<typeof createShadowCache>;
   paintTileFull: (g: CanvasRenderingContext2D, i: number) => void;
   drawStatic: () => void;
+  drawBorders: (full?: boolean) => void;
+  drawMiniStatic: () => void;
   buildingContour: (img: Sprite) => HTMLCanvasElement;
-  drawBuilding: (g: CanvasRenderingContext2D, b: Building) => void;
-  drawTree: (g: CanvasRenderingContext2D, x: number, y: number, tl: Tile, now: number) => void;
-  drawSmoke: (g: CanvasRenderingContext2D, x: number, y: number, now: number, sd: number) => void;
-  drawUnit: (g: CanvasRenderingContext2D, u: Unit, now: number) => void;
-  meadowParticles: (g: CanvasRenderingContext2D, now: number) => void;
-  fxDraw: (g: CanvasRenderingContext2D, now: number) => void;
+  drawBuilding: (s: SceneLayer, b: Building) => void;
+  drawTree: (s: SceneLayer, x: number, y: number, tl: Tile, now: number) => void;
+  drawSmoke: (s: SceneLayer, x: number, y: number, now: number, sd: number) => void;
+  drawUnit: (s: SceneLayer, u: Unit, now: number) => void;
+  meadowParticles: (s: SceneLayer, now: number) => void;
+  fxDraw: (s: SceneLayer, now: number) => void;
   getPlacementPreview: () => PlacementPreview | null;
   getRoadPreview: () => RoadPreview | null;
-  clarityBuildings: (g: CanvasRenderingContext2D) => void;
-  glowsDraw: (g: CanvasRenderingContext2D) => void;
+  clarityBuildings: (s: SceneLayer) => void;
+  glowsDraw: (s: SceneLayer) => void;
   terrainRevision: number;
   miniDirty: boolean;
   atmosphereCount: number;

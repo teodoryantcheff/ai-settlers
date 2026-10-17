@@ -17,33 +17,42 @@ interface PaintedManifest {
   trees: PaintedRegion[];
   rocks: PaintedRegion[];
   terrain: { sheet: string; worldSize: number };
-  mountains?: { dry: PaintedRegion[]; snowy: PaintedRegion[]; foothill: PaintedRegion };
+  mountains: { dry: PaintedRegion[]; snowy: PaintedRegion[]; foothill: PaintedRegion };
 }
 
-const buildingTypes: BuildingType[] = [
-  'hq',
-  'warehouse',
-  'lumberjack',
-  'forester',
-  'quarry',
-  'fisherman',
-  'farm',
-  'windmill',
-  'bakery',
-  'pigfarm',
-  'butcher',
-  'well',
-  'brewery',
-  'smelter',
-  'workshop',
-  'mine_coal',
-  'mine_iron',
-  'mine_gold',
-  'sawmill',
-  'toolsmith',
-  'armory',
-  'guard',
-];
+/** World-pixel boxes for each building sprite. The box bottom is the entrance
+ * row of the 24px tile, so footprints and anchors stay put for any painted pack. */
+export const BUILDING_FRAMES: Readonly<Record<BuildingType, { w: number; h: number }>> = {
+  hq: { w: 48, h: 56 },
+  warehouse: { w: 38, h: 46 },
+  lumberjack: { w: 36, h: 42 },
+  forester: { w: 38, h: 42 },
+  sawmill: { w: 36, h: 44 },
+  quarry: { w: 38, h: 44 },
+  fisherman: { w: 36, h: 40 },
+  farm: { w: 44, h: 46 },
+  windmill: { w: 44, h: 58 },
+  bakery: { w: 38, h: 44 },
+  pigfarm: { w: 38, h: 44 },
+  butcher: { w: 38, h: 44 },
+  well: { w: 34, h: 40 },
+  brewery: { w: 38, h: 44 },
+  smelter: { w: 36, h: 44 },
+  workshop: { w: 38, h: 44 },
+  mine_coal: { w: 34, h: 42 },
+  mine_iron: { w: 34, h: 42 },
+  mine_gold: { w: 34, h: 42 },
+  toolsmith: { w: 36, h: 44 },
+  armory: { w: 36, h: 46 },
+  guard: { w: 34, h: 50 },
+};
+const SITE_FRAME = { w: 34, h: 38 };
+/** Tree canvases keep one root row for every growth stage; rocks share one box. */
+const TREE_FRAME = { w: 36, h: 42, root: 39 };
+const ROCK_FRAME = { w: 32, h: 24 };
+const TREE_GROWTH = [0.34, 0.49, 0.72, 1];
+
+const buildingTypes = Object.keys(BUILDING_FRAMES) as BuildingType[];
 
 /** Reject incomplete packs before changing any installed sprite or terrain. */
 export function validatePaintedManifest(input: unknown): PaintedManifest {
@@ -70,18 +79,17 @@ export function validatePaintedManifest(input: unknown): PaintedManifest {
     throw new Error('Painted artwork requires two rock variants.');
   manifest.trees.forEach((item, index) => region(item, 'tree ' + index));
   manifest.rocks.forEach((item, index) => region(item, 'rock ' + index));
-  if (manifest.mountains) {
-    if (
-      !Array.isArray(manifest.mountains.dry) ||
-      manifest.mountains.dry.length !== 3 ||
-      !Array.isArray(manifest.mountains.snowy) ||
-      manifest.mountains.snowy.length !== 2
-    )
-      throw new Error('Painted mountains require three dry and two snowy variants.');
-    manifest.mountains.dry.forEach((item, index) => region(item, 'dry mountain ' + index));
-    manifest.mountains.snowy.forEach((item, index) => region(item, 'snowy mountain ' + index));
-    region(manifest.mountains.foothill, 'mountain foothill');
-  }
+  if (
+    !manifest.mountains ||
+    !Array.isArray(manifest.mountains.dry) ||
+    manifest.mountains.dry.length !== 3 ||
+    !Array.isArray(manifest.mountains.snowy) ||
+    manifest.mountains.snowy.length !== 2
+  )
+    throw new Error('Painted mountains require three dry and two snowy variants.');
+  manifest.mountains.dry.forEach((item, index) => region(item, 'dry mountain ' + index));
+  manifest.mountains.snowy.forEach((item, index) => region(item, 'snowy mountain ' + index));
+  region(manifest.mountains.foothill, 'mountain foothill');
   if (
     !manifest.terrain ||
     !manifest.sheets[manifest.terrain.sheet] ||
@@ -196,11 +204,16 @@ function fittedCanvas(
   return canvas;
 }
 
-function fittedBuilding(image: HTMLCanvasElement, original: Sprite): Sprite {
-  return {
-    ...original,
-    img: fittedCanvas(image, original.img.width, original.img.height),
+/** Fit painted art into a building box whose bottom row is the tile's entrance. */
+function fittedBuilding(image: HTMLCanvasElement, frame: { w: number; h: number }, ss: number) {
+  const sprite: Sprite = {
+    img: fittedCanvas(image, frame.w * ss, frame.h * ss),
+    w: frame.w,
+    h: frame.h,
+    ox: -(frame.w - 24) / 2,
+    oy: -(frame.h - 24),
   };
+  return sprite;
 }
 
 export function artworkAssetURL(file = 'manifest.json'): URL {
@@ -212,39 +225,8 @@ export function artworkAssetURL(file = 'manifest.json'): URL {
   return new URL('assets/art/' + file, script?.src || document.baseURI);
 }
 
-function showFallback(message: string) {
-  let warning = document.getElementById('painted-art-status');
-  if (!warning) {
-    warning = document.createElement('div');
-    warning.id = 'painted-art-status';
-    warning.setAttribute('role', 'status');
-    warning.style.cssText =
-      'position:fixed;left:12px;bottom:12px;z-index:100;padding:12px;max-width:380px;border:1px solid #ad8c4c;border-radius:6px;background:#f6f0e2;color:#284535;font:13px/1.5 system-ui;box-shadow:0 5px 24px #132d2340';
-    document.body.append(warning);
-  }
-  warning.textContent = 'Painted artwork could not load. Standard artwork is active.';
-  warning.title = message;
-  const details = document.createElement('details');
-  const summary = document.createElement('summary');
-  summary.textContent = 'Why standard artwork is active';
-  details.appendChild(summary);
-  const explanation = document.createElement('p');
-  explanation.textContent =
-    message +
-    ' The incomplete pack was not installed. The native WebGL world remains playable with the existing standard artwork; simulation and checkpoints are unchanged.';
-  details.appendChild(explanation);
-  const reference = document.createElement('button');
-  reference.textContent = 'Artwork recovery reference';
-  reference.dataset.reference = 'settings';
-  details.appendChild(reference);
-  const keep = document.createElement('button');
-  keep.textContent = 'Keep playing with standard artwork';
-  keep.onclick = () => warning.remove();
-  warning.appendChild(details);
-  warning.appendChild(keep);
-}
-
-/** Load before game.init(); installation is atomic, so failures preserve working art. */
+/** Load before game.init(). Installation is atomic: any missing or invalid image
+ * rejects before the atlas changes, and boot reports the failure. */
 export async function loadPaintedAssets(game: GameRuntime): Promise<void> {
   game.ART.paintedStatus = { state: 'loading', message: 'Loading painted artwork.' };
   try {
@@ -261,68 +243,55 @@ export async function loadPaintedAssets(game: GameRuntime): Promise<void> {
       ),
     ) as Record<string, HTMLImageElement>;
     const crop = (region: PaintedRegion) => cropRegion(sheets[region.sheet], region);
+    const ss = game.SS;
     const buildings: Partial<Record<BuildingType, Sprite>> = {};
-    const variants: Partial<Record<BuildingType, Sprite>> = {};
-    for (const type of buildingTypes) {
-      const original = game.ART.bld[type];
-      if (!original) throw new Error('Missing original sprite anchor: ' + type);
-      buildings[type] = fittedBuilding(crop(manifest.buildings[type]), original);
-      // Every visual variant uses the painted asset instead of alternating to the
-      // procedural atlas when a building ID happens to have the other parity.
-      if (game.ART.bld2[type]) variants[type] = buildings[type];
-    }
-    const site = fittedBuilding(crop(manifest.site), game.ART.site);
+    for (const type of buildingTypes)
+      buildings[type] = fittedBuilding(crop(manifest.buildings[type]), BUILDING_FRAMES[type], ss);
+    const site = fittedBuilding(crop(manifest.site), SITE_FRAME, ss);
     const trees = manifest.trees.map(crop);
-    const growth = [0.34, 0.49, 0.72, 1];
-    const treeAtlas = growth.map((scale, stage) =>
-      trees.map((image, variant) => {
-        const original = game.ART.tree[stage][variant][0];
-        // The renderer keeps its existing fixed canvas/root placement. A smaller
-        // growth stage scales around the same root, never around the image center.
-        const base = original.height * (39 / 42);
-        return [0, 1].map((frame) =>
-          fittedCanvas(image, original.width, original.height, base, scale, frame ? scale : 0),
-        );
-      }),
+    const treeAtlas = TREE_GROWTH.map((scale) =>
+      trees.map((image) =>
+        // A smaller growth stage scales around the same root, never the image centre.
+        [0, 1].map((frame) =>
+          fittedCanvas(
+            image,
+            TREE_FRAME.w * ss,
+            TREE_FRAME.h * ss,
+            TREE_FRAME.root * ss,
+            scale,
+            frame ? scale : 0,
+          ),
+        ),
+      ),
     );
-    const rocks = manifest.rocks.map((region, index) => {
-      const original = game.ART.rock[index];
-      return fittedCanvas(crop(region), original.width, original.height);
-    });
-    const paintedMountains = manifest.mountains
-      ? {
-          dry: manifest.mountains.dry.map(crop),
-          snowy: manifest.mountains.snowy.map(crop),
-          foothill: crop(manifest.mountains.foothill),
-        }
-      : undefined;
+    const rocks = manifest.rocks.map((region) =>
+      fittedCanvas(crop(region), ROCK_FRAME.w * ss, ROCK_FRAME.h * ss),
+    );
+    const mountains = {
+      dry: manifest.mountains.dry.map(crop),
+      snowy: manifest.mountains.snowy.map(crop),
+      foothill: crop(manifest.mountains.foothill),
+    };
     // Keep the decoded material immutable; repeatedly sampling a large mutable
     // Canvas forces costly snapshots on some accelerated Canvas implementations.
     const meadow = sheets[manifest.terrain.sheet];
-    // Painted terrain variants share one immutable meadow thumbnail.
-    const grass = makeCanvas(game.ART.grass[0].width, game.ART.grass[0].height);
-    canvasContext(grass).drawImage(meadow, 0, 0, grass.width, grass.height);
     Object.assign(game.ART, {
       bld: buildings,
-      bld2: variants,
       site,
       tree: treeAtlas,
       rock: rocks,
-      grass: game.ART.grass.map(() => grass),
       paintedTerrain: { image: meadow, worldSize: manifest.terrain.worldSize },
-      paintedMountains,
+      paintedMountains: mountains,
       paintedStatus: { state: 'loaded', message: 'Painted artwork loaded.' },
     });
     game.staticDirty = true;
-    document.getElementById('painted-art-status')?.remove();
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    game.ART.paintedStatus = { state: 'failed', message };
     if (error instanceof CanvasContextError) {
-      game.reportGraphicsFailure?.(error.message);
+      game.reportGraphicsFailure(error.message);
       throw error;
     }
-    const message = error instanceof Error ? error.message : String(error);
-    game.ART.paintedStatus = { state: 'fallback', message };
-    showFallback(message);
-    console.warn('Painted artwork fallback:', message);
+    throw new Error('Painted artwork could not load: ' + message, { cause: error });
   }
 }

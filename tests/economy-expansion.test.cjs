@@ -85,7 +85,7 @@ test('grain and prepared food remain separate goods', () => {
   assert.equal(game.GOODS.iron.name, 'Iron ore');
 });
 
-test('expanded goods, completed contracts and legacy recipes survive validated saves', () => {
+test('expanded goods and completed contracts survive validated saves', () => {
   const { createEngine } = require('../src/simulation/engine.ts');
   const { createPersistence } = require('../src/core/persistence.ts');
   const { fakeStorage } = require('./helpers/game.cjs');
@@ -99,36 +99,6 @@ test('expanded goods, completed contracts and legacy recipes survive validated s
   const prepared = hooks.prepareLoad(JSON.stringify(data));
   assert.deepEqual(prepared.data.st.contracts, [0, 3, 4, 5]);
   assert.equal(prepared.buildings[0].stock.beer, 7);
-  assert.throws(
-    () => hooks.prepareLoad(JSON.stringify({ ...data, economy: 99 })),
-    /economy version/,
-  );
-  const legacy = structuredClone(data);
-  delete legacy.economy;
-  const site = game.newBuilding('toolsmith', game.buildings[0].x + 3, game.buildings[0].y);
-  const index = site.y * game.W + site.x;
-  legacy.t[0][index] = game.GRASS;
-  legacy.b.push(site);
-  legacy.nextId = game.nextId;
-  assert.equal(hooks.prepareLoad(JSON.stringify(legacy)).buildings.at(-1).type, 'workshop');
-  legacy.b.at(-1).type = 'armory';
-  legacy.b.at(-1).done = true;
-  legacy.b.at(-1).stock = { coal: 1 };
-  legacy.b[0].stock.iron = 1;
-  legacy.b[0].reservedStock.iron = 1;
-  legacy.j.push({ kind: 'fetch', good: 'iron', to: site.id, s: legacy.b[0].id, state: 'p' });
-  const migrated = hooks.prepareLoad(JSON.stringify(legacy));
-  assert.equal(migrated.buildings.at(-1).legacyIndustry, true);
-  hooks.commitLoad(migrated);
-  const savedMigration = hooks.snapshotGame();
-  const reloaded = hooks.prepareLoad(JSON.stringify(savedMigration));
-  assert.equal(reloaded.buildings.at(-1).legacyIndustry, true);
-  assert.equal(reloaded.jobs.at(-1).good, 'iron');
-  hooks.commitLoad(reloaded);
-  assert.doesNotThrow(() => hooks.prepareLoad(JSON.stringify(hooks.snapshotGame())));
-  const invalid = structuredClone(data);
-  invalid.b[0].legacyIndustry = 'yes';
-  assert.throws(() => hooks.prepareLoad(JSON.stringify(invalid)), /legacy industry/);
 });
 
 test('food variety accelerates mines while consuming one real meal', () => {
@@ -272,14 +242,11 @@ test('a mine records an eligible meal arrival even when another meal is more ple
   assert.deepEqual(mine.metrics.consumed, {});
 });
 
-test('save acceptance retains historical cargo unions separately from current recipes', () => {
+test('saved fetch cargo must match the destination recipe', () => {
   const { DEFAULT_MODULES, fakeStorage } = require('./helpers/game.cjs');
-  for (const [type, unversioned, legacyIndustry, accepted] of [
-    ['armory', false, true, ['iron', 'iron_bars', 'coal']],
-    ['armory', true, false, ['iron', 'iron_bars', 'coal']],
-    ['toolsmith', true, false, ['planks', 'stone', 'iron_bars']],
-    ['armory', false, false, ['iron_bars', 'coal']],
-    ['toolsmith', false, false, ['planks', 'iron_bars']],
+  for (const [type, accepted] of [
+    ['armory', ['iron_bars', 'coal']],
+    ['toolsmith', ['planks', 'iron_bars']],
   ]) {
     const { game, internals } = createGame({
       seed: 7,
@@ -291,20 +258,18 @@ test('save acceptance retains historical cargo unions separately from current re
     const hq = game.buildings[0];
     const producer = game.newBuilding(type, hq.x + 3, hq.y);
     producer.done = true;
-    if (type === 'armory') producer.legacyIndustry = legacyIndustry;
     game.tiles[game.idx(producer.x, producer.y)].t = game.GRASS;
     game.buildings.push(producer);
     const base = internals.persistence.snapshotGame();
-    if (unversioned) delete base.economy;
     for (const good of ['iron', 'iron_bars', 'coal', 'planks', 'stone', 'grain']) {
       const data = structuredClone(base);
       data.b[0].stock[good] = 1;
       data.b[0].reservedStock[good] = 1;
-      data.j = [{ kind: 'fetch', good, to: producer.id, s: hq.id, state: 'p' }];
+      data.j = [{ kind: 'fetch', good, to: producer.id, sourceId: hq.id, status: 'pending' }];
       const raw = JSON.stringify(data);
       if (accepted.includes(good)) {
         const prepared = internals.persistence.prepareLoad(raw);
-        assert.equal(prepared.jobs[0].good, good, 'historical cargo keeps its identity');
+        assert.equal(prepared.jobs[0].good, good);
         assert.equal(prepared.buildings[0].reservedStock[good], 1);
       } else {
         const buildings = game.buildings;

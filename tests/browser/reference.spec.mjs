@@ -38,12 +38,6 @@ test('searchable reference retains native keyboard focus and exact recipes throu
   await expect(search).toHaveValue('mine coal');
   await expect(page.locator('#reference-results')).toContainText('Fish, bread, meat or provisions');
   await expect(page.locator('#reference-results')).not.toContainText('Iron Smelter');
-  await search.fill('legacy');
-  await page.locator('#reference-topic').selectOption('buildings');
-  await expect(page.locator('#reference-results')).toContainText('Iron ore + 1 Coal');
-  await expect(page.locator('#reference-results')).toContainText(
-    'original wood-and-stone toolsmith',
-  );
   await search.fill('water');
   await expect(page.locator('#reference-results')).toContainText('no transported water');
   await page.keyboard.press('Escape');
@@ -135,17 +129,13 @@ test('searchable reference retains native keyboard focus and exact recipes throu
   ).toEqual(before);
 });
 
-test('loading stages explain artwork work and preserve the playable atomic fallback', async ({
+test('loading stages explain artwork work and report an incomplete pack before play', async ({
   page,
 }) => {
   let release;
   const gate = new Promise((resolve) => (release = resolve));
   await page.addInitScript(() => {
     localStorage.setItem('settlers.prefs', JSON.stringify({ quality: 0.75, reducedMotion: true }));
-    window.requestAnimationFrame = (callback) => {
-      window.__referenceFrame = callback;
-      return 0;
-    };
   });
   await page.route('**/assets/art/manifest.json', async (route) => {
     await gate;
@@ -165,37 +155,10 @@ test('loading stages explain artwork work and preserve the playable atomic fallb
     await page.screenshot({ path: test.info().outputPath('loading-' + width + '.png') });
   }
   release();
-  await expect(page.locator('#boot')).toHaveCount(0, { timeout: 30000 });
-  await page.evaluate(() => window.__referenceFrame(1000));
-  await expect(page.locator('#painted-art-status')).toContainText('Standard artwork is active');
-  await page.locator('#painted-art-status summary').click();
-  await expect(page.locator('#painted-art-status')).toContainText(
-    'incomplete pack was not installed',
-  );
-  expect(await page.evaluate(() => window.productionArtPreview.game.ART.paintedStatus.state)).toBe(
-    'fallback',
-  );
-  expect(await page.evaluate(() => window.productionRendererStats.backend)).toBe('PixiJS WebGL');
-  for (const [width, height] of [
-    [1440, 900],
-    [1280, 720],
-  ]) {
-    await page.setViewportSize({ width, height });
-    await page.evaluate(() => {
-      const g = window.productionArtPreview.game;
-      g.resize();
-      g.draw();
-    });
-    await page.screenshot({ path: test.info().outputPath('artwork-fallback-' + width + '.png') });
-  }
-  await page.locator('#painted-art-status [data-reference]').click();
-  await expect(page.locator('#reference-results')).toContainText('incomplete painted art pack');
-  await page.keyboard.press('Escape');
-  await page
-    .locator('#painted-art-status')
-    .getByRole('button', { name: 'Keep playing with standard artwork' })
-    .click();
-  await expect(page.locator('#painted-art-status')).toHaveCount(0);
+  await expect(page.locator('#boot')).toHaveAttribute('data-stage', 'failed');
+  await expect(page.locator('#boot-stage')).toContainText('Painted artwork could not load');
+  await expect(page.locator('#boot-error-controls')).toContainText('Reload to retry');
+  await page.screenshot({ path: test.info().outputPath('artwork-failure.png') });
 });
 
 test('unavailable WebGL has explicit browser recovery and leaves checkpoints untouched', async ({
