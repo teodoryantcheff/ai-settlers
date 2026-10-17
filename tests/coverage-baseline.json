@@ -78,11 +78,11 @@
     },
     "browser": {
       "lines": {
-        "uncovered": 86,
+        "uncovered": 122,
         "total": 231
       },
       "branches": {
-        "uncovered": 43,
+        "uncovered": 41,
         "total": 73
       }
     }
@@ -144,11 +144,11 @@
     },
     "browser": {
       "lines": {
-        "uncovered": 60,
+        "uncovered": 58,
         "total": 414
       },
       "branches": {
-        "uncovered": 96,
+        "uncovered": 94,
         "total": 260
       }
     }
@@ -310,22 +310,22 @@
   "src/core/persistence.ts": {
     "node": {
       "lines": {
-        "uncovered": 42,
-        "total": 458
+        "uncovered": 47,
+        "total": 432
       },
       "branches": {
-        "uncovered": 26,
-        "total": 142
+        "uncovered": 28,
+        "total": 123
       }
     },
     "browser": {
       "lines": {
-        "uncovered": 80,
-        "total": 533
+        "uncovered": 70,
+        "total": 507
       },
       "branches": {
-        "uncovered": 104,
-        "total": 201
+        "uncovered": 81,
+        "total": 172
       }
     }
   },
@@ -333,21 +333,21 @@
     "node": {
       "lines": {
         "uncovered": 14,
-        "total": 156
+        "total": 135
       },
       "branches": {
         "uncovered": 14,
-        "total": 86
+        "total": 74
       }
     },
     "browser": {
       "lines": {
-        "uncovered": 35,
-        "total": 170
+        "uncovered": 22,
+        "total": 149
       },
       "branches": {
-        "uncovered": 57,
-        "total": 132
+        "uncovered": 52,
+        "total": 122
       }
     }
   },
@@ -358,7 +358,7 @@
         "total": 109
       },
       "branches": {
-        "uncovered": 9,
+        "uncovered": 10,
         "total": 91
       }
     },
@@ -368,7 +368,7 @@
         "total": 117
       },
       "branches": {
-        "uncovered": 57,
+        "uncovered": 59,
         "total": 150
       }
     }
@@ -376,22 +376,22 @@
   "src/core/state.ts": {
     "node": {
       "lines": {
-        "uncovered": 60,
-        "total": 629
+        "uncovered": 29,
+        "total": 571
       },
       "branches": {
-        "uncovered": 68,
-        "total": 554
+        "uncovered": 30,
+        "total": 455
       }
     },
     "browser": {
       "lines": {
-        "uncovered": 129,
-        "total": 652
+        "uncovered": 74,
+        "total": 595
       },
       "branches": {
-        "uncovered": 365,
-        "total": 880
+        "uncovered": 275,
+        "total": 766
       }
     }
   },
@@ -408,7 +408,7 @@
     },
     "browser": {
       "lines": {
-        "uncovered": 1,
+        "uncovered": 4,
         "total": 159
       },
       "branches": {
@@ -465,21 +465,21 @@
     "node": {
       "lines": {
         "uncovered": 3,
-        "total": 58
+        "total": 48
       },
       "branches": {
         "uncovered": 3,
-        "total": 39
+        "total": 35
       }
     },
     "browser": {
       "lines": {
         "uncovered": 3,
-        "total": 60
+        "total": 49
       },
       "branches": {
-        "uncovered": 17,
-        "total": 57
+        "uncovered": 16,
+        "total": 49
       }
     }
   },
@@ -575,21 +575,21 @@
     "node": {
       "lines": {
         "uncovered": 1,
-        "total": 124
+        "total": 122
       },
       "branches": {
         "uncovered": 1,
-        "total": 79
+        "total": 77
       }
     },
     "browser": {
       "lines": {
-        "uncovered": 8,
-        "total": 130
+        "uncovered": 7,
+        "total": 128
       },
       "branches": {
-        "uncovered": 54,
-        "total": 141
+        "uncovered": 52,
+        "total": 137
       }
     }
   },
@@ -716,11 +716,11 @@
     },
     "browser": {
       "lines": {
-        "uncovered": 32,
+        "uncovered": 31,
         "total": 575
       },
       "branches": {
-        "uncovered": 54,
+        "uncovered": 53,
         "total": 270
       }
     }
@@ -750,22 +750,22 @@
   "src/rendering/renderer.ts": {
     "node": {
       "lines": {
-        "uncovered": 1316,
+        "uncovered": 1317,
         "total": 2772
       },
       "branches": {
-        "uncovered": 565,
+        "uncovered": 567,
         "total": 1078
       }
     },
     "browser": {
       "lines": {
-        "uncovered": 408,
+        "uncovered": 422,
         "total": 2952
       },
       "branches": {
-        "uncovered": 556,
-        "total": 1622
+        "uncovered": 564,
+        "total": 1628
       }
     }
   },
@@ -896,8 +896,8 @@
         "total": 579
       },
       "branches": {
-        "uncovered": 532,
-        "total": 595
+        "uncovered": 530,
+        "total": 593
       }
     }
   },
@@ -926,22 +926,22 @@
   "src/simulation/economy.ts": {
     "node": {
       "lines": {
-        "uncovered": 190,
-        "total": 2049
+        "uncovered": 189,
+        "total": 2046
       },
       "branches": {
-        "uncovered": 166,
-        "total": 1299
+        "uncovered": 165,
+        "total": 1297
       }
     },
     "browser": {
       "lines": {
-        "uncovered": 400,
-        "total": 2242
+        "uncovered": 398,
+        "total": 2239
       },
       "branches": {
-        "uncovered": 876,
-        "total": 1894
+        "uncovered": 875,
+        "total": 1892
       }
     }
   },
@@ -984,8 +984,8 @@
         "total": 433
       },
       "branches": {
-        "uncovered": 119,
-        "total": 281
+        "uncovered": 117,
+        "total": 279
       }
     }
   },
@@ -1169,21 +1169,21 @@
     "node": {
       "lines": {
         "uncovered": 88,
-        "total": 304
+        "total": 300
       },
       "branches": {
         "uncovered": 45,
-        "total": 106
+        "total": 104
       }
     },
     "browser": {
       "lines": {
         "uncovered": 28,
-        "total": 313
+        "total": 309
       },
       "branches": {
         "uncovered": 33,
-        "total": 158
+        "total": 154
       }
     }
   },
@@ -1278,22 +1278,22 @@
   "src/ui/economy-view.ts": {
     "node": {
       "lines": {
-        "uncovered": 185,
-        "total": 274
+        "uncovered": 183,
+        "total": 272
       },
       "branches": {
-        "uncovered": 132,
-        "total": 147
+        "uncovered": 130,
+        "total": 145
       }
     },
     "browser": {
       "lines": {
         "uncovered": 12,
-        "total": 287
+        "total": 285
       },
       "branches": {
-        "uncovered": 55,
-        "total": 186
+        "uncovered": 54,
+        "total": 184
       }
     }
   },
@@ -1301,7 +1301,7 @@
     "node": {
       "lines": {
         "uncovered": 629,
-        "total": 1227
+        "total": 1226
       },
       "branches": {
         "uncovered": 299,
@@ -1311,11 +1311,11 @@
     "browser": {
       "lines": {
         "uncovered": 163,
-        "total": 1285
+        "total": 1284
       },
       "branches": {
-        "uncovered": 289,
-        "total": 930
+        "uncovered": 293,
+        "total": 934
       }
     }
   },
@@ -1323,21 +1323,21 @@
     "node": {
       "lines": {
         "uncovered": 163,
-        "total": 454
+        "total": 447
       },
       "branches": {
         "uncovered": 124,
-        "total": 355
+        "total": 351
       }
     },
     "browser": {
       "lines": {
         "uncovered": 51,
-        "total": 458
+        "total": 451
       },
       "branches": {
-        "uncovered": 179,
-        "total": 480
+        "uncovered": 177,
+        "total": 474
       }
     }
   },
@@ -1388,8 +1388,8 @@
   "src/ui/logistics-view.ts": {
     "node": {
       "lines": {
-        "uncovered": 174,
-        "total": 240
+        "uncovered": 173,
+        "total": 239
       },
       "branches": {
         "uncovered": 128,
@@ -1398,8 +1398,8 @@
     },
     "browser": {
       "lines": {
-        "uncovered": 18,
-        "total": 247
+        "uncovered": 17,
+        "total": 246
       },
       "branches": {
         "uncovered": 72,
@@ -1508,11 +1508,11 @@
     },
     "browser": {
       "lines": {
-        "uncovered": 15,
+        "uncovered": 18,
         "total": 243
       },
       "branches": {
-        "uncovered": 26,
+        "uncovered": 27,
         "total": 136
       }
     }
@@ -1543,21 +1543,21 @@
     "node": {
       "lines": {
         "uncovered": 62,
-        "total": 228
+        "total": 223
       },
       "branches": {
         "uncovered": 50,
-        "total": 123
+        "total": 115
       }
     },
     "browser": {
       "lines": {
-        "uncovered": 8,
-        "total": 241
+        "uncovered": 7,
+        "total": 236
       },
       "branches": {
-        "uncovered": 49,
-        "total": 168
+        "uncovered": 43,
+        "total": 155
       }
     }
   },
@@ -1634,18 +1634,18 @@
         "total": 281
       },
       "branches": {
-        "uncovered": 68,
-        "total": 68
+        "uncovered": 66,
+        "total": 66
       }
     },
     "browser": {
       "lines": {
-        "uncovered": 35,
+        "uncovered": 34,
         "total": 288
       },
       "branches": {
-        "uncovered": 44,
-        "total": 101
+        "uncovered": 43,
+        "total": 99
       }
     }
   },

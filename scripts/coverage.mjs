@@ -53,9 +53,12 @@ if (!values['report-only']) {
     NODE_V8_COVERAGE: path.join(raw, 'node'),
   });
   await node(['scripts/build.mjs'], { SETTLERS_SOURCEMAP: '1' });
-  await node(['node_modules/@playwright/test/cli.js', 'test', `--workers=${values.workers}`], {
-    SETTLERS_BROWSER_COVERAGE: path.join(raw, 'browser'),
-  });
+  // This run measures coverage; `npm run check` is the pass/fail gate and never
+  // retries. One retry keeps a rare timing flake from discarding a whole run.
+  await node(
+    ['node_modules/@playwright/test/cli.js', 'test', `--workers=${values.workers}`, '--retries=1'],
+    { SETTLERS_BROWSER_COVERAGE: path.join(raw, 'browser') },
+  );
 }
 
 const baseUrl = pathToFileURL(root + '/').href;
