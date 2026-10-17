@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/test.mjs';
 
 for (const missing of ['goaltxt', 'boot-stage']) {
   test(

@@ -40,6 +40,7 @@ test('the main typecheck rejects null errors, retains diagnostics and accepts gu
         typecheck,
         {
           name: 'later-step',
+          after: ['typecheck'],
           command: process.execPath,
           args: ['-e', "require('node:fs').writeFileSync('later-step-ran', 'yes')"],
         },
@@ -47,7 +48,7 @@ test('the main typecheck rejects null errors, retains diagnostics and accepts gu
       { directory, logDirectory, output: { write: (chunk) => (output += chunk) } },
     );
 
-  await assert.rejects(run(), /Validation stopped at typecheck/);
+  await assert.rejects(run(), /Validation failed: typecheck, later-step/);
   await assert.rejects(fs.access(path.join(directory, 'later-step-ran')));
   const summary = JSON.parse(await fs.readFile(path.join(logDirectory, 'summary.json')));
   assert.equal(summary.complete, false);

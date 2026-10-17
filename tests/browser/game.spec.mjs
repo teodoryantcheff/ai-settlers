@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/test.mjs';
 
 // Keep native WebGL enabled while avoiding software-GPU Canvas cache stalls.
 test.use({

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/test.mjs';
 
 // Exercise the shipped Tone graph. Faults and observations stay at the browser
 // AudioContext boundary; the game needs no production fault switches.

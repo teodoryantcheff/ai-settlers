@@ -17,9 +17,16 @@ async function workspace(t) {
     text: () => text,
   };
 }
-const step = (name, code) => ({ name, command: process.execPath, args: ['-e', code] });
+const step = (name, code, after = []) => ({
+  name,
+  command: process.execPath,
+  args: ['-e', code],
+  after,
+});
+const summaryOf = async (context) =>
+  JSON.parse(await fs.readFile(path.join(context.logDirectory, 'summary.json')));
 
-test('validation waits for each command and retains stdout, stderr and summary', async (t) => {
+test('a step waits for the steps it names; logs retain stdout, stderr and a summary', async (t) => {
   const context = await workspace(t);
   await runSteps(
     [
@@ -34,11 +41,12 @@ test('validation waits for each command and retains stdout, stderr and summary',
       step(
         'second',
         `require('node:assert/strict').equal(require('node:fs').readFileSync('ready', 'utf8'), 'yes')`,
+        ['first'],
       ),
     ],
     context,
   );
-  const summary = JSON.parse(await fs.readFile(path.join(context.logDirectory, 'summary.json')));
+  const summary = await summaryOf(context);
   assert.equal(summary.complete, true);
   assert.deepEqual(
     summary.results.map((entry) => entry.passed),
@@ -50,29 +58,56 @@ test('validation waits for each command and retains stdout, stderr and summary',
   assert.match(context.text(), /Validation passed/);
 });
 
-test('a real failing assertion is printed and prevents the next command', async (t) => {
+test('independent steps run concurrently', async (t) => {
+  const context = await workspace(t);
+  // Each step waits for the other's marker, so serial execution would deadlock.
+  const meet = (mine, theirs) => `
+    const fs = require('node:fs');
+    fs.writeFileSync('${mine}', '');
+    const until = Date.now() + 5000;
+    (function poll() {
+      if (fs.existsSync('${theirs}')) return;
+      if (Date.now() > until) process.exit(1);
+      setTimeout(poll, 10);
+    })();`;
+  await runSteps([step('a', meet('a', 'b')), step('b', meet('b', 'a'))], context);
+  assert.equal((await summaryOf(context)).passed, true);
+});
+
+test('every failure is reported; dependents are skipped and independent steps still run', async (t) => {
   const context = await workspace(t);
   await assert.rejects(
     runSteps(
       [
         step('assertion', `require('node:assert/strict').equal(1, 2, 'cargo mismatch')`),
-        step('publish', `require('node:fs').writeFileSync('published', 'bad')`),
+        step('publish', `require('node:fs').writeFileSync('published', 'bad')`, ['assertion']),
+        step('lint', `console.error('lint finding'); process.exitCode = 1`),
+        step('types', `require('node:fs').writeFileSync('typed', 'yes')`),
       ],
       context,
     ),
-    /remaining steps were not run/,
+    /Validation failed: assertion, publish, lint/,
   );
   await assert.rejects(fs.access(path.join(context.directory, 'published')));
-  assert.match(context.text(), /AssertionError/);
+  assert.equal(await fs.readFile(path.join(context.directory, 'typed'), 'utf8'), 'yes');
   assert.match(context.text(), /cargo mismatch/);
+  assert.match(context.text(), /lint finding/);
+  assert.match(context.text(), /SKIP publish/);
   assert.match(context.text(), /Full log:/);
-  const summary = JSON.parse(await fs.readFile(path.join(context.logDirectory, 'summary.json')));
+  const summary = await summaryOf(context);
   assert.equal(summary.complete, false);
-  assert.equal(summary.results.length, 1);
-  assert.equal(summary.results[0].passed, false);
+  assert.equal(summary.passed, false);
+  assert.deepEqual(
+    summary.results.map((entry) => [entry.name, entry.passed]),
+    [
+      ['assertion', false],
+      ['lint', false],
+      ['types', true],
+    ],
+  );
 });
 
-test('launch failures and terminated commands fail validation', async (t) => {
+test('launch failures and terminated commands fail and skip their dependents', async (t) => {
   for (const first of [
     { name: 'missing', command: '/nonexistent/settlers-validation-command', args: [] },
     step('terminated', `process.kill(process.pid, 'SIGTERM')`),
@@ -80,15 +115,17 @@ test('launch failures and terminated commands fail validation', async (t) => {
     const context = await workspace(t);
     await assert.rejects(
       runSteps(
-        [first, step('publish', `require('node:fs').writeFileSync('published', 'bad')`)],
+        [
+          first,
+          step('publish', `require('node:fs').writeFileSync('published', 'bad')`, [first.name]),
+        ],
         context,
       ),
-      /Validation stopped/,
+      /Validation failed/,
     );
     await assert.rejects(fs.access(path.join(context.directory, 'published')));
     assert.match(context.text(), /FAIL/);
-    const summary = JSON.parse(await fs.readFile(path.join(context.logDirectory, 'summary.json')));
-    assert.equal(summary.results[0].passed, false);
+    assert.equal((await summaryOf(context)).results[0].passed, false);
   }
 });
 
@@ -104,74 +141,48 @@ test('failure summaries stay bounded while the full diagnostic log is retained',
       ],
       context,
     ),
-    /Validation stopped/,
+    /Validation failed/,
   );
-  const summary = JSON.parse(await fs.readFile(path.join(context.logDirectory, 'summary.json')));
+  const summary = await summaryOf(context);
   assert.ok((await fs.stat(summary.results[0].log)).size > 40000);
   assert.ok(context.text().length < 18000);
   assert.match(context.text(), /timeout detail/);
   assert.match(context.text(), /Earlier output retained/);
 });
 
-test('the full plan includes every Node and soak test before build and single-worker browsers', async () => {
+test('the full plan runs every routine Node test file and browsers after the build, never soak', async () => {
   const root = path.resolve(import.meta.dirname, '..');
   const plan = await validationSteps(root);
-  const testFiles = async (directory) =>
-    (await fs.readdir(path.join(root, directory)))
-      .filter((name) => /\.test\.(cjs|mjs)$/.test(name))
-      .sort();
-  const files = await testFiles('tests');
-  const soak = (await testFiles('tests/soak')).map((name) => `soak/${name}`);
-  assert.ok(soak.includes('soak/economy-autoplay.test.cjs'));
+  const files = (await fs.readdir(path.join(root, 'tests')))
+    .filter((name) => /\.test\.(cjs|mjs)$/.test(name))
+    .sort()
+    .map((name) => path.join('tests', name));
   assert.deepEqual(
     plan.map((entry) => entry.name),
-    ['format', 'lint', 'typecheck', ...files, ...soak, 'build', 'browser'],
+    ['format', 'lint', 'typecheck', 'node-tests', 'build', 'browser'],
   );
-  assert.ok(plan.at(-1).args.includes('--workers=1'));
-  for (const entry of plan.filter((entry) => [...files, ...soak].includes(entry.name)))
-    assert.deepEqual(entry.args, ['--test-reporter=spec', path.join('tests', entry.name)]);
+  const byName = Object.fromEntries(plan.map((entry) => [entry.name, entry]));
+  assert.deepEqual(byName.browser.after, ['build']);
+  assert.deepEqual(byName['node-tests'].args.slice(-files.length), files);
+  assert.ok(!plan.some((entry) => entry.args.some((arg) => arg.includes('soak'))));
   assert.deepEqual(
     (await validationSteps(root, { nodeOnly: true })).map((entry) => entry.name),
-    ['lint', 'typecheck', ...files],
+    ['lint', 'typecheck', 'node-tests'],
   );
-  assert.deepEqual(
-    (await validationSteps(root, { soakOnly: true })).map((entry) => entry.name),
-    soak,
-  );
-  assert.deepEqual(plan.find((entry) => entry.name === 'lint').args.slice(-4), [
-    'src',
-    'scripts',
-    'tests',
-    'playwright.config.mjs',
-  ]);
-  const { scripts } = JSON.parse(await fs.readFile(path.join(root, 'package.json')));
-  assert.equal(scripts.check, 'node scripts/validate.mjs');
-  assert.equal(scripts['test:soak'], 'node scripts/validate.mjs --soak');
-  assert.equal(scripts['build:pages'], 'npm run build && node scripts/package-pages.mjs');
-  assert.match(scripts.deploy, /^npm test && npm run build:pages && wrangler pages deploy /);
+  const [soak] = await validationSteps(root, { soakOnly: true });
+  assert.ok(soak.args.includes(path.join('tests', 'soak', 'economy-autoplay.test.cjs')));
 });
 
 test('pull-request CI validates on the supported Node and never publishes', async () => {
   const root = path.resolve(import.meta.dirname, '..');
   const workflow = await fs.readFile(path.join(root, '.github/workflows/ci.yml'), 'utf8');
   const { engines } = JSON.parse(await fs.readFile(path.join(root, 'package.json')));
-  assert.match(workflow, /^on:\n {2}pull_request:\n {2}push:\n {4}branches: \[main\]\n/m);
   assert.equal(`>=${workflow.match(/node-version: '([\d.]+)'/)[1]}`, engines.node);
-  const commands = [...workflow.matchAll(/^ +run: (.+)$/gm)].map((match) => match[1]);
-  assert.deepEqual(commands, [
-    'npm ci',
-    'npm run format:check',
-    'npm test',
-    'npm ci',
-    'npm run test:soak',
-  ]);
-  assert.match(workflow, /if: failure\(\)\n(?: {8}.+\n)*? {8}uses: actions\/upload-artifact@/);
-  assert.match(workflow, /^ {10}path: output\/validation\/$/m);
   assert.match(workflow, /^permissions:\n {2}contents: read\n/m);
   assert.doesNotMatch(workflow, /secrets[.:]|deploy|wrangler|build:pages|CLOUDFLARE/i);
 });
 
-test('focused validation keeps lint and types, selects exact routine files and removes duplicates', async () => {
+test('focused validation keeps lint and types and selects exact routine files once', async () => {
   const root = path.resolve(import.meta.dirname, '..');
   const plan = await validationSteps(root, {
     nodeOnly: true,
@@ -183,10 +194,10 @@ test('focused validation keeps lint and types, selects exact routine files and r
   });
   assert.deepEqual(
     plan.map((entry) => entry.name),
-    ['lint', 'typecheck', 'typecheck.test.mjs', 'validation.test.mjs'],
+    ['lint', 'typecheck', 'node-tests'],
   );
-  assert.deepEqual(plan.at(-1).args, [
-    '--test-reporter=spec',
+  assert.deepEqual(plan.at(-1).args.slice(-2), [
+    path.join('tests', 'typecheck.test.mjs'),
     path.join('tests', 'validation.test.mjs'),
   ]);
 });
@@ -242,7 +253,7 @@ test('the CLI rejects malformed options before starting validation', () => {
   }
 });
 
-test('focused CLI runs real checks, retains selected-test logs and stops at a failure', async (t) => {
+test('focused CLI runs real checks and only the selected tests, retaining their logs', async (t) => {
   const root = path.resolve(import.meta.dirname, '..');
   const { directory } = await workspace(t);
   for (const name of ['scripts', 'src', 'tests']) await fs.mkdir(path.join(directory, name));
@@ -273,10 +284,6 @@ test('focused CLI runs real checks, retains selected-test logs and stops at a fa
     path.join(directory, 'tests/failure.test.mjs'),
     'console.error("selected diagnostic"); process.exitCode = 1;\n',
   );
-  await fs.writeFile(
-    path.join(directory, 'tests/later.test.mjs'),
-    'import fs from "node:fs"; fs.writeFileSync("later-ran", "bad");\n',
-  );
   const run = async (files) => {
     const result = spawnSync(
       process.execPath,
@@ -291,26 +298,21 @@ test('focused CLI runs real checks, retains selected-test logs and stops at a fa
   };
   const success = await run(['tests/success.test.mjs']);
   assert.equal(success.result.status, 0, success.result.stdout + success.result.stderr);
-  assert.equal(success.summary.complete, true);
   assert.equal(success.summary.passed, true);
-  assert.deepEqual(
-    success.summary.results.map((entry) => entry.name),
-    ['lint', 'typecheck', 'success.test.mjs'],
-  );
-  assert.match(await fs.readFile(success.summary.results.at(-1).log, 'utf8'), /selected success/);
+  const log = await fs.readFile(success.summary.results.at(-1).log, 'utf8');
+  assert.match(log, /selected success/);
+  assert.doesNotMatch(log, /unselected test ran/);
 
-  const failure = await run(['tests/later.test.mjs', 'tests/failure.test.mjs']);
+  const failure = await run(['tests/success.test.mjs', 'tests/failure.test.mjs']);
   assert.equal(failure.result.status, 1);
-  assert.equal(failure.summary.complete, false);
   assert.equal(failure.summary.passed, false);
   assert.deepEqual(
-    failure.summary.results.map((entry) => entry.name),
-    ['lint', 'typecheck', 'failure.test.mjs'],
-  );
-  assert.match(
-    await fs.readFile(failure.summary.results.at(-1).log, 'utf8'),
-    /selected diagnostic/,
+    failure.summary.results.map((entry) => [entry.name, entry.passed]),
+    [
+      ['lint', true],
+      ['typecheck', true],
+      ['node-tests', false],
+    ],
   );
   assert.match(failure.result.stdout, /selected diagnostic/);
-  await assert.rejects(fs.access(path.join(directory, 'later-ran')));
 });

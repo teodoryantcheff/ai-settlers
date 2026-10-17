@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/test.mjs';
 
 // Exercise a real WebGL renderer on machines without a physical display/GPU.
 test.use({

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/test.mjs';
 import { openAtlas, expectMapFocus } from './helpers/atlas.mjs';
 test.use({
   launchOptions: {

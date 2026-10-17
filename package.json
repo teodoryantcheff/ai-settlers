@@ -22,11 +22,13 @@
     "format": "prettier --write src scripts tests index.html tsconfig.json",
     "format:check": "prettier --check src scripts tests index.html tsconfig.json",
     "dev": "python3 -m http.server 8765 --bind 127.0.0.1",
-    "check": "node scripts/validate.mjs"
+    "check": "node scripts/validate.mjs",
+    "coverage": "node scripts/coverage.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.64.0",
     "esbuild": "0.28.2",
+    "monocart-coverage-reports": "2.13.2",
     "oxlint": "1.86.0",
     "pixi.js": "8.22.0",
     "prettier": "3.9.10",

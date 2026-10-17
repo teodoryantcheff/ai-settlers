@@ -1,0 +1,318 @@
+{
+  "src/app.ts": {
+    "lines": 11.11,
+    "branches": 0
+  },
+  "src/application/assembly.ts": {
+    "lines": 67.19,
+    "branches": 100
+  },
+  "src/application/loop.ts": {
+    "lines": 88.04,
+    "branches": 65.22
+  },
+  "src/audio/ambience.ts": {
+    "lines": 98.23,
+    "branches": 85.71
+  },
+  "src/audio/audio-runtime.ts": {
+    "lines": "",
+    "branches": ""
+  },
+  "src/audio/audio-types.ts": {
+    "lines": "",
+    "branches": ""
+  },
+  "src/audio/audio.ts": {
+    "lines": 91.6,
+    "branches": 85.33
+  },
+  "src/audio/bell-options.ts": {
+    "lines": 100,
+    "branches": ""
+  },
+  "src/audio/interface-sounds.ts": {
+    "lines": 100,
+    "branches": ""
+  },
+  "src/audio/music.ts": {
+    "lines": 99.43,
+    "branches": 96.77
+  },
+  "src/audio/world-effects.ts": {
+    "lines": 98.68,
+    "branches": 89.71
+  },
+  "src/bootstrap.ts": {
+    "lines": 85.45,
+    "branches": 48.57
+  },
+  "src/core/attach.ts": {
+    "lines": 100,
+    "branches": 100
+  },
+  "src/core/events.ts": {
+    "lines": 100,
+    "branches": ""
+  },
+  "src/core/persistence.ts": {
+    "lines": 90.83,
+    "branches": 81.69
+  },
+  "src/core/save-catalog.ts": {
+    "lines": 91.03,
+    "branches": 83.72
+  },
+  "src/core/save-codec.ts": {
+    "lines": 93.58,
+    "branches": 90.11
+  },
+  "src/core/state.ts": {
+    "lines": 90.46,
+    "branches": 87.73
+  },
+  "src/core/world.ts": {
+    "lines": 100,
+    "branches": 100
+  },
+  "src/gameplay/advisor.ts": {
+    "lines": 96.77,
+    "branches": 95.81
+  },
+  "src/gameplay/colony-rules.ts": {
+    "lines": 98.67,
+    "branches": 97.37
+  },
+  "src/gameplay/production-rules.ts": {
+    "lines": 94.83,
+    "branches": 92.31
+  },
+  "src/gameplay/progression.ts": {
+    "lines": 96.74,
+    "branches": 87.5
+  },
+  "src/main.ts": {
+    "lines": 100,
+    "branches": ""
+  },
+  "src/observations/attention.ts": {
+    "lines": 95.39,
+    "branches": 90.76
+  },
+  "src/observations/production-condition.ts": {
+    "lines": 100,
+    "branches": 100
+  },
+  "src/observations/validate-attention.ts": {
+    "lines": 99.19,
+    "branches": 98.73
+  },
+  "src/rendering/art.ts": {
+    "lines": 0.18,
+    "branches": 0
+  },
+  "src/rendering/canvas-context.ts": {
+    "lines": 100,
+    "branches": 100
+  },
+  "src/rendering/landscape.ts": {
+    "lines": 86.88,
+    "branches": 74.55
+  },
+  "src/rendering/painted-assets.ts": {
+    "lines": 14.68,
+    "branches": 4.05
+  },
+  "src/rendering/pixi-atmosphere.ts": {
+    "lines": 40.4,
+    "branches": 0
+  },
+  "src/rendering/pixi-renderer.ts": {
+    "lines": 2.61,
+    "branches": 0
+  },
+  "src/rendering/pixi-shadows.ts": {
+    "lines": 44.44,
+    "branches": ""
+  },
+  "src/rendering/renderer.ts": {
+    "lines": 52.68,
+    "branches": 47.59
+  },
+  "src/rendering/scene.ts": {
+    "lines": 20,
+    "branches": 7.14
+  },
+  "src/rendering/shadow-cache.ts": {
+    "lines": 91.58,
+    "branches": 83.87
+  },
+  "src/rendering/village.ts": {
+    "lines": 91.45,
+    "branches": 81.3
+  },
+  "src/runtime.ts": {
+    "lines": 100,
+    "branches": ""
+  },
+  "src/simulation/assembly.ts": {
+    "lines": 100,
+    "branches": 100
+  },
+  "src/simulation/autoplay.ts": {
+    "lines": 92.12,
+    "branches": 90.43
+  },
+  "src/simulation/delivery-stage.ts": {
+    "lines": 100,
+    "branches": 100
+  },
+  "src/simulation/economy.ts": {
+    "lines": 89.78,
+    "branches": 86.46
+  },
+  "src/simulation/engine.ts": {
+    "lines": 100,
+    "branches": ""
+  },
+  "src/simulation/map.ts": {
+    "lines": 74.48,
+    "branches": 71.11
+  },
+  "src/simulation/navigation.ts": {
+    "lines": 97.02,
+    "branches": 97.18
+  },
+  "src/simulation/observations.ts": {
+    "lines": 94.76,
+    "branches": 87.01
+  },
+  "src/simulation/roads.ts": {
+    "lines": 100,
+    "branches": 100
+  },
+  "src/simulation/startup.ts": {
+    "lines": 100,
+    "branches": 100
+  },
+  "src/simulation/state.ts": {
+    "lines": 100,
+    "branches": ""
+  },
+  "src/simulation/transport.ts": {
+    "lines": 96.34,
+    "branches": 92.31
+  },
+  "src/types.ts": {
+    "lines": "",
+    "branches": ""
+  },
+  "src/ui/attention-view.ts": {
+    "lines": 2.1,
+    "branches": 0
+  },
+  "src/ui/catalog-view.ts": {
+    "lines": 71.15,
+    "branches": 57.27
+  },
+  "src/ui/dom.ts": {
+    "lines": 99.54,
+    "branches": 75
+  },
+  "src/ui/domain-feedback.ts": {
+    "lines": 87.16,
+    "branches": 74.29
+  },
+  "src/ui/economic-feedback.ts": {
+    "lines": 96.74,
+    "branches": 94.66
+  },
+  "src/ui/economic-notices.ts": {
+    "lines": 95.24,
+    "branches": 100
+  },
+  "src/ui/economy-view.ts": {
+    "lines": 32.85,
+    "branches": 11.92
+  },
+  "src/ui/hud.ts": {
+    "lines": 49.4,
+    "branches": 50.98
+  },
+  "src/ui/inspector-view.ts": {
+    "lines": 64.54,
+    "branches": 64.82
+  },
+  "src/ui/interaction.ts": {
+    "lines": 88.94,
+    "branches": 94.12
+  },
+  "src/ui/live-report.ts": {
+    "lines": 39.13,
+    "branches": 29.03
+  },
+  "src/ui/logistics-view.ts": {
+    "lines": 28.28,
+    "branches": 4.44
+  },
+  "src/ui/map-controls.ts": {
+    "lines": 30.99,
+    "branches": 20
+  },
+  "src/ui/markup.ts": {
+    "lines": 89.47,
+    "branches": 85.11
+  },
+  "src/ui/messages.ts": {
+    "lines": 91.67,
+    "branches": 100
+  },
+  "src/ui/placement-feedback.ts": {
+    "lines": 37.04,
+    "branches": 16.67
+  },
+  "src/ui/progression-view.ts": {
+    "lines": 67.5,
+    "branches": 54.05
+  },
+  "src/ui/recovery-view.ts": {
+    "lines": 42.22,
+    "branches": 0
+  },
+  "src/ui/reference-view.ts": {
+    "lines": 72.81,
+    "branches": 59.35
+  },
+  "src/ui/report-navigation.ts": {
+    "lines": 0,
+    "branches": 0
+  },
+  "src/ui/report-windows.ts": {
+    "lines": 8.58,
+    "branches": 6.25
+  },
+  "src/ui/resource-icons.ts": {
+    "lines": 100,
+    "branches": ""
+  },
+  "src/ui/save-view.ts": {
+    "lines": 0.71,
+    "branches": 0
+  },
+  "src/ui/session-view.ts": {
+    "lines": 36.56,
+    "branches": 32.65
+  },
+  "src/ui/transient-help.ts": {
+    "lines": 30.19,
+    "branches": 8.47
+  },
+  "src/ui/utility-art.ts": {
+    "lines": 11.11,
+    "branches": 0
+  },
+  "src/ui/workspace.ts": {
+    "lines": 71.1,
+    "branches": 52.15
+  }
+}
