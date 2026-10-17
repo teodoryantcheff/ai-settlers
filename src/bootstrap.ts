@@ -7,7 +7,6 @@ import type { GameRuntime } from './runtime.ts';
 
 async function stage(number: number, message: string) {
   const boot = requireElement('boot');
-  if (!boot) return;
   boot.dataset.stage = String(number);
   requireElement('boot-stage').textContent = message;
   for (const item of boot.querySelectorAll<HTMLElement>('[data-boot-stage]')) {
@@ -51,7 +50,7 @@ export async function bootGame(): Promise<GameRuntime> {
   } catch (error) {
     presenter.destroy();
     if (game?.buildings.length && !(error instanceof MissingElementError)) {
-      requireElement('boot')?.remove();
+      document.querySelector('#boot')?.remove();
       document.documentElement.dataset.renderer = 'unavailable';
       game.emitGameEvent('rendererFailed', {
         reason:

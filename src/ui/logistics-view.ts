@@ -149,7 +149,7 @@ export function createLogisticsView(game: GameRuntime): LogisticsViewSubsystem {
     )}`;
   }
   function updateLogisticsView() {
-    if (!host || game.workspace !== 'logistics') return;
+    if (game.workspace !== 'logistics') return;
     const snapshot = game.currentTransport();
     const stage = requireElement<HTMLSelectElement>('logistics-stage').value;
     const query = requireElement<HTMLInputElement>('logistics-query').value.trim().toLowerCase();
@@ -196,45 +196,41 @@ export function createLogisticsView(game: GameRuntime): LogisticsViewSubsystem {
     );
     replace('logistics-waiting', waiting(snapshot.rows));
   }
-  if (host) {
-    host.innerHTML = `<h1 id="logistics-heading" class="report-content-heading">Deliveries and carrier workload</h1><p class="logistics-intro">Separate promised work from collected cargo and completed arrivals. Follow current carrier paths and goods waiting for collection.</p><div class="logistics-map-actions"><button id="logistics-routes" aria-controls="map-modes">Show routes on map</button><span class="logistics-muted">Highlight current carrier routes on the live map.</span></div><div class="logistics-controls"><label>Arrival reporting window <select id="logistics-window"><option value="30">30 seconds</option><option value="120">2 minutes</option><option value="600">10 minutes</option><option value="lifetime">Lifetime</option></select></label><label>Live stage <select id="logistics-stage"><option value="all">All stages</option><option value="queued">Queued · unassigned</option><option value="assigned">Assigned · before pickup</option><option value="carrying">Physically carrying</option><option value="unknown">Assignment evidence unavailable</option></select></label><label>Find resource / building / carrier <input id="logistics-query" type="search"></label></div><div id="logistics-live"></div><section id="logistics-detail"></section><section id="logistics-completions"></section><section id="logistics-workload"></section><section id="logistics-waiting"></section>`;
-    requireElement('logistics-routes').addEventListener('click', () =>
-      game.setMapOverlay('routes'),
+  host.innerHTML = `<h1 id="logistics-heading" class="report-content-heading">Deliveries and carrier workload</h1><p class="logistics-intro">Separate promised work from collected cargo and completed arrivals. Follow current carrier paths and goods waiting for collection.</p><div class="logistics-map-actions"><button id="logistics-routes" aria-controls="map-modes">Show routes on map</button><span class="logistics-muted">Highlight current carrier routes on the live map.</span></div><div class="logistics-controls"><label>Arrival reporting window <select id="logistics-window"><option value="30">30 seconds</option><option value="120">2 minutes</option><option value="600">10 minutes</option><option value="lifetime">Lifetime</option></select></label><label>Live stage <select id="logistics-stage"><option value="all">All stages</option><option value="queued">Queued · unassigned</option><option value="assigned">Assigned · before pickup</option><option value="carrying">Physically carrying</option><option value="unknown">Assignment evidence unavailable</option></select></label><label>Find resource / building / carrier <input id="logistics-query" type="search"></label></div><div id="logistics-live"></div><section id="logistics-detail"></section><section id="logistics-completions"></section><section id="logistics-workload"></section><section id="logistics-waiting"></section>`;
+  requireElement('logistics-routes').addEventListener('click', () => game.setMapOverlay('routes'));
+  requireElement('logistics-window').addEventListener('change', (event) => {
+    const value = (event.target as HTMLSelectElement).value;
+    window = value === 'lifetime' ? value : (+value as 30 | 120 | 600);
+    updateLogisticsView();
+  });
+  for (const id of ['logistics-stage', 'logistics-query'])
+    requireElement(id).addEventListener(
+      id === 'logistics-query' ? 'input' : 'change',
+      updateLogisticsView,
     );
-    requireElement('logistics-window').addEventListener('change', (event) => {
-      const value = (event.target as HTMLSelectElement).value;
-      window = value === 'lifetime' ? value : (+value as 30 | 120 | 600);
+  host.addEventListener('click', (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
+    if (!button) return;
+    if (button.dataset.logisticsSelect) {
+      selected =
+        game.currentTransport().rows.find((row) => row.key === button.dataset.logisticsSelect) ||
+        null;
       updateLogisticsView();
-    });
-    for (const id of ['logistics-stage', 'logistics-query'])
-      requireElement(id).addEventListener(
-        id === 'logistics-query' ? 'input' : 'change',
-        updateLogisticsView,
-      );
-    host.addEventListener('click', (event) => {
-      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
-      if (!button) return;
-      if (button.dataset.logisticsSelect) {
-        selected =
-          game.currentTransport().rows.find((row) => row.key === button.dataset.logisticsSelect) ||
-          null;
+      const heading = host.querySelector<HTMLElement>('#logistics-detail h2');
+      revealReportHeading(host, heading);
+    }
+    if (button.dataset.logisticsInspect) {
+      const building = game.byId(+button.dataset.logisticsInspect);
+      if (building) {
+        inspected = { id: building.id, type: building.type, x: building.x, y: building.y };
+        game.inspectContributor(building.id);
         updateLogisticsView();
-        const heading = host.querySelector<HTMLElement>('#logistics-detail h2');
-        revealReportHeading(host, heading);
       }
-      if (button.dataset.logisticsInspect) {
-        const building = game.byId(+button.dataset.logisticsInspect);
-        if (building) {
-          inspected = { id: building.id, type: building.type, x: building.x, y: building.y };
-          game.inspectContributor(building.id);
-          updateLogisticsView();
-        }
-      }
-      if (button.dataset.logisticsLocate) game.locateContributor(+button.dataset.logisticsLocate);
-      if (button.hasAttribute('data-logistics-former') && inspected)
-        game.locateContributor(inspected);
-    });
-  }
+    }
+    if (button.dataset.logisticsLocate) game.locateContributor(+button.dataset.logisticsLocate);
+    if (button.hasAttribute('data-logistics-former') && inspected)
+      game.locateContributor(inspected);
+  });
   observePresentation(game, 'buildingDemolished', (event) => {
     if (inspected?.id === event.id) {
       game.showRemovedContributor(inspected);

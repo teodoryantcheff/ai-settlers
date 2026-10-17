@@ -9,8 +9,7 @@ const overlays: MapOverlay[] = ['none', 'routes', 'workload', 'reach', 'stalls']
 /** Shared map choice and persistent navigation controls; no world state or rendering decisions. */
 export function createMapControls(game: GameRuntime, stopMinimapDrag: () => void) {
   const buttons = [
-    ...(requireElement('map-modes')?.querySelectorAll<HTMLButtonElement>('[data-map-overlay]') ||
-      []),
+    ...requireElement('map-modes').querySelectorAll<HTMLButtonElement>('[data-map-overlay]'),
   ];
   const toggle = requireElement('minimap-toggle');
   const mini = requireElement('mini');
@@ -21,14 +20,12 @@ export function createMapControls(game: GameRuntime, stopMinimapDrag: () => void
       if (button.getAttribute('aria-pressed') !== String(selected))
         button.setAttribute('aria-pressed', String(selected));
     }
-    if (toggle) {
-      const visible = game.presentationPrefs.minimapVisible !== false;
-      toggle.setAttribute('aria-expanded', String(visible));
-      toggle.setAttribute('aria-label', visible ? 'Collapse minimap' : 'Expand minimap');
-      const label = visible ? 'Minimap ▾' : 'Minimap ▸';
-      if (toggle.textContent !== label) toggle.textContent = label;
-      if (mini) mini.hidden = !visible;
-    }
+    const visible = game.presentationPrefs.minimapVisible !== false;
+    toggle.setAttribute('aria-expanded', String(visible));
+    toggle.setAttribute('aria-label', visible ? 'Collapse minimap' : 'Expand minimap');
+    const label = visible ? 'Minimap ▾' : 'Minimap ▸';
+    if (toggle.textContent !== label) toggle.textContent = label;
+    mini.hidden = !visible;
   }
   function setMapOverlay(overlay: MapOverlay) {
     if (!overlays.includes(overlay)) return;
@@ -67,7 +64,7 @@ export function createMapControls(game: GameRuntime, stopMinimapDrag: () => void
   }
   for (const button of buttons)
     button.addEventListener('click', () => setMapOverlay(button.dataset.mapOverlay as MapOverlay));
-  toggle?.addEventListener('click', () => {
+  toggle.addEventListener('click', () => {
     stopMinimapDrag();
     game.presentationPrefs.minimapVisible = game.presentationPrefs.minimapVisible === false;
     update();

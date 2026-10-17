@@ -106,34 +106,28 @@ export function createProgressionView(game: GameRuntime): ProgressionViewSubsyst
     }
     const colonyLesson = document.querySelector<HTMLButtonElement>('#colony-lesson-build');
     if (colonyLesson) colonyLesson.onclick = journeyAction;
-    const auto = requireElement('colony-auto-status');
-    if (auto)
-      auto.textContent = game.state.auto
-        ? 'Enabled · colonists make building and road decisions. Manual placement temporarily holds planning; pause and utility screens suspend simulation.'
-        : 'Off · you choose construction and roads. Press P or use Enable autoplay.';
+    requireElement('colony-auto-status').textContent = game.state.auto
+      ? 'Enabled · colonists make building and road decisions. Manual placement temporarily holds planning; pause and utility screens suspend simulation.'
+      : 'Off · you choose construction and roads. Press P or use Enable autoplay.';
     const autoButton = requireElement('colony-autoplay');
-    if (autoButton) {
-      autoButton.textContent = game.state.auto ? 'Disable autoplay' : 'Enable autoplay';
-      autoButton.setAttribute('aria-pressed', String(game.state.auto));
-    }
+    autoButton.textContent = game.state.auto ? 'Disable autoplay' : 'Enable autoplay';
+    autoButton.setAttribute('aria-pressed', String(game.state.auto));
     const toolbar = requireElement('autob');
     toolbar.textContent = game.state.auto ? 'AUTO ON' : 'AUTO OFF';
     toolbar.className = game.state.auto ? 'on' : '';
     toolbar.setAttribute('aria-pressed', String(game.state.auto));
-    const objective = requireElement('colony-objective');
-    if (objective)
-      objective.textContent = game.state.won
-        ? '✓ 200-gold objective achieved. Current treasury: ' +
-          game.state.gold +
-          ' Gold. Later spending keeps the achievement.'
-        : 'Bank ' +
-          game.GOAL +
-          ' Gold to complete the objective. Treasury: ' +
-          game.state.gold +
-          ' Gold · Gold spent on upgrades: ' +
-          game.state.spentGold +
-          '.';
-    requireElement('colony-achievement')?.classList.toggle('hidden', !game.state.won);
+    requireElement('colony-objective').textContent = game.state.won
+      ? '✓ 200-gold objective achieved. Current treasury: ' +
+        game.state.gold +
+        ' Gold. Later spending keeps the achievement.'
+      : 'Bank ' +
+        game.GOAL +
+        ' Gold to complete the objective. Treasury: ' +
+        game.state.gold +
+        ' Gold · Gold spent on upgrades: ' +
+        game.state.spentGold +
+        '.';
+    requireElement('colony-achievement').classList.toggle('hidden', !game.state.won);
     let html =
       '<section class="progression-upgrades"><h2 tabindex="-1">Colony improvements</h2><p>Gold spent here leaves the treasury instead of advancing the banked-gold objective. Improvements affect nominal cycles or movement; shortages, output reserves and routes still matter.</p>';
     for (const kind of ['haul', 'production'] as const) {
@@ -169,7 +163,7 @@ export function createProgressionView(game: GameRuntime): ProgressionViewSubsyst
     ).length;
     const carriers = game.units.filter((unit) => unit.kind === 'carrier').length;
     const perf = requireElement('perftext');
-    if (perf && typeof game.renderStats !== 'undefined')
+    if (typeof game.renderStats !== 'undefined')
       perf.textContent =
         'Frame ' +
         (game.renderStats.frameMs || 0).toFixed(1) +
@@ -208,17 +202,17 @@ export function createProgressionView(game: GameRuntime): ProgressionViewSubsyst
     renderVictory();
     game.openLayer?.('win', { blocking: true });
   }
-  requireElement('colony-autoplay')?.addEventListener('click', () => {
+  requireElement('colony-autoplay').addEventListener('click', () => {
     game.toggleAutoplay();
     gameplayHUD();
   });
-  requireElement('colony-achievement')?.addEventListener('click', showVictory);
-  requireElement('colony-map')?.addEventListener('click', () => game.switchWorkspace('map'));
+  requireElement('colony-achievement').addEventListener('click', showVictory);
+  requireElement('colony-map').addEventListener('click', () => game.switchWorkspace('map'));
   requireElement('wingo').onclick = () => {
     if (game.continueColony) game.continueColony();
     else game.closeLayer?.('win');
   };
-  requireElement('winhome')?.addEventListener('click', () => game.returnHome());
+  requireElement('winhome').addEventListener('click', () => game.returnHome());
   observePresentation(game, 'victory', showVictory);
   observePresentation(game, 'worldLoaded', () => {
     lastJourneyHTML = '';

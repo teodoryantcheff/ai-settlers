@@ -70,19 +70,16 @@ export function createLoop(game: GameRuntime, internals?: LoopInternals): LoopSu
     window.addEventListener('resize', game.resize);
     const sizing = new ResizeObserver(game.resize);
     sizing.observe(requireElement('bar'));
-    const mapHost = requireElement('main');
-    if (mapHost) sizing.observe(mapHost);
+    sizing.observe(requireElement('main'));
     const grain = requireElement('grain');
-    if (grain && game.ART.grainURL) grain.style.backgroundImage = 'url(' + game.ART.grainURL + ')';
+    if (game.ART.grainURL) grain.style.backgroundImage = 'url(' + game.ART.grainURL + ')';
     game.loadPrefs();
     game.resize();
-    const mb = requireElement('musicb');
-    if (mb) mb.classList.toggle('off', !game.musicOn);
+    requireElement('musicb').classList.toggle('off', !game.musicOn);
     requireElement('mute').style.opacity = game.muted ? '0.4' : '1';
     game.buildPalette();
     game.updateHint();
-    const boot = requireElement('boot');
-    if (boot) boot.remove();
+    requireElement('boot').remove();
     requestAnimationFrame(frame);
   }
 

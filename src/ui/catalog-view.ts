@@ -120,12 +120,12 @@ export function createCatalogView(
     element: HTMLButtonElement;
   }> = [];
   const helpCleanup: Array<() => void> = [];
-  const search = requireElement('catalog-search') as HTMLInputElement;
-  const chain = requireElement('catalog-chain') as HTMLSelectElement;
+  const search = requireElement<HTMLInputElement>('catalog-search');
+  const chain = requireElement<HTMLSelectElement>('catalog-chain');
   function filter() {
     help.dismiss();
-    const query = (search?.value || '').trim().toLowerCase();
-    const group = chain?.value || 'all';
+    const query = (search.value || '').trim().toLowerCase();
+    const group = chain.value || 'all';
     let count = 0;
     for (const card of cards) {
       card.element.hidden = !(
@@ -134,14 +134,13 @@ export function createCatalogView(
       );
       if (!card.element.hidden) count++;
     }
-    const output = requireElement('catalog-count');
-    if (output) output.textContent = count + ' of ' + cards.length + ' buildings and tools';
-    const empty = requireElement('catalog-empty');
-    if (empty) empty.hidden = count > 0;
+    requireElement('catalog-count').textContent =
+      count + ' of ' + cards.length + ' buildings and tools';
+    requireElement('catalog-empty').hidden = count > 0;
   }
-  search?.addEventListener('input', filter);
-  chain?.addEventListener('change', filter);
-  requireElement('catalog-clear')?.addEventListener('click', () => {
+  search.addEventListener('input', filter);
+  chain.addEventListener('change', filter);
+  requireElement('catalog-clear').addEventListener('click', () => {
     search.value = '';
     chain.value = 'all';
     filter();

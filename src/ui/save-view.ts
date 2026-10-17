@@ -27,21 +27,19 @@ export function createSaveView(game: GameRuntime): SaveViewSubsystem {
         panel.clientHeight / 2;
   }
   function refreshHealth() {
-    if (recovery) {
-      const wasHidden = recovery.classList.contains('hidden');
-      recovery.classList.toggle('hidden', game.saveHealth.ok);
-      recovery.textContent = !game.saveHealth.ok
-        ? 'Save failed · Export'
-        : game.saveHealth.savedAt === null
-          ? 'Saves'
-          : 'Saves ✓';
-      recovery.setAttribute(
-        'aria-label',
-        game.saveHealth.message + '. Open saves to export current progress.',
-      );
-      recovery.title = game.saveHealth.message;
-      if (wasHidden !== game.saveHealth.ok && game.vw > 0) game.resize?.();
-    }
+    const wasHidden = recovery.classList.contains('hidden');
+    recovery.classList.toggle('hidden', game.saveHealth.ok);
+    recovery.textContent = !game.saveHealth.ok
+      ? 'Save failed · Export'
+      : game.saveHealth.savedAt === null
+        ? 'Saves'
+        : 'Saves ✓';
+    recovery.setAttribute(
+      'aria-label',
+      game.saveHealth.message + '. Open saves to export current progress.',
+    );
+    recovery.title = game.saveHealth.message;
+    if (wasHidden !== game.saveHealth.ok && game.vw > 0) game.resize?.();
     health.textContent =
       game.saveHealth.message +
       (game.saveHealth.ok
@@ -207,7 +205,7 @@ export function createSaveView(game: GameRuntime): SaveViewSubsystem {
     refreshSaveManager();
     game.openLayer('savedata', { blocking: true });
     const utility = requireElement('utility') as HTMLDetailsElement;
-    if (utility) utility.open = false;
+    utility.open = false;
   }
   function closeSaveManager() {
     cancelConfirmation();
@@ -282,7 +280,7 @@ export function createSaveView(game: GameRuntime): SaveViewSubsystem {
         raw.startsWith('{') ? raw : decodeURIComponent(escape(atob(raw.replace(/\s+/g, '')))),
       );
     });
-  if (recovery) recovery.onclick = openSaveManager;
+  recovery.onclick = openSaveManager;
   observePresentation(game, 'saveHealthChanged', refreshHealth);
   refreshHealth();
   return { openSaveManager, closeSaveManager, refreshSaveManager };
