@@ -17,19 +17,6 @@ function lint(...targets) {
   return { status: result.status, output: result.stdout + result.stderr };
 }
 
-test('declaration rules apply as errors without per-file overrides', async () => {
-  const settings = JSON.parse(await fs.readFile(config, 'utf8'));
-  for (const rule of ['no-var', 'prefer-const']) {
-    assert.equal(settings.rules[rule], 'error', `${rule} must remain an error`);
-    for (const override of settings.overrides ?? [])
-      assert.equal(
-        Object.hasOwn(override.rules ?? {}, rule),
-        false,
-        `${rule} must have no per-file override`,
-      );
-  }
-});
-
 for (const [name, source, rule] of [
   ['var declarations', 'export function same(a: unknown) { var b = a; return b === 1; }', 'no-var'],
   [

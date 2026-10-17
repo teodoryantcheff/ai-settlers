@@ -46,7 +46,6 @@ const placementAdvice: Record<PlacementRefusal['code'], PlacementAdvice> = {
   water: '',
   mountain: '',
   territory: 'build an Outpost toward that spot — it pushes your border out',
-  'shore-land': '',
   'no-water': 'place it on a shore inside your border (grass or sand both work)',
   meadow: '',
   deposit: 'click mountains to scout them, then build against the wall with the colored dots',
@@ -201,15 +200,8 @@ export function createEconomy(
     for (let i = 0; i < ss.length; i++) target += Math.max(0, ((ss[i].targets || {})[g] ?? 0) | 0);
     return target;
   }
-  function foodSaturated(good?: Good) {
-    if (good) return totalGood(good) >= Math.max(6 + 2 * liveMines(), stockTargetTotal(good));
-    return (
-      edibleGoods.reduce((n, g) => n + totalGood(g), 0) >=
-      Math.max(
-        10 + 3 * liveMines(),
-        edibleGoods.reduce((n, g) => n + stockTargetTotal(g), 0),
-      )
-    );
+  function foodSaturated(good: Good) {
+    return totalGood(good) >= Math.max(6 + 2 * liveMines(), stockTargetTotal(good));
   }
   function intermediateSaturated(good: Good) {
     const reserve = intermediateReserves[good] || 0;
@@ -319,7 +311,6 @@ export function createEconomy(
     const accepted = Math.min(n, Math.max(0, productionOutputLimit - ((b.stock[g] ?? 0) | 0)));
     b.stock[g] = ((b.stock[g] ?? 0) | 0) + accepted;
     b.produced = (b.produced | 0) + accepted;
-    if (!b.metrics) b.metrics = productionMetrics();
     b.metrics.produced[g] = ((b.metrics.produced[g] ?? 0) | 0) + accepted;
     game.recordEconomicFlow('produced', g, accepted);
     if (accepted) gameEvent('goodsProduced', { building: b, good: g as Good, amount: accepted });
@@ -521,9 +512,6 @@ export function createEconomy(
     if (!game.owned[i]) if (fail('ownership', { code: 'territory' })) return checks;
     const sp = game.BSPEC[type];
     if (type === 'fisherman') {
-      if (!game.owned[i]) if (fail('ownership', { code: 'territory' })) return checks;
-      if (tl.t !== game.GRASS && tl.t !== game.SAND)
-        if (fail('terrain', { code: 'shore-land' })) return checks;
       let wa = false;
       for (let wy2 = y - 2; wy2 <= y + 2 && !wa; wy2++)
         for (let wx2 = x - 2; wx2 <= x + 2 && !wa; wx2++)
@@ -610,8 +598,6 @@ export function createEconomy(
         return 'Cannot build on mountains';
       case 'territory':
         return 'Outside your territory';
-      case 'shore-land':
-        return 'Must stand on land by the shore';
       case 'no-water':
         return 'No water nearby';
       case 'meadow':
@@ -909,7 +895,6 @@ export function createEconomy(
       return;
     }
     if (sp.prod === 'none' || sp.store) return;
-    if (!b.metrics) b.metrics = productionMetrics();
     const reason = productionConstraint(b);
     let g: Good;
     b.blockedReason = reason;
@@ -999,7 +984,7 @@ export function createEconomy(
           b.blockedReason = 'resources';
           break;
         }
-        if (foodSaturated(sp.out)) {
+        if (foodSaturated('fish')) {
           b.timer = 6;
           break;
         }
@@ -1617,7 +1602,6 @@ export function createEconomy(
   }
   function recordDelivery(b: Building, g: Good, transfer: boolean) {
     game.recordCargoArrival(g);
-    if (!b.metrics) b.metrics = productionMetrics();
     b.metrics.delivered[g] = ((b.metrics.delivered[g] ?? 0) | 0) + 1;
     const sp = game.BSPEC[b.type];
     if (b.done && !sp.store && sp.in && eligibleIngredients(sp)[g]) {
@@ -1632,7 +1616,6 @@ export function createEconomy(
     if (!u.carryProducer || u.carryTransfer) return;
     const source = byId(u.carryProducer);
     if (source) {
-      if (!source.metrics) source.metrics = productionMetrics();
       source.metrics.outputDelivered[g] = (source.metrics.outputDelivered[g] || 0) + 1;
     }
     game.recordEconomicFlow('outputStored', g, 1);
@@ -1786,8 +1769,7 @@ export function createEconomy(
     for (let i = 0; i < game.buildings.length; i++) {
       const b = game.buildings[i],
         sp = game.BSPEC[b.type];
-      if (b.done && sp.prod && sp.prod !== 'none' && !sp.store && b.metrics)
-        sampleProduction(b.metrics);
+      if (b.done && sp.prod && sp.prod !== 'none' && !sp.store) sampleProduction(b.metrics);
     }
     // Reaping dead units only allocates when a death actually happened; the
     // identity check keeps save-load array replacements authoritative.
@@ -1991,7 +1973,7 @@ export function createEconomy(
       }
       case 'fish':
         lines.push({
-          t: foodSaturated(sp.out)
+          t: foodSaturated('fish')
             ? 'Food stocks are plentiful \u2014 production paused'
             : 'Fishing \u2014 never runs out',
           w: false,
@@ -2124,7 +2106,6 @@ export function createEconomy(
     nearestStoragePos,
     totalGood,
     stockTargetTotal,
-    foodSaturated,
     carrierCap,
     newBuilding,
     siteReady,
@@ -2202,7 +2183,6 @@ export interface EconomySubsystem {
   nearestStoragePos: (x: number, y: number) => Building | null;
   totalGood: (g: Good) => number;
   stockTargetTotal: (g: Good) => number;
-  foodSaturated: (good?: Good) => boolean;
   carrierCap: () => number;
   newBuilding: (type: BuildingType, x: number, y: number) => Building;
   siteReady: (b: Building) => boolean;

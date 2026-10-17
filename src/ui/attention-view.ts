@@ -43,10 +43,8 @@ export function createAttentionView(game: GameRuntime): AttentionViewSubsystem {
   function replace(parent: HTMLElement, id: string, html: string) {
     updateReport(parent.querySelector<HTMLElement>('#' + id), html);
   }
-  if (host)
-    host.innerHTML = `<h1 id="attention-heading">Attention</h1><p class="attention-intro">Unresolved conditions, evidence and actions. The colony continues to run here.</p><div class="attention-toolbar"><label>Find issues<input id="attention-query" type="search" placeholder="Building, condition or resource" /></label><label>Severity<select id="attention-severity"><option value="all">All priorities</option><option value="urgent">Urgent failures</option><option value="bottleneck">Persistent bottlenecks</option></select></label><button data-attention-history>View activity history</button></div><p id="attention-status" class="attention-muted"></p><div id="attention-list"></div><section id="attention-detail" class="attention-card"></section><p class="attention-muted">Production waits become persistent after 12 simulation seconds. Deliberate pauses and satisfied demand/reserves are excluded. Paused, hidden and offline time never matures a wait. Visible notices and audio retain separate coalescing and cooldowns.</p>`;
-  if (historyHost)
-    historyHost.innerHTML = `<h1 id="activity-heading">Activity</h1><p class="attention-intro">The latest 200 significant colony events, independent of notification cooldowns.</p><div class="attention-toolbar"><label>Find events<input id="activity-query" type="search" placeholder="Building, event or resource" /></label><label>Priority<select id="activity-severity"><option value="all">All priorities</option><option value="urgent">Urgent failures</option><option value="bottleneck">Bottlenecks</option><option value="info">Information</option></select></label><label>History window<select id="activity-window"><option value="all">Retained history</option><option value="30">30 seconds</option><option value="120">2 minutes</option><option value="600">10 minutes</option></select></label><button data-attention-open>View unresolved issues</button></div><p id="activity-coverage" class="attention-muted"></p><div id="activity-list"></div><section id="activity-contributor" class="attention-card"></section>`;
+  host.innerHTML = `<h1 id="attention-heading">Attention</h1><p class="attention-intro">Unresolved conditions, evidence and actions. The colony continues to run here.</p><div class="attention-toolbar"><label>Find issues<input id="attention-query" type="search" placeholder="Building, condition or resource" /></label><label>Severity<select id="attention-severity"><option value="all">All priorities</option><option value="urgent">Urgent failures</option><option value="bottleneck">Persistent bottlenecks</option></select></label><button data-attention-history>View activity history</button></div><p id="attention-status" class="attention-muted"></p><div id="attention-list"></div><section id="attention-detail" class="attention-card"></section><p class="attention-muted">Production waits become persistent after 12 simulation seconds. Deliberate pauses and satisfied demand/reserves are excluded. Paused, hidden and offline time never matures a wait. Visible notices and audio retain separate coalescing and cooldowns.</p>`;
+  historyHost.innerHTML = `<h1 id="activity-heading">Activity</h1><p class="attention-intro">The latest 200 significant colony events, independent of notification cooldowns.</p><div class="attention-toolbar"><label>Find events<input id="activity-query" type="search" placeholder="Building, event or resource" /></label><label>Priority<select id="activity-severity"><option value="all">All priorities</option><option value="urgent">Urgent failures</option><option value="bottleneck">Bottlenecks</option><option value="info">Information</option></select></label><label>History window<select id="activity-window"><option value="all">Retained history</option><option value="30">30 seconds</option><option value="120">2 minutes</option><option value="600">10 minutes</option></select></label><button data-attention-open>View unresolved issues</button></div><p id="activity-coverage" class="attention-muted"></p><div id="activity-list"></div><section id="activity-contributor" class="attention-card"></section>`;
   function removedContext() {
     if (!inspected) return '';
     return markup`<h2 tabindex="-1" data-attention-key="contributor-heading">${game.byId(inspected.id) ? 'Inspected contributor' : 'Contributor removed'}</h2><p>${game.byId(inspected.id) ? 'Building details are open in the docked inspector. Inspect preserves the camera.' : 'This building no longer exists. Its historical event describes the former building; its current production and controls are unavailable. Choose a surviving supplier or explicitly locate its former site.'}</p>${trusted(referenceActions(inspected, 'contributor'))}`;
@@ -71,18 +69,12 @@ export function createAttentionView(game: GameRuntime): AttentionViewSubsystem {
       urgent = Number(storageFailed) + Number(graphicsFailed),
       count = issues.length + urgent;
     const badge = requireElement('atlas-attention-count');
-    if (badge) {
-      const label = count + ' active Attention issue' + (count === 1 ? '' : 's');
-      if (badge.textContent !== String(count)) badge.textContent = String(count);
-      if (badge.getAttribute('aria-label') !== label) badge.setAttribute('aria-label', label);
-      if (badge.dataset.urgent !== String(urgent > 0)) badge.dataset.urgent = String(urgent > 0);
-    }
-    if (
-      !host ||
-      !historyHost ||
-      (!force && game.workspace !== 'attention' && game.workspace !== 'activity')
-    )
-      return;
+    const badgeLabel = count + ' active Attention issue' + (count === 1 ? '' : 's');
+    if (badge.textContent !== String(count)) badge.textContent = String(count);
+    if (badge.getAttribute('aria-label') !== badgeLabel)
+      badge.setAttribute('aria-label', badgeLabel);
+    if (badge.dataset.urgent !== String(urgent > 0)) badge.dataset.urgent = String(urgent > 0);
+    if (!force && game.workspace !== 'attention' && game.workspace !== 'activity') return;
     const stamp = JSON.stringify([
       game.workspace,
       Math.floor(game.state.time * 2),
@@ -195,18 +187,16 @@ export function createAttentionView(game: GameRuntime): AttentionViewSubsystem {
     }
     update(true);
     const heading =
-      requireElement(history ? 'activity-heading' : 'attention-detail')?.querySelector<HTMLElement>(
+      requireElement(history ? 'activity-heading' : 'attention-detail').querySelector<HTMLElement>(
         'h2',
       ) || requireElement(history ? 'activity-heading' : 'attention-heading');
-    if (heading) {
-      heading.tabIndex = -1;
-      revealReportHeading(history ? historyHost : host, heading);
-    }
+    heading.tabIndex = -1;
+    revealReportHeading(history ? historyHost : host, heading);
   }
   for (const parent of [host, historyHost]) {
-    parent?.addEventListener('input', () => update(true));
-    parent?.addEventListener('change', () => update(true));
-    parent?.addEventListener('click', (event) => {
+    parent.addEventListener('input', () => update(true));
+    parent.addEventListener('change', () => update(true));
+    parent.addEventListener('click', (event) => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
       if (!button) return;
       if (button.dataset.attentionIssue) showAttentionEntity(+button.dataset.attentionIssue);

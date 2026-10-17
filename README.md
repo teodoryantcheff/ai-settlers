@@ -44,7 +44,7 @@ Reference searches buildings, actual recipes, resources, transport and diagnosti
 npm test
 ```
 
-Use `npm test` for routine validation. It lints with oxlint, then runs typechecking and Node tests, retaining per-step logs and a JSON summary under `output/validation/<run>/`; failures print the log tail and stop the sequence.
+Use `npm test` for routine validation. It runs oxlint, typechecking and the Node tests concurrently (one `node --test` run, a process per file, up to four at once), retaining per-step logs and a JSON summary under `output/validation/<run>/`. Every failing step prints its log tail; steps that depend on a failed one are skipped.
 
 During iteration, select affected Node test files while keeping repository-wide lint, typechecking and the same logs:
 
@@ -55,11 +55,13 @@ npm test -- --file tests/validation.test.mjs --file tests/typecheck.test.mjs
 
 Pass exact paths to routine files in `tests/`; repeated selections run once in the suite's usual order. Missing files, globs, helper files, browser tests and soak tests are rejected before validation starts. Run plain `npm test` once at the end, before committing, to cover the full routine suite.
 
-`npm test` excludes the economy soak suite in `tests/soak/`, whose full autoplay playthroughs take several minutes. Run `npm run test:soak` after changing simulation, economy, logistics, autoplay or progression balance; it retains logs the same way. `ECONOMY_SEED=<n>`, `ECONOMY_SEEDS=<a,b>`, `ECONOMY_PROFILE=invest` and `ECONOMY_SECONDS=<limit>` narrow or extend a run. CI and `npm run check` also run it; `npm run deploy` does not.
+`npm test` excludes the economy soak suite in `tests/soak/`, whose full autoplay playthroughs take several minutes. Run `npm run test:soak` after changing simulation, economy, logistics, autoplay or progression balance; it retains logs the same way. `ECONOMY_SEED=<n>`, `ECONOMY_SEEDS=<a,b>`, `ECONOMY_PROFILE=invest` and `ECONOMY_SECONDS=<limit>` narrow or extend a run. CI runs it in a parallel job; `npm run check` and `npm run deploy` do not.
 
 Lint rules live in `.oxlintrc.json`. `no-var` and `prefer-const` apply to source, scripts and tests without exemptions; use `const` for bindings that are never reassigned and `let` for mutable bindings.
 
-Run the slower `npm run check`, browser tests or visual captures only when explicitly requested. The full check adds formatting, the soak suite, the build and browser tests. Browser tests use one worker because software WebGL is load-sensitive; the suite can take about 25 minutes and retains browser failure artifacts alongside its logs.
+Run the slower `npm run check`, browser tests or visual captures only when explicitly requested. The full check adds formatting, the build and browser tests, running alongside the Node tests; it takes about five minutes on a 4-core laptop and retains browser failure artifacts alongside its logs. Browser tests run in three workers on the machine's GPU through ANGLE (`playwright.config.mjs`); Chromium falls back to software WebGL where no GPU is available, which is much slower.
+
+`npm run coverage` measures V8 coverage of `src/` separately for the Node tests and the browser tests (browser bundles are mapped back through source maps), and fails if any file leaves more lines or branches uncovered in either environment than `tests/coverage-baseline.json` records, beyond 0.5% of the file. Counting uncovered code lets redundant code be deleted without a false alarm while a deleted test still fails. HTML reports are written to `output/coverage/report/{node,browser}/`. After an intended coverage change, run `npm run coverage -- --update` and commit the baseline; `-- --report-only` re-reports the last run's raw data.
 
 Tests and builds run TypeScript 7 checking through `npm run typecheck`, which invokes the TypeScript 7 compiler explicitly. Strict null checks are enabled in the main `tsconfig.json` for all source and compiler contracts. Browser tests require Playwright Chromium (`npx playwright install chromium` once). If port 8765 is occupied by another server, use `PLAYWRIGHT_PORT=8766 npm run test:browser`. Development scenarios are available at `tests/game.html?uitest&buildrules&seed=2024`, `?saveload&seed=123`, and `?devshot&seed=2024`.
 

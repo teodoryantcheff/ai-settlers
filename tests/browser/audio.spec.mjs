@@ -1,17 +1,7 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/test.mjs';
 
 // Exercise the shipped Tone graph. Faults and observations stay at the browser
 // AudioContext boundary; the game needs no production fault switches.
-test.use({
-  launchOptions: {
-    args: [
-      '--enable-webgl',
-      '--use-angle=swiftshader',
-      '--enable-unsafe-swiftshader',
-      '--disable-accelerated-2d-canvas',
-    ],
-  },
-});
 test.setTimeout(90000);
 
 async function boot(page, { failure = null, liveFrames = false } = {}) {

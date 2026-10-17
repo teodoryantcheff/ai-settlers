@@ -12,11 +12,7 @@ import { buildingPurposes as buildingHelp } from './catalog-view.ts';
 import { observePresentation } from './domain-feedback.ts';
 
 /** Owns inspector evidence, mounted controls, refresh and native interaction retention. */
-export function createInspectorView(
-  game: GameRuntime,
-  feedback: PlacementFeedback,
-  internals?: InspectorInternals,
-) {
+export function createInspectorView(game: GameRuntime, feedback: PlacementFeedback) {
   let productionRateWindow: ProductionRateWindow = 30;
   let inspectorKey = '';
   let illustratedType = '';
@@ -247,18 +243,15 @@ export function createInspectorView(
     game.updateReferenceContext?.();
     const el = requireElement('info');
     const b = game.selected;
-    const dock = requireElement('inspectordock');
-    if (dock) dock.hidden = !b && !game.selInfo && !game.removedContributor;
-    const illustration = requireElement('inspector-art') as HTMLCanvasElement;
+    requireElement('inspectordock').hidden = !b && !game.selInfo && !game.removedContributor;
+    const illustration = requireElement<HTMLCanvasElement>('inspector-art');
     const type = b?.type || game.removedContributor?.type;
-    if (illustration) {
-      illustration.hidden = !type;
-      if (type && type !== illustratedType && game.drawSpriteIcon) {
-        const context = requireCanvas2D(illustration, game.reportGraphicsFailure);
-        context.clearRect(0, 0, illustration.width, illustration.height);
-        game.drawSpriteIcon(context, type, illustration.width / 2, illustration.height / 2, 192);
-        illustratedType = type;
-      }
+    illustration.hidden = !type;
+    if (type && type !== illustratedType && game.drawSpriteIcon) {
+      const context = requireCanvas2D(illustration, game.reportGraphicsFailure);
+      context.clearRect(0, 0, illustration.width, illustration.height);
+      game.drawSpriteIcon(context, type, illustration.width / 2, illustration.height / 2, 192);
+      illustratedType = type;
     }
     if (!b && !game.selInfo && game.removedContributor) {
       const former = game.removedContributor;
@@ -459,22 +452,7 @@ export function createInspectorView(
     infoBody.innerHTML = '';
   }
   observePresentation(game, 'worldLoaded', reset);
-  if (internals) {
-    Object.assign(internals, { observedProduction, updateDzBtn });
-    Object.defineProperty(internals, 'productionRateWindow', {
-      get: () => productionRateWindow,
-      set: (value: ProductionRateWindow) => {
-        productionRateWindow = value;
-      },
-      enumerable: true,
-    });
-  }
   return { updateInfo, request, tick, tileInfo };
 }
 
 /** Test-only inspector state; kept out of the runtime surface. */
-export interface InspectorInternals {
-  observedProduction: (b: Building) => string;
-  updateDzBtn: () => void;
-  productionRateWindow: ProductionRateWindow;
-}

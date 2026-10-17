@@ -137,18 +137,7 @@ export function createRenderer(
     BAR_H = 44,
     terrainRevision = 0;
   function renderPrefs(): PresentationPreferences {
-    return typeof game.presentationPrefs === 'object'
-      ? game.presentationPrefs
-      : {
-          showFps: false,
-          atlasExpanded: false,
-          minimapVisible: true,
-          reducedMotion: false,
-          weather: true,
-          clarity: false,
-          quality: 1,
-          overlay: 'none',
-        };
+    return game.presentationPrefs;
   }
   function motionTime(now: number): number {
     return renderPrefs().reducedMotion ? 0 : now;
@@ -215,6 +204,8 @@ export function createRenderer(
   function drawTile(g: CanvasRenderingContext2D, i: number) {
     shadowCache.tileChanged(i);
     terrainRevision++;
+    // The canvas now differs from the last full paint; the next one must repaint.
+    paintedTerrain = '';
     paintTileFull(g, i);
     if (macroCan) paintMacroTile(g, i);
     miniTiles.add(i);
@@ -406,21 +397,43 @@ export function createRenderer(
       }
     }
   }
+  // Every input the landscape painter reads. Starting or loading the world that is
+  // already painted (the start screen's own seed, a reloaded checkpoint) keeps it.
+  let paintedTerrain = '';
+  function terrainSignature() {
+    const parts: unknown[] = [game.seed];
+    for (let i = 0; i < game.tiles.length; i++) {
+      const tile = game.tiles[i];
+      parts.push(
+        tile.t,
+        tile.tree,
+        tile.road,
+        tile.rock,
+        tile.deposit,
+        game.buildingAt(i % game.W, (i / game.W) | 0) ? 1 : 0,
+      );
+    }
+    return JSON.stringify(parts);
+  }
   function drawStatic() {
     shadowCache.reset();
-    terrainRevision++;
-    sctx.setTransform(1, 0, 0, 1, 0, 0);
-    sctx.imageSmoothingEnabled = true;
-    for (let y = 0; y < game.H; y++)
-      for (let x = 0; x < game.W; x++) paintTileFull(sctx, game.idx(x, y));
-    const macro = macroCan || buildMacro();
-    sctx.imageSmoothingEnabled = true;
-    sctx.drawImage(macro, 0, 0, game.W * game.TS * game.ST, game.H * game.TS * game.ST);
+    const signature = terrainSignature();
+    if (signature !== paintedTerrain) {
+      paintedTerrain = signature;
+      terrainRevision++;
+      sctx.setTransform(1, 0, 0, 1, 0, 0);
+      sctx.imageSmoothingEnabled = true;
+      for (let y = 0; y < game.H; y++)
+        for (let x = 0; x < game.W; x++) paintTileFull(sctx, game.idx(x, y));
+      const macro = macroCan || buildMacro();
+      sctx.imageSmoothingEnabled = true;
+      sctx.drawImage(macro, 0, 0, game.W * game.TS * game.ST, game.H * game.TS * game.ST);
+      presentation.invalidate(scan);
+    }
     drawBorders(true);
     miniDirty = true;
     miniTiles.clear();
     game.staticDirty = false;
-    presentation.invalidate(scan);
   }
 
   // ---------- camera ----------
@@ -672,7 +685,10 @@ export function createRenderer(
   let badgeGradient: FillGradient | null = null,
     progressGradient: FillGradient | null = null;
   function drawBadge(s: SceneLayer, cx: number, cy: number) {
-    const pulse = renderPrefs().reducedMotion ? 1 : 1 + Math.sin(NOW / 420 + cx * 0.3) * 0.035,
+    // Decorative pulse: holds still with the paused frame clock.
+    const pulse = renderPrefs().reducedMotion
+        ? 1
+        : 1 + Math.sin((_pausedNow ?? NOW) / 420 + cx * 0.3) * 0.035,
       g = s.g;
     badgeGradient ??= new FillGradient({
       type: 'linear',
@@ -2354,18 +2370,17 @@ export function createRenderer(
   let workPulses: Record<string, WorkPulse> = {},
     _renderEventsReady = false;
   function initRenderEvents() {
-    if (_renderEventsReady || typeof game.gameEvents === 'undefined') return;
+    if (_renderEventsReady) return;
     _renderEventsReady = true;
     observePresentation(game, 'goodsProduced', function (e) {
       const b = e.building;
-      if (!b) return;
       workPulses[b.id] = { t: performance.now(), good: e.good };
       if (visibleAt(b.x, b.y) && !renderPrefs().reducedMotion)
         FX.spark(b.x + 0.9, b.y + 0.65, game.GOODS[e.good].c, 3);
     });
     observePresentation(game, 'goodsDelivered', function (e) {
       const b = e.building;
-      if (!b || !visibleAt(b.x, b.y)) return;
+      if (!visibleAt(b.x, b.y)) return;
       workPulses[b.id] = { t: performance.now(), good: e.good };
     });
     observePresentation(
@@ -2751,7 +2766,6 @@ export function createRenderer(
   if (internals) {
     Object.assign(internals, {
       paintTileFull,
-      drawStatic,
       drawBorders,
       drawMiniStatic,
       buildingContour,
@@ -3053,7 +3067,6 @@ export const UNLIT_AT_NIGHT: ReadonlySet<BuildingType> = new Set<BuildingType>([
 export interface RendererInternals {
   shadowCache: ReturnType<typeof createShadowCache>;
   paintTileFull: (g: CanvasRenderingContext2D, i: number) => void;
-  drawStatic: () => void;
   drawBorders: (full?: boolean) => void;
   drawMiniStatic: () => void;
   buildingContour: (img: Sprite) => HTMLCanvasElement;

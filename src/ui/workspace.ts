@@ -37,24 +37,23 @@ export function createWorkspace(game: GameRuntime): WorkspaceSubsystem {
     if (game.presentationPrefs) game.presentationPrefs.atlasExpanded = expanded;
     const nav = requireElement('workspace-nav');
     const toggle = requireElement('atlas-toggle');
-    if (!expanded && nav?.contains(document.activeElement)) toggle?.focus({ preventScroll: true });
-    if (nav) nav.hidden = !expanded;
-    toggle?.setAttribute('aria-expanded', String(expanded));
-    if (toggle) toggle.title = expanded ? 'Collapse Colony Atlas' : 'Expand Colony Atlas';
+    if (!expanded && nav.contains(document.activeElement)) toggle.focus({ preventScroll: true });
+    nav.hidden = !expanded;
+    toggle.setAttribute('aria-expanded', String(expanded));
+    toggle.title = expanded ? 'Collapse Colony Atlas' : 'Expand Colony Atlas';
     document.body.classList.toggle('atlas-expanded', expanded);
     reportWindows.constrain();
     if (persist) game.persistPreferences?.();
   }
   function focusWorkspaceNavigation() {
     const nav = requireElement('workspace-nav');
-    const destination =
-      nav && !nav.hidden
-        ? nav.querySelector<HTMLElement>('[data-workspace][aria-current="page"]')
-        : requireElement('atlas-toggle');
+    const destination = !nav.hidden
+      ? nav.querySelector<HTMLElement>('[data-workspace][aria-current="page"]')
+      : requireElement('atlas-toggle');
     destination?.focus({ preventScroll: true });
   }
-  requireElement('atlas-toggle')?.addEventListener('click', () => {
-    setAtlasExpanded(requireElement('workspace-nav')?.hidden !== false);
+  requireElement('atlas-toggle').addEventListener('click', () => {
+    setAtlasExpanded(requireElement('workspace-nav').hidden !== false);
   });
   setAtlasExpanded(false, false);
 
@@ -65,8 +64,7 @@ export function createWorkspace(game: GameRuntime): WorkspaceSubsystem {
       game.ghost = null;
       game.hoverIn = game.mouseSeen = false;
       game.ttStr = null;
-      const tooltip = requireElement('tt');
-      if (tooltip) tooltip.style.display = 'none';
+      requireElement('tt').style.display = 'none';
       game.keys.l = game.keys.r = game.keys.u = game.keys.d = false;
       game.cancelMapGestures?.();
     }
@@ -78,11 +76,9 @@ export function createWorkspace(game: GameRuntime): WorkspaceSubsystem {
     });
     for (const name of names) {
       if (name === 'map') continue;
-      const panel = requireElement('workspace-' + name);
-      if (panel) panel.hidden = name !== next;
+      requireElement('workspace-' + name).hidden = name !== next;
     }
-    const colony = requireElement('economy');
-    if (colony) colony.classList.toggle('hidden', next !== 'colony');
+    requireElement('economy').classList.toggle('hidden', next !== 'colony');
     game.updateInfo?.();
     game.gameplayHUD?.();
     game.updateEconomyView?.();
@@ -105,7 +101,7 @@ export function createWorkspace(game: GameRuntime): WorkspaceSubsystem {
     if (!canvas?.width || !canvas.height) return { x: game.vw / 2, y: game.vh / 2 };
     function visibleRect(id: string) {
       const element = requireElement(id);
-      if (!element || element.hidden || element.classList.contains('hidden')) return null;
+      if (element.hidden || element.classList.contains('hidden')) return null;
       const style = getComputedStyle(element);
       if (style.display === 'none' || style.visibility === 'hidden') return null;
       const rect = element.getBoundingClientRect();
@@ -163,7 +159,7 @@ export function createWorkspace(game: GameRuntime): WorkspaceSubsystem {
   function visibleLayers() {
     return layers.filter((layer) => {
       const element = requireElement(layer.id);
-      return element && !element.hidden && !element.classList.contains('hidden');
+      return !element.hidden && !element.classList.contains('hidden');
     });
   }
   function layerElement(id: string) {
@@ -176,7 +172,6 @@ export function createWorkspace(game: GameRuntime): WorkspaceSubsystem {
   }
   function openLayer(id: string, options: LayerOptions = {}) {
     const element = layerElement(id);
-    if (!element) return;
     const previous = layers.find((layer) => layer.id === id);
     if (previous) {
       if (!element.hidden && !element.classList.contains('hidden')) return;
@@ -210,15 +205,15 @@ export function createWorkspace(game: GameRuntime): WorkspaceSubsystem {
     const index =
       id === undefined ? layers.length - 1 : layers.findIndex((layer) => layer.id === id);
     if (index < 0) {
-      if (id) layerElement(id)?.classList.add('hidden');
+      if (id) layerElement(id).classList.add('hidden');
       return;
     }
     // Removing a parent also dismisses its temporary children.
     const closing = layers.splice(index);
     for (const layer of closing) {
       const element = layerElement(layer.id);
-      element?.classList.add('hidden');
-      element?.removeAttribute('aria-modal');
+      element.classList.add('hidden');
+      element.removeAttribute('aria-modal');
     }
     const top = visibleLayers().at(-1);
     const returnFocus = closing[0].returnFocus;
@@ -275,16 +270,14 @@ export function createWorkspace(game: GameRuntime): WorkspaceSubsystem {
     for (const layer of visible)
       updateSimulationLine(layerElement(layer.id), layer.blocking, layer === topBlocking);
     const backdrop = requireElement('layer-backdrop');
-    if (backdrop) {
-      backdrop.hidden = active.length === 0;
-      const top = active.at(-1);
-      if (top) {
-        // Inline confirmations share their ancestor's stacking context. Keep the
-        // backdrop below that root so the nested dialog remains reachable.
-        const root =
-          active.find((layer) => layerElement(layer.id).contains(layerElement(top.id))) || top;
-        backdrop.style.zIndex = String(+(layerElement(root.id).style.zIndex || 31) - 1);
-      }
+    backdrop.hidden = active.length === 0;
+    const top = active.at(-1);
+    if (top) {
+      // Inline confirmations share their ancestor's stacking context. Keep the
+      // backdrop below that root so the nested dialog remains reachable.
+      const root =
+        active.find((layer) => layerElement(layer.id).contains(layerElement(top.id))) || top;
+      backdrop.style.zIndex = String(+(layerElement(root.id).style.zIndex || 31) - 1);
     }
     for (const layer of active) {
       const element = layerElement(layer.id);
@@ -303,7 +296,7 @@ export function createWorkspace(game: GameRuntime): WorkspaceSubsystem {
       switchWorkspace(button.dataset.workspace as WorkspaceName),
     );
   });
-  requireElement('locate-selected')?.addEventListener('click', () => {
+  requireElement('locate-selected').addEventListener('click', () => {
     if (game.selected) locateContributor(game.selected.id);
     else if (removedContributor) locateContributor(removedContributor);
   });

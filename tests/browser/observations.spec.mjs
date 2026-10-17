@@ -1,15 +1,5 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/test.mjs';
 
-test.use({
-  launchOptions: {
-    args: [
-      '--enable-webgl',
-      '--use-angle=swiftshader',
-      '--enable-unsafe-swiftshader',
-      '--disable-accelerated-2d-canvas',
-    ],
-  },
-});
 test.setTimeout(60000);
 
 test('real production inspector exposes ten-minute coverage and reconciled colony stock', async ({

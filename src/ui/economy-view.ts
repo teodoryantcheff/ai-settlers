@@ -37,47 +37,44 @@ export function createEconomyView(game: GameRuntime): EconomyViewSubsystem {
     salvage: 'Local stock salvage',
     transferred: 'Warehouse transfers',
   } as const;
-  if (host) {
-    host.innerHTML = markup`<h1 id="economy-heading" class="report-content-heading">Stock and production</h1>
-      <p class="economy-intro">Physical stock, supply chains and completed deliveries · rates in goods per simulation minute.</p>
-      <div class="economy-controls"><label>Reporting window <select id="economy-window"><option value="30">30 seconds</option><option value="120">2 minutes</option><option value="600">10 minutes</option><option value="lifetime">Lifetime</option></select></label>
-      <label>Production chain <select id="economy-chain"><option value="all">All chains</option>${trusted(RESOURCE_GROUPS.map((group, i) => markup`<option value="${i}">${group?.name ?? ''}</option>`).join(''))}</select></label>
-      <label>Find a resource <input id="economy-query" type="search" placeholder="Name or supply chain"></label></div>
-      <p id="economy-coverage" class="economy-coverage" aria-live="polite"></p>
-      <div id="economy-balances"></div><div id="economy-detail"></div>`;
-    requireElement('economy-window').addEventListener('change', (event) => {
-      const value = (event.target as HTMLSelectElement).value;
-      window = value === 'lifetime' ? value : (+value as 30 | 120 | 600);
+  host.innerHTML = markup`<h1 id="economy-heading" class="report-content-heading">Stock and production</h1>
+    <p class="economy-intro">Physical stock, supply chains and completed deliveries · rates in goods per simulation minute.</p>
+    <div class="economy-controls"><label>Reporting window <select id="economy-window"><option value="30">30 seconds</option><option value="120">2 minutes</option><option value="600">10 minutes</option><option value="lifetime">Lifetime</option></select></label>
+    <label>Production chain <select id="economy-chain"><option value="all">All chains</option>${trusted(RESOURCE_GROUPS.map((group, i) => markup`<option value="${i}">${group?.name ?? ''}</option>`).join(''))}</select></label>
+    <label>Find a resource <input id="economy-query" type="search" placeholder="Name or supply chain"></label></div>
+    <p id="economy-coverage" class="economy-coverage" aria-live="polite"></p>
+    <div id="economy-balances"></div><div id="economy-detail"></div>`;
+  requireElement('economy-window').addEventListener('change', (event) => {
+    const value = (event.target as HTMLSelectElement).value;
+    window = value === 'lifetime' ? value : (+value as 30 | 120 | 600);
+    updateEconomyView();
+  });
+  for (const id of ['economy-chain', 'economy-query'])
+    requireElement(id).addEventListener(
+      id === 'economy-query' ? 'input' : 'change',
+      updateEconomyView,
+    );
+  host.addEventListener('click', (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
+    if (!button) return;
+    if (button.dataset.economyResource) {
+      selectedGood = button.dataset.economyResource as Good;
       updateEconomyView();
-    });
-    for (const id of ['economy-chain', 'economy-query'])
-      requireElement(id).addEventListener(
-        id === 'economy-query' ? 'input' : 'change',
-        updateEconomyView,
-      );
-    host.addEventListener('click', (event) => {
-      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
-      if (!button) return;
-      if (button.dataset.economyResource) {
-        selectedGood = button.dataset.economyResource as Good;
+      revealResource();
+    }
+    if (button.dataset.economyInspect) {
+      const building = game.byId(+button.dataset.economyInspect);
+      if (building) {
+        inspected = { id: building.id, type: building.type, x: building.x, y: building.y };
+        game.inspectContributor(building.id);
         updateEconomyView();
-        revealResource();
       }
-      if (button.dataset.economyInspect) {
-        const building = game.byId(+button.dataset.economyInspect);
-        if (building) {
-          inspected = { id: building.id, type: building.type, x: building.x, y: building.y };
-          game.inspectContributor(building.id);
-          updateEconomyView();
-        }
-      }
-      if (button.dataset.economyLocate) {
-        if (button.dataset.economyLocate === 'former' && inspected)
-          game.locateContributor(inspected);
-        else game.locateContributor(+button.dataset.economyLocate);
-      }
-    });
-  }
+    }
+    if (button.dataset.economyLocate) {
+      if (button.dataset.economyLocate === 'former' && inspected) game.locateContributor(inspected);
+      else game.locateContributor(+button.dataset.economyLocate);
+    }
+  });
   function showEconomyResource(good: Good) {
     if (!goods.includes(good)) return;
     selectedGood = good;
@@ -86,7 +83,7 @@ export function createEconomyView(game: GameRuntime): EconomyViewSubsystem {
     revealResource();
   }
   function revealResource() {
-    const heading = host?.querySelector<HTMLElement>('#economy-detail h2');
+    const heading = host.querySelector<HTMLElement>('#economy-detail h2');
     revealReportHeading(host, heading);
   }
   const stockBar = requireElement('goods');
@@ -100,8 +97,8 @@ export function createEconomyView(game: GameRuntime): EconomyViewSubsystem {
       showEconomyResource(target.dataset.good as Good);
     }
   }
-  stockBar?.addEventListener('click', openStock);
-  stockBar?.addEventListener('keydown', openStock);
+  stockBar.addEventListener('click', openStock);
+  stockBar.addEventListener('keydown', openStock);
 
   const updateReport = createLiveReportUpdater({
     focusAttribute: 'data-economy-key',
@@ -206,7 +203,7 @@ export function createEconomyView(game: GameRuntime): EconomyViewSubsystem {
     )}</section>`;
   }
   function updateEconomyView() {
-    if (!host || game.workspace !== 'economy') return;
+    if (game.workspace !== 'economy') return;
     const measured = game.economicWindow(window);
     const coverage = requireElement('economy-coverage');
     const text = measured.available

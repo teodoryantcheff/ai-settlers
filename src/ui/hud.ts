@@ -2,7 +2,7 @@ import { requireElement } from './dom.ts';
 import { requireCanvas2D } from '../rendering/canvas-context.ts';
 import { html as markup, trusted, escapeMarkup, formatGoods } from './markup.ts';
 import { createLiveReportUpdater } from './live-report.ts';
-import { createInspectorView, type InspectorInternals } from './inspector-view.ts';
+import { createInspectorView } from './inspector-view.ts';
 import { createPlacementFeedback } from './placement-feedback.ts';
 import { createTransientHelp } from './transient-help.ts';
 import { createMapControls } from './map-controls.ts';
@@ -36,8 +36,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
   const resourceHelpCleanup: Array<() => void> = [];
   const populationControl = requireElement('ppl');
   const populationHelp = requireElement('population-help');
-  if (populationControl && populationHelp && populationControl !== populationHelp)
-    transientHelp.bind(populationControl, populationHelp);
+  transientHelp.bind(populationControl, populationHelp);
   let preferencesHealth: PreferencesHealth = {
     status: 'unchanged',
     message: 'Changes apply immediately and are remembered in this browser.',
@@ -51,7 +50,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     miniDown = false;
   });
   const placementFeedback = createPlacementFeedback(game);
-  const inspector = createInspectorView(game, placementFeedback, internals);
+  const inspector = createInspectorView(game, placementFeedback);
   const { updateInfo, tileInfo } = inspector;
   function observedFlows(record: Inventory, elapsed: number, allowed?: Inventory) {
     return formatGoods(game.GOODS, record, {
@@ -207,8 +206,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
       game.serfPool +
       '\nSoldier pool: ' +
       game.soldierPool;
-    if (populationCopy && populationCopy.textContent !== populationText)
-      populationCopy.textContent = populationText;
+    if (populationCopy.textContent !== populationText) populationCopy.textContent = populationText;
     const gt = game.state.won
       ? '✓ Goal achieved · ' + game.state.gold + ' banked'
       : 'Banked gold ' + game.state.gold + ' / ' + game.GOAL;
@@ -708,8 +706,8 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     game.setAtlasExpanded?.(game.presentationPrefs.atlasExpanded, false);
     requireElement('fps').hidden = !game.presentationPrefs.showFps;
     (requireElement('fpspref') as HTMLInputElement).checked = game.presentationPrefs.showFps;
-    const atlasArt = requireElement('atlas-art') as HTMLCanvasElement;
-    if (atlasArt && game.drawSpriteIcon) {
+    const atlasArt = requireElement<HTMLCanvasElement>('atlas-art');
+    if (game.drawSpriteIcon) {
       const context = requireCanvas2D(atlasArt, game.reportGraphicsFailure);
       context.clearRect(0, 0, atlasArt.width, atlasArt.height);
       game.drawSpriteIcon(context, 'hq', atlasArt.width / 2, atlasArt.height / 2, 64);
@@ -868,8 +866,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
   }
   function toggleMusic() {
     game.setMusicVol(!game.musicOn);
-    const b = requireElement('musicb');
-    if (b) b.classList.toggle('off', !game.musicOn);
+    requireElement('musicb').classList.toggle('off', !game.musicOn);
     requireElement('mute').style.opacity = game.muted ? '0.4' : '1';
     savePrefs();
     if (!game.muted && game.musicOn) game.SND.ui();
@@ -943,7 +940,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     }
     if (id === 'economy') game.gameplayHUD();
   }
-  requireElement('settings-help')?.addEventListener('click', () =>
+  requireElement('settings-help').addEventListener('click', () =>
     game.openReference ? game.openReference('settings') : toggleHelp(),
   );
   requireElement('mixb').onclick = function () {
@@ -1093,7 +1090,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     transientHelp.dismiss();
     (requireElement('palette') as HTMLDetailsElement).classList.toggle('compact', !expanded);
     requireElement('paletteitems').classList.toggle('hidden', !expanded);
-    requireElement('catalog-controls')?.classList.toggle('hidden', !expanded);
+    requireElement('catalog-controls').classList.toggle('hidden', !expanded);
     const button = requireElement('paletteb');
     button.setAttribute('aria-expanded', expanded ? 'true' : 'false');
     button.title = expanded ? 'Close building palette' : 'Open building palette';
@@ -1126,8 +1123,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
   };
   const mapHelp = requireElement('map-help');
   const mapHelpPopup = requireElement('map-help-popup');
-  if (mapHelp && mapHelpPopup && mapHelp !== mapHelpPopup)
-    transientHelp.bind(mapHelp, mapHelpPopup);
+  transientHelp.bind(mapHelp, mapHelpPopup);
   mapHelp.onclick = () => game.openReference('controls');
   function buildPalette() {
     catalog.build();
@@ -1187,23 +1183,11 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
   // Test-only view of closure internals; never merged into the runtime.
   if (internals) {
     Object.assign(internals, {
-      observedFlows,
       escapeMarkup,
-      costStr,
-      refreshPalette,
-      selectAt,
-      setPaletteExpanded,
-      applyPresentationPrefs,
-      savePrefsSoon,
       savePrefs,
       toggleMute,
       toggleMusic,
-      toggleHelp,
-      toggleAdv,
       toggleAdvisorDetails,
-      toggleAuto,
-      openPanel,
-      volLbl,
     });
     Object.defineProperties(internals, {
       pan: {
@@ -1310,24 +1294,12 @@ export interface HudSubsystem {
 }
 
 /** Test-only view of closure internals; never merged into the runtime. */
-export interface HudInternals extends InspectorInternals {
-  observedFlows: (record: Inventory, elapsed: number, allowed?: Inventory) => string;
+export interface HudInternals {
   escapeMarkup: (text: string) => string;
-  costStr: (type: BuildingType | 'road' | 'demolish') => string;
-  refreshPalette: () => void;
-  selectAt: (ht: TilePoint) => void;
-  setPaletteExpanded: (expanded: boolean) => void;
-  applyPresentationPrefs: () => void;
-  savePrefsSoon: () => void;
   savePrefs: () => boolean;
   toggleMute: () => void;
   toggleMusic: () => void;
-  toggleHelp: () => void;
-  toggleAdv: () => void;
   toggleAdvisorDetails: () => void;
-  toggleAuto: () => void;
-  openPanel: (id: string) => void;
-  volLbl: (id: string, v: number) => void;
   readonly pan: PanDrag | null;
   readonly miniDown: boolean;
 }

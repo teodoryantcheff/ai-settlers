@@ -1,15 +1,5 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/test.mjs';
 import { openAtlas } from './helpers/atlas.mjs';
-test.use({
-  launchOptions: {
-    args: [
-      '--enable-webgl',
-      '--use-angle=swiftshader',
-      '--enable-unsafe-swiftshader',
-      '--disable-accelerated-2d-canvas',
-    ],
-  },
-});
 test.setTimeout(120000);
 async function boot(page, quality = 0.75) {
   await page.addInitScript((quality) => {
@@ -132,7 +122,7 @@ test('Advisor keeps live action focus, and V respects native input and blocking 
   await page.waitForTimeout(300);
   await page.evaluate((id) => {
     const g = window.productionArtPreview.game;
-    g.anyStorage().stock.iron = 1;
+    g.anyStorage().stock.iron_bars = 1;
     g.hudTick();
   }, id);
   await expect(advice).toBeFocused();

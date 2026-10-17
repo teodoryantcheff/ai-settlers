@@ -1,14 +1,4 @@
-import { test, expect } from '@playwright/test';
-test.use({
-  launchOptions: {
-    args: [
-      '--enable-webgl',
-      '--use-angle=swiftshader',
-      '--enable-unsafe-swiftshader',
-      '--disable-accelerated-2d-canvas',
-    ],
-  },
-});
+import { test, expect } from './helpers/test.mjs';
 test.setTimeout(60000);
 async function boot(page) {
   await page.addInitScript(() => {

@@ -2,9 +2,9 @@
 /node_modules/
 /dist/
 /game.min.js
-/game.min.js.br
-/game.min.js.gz
 /game.test.js
+/game.min.js.map
+/game.test.js.map
 /tests/game.html
 
 # Local validation, screenshots, prototypes and browser artifacts.

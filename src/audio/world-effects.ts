@@ -167,10 +167,9 @@ export function createWorldEffects(
     cue.until = Math.max(cue.until, time + duration + 0.1);
   }
   function bindWorkAudio() {
-    if (audioWorkBound || typeof game.gameEvents === 'undefined' || !game.gameEvents.on) return;
+    if (audioWorkBound) return;
     observePresentation(game, 'goodsProduced', function (event) {
       const b = event.building;
-      if (!b) return;
       const method = (
         {
           lumberjack: 'chop',

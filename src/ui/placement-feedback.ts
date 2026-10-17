@@ -12,7 +12,6 @@ export function createPlacementFeedback(game: GameRuntime): PlacementFeedback {
   const tool = () =>
     game.mode ? game.mode.type + (game.mode.type === 'build' ? ':' + game.mode.bt : '') : '';
   function clear() {
-    if (!panel) return;
     if ((reading || panel.contains(document.activeElement)) && html && owner && owner === tool()) {
       const note = panel.querySelector<HTMLElement>('.placement-snapshot');
       if (note) note.hidden = false;
@@ -23,22 +22,21 @@ export function createPlacementFeedback(game: GameRuntime): PlacementFeedback {
     location = '';
     owner = '';
   }
-  panel?.addEventListener('pointerenter', () => {
+  panel.addEventListener('pointerenter', () => {
     reading = true;
     clear();
   });
-  panel?.addEventListener('pointerleave', () => {
+  panel.addEventListener('pointerleave', () => {
     reading = false;
     clear();
   });
-  panel?.addEventListener('focusin', clear);
-  panel?.addEventListener('focusout', () => queueMicrotask(clear));
+  panel.addEventListener('focusin', clear);
+  panel.addEventListener('focusout', () => queueMicrotask(clear));
   for (const type of ['pointerdown', 'mousedown', 'click'])
-    panel?.addEventListener(type, (event) => event.stopPropagation());
+    panel.addEventListener(type, (event) => event.stopPropagation());
   return {
     clear,
     show(next, at) {
-      if (!panel) return;
       if (reading && html && owner === tool()) {
         clear();
         return;

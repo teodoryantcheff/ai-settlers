@@ -43,7 +43,7 @@ export type BuildingType =
 /** Structured, transient placement failures; display copy is derived from the code. */
 export type PlacementRefusal =
   | { code: 'out-of-bounds' | 'choose-map-tile' }
-  | { code: 'water' | 'mountain' | 'territory' | 'shore-land' | 'no-water' | 'meadow' }
+  | { code: 'water' | 'mountain' | 'territory' | 'no-water' | 'meadow' }
   | { code: 'deposit'; good: 'coal' | 'iron' | 'gold' }
   | { code: 'no-rocks' | 'blocked' | 'unreachable-stock' }
   | { code: 'spacing'; building: BuildingType }

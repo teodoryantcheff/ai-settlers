@@ -25,17 +25,16 @@ export function createReportWindows(game: GameRuntime, close: () => void) {
   const reports = new Map<ReportName, ReportWindow>();
   function bounds() {
     const nav = requireElement('workspace-nav');
-    const expanded = nav && !nav.hidden;
+    const expanded = !nav.hidden;
     const left = expanded ? nav.getBoundingClientRect().right + 12 : 12;
-    const top = (requireElement('bar')?.getBoundingClientRect().bottom || 0) + (expanded ? 12 : 58);
+    const top = (requireElement('bar').getBoundingClientRect().bottom || 0) + (expanded ? 12 : 58);
     const reserve =
       window.innerWidth >= 900
         ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dock-width')) ||
           316
         : 0;
     const mapControls = requireElement('map-controls');
-    const controlsTop =
-      mapControls && !mapControls.hidden ? mapControls.getBoundingClientRect().top : 0;
+    const controlsTop = !mapControls.hidden ? mapControls.getBoundingClientRect().top : 0;
     return {
       left,
       top,
@@ -78,7 +77,6 @@ export function createReportWindows(game: GameRuntime, close: () => void) {
   function register(name: ReportName, title: string, focusAttribute = 'data-report-key') {
     if (reports.has(name)) return;
     const host = requireElement('workspace-' + name);
-    if (!host) return;
     const shell = document.createElement('section');
     shell.className = 'report-window';
     shell.dataset.reportWindow = name;
@@ -89,8 +87,7 @@ export function createReportWindows(game: GameRuntime, close: () => void) {
       game.hoverIn = game.mouseSeen = false;
       game.ghost = null;
       game.ttStr = null;
-      const tooltip = requireElement('tt');
-      if (tooltip) tooltip.style.display = 'none';
+      requireElement('tt').style.display = 'none';
     });
     const bar = document.createElement('header');
     bar.className = 'report-titlebar';
@@ -248,8 +245,7 @@ export function createReportWindows(game: GameRuntime, close: () => void) {
   }
   window.addEventListener('resize', constrain);
   if (typeof ResizeObserver !== 'undefined') {
-    const bar = requireElement('bar');
-    if (bar) new ResizeObserver(constrain).observe(bar);
+    new ResizeObserver(constrain).observe(requireElement('bar'));
   }
   function resetContext() {
     for (const report of reports.values()) {

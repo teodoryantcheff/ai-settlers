@@ -1,16 +1,4 @@
-import { test, expect } from '@playwright/test';
-
-// Keep native WebGL enabled while avoiding software-GPU Canvas cache stalls.
-test.use({
-  launchOptions: {
-    args: [
-      '--enable-webgl',
-      '--use-angle=swiftshader',
-      '--enable-unsafe-swiftshader',
-      '--disable-accelerated-2d-canvas',
-    ],
-  },
-});
+import { test, expect } from './helpers/test.mjs';
 
 test.setTimeout(60000);
 

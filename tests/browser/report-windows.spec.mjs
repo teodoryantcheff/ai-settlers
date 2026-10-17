@@ -1,15 +1,5 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/test.mjs';
 import { openAtlas } from './helpers/atlas.mjs';
-test.use({
-  launchOptions: {
-    args: [
-      '--enable-webgl',
-      '--use-angle=swiftshader',
-      '--enable-unsafe-swiftshader',
-      '--disable-accelerated-2d-canvas',
-    ],
-  },
-});
 test.setTimeout(120000);
 async function boot(page) {
   await page.addInitScript(() => {

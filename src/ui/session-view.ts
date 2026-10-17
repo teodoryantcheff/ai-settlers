@@ -140,7 +140,7 @@ export function createSessionView(game: GameRuntime): SessionSubsystem {
   }
   function closeUtility() {
     const utility = requireElement('utility') as HTMLDetailsElement;
-    if (utility) utility.open = false;
+    utility.open = false;
   }
   function openSettings() {
     (requireElement('speedpref') as HTMLSelectElement).value = String(game.state.speed);
@@ -221,22 +221,18 @@ export function createSessionView(game: GameRuntime): SessionSubsystem {
     openWelcome,
     returnHome,
     continueColony,
-    openNewColony,
     newColony,
     startNewColonyFromForm,
     openSettings,
     openReference,
-    openAbout,
   };
 }
 export interface SessionSubsystem {
   openWelcome: () => void;
   returnHome: () => void;
   continueColony: () => void;
-  openNewColony: () => void;
   newColony: (name?: string, seed?: number) => boolean;
   startNewColonyFromForm: () => void;
   openSettings: () => void;
   openReference: (article?: string) => void;
-  openAbout: () => void;
 }
