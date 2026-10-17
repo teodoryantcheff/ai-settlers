@@ -1,5 +1,5 @@
 import { bootGame, reportBootError } from '../bootstrap.ts';
-import { scanPaintedCrop } from '../rendering/painted-crop.ts';
+import { paintedRegions, scanPaintedCrop } from '../rendering/painted-crop.ts';
 import { runScenarios } from './scenarios.ts';
 import { mountUIPrototype } from './ui-prototype.ts';
 import { preparePrototypeMap } from './ui-prototype-map.ts';
@@ -15,6 +15,7 @@ if (new URLSearchParams(location.search).has('uiPrototype')) {
         game,
         canvas: document.getElementById('pixi-view'),
         // The offline crop rule, so browser tests can re-check the manifest.
+        paintedRegions,
         scanPaintedCrop,
       };
     })

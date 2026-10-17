@@ -11,21 +11,37 @@ export interface CropRect {
 const ALPHA_THRESHOLD = 3;
 const PADDING = 2;
 
+/** A decoded sheet: unpremultiplied RGBA, row-major, as in `ImageData`. */
+export interface SheetPixels {
+  data: ArrayLike<number>;
+  width: number;
+  height: number;
+}
+
+/** Every authored sprite region in a manifest, named by its JSON path. */
+export function* paintedRegions(value: unknown, name = ''): Generator<[string, CropRect]> {
+  if (Array.isArray(value)) {
+    for (const [index, item] of value.entries()) yield* paintedRegions(item, name + '.' + index);
+  } else if (value && typeof value === 'object') {
+    const region = value as Partial<CropRect> & { sheet?: unknown };
+    if (typeof region.sheet === 'string' && Number.isInteger(region.w))
+      yield [name.slice(1), region as CropRect];
+    else
+      for (const [key, item] of Object.entries(value))
+        yield* paintedRegions(item, name + '.' + key);
+  }
+}
+
 /**
  * The art pack's crop rule: the visible bounds of an authored region plus two
- * pixels of padding, clamped to the region. `rgba` is the whole sheet,
- * unpremultiplied, row-major. `scripts/crop-pack.mjs` writes the result into the
- * manifest; the runtime only reads it.
+ * pixels of padding, clamped to the region. `scripts/crop-pack.mjs` writes the
+ * result into the manifest; the runtime only reads it.
  */
-export function scanPaintedCrop(
-  rgba: ArrayLike<number>,
-  sheetWidth: number,
-  sheetHeight: number,
-  region: CropRect,
-): CropRect {
+export function scanPaintedCrop(sheet: SheetPixels, region: CropRect): CropRect {
+  const { data: rgba, width: sheetWidth } = sheet;
   const right = region.x + region.w;
   const bottom = region.y + region.h;
-  if (right > sheetWidth || bottom > sheetHeight || region.w <= 0 || region.h <= 0)
+  if (right > sheet.width || bottom > sheet.height || region.w <= 0 || region.h <= 0)
     throw new Error('Artwork crop exceeds its sheet.');
   let left = right;
   let top = bottom;

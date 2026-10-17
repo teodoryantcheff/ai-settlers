@@ -15,12 +15,15 @@ test('the crop keeps visible pixels plus two pixels of transparent padding', () 
     [20, 15, 4],
     [25, 5, 3], // at or below the threshold counts as empty padding
   ]);
-  assert.deepEqual(scanPaintedCrop(rgba, 40, 30, { x: 5, y: 2, w: 30, h: 25 }), {
-    x: 10,
-    y: 7,
-    w: 13,
-    h: 11,
-  });
+  assert.deepEqual(
+    scanPaintedCrop({ data: rgba, width: 40, height: 30 }, { x: 5, y: 2, w: 30, h: 25 }),
+    {
+      x: 10,
+      y: 7,
+      w: 13,
+      h: 11,
+    },
+  );
 });
 
 test('padding is clamped to the authored region', () => {
@@ -28,22 +31,25 @@ test('padding is clamped to the authored region', () => {
     [4, 4, 255],
     [10, 11, 255],
   ]);
-  assert.deepEqual(scanPaintedCrop(rgba, 20, 20, { x: 3, y: 4, w: 9, h: 9 }), {
-    x: 3,
-    y: 4,
-    w: 9,
-    h: 9,
-  });
+  assert.deepEqual(
+    scanPaintedCrop({ data: rgba, width: 20, height: 20 }, { x: 3, y: 4, w: 9, h: 9 }),
+    {
+      x: 3,
+      y: 4,
+      w: 9,
+      h: 9,
+    },
+  );
 });
 
 test('regions outside the sheet, empty art and opaque backgrounds are rejected', () => {
   const rgba = sheet(10, 10, [[5, 5, 255]]);
   assert.throws(
-    () => scanPaintedCrop(rgba, 10, 10, { x: 2, y: 2, w: 9, h: 4 }),
+    () => scanPaintedCrop({ data: rgba, width: 10, height: 10 }, { x: 2, y: 2, w: 9, h: 4 }),
     /Artwork crop exceeds its sheet/,
   );
   assert.throws(
-    () => scanPaintedCrop(rgba, 10, 10, { x: 0, y: 0, w: 4, h: 4 }),
+    () => scanPaintedCrop({ data: rgba, width: 10, height: 10 }, { x: 0, y: 0, w: 4, h: 4 }),
     /no visible pixels/,
   );
   const opaque = sheet(
@@ -52,7 +58,7 @@ test('regions outside the sheet, empty art and opaque backgrounds are rejected',
     Array.from({ length: 16 }, (_, i) => [i % 4, i >> 2, 255]),
   );
   assert.throws(
-    () => scanPaintedCrop(opaque, 4, 4, { x: 0, y: 0, w: 4, h: 4 }),
+    () => scanPaintedCrop({ data: opaque, width: 4, height: 4 }, { x: 0, y: 0, w: 4, h: 4 }),
     /requires a transparent background/,
   );
 });

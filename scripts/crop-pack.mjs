@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inflateSync } from 'node:zlib';
-import { scanPaintedCrop } from '../src/rendering/painted-crop.ts';
+import { paintedRegions, scanPaintedCrop } from '../src/rendering/painted-crop.ts';
 
 const root = path.resolve(import.meta.dirname, '..');
 
@@ -16,7 +16,7 @@ export function decodeRGBA(buffer, name = 'image') {
   let offset = 8;
   let width = 0;
   let height = 0;
-  const data = [];
+  const compressed = [];
   while (offset < buffer.length) {
     const length = buffer.readUInt32BE(offset);
     const type = buffer.toString('latin1', offset + 4, offset + 8);
@@ -27,21 +27,21 @@ export function decodeRGBA(buffer, name = 'image') {
       const [depth, color, , , interlace] = body.subarray(8, 13);
       if (depth !== 8 || color !== 6 || interlace !== 0)
         throw new Error(name + ' must be a non-interlaced 8-bit RGBA PNG.');
-    } else if (type === 'IDAT') data.push(body);
+    } else if (type === 'IDAT') compressed.push(body);
     else if (type === 'IEND') break;
     offset += length + 12;
   }
-  const raw = inflateSync(Buffer.concat(data));
+  const raw = inflateSync(Buffer.concat(compressed));
   const stride = width * 4;
-  const rgba = new Uint8Array(stride * height);
+  const data = new Uint8Array(stride * height);
   for (let y = 0; y < height; y++) {
     const filter = raw[y * (stride + 1)];
     const source = y * (stride + 1) + 1;
     const row = y * stride;
     for (let i = 0; i < stride; i++) {
-      const a = i >= 4 ? rgba[row + i - 4] : 0;
-      const b = y ? rgba[row - stride + i] : 0;
-      const c = y && i >= 4 ? rgba[row - stride + i - 4] : 0;
+      const a = i >= 4 ? data[row + i - 4] : 0;
+      const b = y ? data[row - stride + i] : 0;
+      const c = y && i >= 4 ? data[row - stride + i - 4] : 0;
       let predictor = 0;
       if (filter === 1) predictor = a;
       else if (filter === 2) predictor = b;
@@ -53,20 +53,10 @@ export function decodeRGBA(buffer, name = 'image') {
         const pc = Math.abs(p - c);
         predictor = pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
       } else if (filter !== 0) throw new Error(name + ' has an unknown PNG filter.');
-      rgba[row + i] = (raw[source + i] + predictor) & 255;
+      data[row + i] = (raw[source + i] + predictor) & 255;
     }
   }
-  return { width, height, rgba };
-}
-
-/** Every authored sprite region in the manifest, named by its JSON path. */
-function* regions(value, name = '') {
-  if (Array.isArray(value)) {
-    for (const [index, item] of value.entries()) yield* regions(item, name + '.' + index);
-  } else if (value && typeof value === 'object') {
-    if (typeof value.sheet === 'string' && Number.isInteger(value.w)) yield [name.slice(1), value];
-    else for (const [key, item] of Object.entries(value)) yield* regions(item, name + '.' + key);
-  }
+  return { data, width, height };
 }
 
 /**
@@ -77,7 +67,7 @@ export async function cropPack(directory = path.join(root, 'assets/art')) {
   const file = path.join(directory, 'manifest.json');
   const manifest = JSON.parse(await fs.readFile(file, 'utf8'));
   const sheets = new Map();
-  for (const [name, region] of regions(manifest)) {
+  for (const [name, region] of paintedRegions(manifest)) {
     const sheetFile = manifest.sheets?.[region.sheet];
     if (typeof sheetFile !== 'string') throw new Error(name + ': unknown sheet ' + region.sheet);
     if (!sheets.has(sheetFile))
@@ -87,7 +77,7 @@ export async function cropPack(directory = path.join(root, 'assets/art')) {
       );
     const sheet = sheets.get(sheetFile);
     try {
-      region.crop = scanPaintedCrop(sheet.rgba, sheet.width, sheet.height, region);
+      region.crop = scanPaintedCrop(sheet, region);
     } catch (error) {
       throw new Error(name + ': ' + error.message, { cause: error });
     }

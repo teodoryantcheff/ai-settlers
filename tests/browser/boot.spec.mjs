@@ -29,7 +29,7 @@ test('manifest crops match a full alpha scan of the browser-decoded sheets', asy
   await page.goto('/tests/game.html?seed=2024');
   await page.waitForFunction(() => window.productionArtPreview?.scanPaintedCrop);
   const scan = await page.evaluate(async () => {
-    const { scanPaintedCrop } = window.productionArtPreview;
+    const { paintedRegions, scanPaintedCrop } = window.productionArtPreview;
     const base = new URL('../assets/art/', location.href);
     const manifest = await (await fetch(new URL('manifest.json', base))).json();
     const pixels = new Map();
@@ -47,24 +47,15 @@ test('manifest crops match a full alpha scan of the browser-decoded sheets', asy
       }
       return pixels.get(name);
     }
-    const regions = [
-      ...Object.entries(manifest.buildings),
-      ['site', manifest.site],
-      ...manifest.trees.map((region, index) => ['tree ' + index, region]),
-      ...manifest.rocks.map((region, index) => ['rock ' + index, region]),
-      ...manifest.mountains.dry.map((region, index) => ['dry mountain ' + index, region]),
-      ...manifest.mountains.snowy.map((region, index) => ['snowy mountain ' + index, region]),
-      ['mountain foothill', manifest.mountains.foothill],
-    ];
+    const regions = [...paintedRegions(manifest)];
     const mismatches = [];
     for (const [name, region] of regions) {
-      const { data, width, height } = await sheet(region.sheet);
-      const scanned = scanPaintedCrop(data, width, height, region);
+      const scanned = scanPaintedCrop(await sheet(region.sheet), region);
       if (JSON.stringify(scanned) !== JSON.stringify(region.crop))
         mismatches.push({ name, manifest: region.crop, scanned });
     }
     return { regions: regions.length, mismatches };
   });
-  // Stale crops mean the pack changed without `node scripts/crop-pack.mjs`.
+  // Stale crops mean the pack changed without `npm run crop:art`.
   expect(scan).toEqual({ regions: 34, mismatches: [] });
 });

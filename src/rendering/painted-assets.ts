@@ -59,7 +59,7 @@ export function validatePaintedManifest(input: unknown): PaintedManifest {
   const manifest = input as PaintedManifest;
   if (!manifest || manifest.version !== 1 || !manifest.sheets || !manifest.buildings)
     throw new Error('Unsupported painted artwork manifest.');
-  const rect = (value: CropRect | undefined): value is CropRect =>
+  const isRect = (value: CropRect | undefined): value is CropRect =>
     !!value &&
     [value.x, value.y, value.w, value.h].every(Number.isInteger) &&
     value.x >= 0 &&
@@ -71,8 +71,8 @@ export function validatePaintedManifest(input: unknown): PaintedManifest {
     if (
       !value ||
       !manifest.sheets[value.sheet] ||
-      !rect(value) ||
-      !rect(crop) ||
+      !isRect(value) ||
+      !isRect(crop) ||
       crop.x < value.x ||
       crop.y < value.y ||
       crop.x + crop.w > value.x + value.w ||
@@ -161,8 +161,9 @@ function loadImage(url: URL): Promise<HTMLImageElement> {
 }
 
 /** Copy the manifest's precomputed crop; the pixel scan runs offline. */
-function cropRegion(image: HTMLImageElement, { crop }: PaintedRegion): HTMLCanvasElement {
-  if (crop.x + crop.w > image.naturalWidth || crop.y + crop.h > image.naturalHeight)
+function cropRegion(image: HTMLImageElement, region: PaintedRegion): HTMLCanvasElement {
+  const { crop } = region;
+  if (region.x + region.w > image.naturalWidth || region.y + region.h > image.naturalHeight)
     throw new Error('Artwork crop exceeds its sheet.');
   const canvas = makeCanvas(crop.w, crop.h);
   canvasContext(canvas).drawImage(image, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h);
