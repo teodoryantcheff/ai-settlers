@@ -122,7 +122,7 @@ test('Advisor keeps live action focus, and V respects native input and blocking 
   await page.waitForTimeout(300);
   await page.evaluate((id) => {
     const g = window.productionArtPreview.game;
-    g.anyStorage().stock.iron = 1;
+    g.anyStorage().stock.iron_bars = 1;
     g.hudTick();
   }, id);
   await expect(advice).toBeFocused();
