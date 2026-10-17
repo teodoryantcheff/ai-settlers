@@ -48,23 +48,6 @@ function observe(game) {
   };
 }
 
-test('legacy armory readiness, status and persistent notice request iron ore', () => {
-  const { game, b, hooks } = colony('armory', { coal: 1 }, true);
-  hooks.bTick(b, 0.25);
-  assert.equal(b.blockedReason, 'inputs');
-  assert.match(
-    game
-      .buildingStatus(b)
-      .lines.map((line) => line.t)
-      .join('\n'),
-    /no iron ore/,
-  );
-  const feedback = observe(game);
-  feedback.advance(12_000);
-  assert.equal(feedback.notices.length, 1);
-  assert.match(feedback.notices[0].message, /blocked — needs iron ore$/);
-});
-
 test('both armory recipes report each missing ingredient and run when supplied', () => {
   for (const legacy of [true, false]) {
     const metal = legacy ? 'iron' : 'iron_bars';
@@ -80,10 +63,10 @@ test('both armory recipes report each missing ingredient and run when supplied',
       const feedback = observe(game);
       feedback.advance(12_000);
       if (missing) {
+        const name = missing === metal ? metalName : 'coal';
+        assert.match(status.lines.map((line) => line.t).join('\n'), new RegExp('no ' + name));
         assert.equal(feedback.notices.length, 1);
-        assert.ok(
-          feedback.notices[0].message.endsWith('needs ' + (missing === metal ? metalName : 'coal')),
-        );
+        assert.ok(feedback.notices[0].message.endsWith('blocked — needs ' + name));
       } else {
         assert.deepEqual(feedback.notices, []);
         b.timer = 0;
