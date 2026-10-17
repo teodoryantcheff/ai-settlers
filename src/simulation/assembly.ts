@@ -75,8 +75,6 @@ export const DOMAIN_SUBSYSTEMS = [
   domainSubsystem('startup', (game) => createEngineStartup(game)),
 ] as const;
 
-export type DomainSubsystemName = (typeof DOMAIN_SUBSYSTEMS)[number]['name'];
-
 function domainSubsystem<Name extends string, Hooks extends object = never>(
   name: Name,
   create: (game: SimulationEngine, options: EngineOptions, hooks?: Hooks) => object,

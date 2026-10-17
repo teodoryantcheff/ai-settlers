@@ -55,7 +55,6 @@ export interface AudioInternals {
   readonly gSfx: GainNode | undefined;
   readonly industrialVoices: IndustrialVoice[];
   musicBar: number;
-  readonly musicSchedule: number;
 }
 
 export interface SoundCatalog {

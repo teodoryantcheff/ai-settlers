@@ -2778,7 +2778,6 @@ export function createRenderer(
   if (internals) {
     Object.assign(internals, {
       paintTileFull,
-      drawStatic,
       drawBorders,
       drawMiniStatic,
       buildingContour,
@@ -3080,7 +3079,6 @@ export const UNLIT_AT_NIGHT: ReadonlySet<BuildingType> = new Set<BuildingType>([
 export interface RendererInternals {
   shadowCache: ReturnType<typeof createShadowCache>;
   paintTileFull: (g: CanvasRenderingContext2D, i: number) => void;
-  drawStatic: () => void;
   drawBorders: (full?: boolean) => void;
   drawMiniStatic: () => void;
   buildingContour: (img: Sprite) => HTMLCanvasElement;

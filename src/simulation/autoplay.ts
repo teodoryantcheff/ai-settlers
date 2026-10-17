@@ -565,7 +565,6 @@ export function createAutoplay(
       afford,
       mineDeficits,
       findSpot,
-      clearNeighbor,
       buildCorridor,
       isFaceTile,
       spotOnCorridor,
@@ -591,7 +590,6 @@ export interface AutoplayInternals {
   afford: (bt: BuildingType) => boolean;
   mineDeficits: () => DepositKind[];
   findSpot: (bt: BuildingType, want?: DepositKind[] | null) => [number, number] | null;
-  clearNeighbor: (b: Building) => TilePoint | null;
   buildCorridor: (want: DepositKind[]) => number[] | null;
   isFaceTile: (x: number, y: number, want?: DepositKind[] | null) => boolean;
   spotOnCorridor: (cor: number[] | null, want: DepositKind[]) => [number, number] | null;

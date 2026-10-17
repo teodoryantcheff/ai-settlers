@@ -2,7 +2,7 @@ import { requireElement } from './dom.ts';
 import { requireCanvas2D } from '../rendering/canvas-context.ts';
 import { html as markup, trusted, escapeMarkup, formatGoods } from './markup.ts';
 import { createLiveReportUpdater } from './live-report.ts';
-import { createInspectorView, type InspectorInternals } from './inspector-view.ts';
+import { createInspectorView } from './inspector-view.ts';
 import { createPlacementFeedback } from './placement-feedback.ts';
 import { createTransientHelp } from './transient-help.ts';
 import { createMapControls } from './map-controls.ts';
@@ -52,7 +52,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     miniDown = false;
   });
   const placementFeedback = createPlacementFeedback(game);
-  const inspector = createInspectorView(game, placementFeedback, internals);
+  const inspector = createInspectorView(game, placementFeedback);
   const { updateInfo, tileInfo } = inspector;
   function observedFlows(record: Inventory, elapsed: number, allowed?: Inventory) {
     return formatGoods(game.GOODS, record, {
@@ -1188,23 +1188,11 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
   // Test-only view of closure internals; never merged into the runtime.
   if (internals) {
     Object.assign(internals, {
-      observedFlows,
       escapeMarkup,
-      costStr,
-      refreshPalette,
-      selectAt,
-      setPaletteExpanded,
-      applyPresentationPrefs,
-      savePrefsSoon,
       savePrefs,
       toggleMute,
       toggleMusic,
-      toggleHelp,
-      toggleAdv,
       toggleAdvisorDetails,
-      toggleAuto,
-      openPanel,
-      volLbl,
     });
     Object.defineProperties(internals, {
       pan: {
@@ -1311,24 +1299,12 @@ export interface HudSubsystem {
 }
 
 /** Test-only view of closure internals; never merged into the runtime. */
-export interface HudInternals extends InspectorInternals {
-  observedFlows: (record: Inventory, elapsed: number, allowed?: Inventory) => string;
+export interface HudInternals {
   escapeMarkup: (text: string) => string;
-  costStr: (type: BuildingType | 'road' | 'demolish') => string;
-  refreshPalette: () => void;
-  selectAt: (ht: TilePoint) => void;
-  setPaletteExpanded: (expanded: boolean) => void;
-  applyPresentationPrefs: () => void;
-  savePrefsSoon: () => void;
   savePrefs: () => boolean;
   toggleMute: () => void;
   toggleMusic: () => void;
-  toggleHelp: () => void;
-  toggleAdv: () => void;
   toggleAdvisorDetails: () => void;
-  toggleAuto: () => void;
-  openPanel: (id: string) => void;
-  volLbl: (id: string, v: number) => void;
   readonly pan: PanDrag | null;
   readonly miniDown: boolean;
 }

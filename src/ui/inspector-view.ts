@@ -12,11 +12,7 @@ import { buildingPurposes as buildingHelp } from './catalog-view.ts';
 import { observePresentation } from './domain-feedback.ts';
 
 /** Owns inspector evidence, mounted controls, refresh and native interaction retention. */
-export function createInspectorView(
-  game: GameRuntime,
-  feedback: PlacementFeedback,
-  internals?: InspectorInternals,
-) {
+export function createInspectorView(game: GameRuntime, feedback: PlacementFeedback) {
   let productionRateWindow: ProductionRateWindow = 30;
   let inspectorKey = '';
   let illustratedType = '';
@@ -466,22 +462,7 @@ export function createInspectorView(
     infoBody.innerHTML = '';
   }
   observePresentation(game, 'worldLoaded', reset);
-  if (internals) {
-    Object.assign(internals, { observedProduction, updateDzBtn });
-    Object.defineProperty(internals, 'productionRateWindow', {
-      get: () => productionRateWindow,
-      set: (value: ProductionRateWindow) => {
-        productionRateWindow = value;
-      },
-      enumerable: true,
-    });
-  }
   return { updateInfo, request, tick, tileInfo };
 }
 
 /** Test-only inspector state; kept out of the runtime surface. */
-export interface InspectorInternals {
-  observedProduction: (b: Building) => string;
-  updateDzBtn: () => void;
-  productionRateWindow: ProductionRateWindow;
-}

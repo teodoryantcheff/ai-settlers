@@ -543,7 +543,6 @@ export function createMusic(game: GameRuntime, runtime: AudioRuntime, internals?
         },
         enumerable: true,
       },
-      musicSchedule: { get: () => musicSchedule, enumerable: true },
     });
   }
   return {

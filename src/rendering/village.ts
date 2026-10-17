@@ -711,7 +711,6 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
       villageStockPlan,
       drawVillageStock,
       villageConstructionStage,
-      villageSite,
     });
     Object.defineProperties(internals, {
       villageSites: {
@@ -747,6 +746,5 @@ export interface VillageInternals {
   villageStockPlan: (b: Building) => VillageStockSlot[];
   drawVillageStock: (s: SceneLayer, b: Building) => void;
   villageConstructionStage: (progress: number) => number;
-  villageSite: (type: BuildingType, stage: number) => Sprite;
   villageSites: Record<string, Sprite>;
 }

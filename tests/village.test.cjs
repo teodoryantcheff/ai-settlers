@@ -46,7 +46,6 @@ function village() {
       TESTMODE: false,
       presentationPrefs: { reducedMotion: false, weather: true, quality: 1, overlay: 'none' },
       bStatus: () => ({ bad: false }),
-      foodSaturated: () => false,
       refreshGhost: noop,
       rebuildHighlights: noop,
       ART: { bld: {}, site: null, anchors: {}, cargo: {}, blade: 'blade' },

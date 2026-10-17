@@ -201,15 +201,8 @@ export function createEconomy(
     for (let i = 0; i < ss.length; i++) target += Math.max(0, ((ss[i].targets || {})[g] ?? 0) | 0);
     return target;
   }
-  function foodSaturated(good?: Good) {
-    if (good) return totalGood(good) >= Math.max(6 + 2 * liveMines(), stockTargetTotal(good));
-    return (
-      edibleGoods.reduce((n, g) => n + totalGood(g), 0) >=
-      Math.max(
-        10 + 3 * liveMines(),
-        edibleGoods.reduce((n, g) => n + stockTargetTotal(g), 0),
-      )
-    );
+  function foodSaturated(good: Good) {
+    return totalGood(good) >= Math.max(6 + 2 * liveMines(), stockTargetTotal(good));
   }
   function intermediateSaturated(good: Good) {
     const reserve = intermediateReserves[good] || 0;
@@ -1019,7 +1012,7 @@ export function createEconomy(
           b.blockedReason = 'resources';
           break;
         }
-        if (foodSaturated(sp.out)) {
+        if (foodSaturated('fish')) {
           b.timer = 6;
           break;
         }
@@ -2013,7 +2006,7 @@ export function createEconomy(
       }
       case 'fish':
         lines.push({
-          t: foodSaturated(sp.out)
+          t: foodSaturated('fish')
             ? 'Food stocks are plentiful \u2014 production paused'
             : 'Fishing \u2014 never runs out',
           w: false,
@@ -2146,7 +2139,6 @@ export function createEconomy(
     nearestStoragePos,
     totalGood,
     stockTargetTotal,
-    foodSaturated,
     carrierCap,
     newBuilding,
     siteReady,
@@ -2224,7 +2216,6 @@ export interface EconomySubsystem {
   nearestStoragePos: (x: number, y: number) => Building | null;
   totalGood: (g: Good) => number;
   stockTargetTotal: (g: Good) => number;
-  foodSaturated: (good?: Good) => boolean;
   carrierCap: () => number;
   newBuilding: (type: BuildingType, x: number, y: number) => Building;
   siteReady: (b: Building) => boolean;
