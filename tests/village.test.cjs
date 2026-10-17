@@ -60,11 +60,12 @@ function village() {
       foodSaturated: () => false,
       refreshGhost: noop,
       rebuildHighlights: noop,
-      ART: { bld: {}, bld2: {}, anchors: {}, cargo: {}, blade: 'blade' },
+      ART: { bld: {}, site: null, anchors: {}, cargo: {}, blade: 'blade' },
     },
   });
   for (const type of Object.keys(e.BSPEC))
     e.ART.bld[type] = { img: canvas(108, 132), w: 36, h: 44, ox: -6, oy: -20 };
+  e.ART.site = { img: canvas(102, 114), w: 34, h: 38, ox: -5, oy: -14 };
   for (const good of Object.keys(e.GOODS)) e.ART.cargo[good] = 'cargo:' + good;
   e.tiles = Array.from({ length: e.W * e.H }, () => ({
     t: e.GRASS,
@@ -142,7 +143,8 @@ test('construction uses whole foundation, frame, wall and roof stages with bound
   assert.equal(images[3], e.ART.bld.warehouse.img);
   for (let progress = 0; progress < 0.74; progress += 0.001)
     e.drawVillageConstruction(e.context, b, progress);
-  assert.equal(Object.keys(e.villageSites).length, 3);
+  // Foundation and walls are generated; the frame stage is the painted site.
+  assert.equal(Object.keys(e.villageSites).length, 2);
 });
 
 test('work motion advances gently at 8x and freezes through pause and Reduced Motion', () => {
@@ -237,7 +239,6 @@ test('painted construction frames use the installed site entrance anchor', () =>
   const e = village();
   const b = e.newBuilding('warehouse', 48, 48);
   const image = { painted: true };
-  e.ART.paintedStatus = { state: 'loaded' };
   e.ART.site = { img: image, w: 34, h: 38, ox: -5, oy: -14 };
   e.drawVillageConstruction(e.context, b, 0.25);
   const draw = e.calls.find((call) => call.method === 'drawImage' && call.args[0] === image);

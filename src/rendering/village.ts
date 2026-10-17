@@ -537,8 +537,7 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
     return progress < 0.18 ? 0 : progress < 0.44 ? 1 : progress < 0.74 ? 2 : 3;
   }
   function villageSite(type: BuildingType, stage: number): Sprite {
-    if (stage === 1 && game.ART.paintedStatus?.state === 'loaded' && game.ART.site)
-      return game.ART.site;
+    if (stage === 1) return game.ART.site;
     const key = type + ':' + stage;
     if (villageSites[key]) return villageSites[key];
     const art = game.ART.bld[type];

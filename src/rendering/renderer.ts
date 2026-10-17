@@ -560,8 +560,7 @@ export function createRenderer(
 
   // ---------- objects ----------
   function bldImg(b: Building): Sprite {
-    const variant = game.ART.bld2[b.type];
-    const image = variant && ((b.id * 2654435761) >>> 0) % 2 ? variant : game.ART.bld[b.type];
+    const image = game.ART.bld[b.type];
     if (!image) throw new Error('Missing building artwork: ' + b.type);
     return image;
   }

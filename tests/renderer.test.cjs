@@ -86,7 +86,8 @@ function renderer(options = {}) {
       rr: noop,
       rgba: (color, alpha) => color + ':' + alpha,
       ART: {
-        grass: ['g0', 'g1', 'g2', 'g3'],
+        paintedTerrain: { image: { width: 384, height: 384 }, worldSize: 384 },
+        paintedMountains: { dry: [], snowy: [], foothill: { width: 120, height: 60 } },
       },
       presentationPrefs: {
         reducedMotion: false,

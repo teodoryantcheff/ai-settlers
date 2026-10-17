@@ -440,26 +440,20 @@ test('actual frame loop shows restrained economic transitions at 8x even when mu
   expect(errors).toEqual([]);
 });
 
-test('failed artwork sheet preserves a usable native renderer and shows fallback', async ({
-  page,
-}) => {
+test('a failed artwork sheet stops boot with a reload prompt and no colony', async ({ page }) => {
   const errors = captureErrors(page);
+  await page.addInitScript(() => localStorage.setItem('recovery-sentinel', 'keep'));
   await page.route('**/assets/art/foliage.png', (route) =>
     route.fulfill({ status: 404, body: 'Artwork unavailable' }),
   );
-  await frozenGame(page);
-  await expect(page.locator('#painted-art-status')).toContainText('Standard artwork is active');
-  const result = await page.evaluate(() => ({
-    status: window.productionArtPreview.game.ART.paintedStatus.state,
-    terrain: Boolean(window.productionArtPreview.game.ART.paintedTerrain),
-    buildingTypes: Object.keys(window.productionArtPreview.game.ART.bld).length,
-    renderer: window.productionRendererStats,
-  }));
-  expect(result.status).toBe('fallback');
-  expect(result.terrain).toBe(false);
-  expect(result.buildingTypes).toBe(22);
-  expect(result.renderer.backend).toBe('PixiJS WebGL');
-  expect(result.renderer.nativeSprites).toBeGreaterThan(0);
+  await page.goto('/tests/game.html?seed=2024');
+  await expect(page.locator('#boot')).toHaveAttribute('role', 'alert');
+  await expect(page.locator('#boot-stage')).toContainText('Painted artwork could not load');
+  await expect(page.locator('#boot-stage')).toContainText('foliage.png');
+  await expect(page.locator('#boot-reload')).toBeVisible();
+  await expect(page.locator('#pixi-view')).toHaveCount(0);
+  expect(await page.evaluate(() => Boolean(window.productionArtPreview?.game))).toBe(false);
+  expect(await page.evaluate(() => localStorage.getItem('recovery-sentinel'))).toBe('keep');
   expect(errors).toEqual([]);
 });
 

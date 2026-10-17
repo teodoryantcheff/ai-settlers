@@ -6,6 +6,8 @@ const { createGame, fakeWindow, installGlobals, pinClock } = require('./helpers/
 // Wall-clock reads inside the simulation stay deterministic.
 pinClock(0);
 
+const mountain = { width: 120, height: 120 };
+
 function landscape() {
   const calls = [];
   const noop = () => {};
@@ -33,7 +35,14 @@ function landscape() {
     presentation: { available: true, invalidate: noop, begin: noop, layer: noop, end: noop },
     stubs: {
       Acan: canvas,
-      ART: { grass: ['g0', 'g1', 'g2', 'g3'], sand: ['s0', 's1', 's2'], water: ['w0', 'w1'] },
+      ART: {
+        paintedTerrain: { image: { width: 384, height: 384 }, worldSize: 384 },
+        paintedMountains: {
+          dry: [mountain, mountain, mountain],
+          snowy: [mountain, mountain],
+          foothill: mountain,
+        },
+      },
       rgba: (color, alpha) => color + ':' + alpha,
       buildingAt: () => null,
     },
@@ -67,23 +76,6 @@ test('cosmetic landscape painting is deterministic and leaves simulation RNG unt
   assert.equal(JSON.stringify(e.calls), first);
   assert.equal(rolls, 0);
   assert.equal(e.tiles[i].deposit.amt, 180);
-});
-
-test('mountain interiors connect without cliff edges and rim endpoints agree across tiles', () => {
-  const e = landscape();
-  for (let y = 9; y <= 11; y++) for (let x = 9; x <= 12; x++) e.tiles[e.idx(x, y)].t = e.MTN;
-  const interior = e.mountainContour(10, 10);
-  assert.deepEqual(Array.from(interior.exposed), [false, false, false, false]);
-  assert.deepEqual(Array.from(interior.points[0]), [0, 0]);
-  assert.deepEqual(Array.from(interior.points[4]), [24, 24]);
-  const left = e.mountainContour(10, 9);
-  const right = e.mountainContour(11, 9);
-  assert.equal(left.points[2][1], right.points[0][1]);
-  assert.equal(left.points[2][0], 24);
-  assert.equal(right.points[0][0], 0);
-  const lowLeft = e.mountainContour(10, 11);
-  const lowRight = e.mountainContour(11, 11);
-  assert.equal(lowLeft.points[4][1], lowRight.points[6][1]);
 });
 
 test('roads join adjacent roads and building entrances without wrapping map edges', () => {
@@ -154,24 +146,18 @@ test('large crags share cached world geometry across tiles and rebuild for impor
   const first = cache.perTile[e.idx(22, 22)][0];
   const entries = cache.perTile.filter((items) => items && items.includes(first));
   assert.ok(entries.length >= 9);
-  assert.ok(first.right[0] - first.left[0] > 2 * e.TS);
+  assert.ok(first.radius * 2 > 2 * e.TS);
   e.prepareLandscapeCrags();
   assert.equal(e.landscapeCragMap, cache);
   e.tiles = e.tiles.map((tile) => ({ ...tile }));
   e.prepareLandscapeCrags();
   assert.notEqual(e.landscapeCragMap, cache);
-  assert.deepEqual(
-    Array.from(e.landscapeCragMap.perTile[e.idx(22, 22)][0].peak),
-    Array.from(first.peak),
-  );
+  assert.deepEqual(e.landscapeCragMap.perTile[e.idx(22, 22)][0], first);
   const imported = e.landscapeCragMap;
   e.seed = 17;
   e.prepareLandscapeCrags();
   assert.notEqual(e.landscapeCragMap, imported);
-  assert.notDeepEqual(
-    Array.from(e.landscapeCragMap.perTile[e.idx(22, 22)][0].peak),
-    Array.from(first.peak),
-  );
+  assert.notEqual(e.landscapeCragMap.perTile[e.idx(22, 22)][0].hash, first.hash);
 });
 
 test('snow is limited to tall peaks while overlapping mountain faces retain world depth order', () => {
@@ -195,22 +181,22 @@ test('snow is limited to tall peaks while overlapping mountain faces retain worl
   assert.ok(e.landscapeCragMap.perTile[e.idx(80, 80)].every((feature) => !feature.snow));
   for (const overlapping of e.landscapeCragMap.perTile.filter(Boolean)) {
     for (let i = 1; i < overlapping.length; i++) {
-      assert.ok(overlapping[i - 1].foot[1] <= overlapping[i].foot[1]);
+      assert.ok(overlapping[i - 1].artFoot[1] <= overlapping[i].artFoot[1]);
     }
   }
 });
 
-test('sparse mountains cache their grassy aprons below the granite feet', () => {
+test('sparse mountains cache every tile down to the painted foothill base', () => {
   const e = landscape();
   for (let y = 8; y < 88; y += 8) for (let x = 8; x < 88; x += 8) e.tiles[e.idx(x, y)].t = e.MTN;
   e.prepareLandscapeCrags();
   const features = [...new Set(e.landscapeCragMap.perTile.flat().filter(Boolean))];
   for (const feature of features) {
-    const apronTile = e.idx(
-      Math.floor(feature.foot[0] / e.TS),
-      Math.floor((feature.foot[1] + 16) / e.TS),
+    const baseTile = e.idx(
+      Math.floor(feature.artFoot[0] / e.TS),
+      Math.floor((feature.artFoot[1] + 4) / e.TS),
     );
-    assert.ok(e.landscapeCragMap.perTile[apronTile]?.includes(feature));
+    assert.ok(e.landscapeCragMap.perTile[baseTile]?.includes(feature));
   }
 });
 
@@ -250,7 +236,7 @@ test('water banks repaint deterministically without consuming gameplay RNG or ch
   assert.equal(JSON.stringify(e.calls), first);
   assert.equal(JSON.stringify(e.tiles), before);
   assert.ok(
-    !e.calls.some((c) => c.key === 'drawImage' && ['w0', 'w1'].includes(c.args[0])),
-    'water no longer stamps alternating tile textures',
+    !e.calls.some((c) => c.key === 'drawImage'),
+    'water is painted from world-space washes, never stamped tile textures',
   );
 });

@@ -233,20 +233,20 @@ export interface Sprite {
   ox: number;
   oy: number;
 }
+/** Generated settler/effect textures plus the painted pack installed before play.
+ * Buildings, site, trees, rocks, meadow and mountains exist only once installed. */
 export interface ArtAtlas {
-  grass: HTMLCanvasElement[];
   road: HTMLCanvasElement;
   tree: HTMLCanvasElement[][][];
   rock: HTMLCanvasElement[];
-  paintedTerrain?: { image: HTMLCanvasElement | HTMLImageElement; worldSize: number };
-  paintedMountains?: {
+  paintedTerrain: { image: HTMLCanvasElement | HTMLImageElement; worldSize: number };
+  paintedMountains: {
     dry: HTMLCanvasElement[];
     snowy: HTMLCanvasElement[];
     foothill: HTMLCanvasElement;
   };
-  paintedStatus?: { state: 'loading' | 'loaded' | 'fallback'; message: string };
+  paintedStatus?: { state: 'loading' | 'loaded' | 'failed'; message: string };
   bld: Partial<Record<BuildingType, Sprite>>;
-  bld2: Partial<Record<BuildingType, Sprite>>;
   site: Sprite;
   blade: HTMLCanvasElement;
   unitDirections: Partial<
