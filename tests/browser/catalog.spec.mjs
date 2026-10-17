@@ -1,14 +1,4 @@
 import { test, expect } from './helpers/test.mjs';
-test.use({
-  launchOptions: {
-    args: [
-      '--enable-webgl',
-      '--use-angle=swiftshader',
-      '--enable-unsafe-swiftshader',
-      '--disable-accelerated-2d-canvas',
-    ],
-  },
-});
 test.setTimeout(120000);
 async function boot(page, manualFrames = false) {
   if (manualFrames)

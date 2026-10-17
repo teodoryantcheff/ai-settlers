@@ -74,7 +74,7 @@ const mcr = new CoverageReport({
   logging: 'error',
   all: {
     dir: ['./src'],
-    filter: (file) => file.endsWith('.ts') &&isRuntimeSource(file) && 'js',
+    filter: (file) => file.endsWith('.ts') && isRuntimeSource(file) && 'js',
     transformer: (entry) => {
       entry.source = stripTypeScriptTypes(entry.source);
     },

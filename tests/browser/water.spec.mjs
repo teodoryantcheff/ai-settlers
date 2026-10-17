@@ -1,15 +1,5 @@
 import { test, expect } from './helpers/test.mjs';
-test.use({
-  launchOptions: {
-    args: [
-      '--enable-webgl',
-      '--use-angle=swiftshader',
-      '--enable-unsafe-swiftshader',
-      '--disable-accelerated-2d-canvas',
-    ],
-  },
-  viewport: { width: 1200, height: 850 },
-});
+test.use({ viewport: { width: 1200, height: 850 } });
 test.setTimeout(60000);
 
 test('painted water keeps the shoreline and simulation stable across motion and quality settings', async ({

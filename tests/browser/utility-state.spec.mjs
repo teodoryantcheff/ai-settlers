@@ -1,14 +1,4 @@
 import { test, expect } from './helpers/test.mjs';
-test.use({
-  launchOptions: {
-    args: [
-      '--enable-webgl',
-      '--use-angle=swiftshader',
-      '--enable-unsafe-swiftshader',
-      '--disable-accelerated-2d-canvas',
-    ],
-  },
-});
 test.setTimeout(90000);
 const stateLine = (page, root) =>
   page.locator(root).getByRole('status', { name: 'Simulation state' });

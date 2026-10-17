@@ -1,17 +1,5 @@
 import { test, expect } from './helpers/test.mjs';
 
-// Exercise a real WebGL renderer on machines without a physical display/GPU.
-test.use({
-  launchOptions: {
-    args: [
-      '--enable-webgl',
-      '--use-angle=swiftshader',
-      '--enable-unsafe-swiftshader',
-      '--disable-accelerated-2d-canvas',
-    ],
-  },
-});
-
 test.setTimeout(60000);
 
 function captureErrors(page) {
