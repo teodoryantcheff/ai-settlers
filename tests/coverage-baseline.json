@@ -2,8 +2,8 @@
   "src/app.ts": {
     "node": {
       "lines": {
-        "uncovered": 16,
-        "total": 18
+        "uncovered": 20,
+        "total": 22
       },
       "branches": {
         "uncovered": 4,
@@ -13,7 +13,7 @@
     "browser": {
       "lines": {
         "uncovered": 3,
-        "total": 20
+        "total": 30
       },
       "branches": {
         "uncovered": 3,
@@ -24,22 +24,22 @@
   "src/application/assembly.ts": {
     "node": {
       "lines": {
-        "uncovered": 21,
-        "total": 64
+        "uncovered": 22,
+        "total": 66
       },
       "branches": {
-        "uncovered": 0,
-        "total": 5
+        "uncovered": 2,
+        "total": 7
       }
     },
     "browser": {
       "lines": {
         "uncovered": 1,
-        "total": 68
+        "total": 71
       },
       "branches": {
         "uncovered": 5,
-        "total": 9
+        "total": 11
       }
     }
   },
