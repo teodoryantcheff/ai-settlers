@@ -19,12 +19,11 @@ async function usable(control) {
     }),
   ).toBe(true);
 }
-async function capture(page, name) {
+async function expectPixiFrame(page) {
   await frame(page);
   await expect(page.locator('html')).toHaveAttribute('data-renderer', 'pixi');
   expect(await page.evaluate(() => window.productionRendererStats.backend)).toBe('PixiJS WebGL');
   expect(await page.evaluate(() => ({ x: scrollX, y: scrollY }))).toEqual({ x: 0, y: 0 });
-  await page.screenshot({ path: test.info().outputPath(name + '.png') });
 }
 
 for (const [width, height, quality, reducedMotion] of [
@@ -98,7 +97,7 @@ for (const [width, height, quality, reducedMotion] of [
     await page.getByRole('button', { name: 'Normal', exact: true }).press('Enter');
     await expect(page.locator('#paletteitems')).toBeVisible();
     await expect(page.locator('#paletteb')).toHaveAttribute('aria-expanded', 'true');
-    await capture(page, `combined-map-${width}-q${quality}`);
+    await expectPixiFrame(page);
     await page.locator('#catalog-search').fill('gold');
     const mine = page.locator('.pb[data-b="mine_gold"]');
     await mine.focus();
@@ -107,7 +106,7 @@ for (const [width, height, quality, reducedMotion] of [
     const popupBox = await popup.boundingBox();
     await page.mouse.move(popupBox.x + 20, popupBox.y + 30);
     await expect(popup).toBeVisible();
-    if (width === 1280 && quality === 1) await capture(page, 'combined-map-popup-1280-q1');
+    if (width === 1280 && quality === 1) await expectPixiFrame(page);
     await page.keyboard.press('Escape');
     await expect(popup).toBeHidden();
     await expect(page.locator('#paletteitems')).toBeVisible();
@@ -142,7 +141,7 @@ for (const [width, height, quality, reducedMotion] of [
     expect(await page.evaluate(() => ({ ...window.productionArtPreview.game.cam }))).toEqual(
       before.cam,
     );
-    await capture(page, `combined-report-${width}-q${quality}`);
+    await expectPixiFrame(page);
     await page.locator('#ppl').focus();
     await expect(page.locator('#population-help')).toBeVisible();
     await page.keyboard.press('Escape');

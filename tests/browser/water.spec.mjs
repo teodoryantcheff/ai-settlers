@@ -29,7 +29,6 @@ test('painted water keeps the shoreline and simulation stable across motion and 
     return JSON.stringify({ tiles: g.tiles, state: g.state, cam: g.cam });
   });
   await expect(page.locator('#painted-art-status')).toHaveCount(0);
-  await page.screenshot({ path: test.info().outputPath('painted-water.png') });
   const after = await page.evaluate(() => {
     const g = window.productionArtPreview.game;
     g.presentationPrefs.reducedMotion = false;
@@ -44,7 +43,6 @@ test('painted water keeps the shoreline and simulation stable across motion and 
     return JSON.stringify({ tiles: g.tiles, state: g.state, cam: g.cam });
   });
   expect(after).toBe(before);
-  await page.screenshot({ path: test.info().outputPath('painted-water-low-quality.png') });
   await expect(page.locator('html')).toHaveAttribute('data-renderer', 'pixi');
   expect(errors).toEqual([]);
 });

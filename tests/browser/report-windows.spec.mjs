@@ -276,10 +276,4 @@ test('opening and switching reports ends held map gestures while new gestures an
   expect(await page.evaluate(() => window.productionArtPreview.game.selected)).toBe(null);
   await expect(page.getByRole('region', { name: 'Colony window', exact: true })).toBeVisible();
   expect(await page.evaluate(() => window.productionArtPreview.game.exportSave())).toBe(saved);
-  await page.evaluate(() => {
-    const g = window.productionArtPreview.game;
-    g.draw();
-    g.drawMini();
-  });
-  await page.screenshot({ path: test.info().outputPath('report-gesture-navigation.png') });
 });

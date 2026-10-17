@@ -22,7 +22,7 @@ async function shortage(page) {
 }
 test('Attention shows an actual shortage, pure drilldowns and live keyboard state; Activity survives saves and removal', async ({
   page,
-}, testInfo) => {
+}) => {
   logErrors(page);
   const issue = await shortage(page);
   await openAtlas(page);
@@ -82,7 +82,6 @@ test('Attention shows an actual shortage, pure drilldowns and live keyboard stat
     await page.locator('#workspace-attention').evaluate((el) => {
       el.scrollTop = 0;
     });
-    await page.screenshot({ path: testInfo.outputPath(`attention-${viewport.width}.png`) });
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
@@ -127,7 +126,6 @@ test('Attention shows an actual shortage, pure drilldowns and live keyboard stat
   await page.locator('#workspace-nav [data-workspace="activity"]').click();
   await expect(page.locator('#activity-query')).toHaveValue('Sawmill');
   await expect(page.locator('#activity-window')).toHaveValue('600');
-  await page.screenshot({ path: testInfo.outputPath('activity-1280.png') });
   expect(await page.evaluate(() => ({ ...window.productionArtPreview.game.cam }))).toEqual(noMove);
   await page.locator('#activity-contributor [data-attention-locate]').click();
   await expectMapFocus(page);
@@ -234,7 +232,7 @@ test('collapsed Atlas counts current issues and urgent evidence, with immediate 
 
 test('crowded muted notices stay below the bar, clear of palette and map controls, and keep evidence links and timing', async ({
   page,
-}, testInfo) => {
+}) => {
   logErrors(page);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const issue = await shortage(page);
@@ -281,7 +279,6 @@ test('crowded muted notices stay below the bar, clear of palette and map control
     expect(overlaps(box, modes)).toBe(false);
     expect(overlaps(box, minimap)).toBe(false);
     expect(overlaps(box, inspectorClose)).toBe(false);
-    await page.screenshot({ path: testInfo.outputPath(`crowded-notices-${viewport.width}.png`) });
   }
   const cam = await page.evaluate(() => ({ ...window.productionArtPreview.game.cam }));
   await feed.hover();
@@ -309,7 +306,6 @@ test('crowded muted notices stay below the bar, clear of palette and map control
         return el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2));
       }),
     ).toBe(true);
-    await page.screenshot({ path: testInfo.outputPath(`report-notices-${viewport.width}.png`) });
   }
 
   await page.getByRole('button', { name: 'Close Attention window', exact: true }).press('Enter');

@@ -32,13 +32,6 @@ test('searchable reference retains native keyboard focus and exact recipes throu
     'href',
     /\/assets\/art\/prompts\.md$/,
   );
-  for (const [width, height] of [
-    [1440, 900],
-    [1280, 720],
-  ]) {
-    await page.setViewportSize({ width, height });
-    await page.screenshot({ path: test.info().outputPath('about-' + width + '.png') });
-  }
   await page.keyboard.press('Escape');
   await page.locator('#startb').click();
   await page.evaluate(() => {
@@ -73,7 +66,6 @@ test('searchable reference retains native keyboard focus and exact recipes throu
   await page.locator('#reference-topic').selectOption('controls');
   await search.fill('water');
   await expect(page.locator('#reference-results')).toContainText('No matching reference articles');
-  await page.screenshot({ path: test.info().outputPath('reference-no-results-1280.png') });
   await page.locator('#reference-topic').selectOption('all');
   await expect(page.locator('#reference-results')).toContainText('Water is local coverage');
   for (const [width, height] of [
@@ -86,7 +78,6 @@ test('searchable reference retains native keyboard focus and exact recipes throu
       g.resize();
       g.draw();
     });
-    await page.screenshot({ path: test.info().outputPath('reference-' + width + '.png') });
     await page.locator('#help').evaluate((element) => {
       element.scrollTop = 300;
     });
@@ -97,7 +88,6 @@ test('searchable reference retains native keyboard focus and exact recipes throu
     });
     expect(stack.searchTop).toBeGreaterThanOrEqual(stack.stateBottom);
     expect(stack.rootScroll).toBe(0);
-    await page.screenshot({ path: test.info().outputPath('reference-scrolled-' + width + '.png') });
     await page.locator('#help').evaluate((element) => {
       element.scrollTop = 0;
     });
@@ -129,18 +119,10 @@ test('loading stages explain artwork work and report an incomplete pack before p
   await page.goto('/tests/game.html?seed=2024');
   await expect(page.locator('#boot-stage')).toContainText('Loading and validating painted artwork');
   await expect(page.locator('[data-boot-stage="3"]')).toHaveAttribute('aria-current', 'step');
-  for (const [width, height] of [
-    [1440, 900],
-    [1280, 720],
-  ]) {
-    await page.setViewportSize({ width, height });
-    await page.screenshot({ path: test.info().outputPath('loading-' + width + '.png') });
-  }
   release();
   await expect(page.locator('#boot')).toHaveAttribute('data-stage', 'failed');
   await expect(page.locator('#boot-stage')).toContainText('Painted artwork could not load');
   await expect(page.locator('#boot-error-controls')).toContainText('Reload to retry');
-  await page.screenshot({ path: test.info().outputPath('artwork-failure.png') });
 });
 
 test('unavailable WebGL has explicit browser recovery and leaves checkpoints untouched', async ({
@@ -159,13 +141,6 @@ test('unavailable WebGL has explicit browser recovery and leaves checkpoints unt
   await expect(page.locator('#boot-stage')).toContainText('WebGL is required');
   await expect(page.locator('#boot-reload')).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('recovery-sentinel'))).toBe('keep');
-  for (const [width, height] of [
-    [1440, 900],
-    [1280, 720],
-  ]) {
-    await page.setViewportSize({ width, height });
-    await page.screenshot({ path: test.info().outputPath('webgl-unavailable-' + width + '.png') });
-  }
 });
 
 test('actual WebGL context loss pauses and exports the preserved live colony even when storage fails', async ({
@@ -227,13 +202,6 @@ test('actual WebGL context loss pauses and exports the preserved live colony eve
     'Reload discards the in-memory colony',
   );
   await page.locator('#recovery-cancel-reload').click();
-  for (const [width, height] of [
-    [1440, 900],
-    [1280, 720],
-  ]) {
-    await page.setViewportSize({ width, height });
-    await page.screenshot({ path: test.info().outputPath('graphics-recovery-' + width + '.png') });
-  }
   await page.keyboard.press('Escape');
   await expect(page.locator('#renderer-status')).toBeVisible();
 });

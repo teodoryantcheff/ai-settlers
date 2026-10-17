@@ -89,11 +89,9 @@ test('Logistics distinguishes real job stages, completed arrivals and actual rou
       game.hudTick();
     }, quality);
     await page.locator('#workspace-logistics').evaluate((element) => (element.scrollTop = 0));
-    await page.screenshot({ path: test.info().outputPath(`logistics-overview-${width}.png`) });
     await page
       .locator('#logistics-detail')
       .evaluate((element) => element.scrollIntoView({ block: 'start' }));
-    await page.screenshot({ path: test.info().outputPath(`logistics-route-${width}.png`) });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );

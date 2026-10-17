@@ -79,18 +79,6 @@ test('producer, construction and outpost inspectors expose evidence and retain f
   });
   await expect(page.locator('[data-inspector-live]')).toContainText('Local water');
   await expect(page.locator('.production-dashboard')).toContainText('Observed');
-  for (const [width, height] of [
-    [1440, 900],
-    [1280, 720],
-  ]) {
-    await page.setViewportSize({ width, height });
-    await page.evaluate(() => {
-      const g = window.productionArtPreview.game;
-      g.resize();
-      g.draw();
-    });
-    await page.screenshot({ path: test.info().outputPath('inspector-producer-' + width + '.png') });
-  }
   const toggle = page.locator('[data-production]');
   await toggle.click();
   await expect(toggle).toHaveText('Resume production');
@@ -130,20 +118,6 @@ test('producer, construction and outpost inspectors expose evidence and retain f
     'Delivered construction goods only',
   );
   await expect(page.locator('#demolition-evidence')).toContainText('1 Stone');
-  for (const [width, height] of [
-    [1440, 900],
-    [1280, 720],
-  ]) {
-    await page.setViewportSize({ width, height });
-    await page.evaluate(() => {
-      const g = window.productionArtPreview.game;
-      g.resize();
-      g.draw();
-    });
-    await page.screenshot({
-      path: test.info().outputPath('inspector-demolition-' + width + '.png'),
-    });
-  }
   await page.locator('#demolition-cancel').click();
   await page.evaluate(() => {
     const g = window.productionArtPreview.game;
@@ -221,20 +195,6 @@ test('real producer countdown suspends for a full batch and resumes without losi
   });
   await expect(page.locator('.inspector-status p').first()).toContainText('Output blocked');
   await expect(page.locator('[data-cycle-countdown]')).toHaveText('3.0s remaining · suspended');
-  for (const [width, height] of [
-    [1440, 900],
-    [1280, 720],
-  ]) {
-    await page.setViewportSize({ width, height });
-    await page.evaluate(() => {
-      const g = window.productionArtPreview.game;
-      g.resize();
-      g.draw();
-    });
-    await page.screenshot({
-      path: test.info().outputPath(`producer-countdown-blocked-${width}.png`),
-    });
-  }
   const windowControl = page.locator('[data-rate-window]');
   await windowControl.focus();
   await page.evaluate(() => {

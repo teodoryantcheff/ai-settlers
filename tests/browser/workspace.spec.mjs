@@ -150,9 +150,7 @@ test('atlas layout keeps stored goods visible and map input aligned at desktop s
     expect(await page.evaluate(() => ({ ...window.productionArtPreview.game.cam }))).toEqual(
       camera,
     );
-    await page.screenshot({ path: test.info().outputPath(`atlas-map-${width}.png`) });
     await openAtlas(page);
     await page.getByRole('button', { name: 'Economy', exact: true }).press('Enter');
-    await page.screenshot({ path: test.info().outputPath(`atlas-economy-${width}.png`) });
   }
 });

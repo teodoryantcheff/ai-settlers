@@ -21,7 +21,6 @@ test('armory shows the same iron-bar shortage in its inspector and muted persist
   });
   await expect(page.locator('#msgs')).not.toContainText('needs coal');
   expect(await page.evaluate(() => window.productionArtPreview.game.muted)).toBe(true);
-  await page.screenshot({ path: test.info().outputPath('armory-shortage.png') });
 });
 
 test('all resources remain visible at desktop sizes', async ({ freshPage: page }) => {
@@ -61,7 +60,6 @@ test('FPS remains visible and updates while the simulation is paused', async ({
   });
   await expect(page.locator('#fps')).toHaveText(/^\d+ FPS$/, { timeout: 15000 });
   await expect(page.locator('#fps')).toBeVisible();
-  await page.screenshot({ path: test.info().outputPath('fps-counter.png') });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.locator('#fps')).toBeVisible();
   const fpsBox = await page.locator('#fps').boundingBox();
@@ -214,7 +212,6 @@ test('shared interaction transitions preserve real map, inspector, road, Journey
   expect(await page.evaluate((id) => !!window.productionArtPreview.game.byId(id), ids.farm)).toBe(
     true,
   );
-  await page.screenshot({ path: test.info().outputPath('map-raze-armed.png') });
   await page.locator('#demolition-confirm').click();
   expect(
     await page.evaluate((id) => window.productionArtPreview.game.byId(id), ids.farm),
@@ -295,7 +292,6 @@ test('shared interaction transitions preserve real map, inspector, road, Journey
       return Math.abs(cam.x - ((b.x + 0.5) * g.TS - g.vw / g.z / 2)) < 0.01;
     }, journeyCam),
   ).toBe(true);
-  await page.screenshot({ path: test.info().outputPath('journey-inspection.png') });
 
   await choose('road');
   await mapClick(49, 48);
@@ -353,6 +349,5 @@ test('shared interaction transitions preserve real map, inspector, road, Journey
   await mapClick(48, 48);
   expect((await state()).selected).toBe(ids.hq);
   await expect(page.locator('#infobody')).toContainText('Headquarters');
-  await page.screenshot({ path: test.info().outputPath('loaded-inspection.png') });
   expect(errors).toEqual([]);
 });

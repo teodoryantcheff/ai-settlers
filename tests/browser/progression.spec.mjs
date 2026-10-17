@@ -76,7 +76,6 @@ test('V opens Colony guidance over the live map and retains native window contex
     await expect(page.locator('#advdetails summary')).toBeFocused();
     expect(await window.boundingBox()).toEqual(box);
     expect(await page.locator('#workspace-colony').evaluate((el) => el.scrollTop)).toBe(scroll);
-    await page.screenshot({ path: test.info().outputPath(`colony-guidance-${width}.png`) });
   }
 });
 
@@ -229,11 +228,9 @@ test('Colony connects live Journey actions, spending conditions and saved autopl
     await page.setViewportSize({ width, height });
     await page.locator('#colony-objective').scrollIntoViewIfNeeded();
     await expect(page.locator('#goods .gd')).toHaveCount(17);
-    await page.screenshot({ path: test.info().outputPath(`colony-${width}.png`) });
     await page.locator('#availability-upgrade-haul-summary').scrollIntoViewIfNeeded();
     if (!(await page.locator('#availability-upgrade-haul').evaluate((element) => element.open)))
       await page.locator('#availability-upgrade-haul-summary').click();
-    await page.screenshot({ path: test.info().outputPath(`colony-stock-${width}.png`) });
   }
 });
 
@@ -325,7 +322,6 @@ test('earned victory stays achieved after spending and continues through Home wi
     await page.setViewportSize({ width, height });
     await expect(page.locator('#wingo')).toBeInViewport();
     await expect(page.locator('#winhome')).toBeInViewport();
-    await page.screenshot({ path: test.info().outputPath(`victory-${width}.png`) });
   }
   await page.locator('#wingo').click();
   await expect(page.locator('#win')).toBeHidden();

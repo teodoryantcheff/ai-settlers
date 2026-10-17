@@ -67,7 +67,7 @@ Tests and builds run TypeScript 7 checking through `npm run typecheck`, which in
 
 `npm run bench:render` is opt-in and not part of `npm test`. It measures CPU and GPU frame time at every zoom on this machine's GPU (headless Chromium, real WebGL) and warns if Chromium falls back to software rendering. Add `-- --zooms 3 --profile 3` to narrow it and keep a CPU profile; `scripts/bench-render.mjs` lists every option. Results go to `output/bench/`; see [performance notes](docs/performance-60fps.md). After building, `node scripts/bench-territory.mjs` measures isolated territory-cache frames on hardware WebGL and saves raw samples plus a game screenshot to `output/bench-territory/`.
 
-With the local server running, `npm run capture:production-art` exports images, diagnostics and a particle animation into `output/production-art/`. Capture additionally requires FFmpeg. Headless software-WebGL timings are diagnostics; profile target hardware for performance decisions.
+Browser tests take no screenshots. With the local server running, `npm run capture` exports a curated set of views into `output/captures/`: the release frame and HUD, the minimap, the inspector and Colony, Economy and Logistics panels, the painted production buildings, development overview and detail scenes, `capture.json` renderer diagnostics and a particle animation (`particles.gif`). Capture additionally requires FFmpeg. Headless software-WebGL timings are diagnostics; profile target hardware for performance decisions.
 
 ## Deploy
 

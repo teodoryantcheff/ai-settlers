@@ -28,10 +28,9 @@ async function paint(page) {
     game.draw();
   });
 }
-async function capture(page, name) {
+async function expectReadableLayout(page) {
   await expect(page.locator('#goods .gd')).toHaveCount(17);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.screenshot({ path: test.info().outputPath(name + '.png') });
 }
 
 test('native first colony carries Journey construction through real deliveries, output and durable reports', async ({
@@ -52,11 +51,11 @@ test('native first colony carries Journey construction through real deliveries, 
   await frame(page, 1000);
   await expect(page.locator('html')).toHaveAttribute('data-renderer', 'pixi');
   await paint(page);
-  await capture(page, 'fresh-map-1440-q1');
+  await expectReadableLayout(page);
   for (const workspace of ['attention', 'activity', 'economy']) {
     await openAtlas(page);
     await page.locator(`#workspace-nav [data-workspace="${workspace}"]`).click();
-    await capture(page, `fresh-${workspace}-1440-q1`);
+    await expectReadableLayout(page);
   }
   await expect(page.locator('#economy-coverage')).toContainText('History unavailable');
   await openAtlas(page);
@@ -138,7 +137,7 @@ test('native first colony carries Journey construction through real deliveries, 
   expect(arrival.done).toBe(false);
   await paint(page);
   await expect(page.locator('#infobody')).toContainText(/[1-9]\d* \/ [1-9]\d* delivered/);
-  await capture(page, 'first-material-arrival-1440-q1');
+  await expectReadableLayout(page);
   const production = await page.evaluate((id) => {
     const game = window.productionArtPreview.game,
       b = game.byId(id);
@@ -204,7 +203,7 @@ test('native first colony carries Journey construction through real deliveries, 
           .locator(`#workspace-${workspace}`)
           .evaluate((element) => (element.scrollTop = 0));
       await paint(page);
-      await capture(page, `first-colony-${workspace}-${width}-q${quality}`);
+      await expectReadableLayout(page);
     }
   }
   // Cross-quality map canaries use the same colony and camera, without advancing its world.
@@ -220,7 +219,7 @@ test('native first colony carries Journey construction through real deliveries, 
       game.resize();
     }, quality);
     await paint(page);
-    await capture(page, `cross-quality-map-${width}-q${quality}`);
+    await expectReadableLayout(page);
   }
   expect(await page.evaluate(() => window.productionArtPreview.game.exportSave())).toBe(before);
   expect(errors).toEqual([]);

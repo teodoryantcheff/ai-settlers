@@ -88,7 +88,6 @@ test('checkpoint metadata, rename, confirmations, separate autosave and files wo
   ]) {
     await page.setViewportSize({ width, height });
     await expect(page.locator('#create-checkpoint')).toBeInViewport();
-    await page.screenshot({ path: test.info().outputPath(`saves-${width}.png`) });
   }
   expect(errors).toEqual([]);
 });
@@ -117,13 +116,6 @@ test('storage failure preserves valid checkpoints, reports quiet autosave failur
   );
   await page.locator('#create-checkpoint').click();
   await expect(page.locator('#save-status')).toContainText('quota exhausted');
-  for (const [width, height] of [
-    [1440, 900],
-    [1280, 720],
-  ]) {
-    await page.setViewportSize({ width, height });
-    await page.screenshot({ path: test.info().outputPath(`save-failure-${width}.png`) });
-  }
   expect(await page.evaluate(() => localStorage.getItem('settlers.saves.v1'))).toBe(prior);
   await page.locator('.save-entry').getByRole('button', { name: 'Load', exact: true }).click();
   await expect(page.locator('#save-confirm')).toContainText(
@@ -150,7 +142,6 @@ test('storage failure preserves valid checkpoints, reports quiet autosave failur
     await expect(page.locator('#save-status')).toBeInViewport();
     await expect(page.locator('#pastecode')).toBeFocused();
     expect(await page.evaluate(() => window.scrollY)).toBe(0);
-    await page.screenshot({ path: test.info().outputPath(`invalid-import-${width}.png`) });
   }
   expect(await page.evaluate(() => localStorage.getItem('settlers.saves.v1'))).toBe(prior);
   expect(await page.evaluate(() => window.productionArtPreview.game.state.time)).toBe(0.25);

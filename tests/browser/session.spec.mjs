@@ -37,7 +37,6 @@ test('named seeded colony, guarded replacement and Home Continue preserve the ac
   ]) {
     await page.setViewportSize({ width, height });
     await expect(page.locator('#startb')).toBeInViewport();
-    await page.screenshot({ path: test.info().outputPath(`first-welcome-${width}.png`) });
   }
   await page.locator('#new-colony-name').fill('Oakbridge');
   await page.locator('#new-colony-seed').fill('42');
@@ -99,7 +98,6 @@ test('named seeded colony, guarded replacement and Home Continue preserve the ac
   ]) {
     await page.setViewportSize({ width, height });
     await expect(page.locator('#continueb')).toBeInViewport();
-    await page.screenshot({ path: test.info().outputPath(`welcome-${width}.png`) });
   }
   const harbor = await snapshot(page);
   await page.locator('#load-colonyb').click();
@@ -204,13 +202,6 @@ test('nested settings preserve running and paused states, native input, persiste
   expect(
     await page.evaluate(() => window.productionArtPreview.game.presentationPrefs.quality),
   ).toBe(0.75);
-  for (const [width, height] of [
-    [1440, 900],
-    [1280, 720],
-  ]) {
-    await page.setViewportSize({ width, height });
-    await page.screenshot({ path: test.info().outputPath(`settings-${width}.png`) });
-  }
   await page.keyboard.press('Escape');
   await expect(page.locator('#start')).toBeVisible();
   await page.locator('#welcome-about').click();

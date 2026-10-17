@@ -177,7 +177,6 @@ for (const failure of ['constructor', 'context-node', 'mixer', 'resume']) {
       game.SND.fanfare();
     });
     expect((await summary(page)).attempts).toBe(attempts);
-    await page.screenshot({ path: test.info().outputPath(`${failure}-notice.png`) });
     await menu(page);
     await page.locator('#mute').click();
     await page.locator('#mute').click();
@@ -219,7 +218,6 @@ test('native context loss during play reports automatically and controls restore
     .toBeGreaterThan(before.time);
   expect(await page.evaluate(() => audioEvidence.frames)).toBeGreaterThan(before.frames);
   expect((await summary(page)).notices).toBe(1);
-  await page.screenshot({ path: test.info().outputPath('playback-loss-notice.png') });
   await menu(page);
   await page.locator('#mute').click();
   await page.locator('#mute').click();
@@ -286,7 +284,6 @@ test('startup, settings, pause, speed, world replacement and background recovery
       }),
     )
     .toEqual([0.29, 0.63, 0.45, false, true]);
-  await page.screenshot({ path: test.info().outputPath('audio-settings.png') });
   await page.keyboard.press('Escape');
 
   // These are real browser lifecycle handlers and native suspend/resume calls.

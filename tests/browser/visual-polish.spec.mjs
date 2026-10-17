@@ -31,7 +31,6 @@ test('illustrated village stays stable in daylight, dusk and compact layouts', a
   });
   await expect(page.locator('#painted-art-status')).toHaveCount(0);
   await expect(page.locator('html')).toHaveAttribute('data-renderer', 'pixi');
-  await page.screenshot({ path: test.info().outputPath('village-daylight.png') });
   const after = await page.evaluate(() => {
     const game = window.productionArtPreview.game;
     game.TESTMODE = false;
@@ -46,7 +45,6 @@ test('illustrated village stays stable in daylight, dusk and compact layouts', a
     });
   });
   expect(after).toBe(before);
-  await page.screenshot({ path: test.info().outputPath('village-dusk.png') });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => {
     const game = window.productionArtPreview.game;
@@ -61,7 +59,6 @@ test('illustrated village stays stable in daylight, dusk and compact layouts', a
     'aria-label',
     'Planks: 48 stored stock. Open resource accounting',
   );
-  await page.screenshot({ path: test.info().outputPath('village-mobile.png') });
   const gold = page.locator('#goods [data-good=gold]');
   await gold.focus();
   await expect(gold).toBeInViewport();

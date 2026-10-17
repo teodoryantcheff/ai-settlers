@@ -48,7 +48,6 @@ test('real production inspector exposes ten-minute coverage and reconciled colon
       game.draw();
     }, quality);
     await expect(page.locator('[data-rate-window]')).toBeVisible();
-    await page.screenshot({ path: test.info().outputPath(`observations-${width}.png`) });
   }
   expect(errors).toEqual([]);
 });

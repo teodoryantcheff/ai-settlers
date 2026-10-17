@@ -213,11 +213,7 @@ test('overlay edges retain real hover, placement, pan and zoom coordinates at bo
       g.draw();
       g.drawMini();
     });
-    await page.screenshot({ path: test.info().outputPath(`full-map-inspector-${width}.png`) });
     await page.locator('#atlas-toggle').click();
-    await page.screenshot({
-      path: test.info().outputPath(`full-map-atlas-inspector-${width}.png`),
-    });
     const saved = await page.evaluate(() => window.productionArtPreview.game.exportSave());
     await page.evaluate((raw) => window.productionArtPreview.game.importSave(raw), saved);
     await expect(page.locator('#inspectordock')).toBeHidden();

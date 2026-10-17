@@ -20,7 +20,6 @@ for (const missing of ['goaltxt', 'boot-stage']) {
       await expect(alert).toContainText('Missing required page element #' + missing);
       await expect(alert.getByRole('button', { name: 'Reload page' })).toBeVisible();
       expect(await page.evaluate(() => window.productionRendererStats)).toBeUndefined();
-      await page.screenshot({ path: test.info().outputPath('missing-' + missing + '.png') });
     },
   );
 }

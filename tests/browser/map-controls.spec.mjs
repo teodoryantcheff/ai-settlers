@@ -142,10 +142,7 @@ for (const [width, height, quality, motion] of [
       'aria-pressed',
       'true',
     );
-    await page.screenshot({ path: test.info().outputPath(`map-controls-${width}.png`) });
     await page.getByRole('button', { name: 'Workload', exact: true }).press('Enter');
-    await page.evaluate(() => window.productionArtPreview.game.draw());
-    await page.screenshot({ path: test.info().outputPath(`map-workload-${width}.png`) });
     await openAtlas(page);
     const shiftedPalette = await page.locator('#palette').boundingBox();
     expect(shiftedPalette.x + shiftedPalette.width).toBeLessThanOrEqual(modes.x);
@@ -159,6 +156,5 @@ for (const [width, height, quality, motion] of [
     );
     const inspector = await page.locator('#inspectordock').boundingBox();
     expect(inspector.y + inspector.height).toBeLessThanOrEqual(mini.y);
-    await page.screenshot({ path: test.info().outputPath(`map-controls-overlays-${width}.png`) });
   });
 }

@@ -139,12 +139,6 @@ test('road plans show zero resource cost and rejection evidence before committin
   await expect(page.locator('#placement-feedback')).toContainText('No walking route');
 });
 
-// The visual fixture submits explicit production frames to keep SwiftShader capture bounded.
-async function capture(page, filename) {
-  await draw(page);
-  await page.screenshot({ path: test.info().outputPath(filename), timeout: 30000 });
-}
-
 test('catalog and placement feedback remain legible at both desktop sizes', async ({ page }) => {
   test.setTimeout(180000);
   await begin(page, false);
@@ -167,11 +161,11 @@ test('catalog and placement feedback remain legible at both desktop sizes', asyn
     const palette = await page.locator('#palette').boundingBox();
     const atlas = await page.locator('#atlas-toggle').boundingBox();
     expect(palette.y).toBeGreaterThanOrEqual(atlas.y + atlas.height + 8);
-    await capture(page, `catalog-${width}.png`);
+    await draw(page);
     await page.locator('#catalog-chain').selectOption('Timber & stone');
     await page.locator('.pb[data-b="lumberjack"]').focus();
     await expect(page.locator('#catalog-detail-lumberjack')).toBeVisible();
-    await capture(page, `catalog-popup-${width}.png`);
+    await draw(page);
     await page.locator('#catalog-chain').selectOption('all');
     await page.locator('.pb[data-b="farm"]').press('Enter');
     await page.evaluate(() => {
@@ -182,13 +176,13 @@ test('catalog and placement feedback remain legible at both desktop sizes', asyn
     const feedback = await page.locator('#placement-feedback').boundingBox();
     const minimap = await page.locator('#minimap-panel').boundingBox();
     expect(feedback.y + feedback.height).toBeLessThanOrEqual(minimap.y - 8);
-    await capture(page, `placement-unaffordable-${width}.png`);
+    await draw(page);
     await page.evaluate(() => {
       window.productionArtPreview.game.anyStorage().stock.planks = 3;
     });
     await draw(page);
     await expect(page.locator('#placement-feedback')).toContainText('Ready to build');
-    await capture(page, `placement-valid-${width}.png`);
+    await draw(page);
   }
 });
 

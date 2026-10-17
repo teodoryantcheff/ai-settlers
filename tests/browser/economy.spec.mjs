@@ -113,11 +113,9 @@ test('real chain drilldowns preserve navigation, show nominal capacity and retai
       game.draw();
     }, quality);
     await page.locator('#workspace-economy').evaluate((element) => (element.scrollTop = 0));
-    await page.screenshot({ path: test.info().outputPath(`economy-overview-${width}.png`) });
     await page
       .locator('#economy-resource-heading')
       .evaluate((element) => element.scrollIntoView({ block: 'start' }));
-    await page.screenshot({ path: test.info().outputPath(`economy-detail-${width}.png`) });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );

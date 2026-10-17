@@ -42,7 +42,6 @@ test('utility fields stay readable and preserve editing through nested checkpoin
     await page.locator('#start .panel').evaluate((element) => {
       element.scrollTop = 0;
     });
-    await page.screenshot({ path: test.info().outputPath(`welcome-${width}.png`) });
   }
   await page.locator('#load-colonyb').click();
   await expect(page.locator('#save-list')).toContainText('No checkpoints');
@@ -54,7 +53,6 @@ test('utility fields stay readable and preserve editing through nested checkpoin
   ]) {
     await page.setViewportSize({ width, height });
     await page.locator('#savecode').focus();
-    await page.screenshot({ path: test.info().outputPath(`empty-saves-${width}.png`) });
     await expect(page.locator('#savecode')).toHaveValue('A colony file can be pasted here');
   }
   await page.keyboard.press('Escape');

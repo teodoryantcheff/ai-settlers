@@ -93,7 +93,6 @@ test('population and stored-resource explanations support pointer reading, keybo
   await population.hover();
   await afterLeaveTimer(page);
   await expect(population).toBeVisible();
-  await page.screenshot({ path: test.info().outputPath('population-help-1280.png') });
   await population.click();
   expect(
     await page.evaluate(() => {
@@ -110,7 +109,6 @@ test('population and stored-resource explanations support pointer reading, keybo
   await expect(gold).toBeVisible();
   await expect(gold).toContainText('Includes reserved stock');
   await expect(gold).toContainText('Banked objective progress is shown separately');
-  await page.screenshot({ path: test.info().outputPath('stored-gold-help-1280.png') });
   await page.keyboard.press('Escape');
   await expect(gold).toBeHidden();
   await afterLeaveTimer(page);
@@ -226,6 +224,5 @@ test('two compact rows retain dense stock, banked objective and essential contro
     });
     await page.mouse.click(point.x, point.y);
     await expect(page.locator('#infobody')).toContainText('Headquarters');
-    await page.screenshot({ path: test.info().outputPath(`dense-bank-goal-failure-${width}.png`) });
   }
 });

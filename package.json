@@ -8,7 +8,7 @@
   },
   "scripts": {
     "prototype:ui": "node scripts/ui-prototype.mjs",
-    "capture:production-art": "npm run build && node scripts/capture-production-art.mjs",
+    "capture": "npm run build && node scripts/capture.mjs",
     "bench:render": "npm run build && node scripts/bench-render.mjs",
     "build": "npm run typecheck && node scripts/build.mjs",
     "crop:art": "node scripts/crop-pack.mjs",

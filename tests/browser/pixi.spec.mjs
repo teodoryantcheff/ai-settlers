@@ -183,7 +183,6 @@ test('road plans render and refresh through real terrain events while paused', a
   expect(before.preview.afterSeconds).toBeLessThan(before.preview.beforeSeconds);
   expect(before.reused).toBe(true);
   expect(before.unchanged).toBe(true);
-  await page.screenshot({ path: test.info().outputPath('road-plan-preview.png') });
   const after = await page.evaluate(({ a, b }) => {
     const game = window.productionArtPreview.game;
     const committed = game.commitRoad(a, b);
@@ -209,7 +208,6 @@ test('road plans render and refresh through real terrain events while paused', a
   expect(after.rng).toBe(before.rng);
   expect(after.backend).toBe('PixiJS WebGL');
   expect(errors).toEqual([]);
-  await page.screenshot({ path: test.info().outputPath('road-plan-built.png') });
 });
 
 test('a scene drawing failure pauses the colony and reports the graphics error visibly', async ({
@@ -247,7 +245,6 @@ test('clarity keeps camera, simulation and artwork anchors intact and reuses nat
     sawmill.stock.logs = 0;
     game.draw();
   });
-  await page.screenshot({ path: test.info().outputPath('standard-view.png') });
   const result = await page.evaluate(() => {
     const game = window.productionArtPreview.game;
     const snapshot = () =>
@@ -294,7 +291,6 @@ test('clarity keeps camera, simulation and artwork anchors intact and reuses nat
   expect(result.after.partialTextureUpdates).toBe(result.warm.partialTextureUpdates);
   expect(result.after.nativeGraphics).toBe(result.warm.nativeGraphics);
   expect(result.after.nativeTexts).toBe(result.warm.nativeTexts);
-  await page.screenshot({ path: test.info().outputPath('clarity-view.png') });
   expect(errors).toEqual([]);
 });
 
@@ -339,7 +335,6 @@ test('producer inspector switches recent and lifetime rates without changing pau
   await expect(stats).toContainText('Observed 105.0s of simulation time');
   await window.selectOption('120');
   await expect(window).toHaveValue('120');
-  await page.screenshot({ path: test.info().outputPath('recent-rates-inspector.png') });
   const after = await page.evaluate(() => {
     const game = window.productionArtPreview.game;
     for (let i = 0; i < 3; i++) game.draw();
@@ -410,7 +405,6 @@ test('actual frame loop shows restrained economic transitions at 8x even when mu
   expect(notices[2].at - notices[1].at).toBeGreaterThanOrEqual(20000);
   await expect(page.locator('#msgs')).toHaveAttribute('role', 'log');
   await expect(page.locator('#msgs')).toContainText('production resumed');
-  await page.screenshot({ path: test.info().outputPath('muted-economic-recovery.png') });
   const stableLog = await page.evaluate(() => {
     const feed = document.getElementById('msgs');
     const notice = [...feed.children].find((node) =>
@@ -575,7 +569,6 @@ test('domain actions retain outpost, gold, contract and upgrade feedback in the 
   });
   await expect(page.locator('#msgs')).toContainText('Contract fulfilled: Timber for the realm');
   await expect(page.locator('#msgs')).toContainText('Carrier training upgraded to level 1');
-  await page.screenshot({ path: test.info().outputPath('domain-feedback.png') });
   expect(errors).toEqual([]);
 });
 
@@ -625,7 +618,6 @@ test('expanded economy buildings render and expose their recipes', async ({ fres
   expect(result.unchanged).toBe(true);
   await expect(page.locator('#infobody')).toContainText('iron ore');
   await expect(page.locator('#infobody')).toContainText('Iron bars');
-  await page.screenshot({ path: test.info().outputPath('expanded-economy.png') });
   expect(errors).toEqual([]);
 });
 
@@ -667,12 +659,10 @@ test('mine production dashboard compares edible deliveries and consumption', asy
   await expect(stats.locator('.production-resource')).toHaveCount(2);
   await expect(stats.locator('[aria-label="Bread: Consumed 1.5 per minute"]')).toBeVisible();
   await expect(stats.locator('[aria-label="Fish: Delivered in 2.5 per minute"]')).toBeVisible();
-  await page.screenshot({ path: test.info().outputPath('production-dashboard.png') });
   await page.setViewportSize({ width: 390, height: 844 });
   const info = page.locator('#info');
   await expect(info).toBeVisible();
   expect(await info.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
-  await page.screenshot({ path: test.info().outputPath('production-dashboard-mobile.png') });
 });
 
 test('graphical workload overlay preserves jobs and renders at both quality levels', async ({
@@ -703,7 +693,6 @@ test('graphical workload overlay preserves jobs and renders at both quality leve
     game.draw();
     return JSON.stringify({ jobs: game.jobs, units: game.units, rng: game.state.rng });
   });
-  await page.screenshot({ path: test.info().outputPath('workload.png') });
   const after = await page.evaluate(() => {
     const game = window.productionArtPreview.game;
     game.presentationPrefs.quality = 0.75;
@@ -722,7 +711,6 @@ test('graphical workload overlay preserves jobs and renders at both quality leve
     game.resize();
     game.draw();
   });
-  await page.screenshot({ path: test.info().outputPath('workload-empty-mobile.png') });
   expect(errors).toEqual([]);
 });
 

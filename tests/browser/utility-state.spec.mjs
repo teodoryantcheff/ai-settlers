@@ -21,7 +21,6 @@ test('blocking screens show readable remembered simulation settings without chan
   await expect(stateLine(page, '#start')).toContainText('Simulation suspended');
   await expect(stateLine(page, '#start')).toContainText('1× selected');
   await expect(stateLine(page, '#start')).toBeInViewport();
-  await page.screenshot({ path: test.info().outputPath('welcome-readable-state-1280.png') });
   await page.locator('#startb').click();
   await frame(page, 1100);
   const before = await page.evaluate(() => window.productionArtPreview.game.exportSave());
@@ -42,7 +41,6 @@ test('blocking screens show readable remembered simulation settings without chan
   await expect(page.locator('#speedpref')).toBeFocused();
   await expect(stateLine(page, '#mix')).toContainText('4× selected');
   expect(await page.evaluate(() => window.productionArtPreview.game.state.paused)).toBe(false);
-  await page.screenshot({ path: test.info().outputPath('settings-readable-state-1280.png') });
   await page.keyboard.press('Escape');
   await frame(page, 1400);
   expect(await page.evaluate(() => window.productionArtPreview.game.state.time)).toBeGreaterThan(
@@ -84,7 +82,6 @@ test('blocking screens show readable remembered simulation settings without chan
   await expect(stateLine(page, '#mix')).not.toContainText('Simulation suspended');
   await expect(stateLine(page, '#mix')).toContainText('Export to protect progress');
   await expect(stateLine(page, '#mix')).toBeInViewport();
-  await page.screenshot({ path: test.info().outputPath('graphics-unavailable-state-1280.png') });
   await page.keyboard.press('Escape');
   expect(
     await page.evaluate(() => ({
@@ -135,7 +132,6 @@ test('graphics reload review dismisses independently and restores focus to its r
   await expect(page.locator('#recovery-cancel-reload')).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(page.locator('#recovery-confirm-reload')).toBeFocused();
-  await page.screenshot({ path: test.info().outputPath('nested-recovery-review.png') });
   await page.keyboard.press('Escape');
   await expect(page.locator('#recovery-reload-confirmation')).toBeHidden();
   await expect(page.locator('#recovery-reload')).toBeFocused();

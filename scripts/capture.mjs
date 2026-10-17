@@ -4,9 +4,16 @@ import { promisify } from 'node:util';
 import { chromium } from '@playwright/test';
 
 // Capture the release page and the matching development colony with the same
-// production Pixi art/renderer.
-const output = new URL('../output/production-art/', import.meta.url);
+// production Pixi art/renderer, plus a curated set of interface views. Browser
+// tests assert behaviour; these images are for people reviewing the look.
+const output = new URL('../output/captures/', import.meta.url);
 await fs.mkdir(output, { recursive: true });
+const views = [];
+async function shot(target, name) {
+  await target.screenshot({ path: new URL(name + '.png', output).pathname });
+  views.push(name);
+  console.log(name + ' captured');
+}
 const browser = await chromium.launch({
   headless: true,
   args: [
@@ -66,6 +73,57 @@ try {
     Buffer.from(releaseImage.split(',')[1], 'base64'),
   );
   console.log('Release frame captured');
+
+  // Restart the release page's own frame loop, so it follows the resize.
+  await page.evaluate(() => requestAnimationFrame(window.__gameFrame));
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.waitForFunction(
+    () =>
+      document.getElementById('pixi-view').getBoundingClientRect().right >= innerWidth - 1 &&
+      !document.getElementById('spd').textContent.includes('SUSPENDED'),
+  );
+  await shot(page, 'hud');
+  await shot(page.locator('#minimap-panel'), 'minimap');
+
+  // Panels open on the standard development colony; frames are submitted
+  // explicitly so every view shows the same paused moment.
+  await page.goto('http://127.0.0.1:8765/tests/game.html?seed=2024&capture', {
+    waitUntil: 'domcontentloaded',
+  });
+  await page.waitForFunction(() => !!window.productionArtPreview?.game, null, { polling: 100 });
+  await page.waitForFunction(() => !document.getElementById('boot'), null, { polling: 100 });
+  const frame = () => page.evaluate(() => window.__gameFrame(performance.now()));
+  await frame();
+  await page.locator('#startb').click();
+  await page.evaluate(() => {
+    const game = window.productionArtPreview.game;
+    game.state.paused = true;
+    game.inspectContributor(game.anyStorage().id);
+    game.hudTick();
+  });
+  await frame();
+  await shot(page, 'panel-inspector');
+  for (const workspace of ['colony', 'economy', 'logistics']) {
+    const toggle = page.locator('#atlas-toggle');
+    if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+    await page.locator(`#workspace-nav [data-workspace="${workspace}"]`).click();
+    await frame();
+    await shot(page, 'panel-' + workspace);
+  }
+
+  // The economy display yard shows the painted production buildings up close.
+  await page.goto('http://127.0.0.1:8765/tests/game.html?economyshot&seed=2024&z=4&capture', {
+    waitUntil: 'domcontentloaded',
+  });
+  await page.waitForFunction(() => !!window.productionArtPreview?.game, null, { polling: 100 });
+  await page.waitForFunction(() => !document.getElementById('boot'), null, { polling: 100 });
+  await page.evaluate(() => {
+    const game = window.productionArtPreview.game;
+    game.hudTick();
+    window.__gameFrame(performance.now());
+  });
+  await shot(page, 'buildings');
+  await page.setViewportSize({ width: 1200, height: 850 });
 
   await page.goto('http://127.0.0.1:8765/tests/game.html?devshot&detail&seed=2024&adv=0&capture', {
     waitUntil: 'domcontentloaded',
@@ -163,7 +221,7 @@ try {
   if (errors.length) throw new Error(errors.join('; '));
   await fs.writeFile(
     new URL('capture.json', output),
-    JSON.stringify({ scenes, animation, errors }, null, 2),
+    JSON.stringify({ views, scenes, animation, errors }, null, 2),
   );
   await promisify(execFile)('ffmpeg', [
     '-y',
@@ -178,7 +236,7 @@ try {
     new URL('particles.gif', output).pathname,
   ]);
   await fs.rm(frames, { recursive: true, force: true });
-  console.log(JSON.stringify({ scenes, animation, errors }, null, 2));
+  console.log(JSON.stringify({ views, scenes, animation, errors }, null, 2));
   await context.close();
 } finally {
   await browser.close();
