@@ -444,7 +444,15 @@ export function createPersistence(
   if (!saveHealth.ok) game.emitGameEvent('saveHealthChanged', { ...saveHealth });
 
   // Test-only view of closure internals; never merged into the runtime.
-  if (internals) Object.assign(internals, { snapshotGame, prepareLoad, commitLoad });
+  if (internals)
+    Object.assign(internals, {
+      snapshotGame,
+      prepareLoad,
+      commitLoad,
+      forgetBaseline: () => {
+        baseline = baselineId = null;
+      },
+    });
 
   return {
     get saveHealth() {
@@ -500,6 +508,8 @@ export interface PersistenceInternals {
   snapshotGame: () => SaveData;
   prepareLoad: (raw: string) => PreparedSave;
   commitLoad: (prepared: PreparedSave) => void;
+  /** Return unsaved-progress tracking to a fresh boot: nothing saved or loaded yet. */
+  forgetBaseline: () => void;
 }
 
 export interface StoragePort {

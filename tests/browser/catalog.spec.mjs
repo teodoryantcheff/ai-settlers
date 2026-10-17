@@ -1,29 +1,26 @@
-import { test, expect } from './helpers/test.mjs';
+import { test, expect, frame } from './helpers/test.mjs';
 test.setTimeout(120000);
-async function boot(page, manualFrames = false) {
-  if (manualFrames)
-    await page.addInitScript(() => {
-      window.requestAnimationFrame = (callback) => {
-        window.__catalogFrame = callback;
-        return 0;
-      };
-    });
-  await page.addInitScript(() =>
-    localStorage.setItem('settlers.prefs', JSON.stringify({ quality: 0.75, reducedMotion: true })),
-  );
-  await page.goto('/tests/game.html?seed=2024');
-  await expect(page.locator('#boot')).toHaveCount(0, { timeout: 30000 });
-  await page.locator('#startb').press('Enter');
+// Paused, so frames redraw placement feedback without advancing the colony. The
+// catalog runs on a live frame loop, as players see it.
+async function begin(page) {
   await page.locator('#sp0').press('Enter');
-  await frame(page);
+  await page.evaluate(() => {
+    window.__liveFrames = setInterval(() => window.__frame(performance.now()), 16);
+  });
+  await draw(page);
 }
-async function frame(page) {
-  await page.evaluate(() => window.__catalogFrame?.(performance.now()));
+test.afterEach(({ page }) => page.evaluate(() => clearInterval(window.__liveFrames)));
+async function draw(page) {
+  await frame(page, await page.evaluate(() => performance.now()));
+}
+// Queued after transient help's 120 ms leave timer, so it runs once that has fired.
+function afterLeaveTimer(page) {
+  return page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 120)));
 }
 test('catalog search exposes recipe alternatives and placement requirements before choosing a tool', async ({
   page,
 }) => {
-  await boot(page);
+  await begin(page);
   await page.locator('#paletteb').press('Enter');
   await expect(page.locator('#catalog-search')).toBeVisible();
   await page.locator('#catalog-search').fill('gold');
@@ -61,7 +58,7 @@ async function move(page, x, y) {
     { x, y },
   );
   await page.mouse.move(point.x, point.y);
-  await frame(page);
+  await draw(page);
   return point;
 }
 async function clearSites(page) {
@@ -80,7 +77,7 @@ async function clearSites(page) {
 test('placement distinguishes spatial permission from affordability and keeps repeat building efficient', async ({
   page,
 }) => {
-  await boot(page);
+  await begin(page);
   await clearSites(page);
   await page.evaluate(() => {
     window.productionArtPreview.game.anyStorage().stock = { planks: 2, stone: 3, tools: 1 };
@@ -117,7 +114,7 @@ test('placement distinguishes spatial permission from affordability and keeps re
 test('road plans show zero resource cost and rejection evidence before committing', async ({
   page,
 }) => {
-  await boot(page);
+  await begin(page);
   await clearSites(page);
   await choose(page, 'road');
   const start = await move(page, 49, 50);
@@ -140,15 +137,8 @@ test('road plans show zero resource cost and rejection evidence before committin
   await expect(page.locator('#placement-feedback')).toContainText('No walking route');
 });
 
-// The visual fixture submits explicit production frames to keep SwiftShader capture bounded.
-async function capture(page, filename) {
-  await frame(page);
-  await page.screenshot({ path: test.info().outputPath(filename), timeout: 30000 });
-}
-
 test('catalog and placement feedback remain legible at both desktop sizes', async ({ page }) => {
-  test.setTimeout(180000);
-  await boot(page, true);
+  await begin(page);
   await clearSites(page);
   for (const [width, height, quality, motion] of [
     [1440, 900, '1', false],
@@ -168,11 +158,9 @@ test('catalog and placement feedback remain legible at both desktop sizes', asyn
     const palette = await page.locator('#palette').boundingBox();
     const atlas = await page.locator('#atlas-toggle').boundingBox();
     expect(palette.y).toBeGreaterThanOrEqual(atlas.y + atlas.height + 8);
-    await capture(page, `catalog-${width}.png`);
     await page.locator('#catalog-chain').selectOption('Timber & stone');
     await page.locator('.pb[data-b="lumberjack"]').focus();
     await expect(page.locator('#catalog-detail-lumberjack')).toBeVisible();
-    await capture(page, `catalog-popup-${width}.png`);
     await page.locator('#catalog-chain').selectOption('all');
     await page.locator('.pb[data-b="farm"]').press('Enter');
     await page.evaluate(() => {
@@ -183,20 +171,17 @@ test('catalog and placement feedback remain legible at both desktop sizes', asyn
     const feedback = await page.locator('#placement-feedback').boundingBox();
     const minimap = await page.locator('#minimap-panel').boundingBox();
     expect(feedback.y + feedback.height).toBeLessThanOrEqual(minimap.y - 8);
-    await capture(page, `placement-unaffordable-${width}.png`);
     await page.evaluate(() => {
       window.productionArtPreview.game.anyStorage().stock.planks = 3;
     });
-    await frame(page);
     await expect(page.locator('#placement-feedback')).toContainText('Ready to build');
-    await capture(page, `placement-valid-${width}.png`);
   }
 });
 
 test('the compact palette presents five illustrated choices per row and retains filters after selection', async ({
   page,
 }) => {
-  await boot(page);
+  await begin(page);
   await page.locator('#paletteb').press('Enter');
   const cards = page.locator('#paletteitems .pb');
   await expect(cards).toHaveCount(23);
@@ -224,7 +209,7 @@ test('the compact palette presents five illustrated choices per row and retains 
 test('ordinary play hides permanent instructions and active construction offers explicit cancellation', async ({
   page,
 }) => {
-  await boot(page);
+  await begin(page);
   await expect(page.locator('#hint')).toBeHidden();
   await choose(page, 'farm');
   await expect(page.locator('#hint')).toBeVisible();
@@ -240,7 +225,7 @@ test('ordinary play hides permanent instructions and active construction offers 
 test('placement evidence remains readable under its pointer and cannot issue a hidden map command', async ({
   page,
 }) => {
-  await boot(page);
+  await begin(page);
   await clearSites(page);
   await choose(page, 'farm');
   await move(page, 51, 48);
@@ -271,7 +256,7 @@ test('placement evidence remains readable under its pointer and cannot issue a h
 test('demolition feedback keeps precise snapshots and still requires the actual building confirmation', async ({
   page,
 }) => {
-  await boot(page);
+  await begin(page);
   await clearSites(page);
   await choose(page, 'farm');
   const point = await move(page, 51, 48);
@@ -302,7 +287,7 @@ test('demolition feedback keeps precise snapshots and still requires the actual 
 test('catalog explanations permit pointer reading, consume Escape first and cannot place on the map', async ({
   page,
 }) => {
-  await boot(page);
+  await begin(page);
   await choose(page, 'farm');
   await page.locator('#paletteb').press('Enter');
   await page.locator('#catalog-search').fill('gold');
@@ -315,7 +300,7 @@ test('catalog explanations permit pointer reading, consume Escape first and cann
   const box = await popup.boundingBox();
   await page.mouse.move(box.x + box.width / 2, box.y + 30);
   await page.locator('#catalog-search').focus();
-  await page.waitForTimeout(180);
+  await afterLeaveTimer(page);
   await expect(popup).toBeVisible();
   await page.mouse.click(box.x + box.width / 2, box.y + 30);
   expect(await page.evaluate(() => window.productionArtPreview.game.exportSave())).toBe(before);
@@ -329,7 +314,7 @@ test('catalog explanations permit pointer reading, consume Escape first and cann
 test('adjacent Help offers current-tool instructions and opens the existing full reference', async ({
   page,
 }) => {
-  await boot(page);
+  await begin(page);
   await choose(page, 'farm');
   const help = page.getByRole('button', { name: 'Help', exact: true });
   await help.focus();
@@ -351,7 +336,7 @@ test('adjacent Help offers current-tool instructions and opens the existing full
 test('changing catalog filters dismisses explanations for entries that leave the results', async ({
   page,
 }) => {
-  await boot(page);
+  await begin(page);
   await page.locator('#paletteb').press('Enter');
   await page.locator('#catalog-search').fill('gold');
   const mine = page.locator('.pb[data-b="mine_gold"]');
@@ -369,7 +354,7 @@ test('changing catalog filters dismisses explanations for entries that leave the
 test('keyboard report opening dismisses catalog help while its pointer stays over the popup', async ({
   page,
 }) => {
-  await boot(page);
+  await begin(page);
   await page.locator('#paletteb').press('Enter');
   await page.locator('#catalog-search').fill('gold');
   await page.locator('.pb[data-b="mine_gold"]').focus();

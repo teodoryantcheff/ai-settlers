@@ -1,19 +1,17 @@
-import { test, expect } from './helpers/test.mjs';
+// Each case boots the release page or a URL scenario with live animation frames.
+import { test, expect, seedPrefs } from './helpers/test.mjs';
 
 test.setTimeout(60000);
 
 async function boot(page, url) {
-  await page.addInitScript(() => {
-    // UI assertions need native rendering, but do not need full-resolution effects.
-    if (!localStorage.getItem('settlers.prefs'))
-      localStorage.setItem('settlers.prefs', JSON.stringify({ quality: 0.75, showFps: true }));
-  });
+  // UI assertions need native rendering, but do not need full-resolution effects.
+  await seedPrefs(page, { quality: 0.75, showFps: true });
   await page.goto(url);
   await expect(page.locator('#boot')).toHaveCount(0, { timeout: 30000 });
 }
 
 test('armory shows the same iron-bar shortage in its inspector and muted persistent notice', async ({
-  page,
+  freshPage: page,
 }) => {
   await boot(page, '/tests/game.html?shortagefeedback&seed=2024');
   await expect(page.locator('html')).toHaveAttribute('data-renderer', 'pixi');
@@ -23,10 +21,9 @@ test('armory shows the same iron-bar shortage in its inspector and muted persist
   });
   await expect(page.locator('#msgs')).not.toContainText('needs coal');
   expect(await page.evaluate(() => window.productionArtPreview.game.muted)).toBe(true);
-  await page.screenshot({ path: test.info().outputPath('armory-shortage.png') });
 });
 
-test('all resources remain visible at desktop sizes', async ({ page }) => {
+test('all resources remain visible at desktop sizes', async ({ freshPage: page }) => {
   await boot(page, '/?seed=2024');
   await page.getByRole('button', { name: 'SETTLE!', exact: true }).click();
   for (const [width, height] of [
@@ -51,7 +48,9 @@ test('all resources remain visible at desktop sizes', async ({ page }) => {
   }
 });
 
-test('FPS remains visible and updates while the simulation is paused', async ({ page }) => {
+test('FPS remains visible and updates while the simulation is paused', async ({
+  freshPage: page,
+}) => {
   await boot(page, '/?seed=2024');
   await page.getByRole('button', { name: 'SETTLE!', exact: true }).click();
   await page.locator('#sp0').click();
@@ -61,7 +60,6 @@ test('FPS remains visible and updates while the simulation is paused', async ({ 
   });
   await expect(page.locator('#fps')).toHaveText(/^\d+ FPS$/, { timeout: 15000 });
   await expect(page.locator('#fps')).toBeVisible();
-  await page.screenshot({ path: test.info().outputPath('fps-counter.png') });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.locator('#fps')).toBeVisible();
   const fpsBox = await page.locator('#fps').boundingBox();
@@ -69,7 +67,7 @@ test('FPS remains visible and updates while the simulation is paused', async ({ 
   expect(fpsBox.x + fpsBox.width).toBeLessThanOrEqual(390);
 });
 
-test('built-in placement and interface scenarios pass', async ({ page }) => {
+test('built-in placement and interface scenarios pass', async ({ freshPage: page }) => {
   // Both exhaustive scenarios share a cold software-GPU boot in this case.
   test.setTimeout(90000);
   await boot(page, '/tests/game.html?uitest&buildrules&seed=2024');
@@ -77,7 +75,7 @@ test('built-in placement and interface scenarios pass', async ({ page }) => {
   await expect(page.locator('#brres')).toContainText('BUILD_RULES OK', { timeout: 30000 });
 });
 
-test('save import is transactional and settings persist', async ({ page }) => {
+test('save import is transactional and settings persist', async ({ freshPage: page }) => {
   await boot(page, '/?seed=2024');
   await page.getByRole('button', { name: 'SETTLE!', exact: true }).click();
   await page.locator('#sp0').click();
@@ -110,14 +108,14 @@ test('save import is transactional and settings persist', async ({ page }) => {
   ).toBe(true);
 });
 
-test('save/load scenario restores a live colony', async ({ page }) => {
+test('save/load scenario restores a live colony', async ({ freshPage: page }) => {
   await boot(page, '/tests/game.html?saveload&seed=123');
   // This scenario advances through timer-driven save/load stages while rendering.
   await expect(page.locator('#slres')).toContainText('SAVELOAD_OK', { timeout: 30000 });
 });
 
 test('keyboard buttons keep pause state and Escape closes a focused text field', async ({
-  page,
+  freshPage: page,
 }) => {
   await boot(page, '/?seed=2024');
   await page.getByRole('button', { name: 'SETTLE!', exact: true }).click();
@@ -138,7 +136,7 @@ test('keyboard buttons keep pause state and Escape closes a focused text field',
 });
 
 test('shared interaction transitions preserve real map, inspector, road, Journey and load controls', async ({
-  page,
+  freshPage: page,
 }) => {
   test.setTimeout(180000);
   const errors = [];
@@ -214,7 +212,6 @@ test('shared interaction transitions preserve real map, inspector, road, Journey
   expect(await page.evaluate((id) => !!window.productionArtPreview.game.byId(id), ids.farm)).toBe(
     true,
   );
-  await page.screenshot({ path: test.info().outputPath('map-raze-armed.png') });
   await page.locator('#demolition-confirm').click();
   expect(
     await page.evaluate((id) => window.productionArtPreview.game.byId(id), ids.farm),
@@ -295,7 +292,6 @@ test('shared interaction transitions preserve real map, inspector, road, Journey
       return Math.abs(cam.x - ((b.x + 0.5) * g.TS - g.vw / g.z / 2)) < 0.01;
     }, journeyCam),
   ).toBe(true);
-  await page.screenshot({ path: test.info().outputPath('journey-inspection.png') });
 
   await choose('road');
   await mapClick(49, 48);
@@ -353,6 +349,5 @@ test('shared interaction transitions preserve real map, inspector, road, Journey
   await mapClick(48, 48);
   expect((await state()).selected).toBe(ids.hq);
   await expect(page.locator('#infobody')).toContainText('Headquarters');
-  await page.screenshot({ path: test.info().outputPath('loaded-inspection.png') });
   expect(errors).toEqual([]);
 });

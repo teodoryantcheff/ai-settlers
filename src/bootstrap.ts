@@ -1,6 +1,6 @@
 import { MissingElementError, PAGE_ELEMENT_IDS, requireElement } from './ui/dom.ts';
 import { paintUtilityArtwork } from './ui/utility-art.ts';
-import { createGame } from './app.ts';
+import { createGame, type DevInternals } from './app.ts';
 import { loadPaintedAssets } from './rendering/painted-assets.ts';
 import { createPixiRenderer } from './rendering/pixi-renderer.ts';
 import type { GameRuntime } from './runtime.ts';
@@ -17,8 +17,11 @@ async function stage(number: number, message: string) {
   // Yield a task so the stage is paintable before synchronous artwork/terrain work.
   await new Promise((resolve) => setTimeout(resolve, 0));
 }
-/** Install artwork atomically before the first world paint, then start native WebGL play. */
-export async function bootGame(): Promise<GameRuntime> {
+/**
+ * Install artwork atomically before the first world paint, then start native WebGL play.
+ * Only the development bundle passes `internals`; the release boots without.
+ */
+export async function bootGame(internals?: DevInternals): Promise<GameRuntime> {
   for (const id of PAGE_ELEMENT_IDS) requireElement(id);
   await stage(1, 'Checking WebGL graphics…');
   let presenter: Awaited<ReturnType<typeof createPixiRenderer>>;
@@ -38,7 +41,7 @@ export async function bootGame(): Promise<GameRuntime> {
   let game: GameRuntime | undefined;
   try {
     await stage(2, 'Preparing colony systems and settler artwork…');
-    game = createGame(presenter.presentation);
+    game = createGame(presenter.presentation, internals);
     await stage(3, 'Loading and validating painted artwork…');
     await loadPaintedAssets(game);
     paintUtilityArtwork(game);

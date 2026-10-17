@@ -23,6 +23,8 @@ import { createHud, type HudInternals } from '../ui/hud.ts';
 
 export interface PresentationOptions {
   presentation: RendererPresentation;
+  /** Development builds only: test-only HUD hooks (see `src/dev/`). */
+  hudInternals?: HudInternals;
 }
 
 /** Production and partial tests use these same factories in this same order. */
@@ -51,7 +53,9 @@ export const PRESENTATION_SUBSYSTEMS = [
   presentationSubsystem('reference', (game) => createReferenceView(game)),
   presentationSubsystem('recovery', (game) => createRecoveryView(game)),
   presentationSubsystem('attentionView', (game) => createAttentionView(game)),
-  presentationSubsystem('hud', (game, _options, hooks?: HudInternals) => createHud(game, hooks)),
+  presentationSubsystem('hud', (game, options, hooks?: HudInternals) =>
+    createHud(game, hooks ?? options.hudInternals),
+  ),
   presentationSubsystem('session', (game) => createSessionView(game)),
   presentationSubsystem('loop', (game, _options, hooks?: LoopInternals) => createLoop(game, hooks)),
 ] as const;

@@ -1,31 +1,24 @@
-import { test, expect } from './helpers/test.mjs';
+import { test, expect, frame, holdFrames, load, seedPrefs } from './helpers/test.mjs';
 import { openAtlas } from './helpers/atlas.mjs';
 
 test.setTimeout(90000);
-async function boot(page) {
-  await page.addInitScript(() => {
-    window.requestAnimationFrame = (callback) => {
-      window.__mapControlsFrame = callback;
-      return 0;
-    };
-    if (!localStorage.getItem('settlers.prefs'))
-      localStorage.setItem(
-        'settlers.prefs',
-        JSON.stringify({ quality: 0.75, reducedMotion: true, weather: false }),
-      );
-  });
-  await page.goto('/tests/game.html?seed=2024');
-  await expect(page.locator('#boot')).toHaveCount(0, { timeout: 30000 });
-  await page.waitForFunction(() => window.productionArtPreview?.game, null, { polling: 100 });
-  await page.evaluate(() => window.__mapControlsFrame(1000));
-  await page.locator('#startb').press('Enter');
+async function pause(page) {
   await page.locator('#sp0').press('Enter');
+}
+/** Reload tests own their page: remembered preferences must survive a real boot. */
+async function bootFresh(page) {
+  await holdFrames(page);
+  await seedPrefs(page);
+  await load(page);
+  await frame(page);
+  await page.locator('#startb').press('Enter');
+  await pause(page);
 }
 
 test('direct map choices remain shared, keyboard accessible and remembered without changing the colony', async ({
-  page,
+  freshPage: page,
 }) => {
-  await boot(page);
+  await bootFresh(page);
   const controls = page.getByRole('group', { name: 'Map modes' });
   await expect(controls.getByRole('button')).toHaveCount(5);
   const before = await page.evaluate(() => window.productionArtPreview.game.exportSave());
@@ -73,9 +66,9 @@ test('direct map choices remain shared, keyboard accessible and remembered witho
 });
 
 test('minimap remains navigable during analysis and remembers collapse without moving the map', async ({
-  page,
+  freshPage: page,
 }) => {
-  await boot(page);
+  await bootFresh(page);
   const toggle = page.getByRole('button', { name: 'Collapse minimap', exact: true });
   const mini = page.locator('#mini');
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
@@ -122,7 +115,7 @@ for (const [width, height, quality, motion] of [
     page,
   }) => {
     await page.setViewportSize({ width, height });
-    await boot(page);
+    await pause(page);
     await page.evaluate(
       ({ quality, motion }) => {
         const g = window.productionArtPreview.game;
@@ -149,10 +142,7 @@ for (const [width, height, quality, motion] of [
       'aria-pressed',
       'true',
     );
-    await page.screenshot({ path: test.info().outputPath(`map-controls-${width}.png`) });
     await page.getByRole('button', { name: 'Workload', exact: true }).press('Enter');
-    await page.evaluate(() => window.productionArtPreview.game.draw());
-    await page.screenshot({ path: test.info().outputPath(`map-workload-${width}.png`) });
     await openAtlas(page);
     const shiftedPalette = await page.locator('#palette').boundingBox();
     expect(shiftedPalette.x + shiftedPalette.width).toBeLessThanOrEqual(modes.x);
@@ -166,6 +156,5 @@ for (const [width, height, quality, motion] of [
     );
     const inspector = await page.locator('#inspectordock').boundingBox();
     expect(inspector.y + inspector.height).toBeLessThanOrEqual(mini.y);
-    await page.screenshot({ path: test.info().outputPath(`map-controls-overlays-${width}.png`) });
   });
 }

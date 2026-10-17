@@ -1,29 +1,16 @@
-import { test, expect } from './helpers/test.mjs';
+import { test, expect, frame, holdFrames, seedPrefs, load } from './helpers/test.mjs';
 
 test.setTimeout(120000);
-async function boot(page) {
-  await page.addInitScript(() => {
-    if (!location.search.includes('rememberAtlas'))
-      localStorage.setItem(
-        'settlers.prefs',
-        JSON.stringify({ quality: 0.75, reducedMotion: true, weather: false }),
-      );
-    window.requestAnimationFrame = (callback) => {
-      window.__fullMapFrame = callback;
-      return 0;
-    };
-  });
-  await page.goto('/tests/game.html?seed=2024');
-  await expect(page.locator('#boot')).toHaveCount(0, { timeout: 30000 });
-  await page.evaluate(() => window.__fullMapFrame(1000));
-  await page.locator('#startb').press('Enter');
+// Paused on a running frame clock: the next frame advances it by at most 0.1 s.
+async function pause(page) {
+  await frame(page, 1000);
   await page.locator('#sp0').press('Enter');
 }
 
 test('map fills the viewport and selected inspector overlays preserve map and camera', async ({
   page,
 }) => {
-  await boot(page);
+  await pause(page);
   await expect(page.locator('#inspectordock')).toBeHidden();
   const before = await page.evaluate(() => {
     const g = window.productionArtPreview.game;
@@ -57,10 +44,16 @@ test('map fills the viewport and selected inspector overlays preserve map and ca
   await expect(page.locator('#inspectordock')).toBeVisible();
 });
 
+// Navigates to a reload that keeps the remembered Atlas choice.
 test('Atlas starts collapsed, stays open across destinations and remembers the explicit choice', async ({
-  page,
+  freshPage: page,
 }) => {
-  await boot(page);
+  await holdFrames(page);
+  await seedPrefs(page);
+  await load(page);
+  await frame(page);
+  await page.locator('#startb').press('Enter');
+  await page.locator('#sp0').press('Enter');
   const toggle = page.locator('#atlas-toggle');
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
   await expect(page.locator('#workspace-nav')).toBeHidden();
@@ -100,7 +93,7 @@ test('Atlas starts collapsed, stays open across destinations and remembers the e
 test('analysis keeps submitting the full map and minimap while simulation remains live', async ({
   page,
 }) => {
-  await boot(page);
+  await pause(page);
   await page.locator('#atlas-toggle').click();
   await page.locator('[data-workspace="economy"]').click();
   await expect(page.locator('#workspace-economy')).toBeVisible();
@@ -108,7 +101,7 @@ test('analysis keeps submitting the full map and minimap while simulation remain
   await page.locator('#sp1').press('Enter');
   const time = await page.evaluate(() => window.productionArtPreview.game.state.time);
   const before = await page.evaluate(() => window.productionArtPreview.game.renderStats.samples);
-  await page.evaluate(() => window.__fullMapFrame(2000));
+  await frame(page, 2000);
   expect(
     await page.evaluate(() => window.productionArtPreview.game.renderStats.samples),
   ).toBeGreaterThan(before);
@@ -121,7 +114,7 @@ test('analysis keeps submitting the full map and minimap while simulation remain
 test('overlay edges retain real hover, placement, pan and zoom coordinates at both supported qualities', async ({
   page,
 }) => {
-  await boot(page);
+  await pause(page);
   for (const [width, height, quality, motion] of [
     [1440, 900, '1', false],
     [1280, 720, '0.75', true],
@@ -202,8 +195,10 @@ test('overlay edges retain real hover, placement, pan and zoom coordinates at bo
       { x: point.screenX - 32, y: point.screenY + 24 },
     );
     const zoom = await page.evaluate(() => window.productionArtPreview.game.zi);
+    const wheeled = await page.evaluate(() => performance.now());
     await page.mouse.wheel(0, -120);
-    await page.waitForTimeout(180);
+    // Past the 150 ms zoom animation, so the next draw lands on the new zoom.
+    await page.waitForFunction((at) => performance.now() >= at + 150, wheeled, { polling: 20 });
     await page.evaluate(() => window.productionArtPreview.game.draw());
     expect(await page.evaluate(() => window.productionArtPreview.game.zi)).toBe(zoom + 1);
     const afterAnchor = await page.evaluate(
@@ -218,11 +213,7 @@ test('overlay edges retain real hover, placement, pan and zoom coordinates at bo
       g.draw();
       g.drawMini();
     });
-    await page.screenshot({ path: test.info().outputPath(`full-map-inspector-${width}.png`) });
     await page.locator('#atlas-toggle').click();
-    await page.screenshot({
-      path: test.info().outputPath(`full-map-atlas-inspector-${width}.png`),
-    });
     const saved = await page.evaluate(() => window.productionArtPreview.game.exportSave());
     await page.evaluate((raw) => window.productionArtPreview.game.importSave(raw), saved);
     await expect(page.locator('#inspectordock')).toBeHidden();
@@ -235,7 +226,7 @@ test('overlay edges retain real hover, placement, pan and zoom coordinates at bo
 test('expanded Atlas leaves Buildings reachable while detailed Advisor lives in Colony', async ({
   page,
 }) => {
-  await boot(page);
+  await pause(page);
   await page.locator('#atlas-toggle').click();
   await expect(page.locator('#adv')).toBeHidden();
   const atlas = await page.locator('#workspace-nav').boundingBox();

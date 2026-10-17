@@ -1,4 +1,4 @@
-import { test, expect } from './helpers/test.mjs';
+import { test, expect, holdFrames } from './helpers/test.mjs';
 
 // Exercise the shipped Tone graph. Faults and observations stay at the browser
 // AudioContext boundary; the game needs no production fault switches.
@@ -7,20 +7,19 @@ test.setTimeout(90000);
 async function boot(page, { failure = null, liveFrames = false } = {}) {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
+  if (!liveFrames) await holdFrames(page);
   await page.addInitScript(
     ({ failure, liveFrames }) => {
-      const frame = window.requestAnimationFrame.bind(window);
       window.audioEvidence = { attempts: 0, contexts: [], taps: [], loops: [], frames: 0 };
-      window.requestAnimationFrame = (callback) => {
-        if (!liveFrames) {
-          window.audioFrame = callback;
-          return 0;
-        }
-        return frame((time) => {
-          audioEvidence.frames++;
-          callback(time);
-        });
-      };
+      if (liveFrames) {
+        // Live frames, counted so audio recovery can be tied to real loop turns.
+        const frame = window.requestAnimationFrame.bind(window);
+        window.requestAnimationFrame = (callback) =>
+          frame((time) => {
+            audioEvidence.frames++;
+            callback(time);
+          });
+      }
       localStorage.setItem(
         'settlers.prefs',
         JSON.stringify({
@@ -141,7 +140,7 @@ async function summary(page) {
 
 for (const failure of ['constructor', 'context-node', 'mixer', 'resume']) {
   test(`native ${failure} failure stays nonblocking and controls retry one clean graph`, async ({
-    page,
+    freshPage: page,
   }) => {
     // Keep one case on the real RAF loop so visibility of the notice and economy
     // progress are observed without manually drawing a frame or stepping time.
@@ -178,7 +177,6 @@ for (const failure of ['constructor', 'context-node', 'mixer', 'resume']) {
       game.SND.fanfare();
     });
     expect((await summary(page)).attempts).toBe(attempts);
-    await page.screenshot({ path: test.info().outputPath(`${failure}-notice.png`) });
     await menu(page);
     await page.locator('#mute').click();
     await page.locator('#mute').click();
@@ -204,7 +202,7 @@ for (const failure of ['constructor', 'context-node', 'mixer', 'resume']) {
 }
 
 test('native context loss during play reports automatically and controls restore audible output', async ({
-  page,
+  freshPage: page,
 }) => {
   const errors = await boot(page, { liveFrames: true });
   await ready(page);
@@ -220,7 +218,6 @@ test('native context loss during play reports automatically and controls restore
     .toBeGreaterThan(before.time);
   expect(await page.evaluate(() => audioEvidence.frames)).toBeGreaterThan(before.frames);
   expect((await summary(page)).notices).toBe(1);
-  await page.screenshot({ path: test.info().outputPath('playback-loss-notice.png') });
   await menu(page);
   await page.locator('#mute').click();
   await page.locator('#mute').click();
@@ -244,7 +241,7 @@ test('native context loss during play reports automatically and controls restore
 });
 
 test('startup, settings, pause, speed, world replacement and background recovery share one graph', async ({
-  page,
+  freshPage: page,
 }) => {
   const errors = await boot(page);
   await ready(page);
@@ -287,7 +284,6 @@ test('startup, settings, pause, speed, world replacement and background recovery
       }),
     )
     .toEqual([0.29, 0.63, 0.45, false, true]);
-  await page.screenshot({ path: test.info().outputPath('audio-settings.png') });
   await page.keyboard.press('Escape');
 
   // These are real browser lifecycle handlers and native suspend/resume calls.
