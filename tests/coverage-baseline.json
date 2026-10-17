@@ -681,6 +681,28 @@
       }
     }
   },
+  "src/rendering/painted-crop.ts": {
+    "node": {
+      "lines": {
+        "uncovered": 0,
+        "total": 47
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 33
+      }
+    },
+    "browser": {
+      "lines": {
+        "uncovered": 3,
+        "total": 58
+      },
+      "branches": {
+        "uncovered": 3,
+        "total": 33
+      }
+    }
+  },
   "src/rendering/pixi-atmosphere.ts": {
     "node": {
       "lines": {
