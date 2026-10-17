@@ -1,6 +1,6 @@
 import { createEngine } from './simulation/engine.ts';
 import { assemblePresentation } from './application/assembly.ts';
-import type { RendererPresentation } from './rendering/renderer.ts';
+import type { RendererPresentation } from './rendering/scene.ts';
 import type { GameRuntime } from './runtime.ts';
 
 /** Assemble before starting: no module starts a frame loop when imported. */

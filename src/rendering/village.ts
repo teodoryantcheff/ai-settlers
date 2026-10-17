@@ -1,6 +1,8 @@
+import type { Graphics } from 'pixi.js';
 import { requireCanvas2D } from './canvas-context.ts';
 import type { GameRuntime } from '../runtime.ts';
 import type { Building, BuildingType, Good, Sprite } from '../types.ts';
+import type { SceneLayer } from './scene.ts';
 
 /** One displayed good pile on a building's stock heap. */
 export interface VillageStockSlot {
@@ -100,6 +102,21 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
     g.beginPath();
     g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
     g.fill();
+  }
+  // Live per-frame marks, drawn natively into the object layer.
+  function sceneLine(
+    g: Graphics,
+    color: number,
+    width: number,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+  ): void {
+    g.moveTo(x1, y1).lineTo(x2, y2).stroke({ color, width });
+  }
+  function sceneEllipse(g: Graphics, color: number, x: number, y: number, rx: number, ry: number) {
+    g.ellipse(x, y, rx, ry).fill(color);
   }
   function villageYard(type: string) {
     if (villageYards[type]) return villageYards[type];
@@ -225,9 +242,9 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
       }
     }));
   }
-  function drawVillageYard(g: CanvasRenderingContext2D, b: Building): void {
+  function drawVillageYard(s: SceneLayer, b: Building): void {
     if (game.z < 0.55) return;
-    g.drawImage(villageYard(b.type), b.x * game.TS - 6, b.y * game.TS - 4, 36, 32);
+    s.image(villageYard(b.type), b.x * game.TS - 6, b.y * game.TS - 4, 36, 32);
   }
 
   function villageSurrounding(type: BuildingType): HTMLCanvasElement {
@@ -400,30 +417,27 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
     return slots;
   }
   function drawVillageGood(
-    g: CanvasRenderingContext2D,
+    s: SceneLayer,
     good: Good,
     quantity: number,
     x: number,
     y: number,
-    scale: number,
+    size: number,
   ): void {
     if (quantity <= 0) return;
     const bundles = Math.min(4, Math.ceil(quantity / 2)),
-      size = scale || 1,
-      img = game.ART.cargo && game.ART.cargo[good];
+      img = game.ART.cargo[good];
     for (let pile = 0; pile < bundles; pile++) {
       const px = x + (pile % 2) * size * 1.1,
         py = y - Math.floor(pile / 2) * size * 2.3;
-      if (img) g.drawImage(img, px, py - 5.5 * size, 7.4 * size, 5.5 * size);
+      if (img) s.image(img, px, py - 5.5 * size, 7.4 * size, 5.5 * size);
       else {
-        g.fillStyle = game.GOODS[good].c;
-        g.fillRect(px, py - 2 * size, 5 * size, 2 * size);
-        g.fillStyle = 'rgba(255,255,255,0.3)';
-        g.fillRect(px, py - 2 * size, 5 * size, 0.6 * size);
+        s.g.rect(px, py - 2 * size, 5 * size, 2 * size).fill(game.GOODS[good].c);
+        s.g.rect(px, py - 2 * size, 5 * size, 0.6 * size).fill({ color: 0xffffff, alpha: 0.3 });
       }
     }
   }
-  function drawVillageStock(g: CanvasRenderingContext2D, b: Building): void {
+  function drawVillageStock(s: SceneLayer, b: Building): void {
     if (game.z < 0.65) return;
     const slots = villageStockPlan(b);
     for (let slot = 0; slot < slots.length; slot++) {
@@ -431,7 +445,7 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
         right = item.output || slot % 2 === 1,
         x = b.x * game.TS + (right ? 16 : 0.4),
         y = b.y * game.TS + 23.5 - Math.floor(slot / 2) * 3;
-      drawVillageGood(g, item.good, item.quantity, x, y, b.done ? 0.85 : 0.75);
+      drawVillageGood(s, item.good, item.quantity, x, y, b.done ? 0.85 : 0.75);
     }
   }
   function villageCrop(stage: number): HTMLCanvasElement {
@@ -489,56 +503,53 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
       villageLine(g, '#967145', 0.8, 15, 12, 23, 12);
     }));
   }
-  function drawVillageDetails(g: CanvasRenderingContext2D, b: Building): void {
+  function drawVillageDetails(s: SceneLayer, b: Building): void {
     if (game.z < 0.8) return;
     const x = b.x * game.TS,
       y = b.y * game.TS;
-    g.drawImage(villageSurrounding(b.type), x - 6, y - 4, 36, 32);
+    s.image(villageSurrounding(b.type), x - 6, y - 4, 36, 32);
+    const g = s.g;
     if (b.type === 'farm') {
       // Timer follows the real fifteen-second harvest cycle and freezes when blocked.
       const stage = b.timer > 10 ? 0 : b.timer > 5 ? 1 : 2;
-      g.drawImage(villageCrop(stage), x, y + 10.5, game.TS, 13);
+      s.image(villageCrop(stage), x, y + 10.5, game.TS, 13);
     } else if (b.type === 'forester') {
-      g.fillStyle = '#87663e';
-      g.fillRect(x + 0.5, y + 18.8, 5, 4.4);
-      g.fillStyle = '#544c30';
-      g.fillRect(x + 0.9, y + 19.2, 4.2, 3.6);
+      g.rect(x + 0.5, y + 18.8, 5, 4.4).fill(0x87663e);
+      g.rect(x + 0.9, y + 19.2, 4.2, 3.6).fill(0x544c30);
       for (let seedling = 0; seedling < 4; seedling++) {
         const sx = x + 1.5 + (seedling % 2) * 2.2,
           sy = y + 20.5 + Math.floor(seedling / 2) * 1.9;
-        villageLine(g, '#d5c19a', 0.5, sx, sy, sx, sy - 2);
-        villageEllipse(g, '#617e39', sx, sy - 1.8, 1.3, 0.65);
-        villageEllipse(g, '#9ab75d', sx - 0.35, sy - 2.1, 0.8, 0.45);
+        sceneLine(g, 0xd5c19a, 0.5, sx, sy, sx, sy - 2);
+        sceneEllipse(g, 0x617e39, sx, sy - 1.8, 1.3, 0.65);
+        sceneEllipse(g, 0x9ab75d, sx - 0.35, sy - 2.1, 0.8, 0.45);
       }
     } else if (b.type === 'sawmill') {
-      villageLine(g, '#624b30', 0.9, x + 0.9, y + 18, x + 1.3, y + 21);
-      villageLine(g, '#624b30', 0.9, x + 6.5, y + 18, x + 6.1, y + 21);
-      g.fillStyle = '#c9a56d';
-      g.fillRect(x + 0.3, y + 17.2, 7, 1.4);
-      villageLine(g, '#ead299', 0.5, x + 0.6, y + 17.3, x + 7, y + 17.3);
+      sceneLine(g, 0x624b30, 0.9, x + 0.9, y + 18, x + 1.3, y + 21);
+      sceneLine(g, 0x624b30, 0.9, x + 6.5, y + 18, x + 6.1, y + 21);
+      g.rect(x + 0.3, y + 17.2, 7, 1.4).fill(0xc9a56d);
+      sceneLine(g, 0xead299, 0.5, x + 0.6, y + 17.3, x + 7, y + 17.3);
     } else if (
       b.type === 'toolsmith' ||
       b.type === 'armory' ||
       b.type === 'smelter' ||
       b.type === 'workshop'
     ) {
-      g.fillStyle = '#514a42';
-      g.fillRect(x + 19.5, y + 14.8, 4.5, 1.2);
-      g.fillRect(x + 21.1, y + 16, 1.4, 2.7);
-      g.fillRect(x + 20, y + 18.5, 3.8, 1);
-      villageLine(g, '#b3b8b0', 0.6, x + 19.5, y + 14.7, x + 23.9, y + 14.7);
-      villageLine(g, '#967452', 0.8, x + 17.8, y + 19, x + 18.8, y + 14.8);
-      villageLine(g, '#ced4cb', 1.2, x + 17.5, y + 15.2, x + 20, y + 14.9);
+      g.rect(x + 19.5, y + 14.8, 4.5, 1.2)
+        .rect(x + 21.1, y + 16, 1.4, 2.7)
+        .rect(x + 20, y + 18.5, 3.8, 1)
+        .fill(0x514a42);
+      sceneLine(g, 0xb3b8b0, 0.6, x + 19.5, y + 14.7, x + 23.9, y + 14.7);
+      sceneLine(g, 0x967452, 0.8, x + 17.8, y + 19, x + 18.8, y + 14.8);
+      sceneLine(g, 0xced4cb, 1.2, x + 17.5, y + 15.2, x + 20, y + 14.9);
     }
-    drawVillageStock(g, b);
+    drawVillageStock(s, b);
   }
 
   function villageConstructionStage(progress: number): number {
     return progress < 0.18 ? 0 : progress < 0.44 ? 1 : progress < 0.74 ? 2 : 3;
   }
   function villageSite(type: BuildingType, stage: number): Sprite {
-    if (stage === 1 && game.ART.paintedStatus?.state === 'loaded' && game.ART.site)
-      return game.ART.site;
+    if (stage === 1) return game.ART.site;
     const key = type + ':' + stage;
     if (villageSites[key]) return villageSites[key];
     const art = game.ART.bld[type];
@@ -626,39 +637,30 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
     villageSites[key] = site;
     return site;
   }
-  function drawVillageScaffold(g: CanvasRenderingContext2D, b: Building, progress: number): void {
+  function drawVillageScaffold(g: Graphics, b: Building, progress: number): void {
     const x = b.x * game.TS,
       y = b.y * game.TS,
       level = progress >= 0.74 ? 3 : progress >= 0.44 ? 2 : 1,
       top = y + 8 - level * 4;
     // Side scaffolding leaves the centre door and road approach unobstructed.
-    villageLine(g, '#87613d', 1, x + 2, y + 18, x + 2, top);
-    villageLine(g, '#87613d', 1, x + 7, y + 18, x + 7, top);
+    sceneLine(g, 0x87613d, 1, x + 2, y + 18, x + 2, top);
+    sceneLine(g, 0x87613d, 1, x + 7, y + 18, x + 7, top);
     for (let step = 0; step < level + 2; step++) {
       const sy = y + 15 - step * 4;
-      villageLine(g, '#c4a16c', 0.7, x + 2, sy, x + 7, sy);
+      sceneLine(g, 0xc4a16c, 0.7, x + 2, sy, x + 7, sy);
     }
-    villageLine(g, '#ad8456', 1.4, x + 1, top + 1, x + 8, top + 1);
-    villageLine(g, '#624a30', 0.7, x + 2, y + 17, x + 7, top + 3);
+    sceneLine(g, 0xad8456, 1.4, x + 1, top + 1, x + 8, top + 1);
+    sceneLine(g, 0x624a30, 0.7, x + 2, y + 17, x + 7, top + 3);
   }
-  function drawVillageConstruction(
-    g: CanvasRenderingContext2D,
-    b: Building,
-    progress: number,
-  ): void {
-    drawVillageYard(g, b);
+  function drawVillageConstruction(s: SceneLayer, b: Building, progress: number): void {
+    drawVillageYard(s, b);
     const stage = villageConstructionStage(progress),
       img = stage === 3 ? game.bldImg(b) : villageSite(b.type, stage);
-    g.drawImage(img.img, b.x * game.TS + img.ox, b.y * game.TS + img.oy, img.w, img.h);
-    if (stage > 0) drawVillageScaffold(g, b, progress);
-    drawVillageStock(g, b);
+    s.image(img.img, b.x * game.TS + img.ox, b.y * game.TS + img.oy, img.w, img.h);
+    if (stage > 0) drawVillageScaffold(s.g, b, progress);
+    drawVillageStock(s, b);
   }
-  function drawVillageWorkEffects(
-    g: CanvasRenderingContext2D,
-    b: Building,
-    work: string,
-    now: number,
-  ): void {
+  function drawVillageWorkEffects(s: SceneLayer, b: Building, work: string, now: number): void {
     if (game.z < 0.85 || game.state.paused || game.renderPrefs().reducedMotion) return;
     const phase = (now / 1100 + b.id * 0.23) % 1;
     if (phase > 0.32) return;
@@ -688,19 +690,18 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
       x = b.x * game.TS + 17.3;
       y = b.y * game.TS + 10.5;
     }
+    const g = s.g,
+      travel = phase / 0.32;
     for (let particle = 0; particle < 3; particle++) {
-      const travel = phase / 0.32,
-        px = x + (particle - 1) * travel * 4,
+      const px = x + (particle - 1) * travel * 4,
         py = y - travel * (forge ? 6 : 3) + travel * travel * 7;
-      g.fillStyle = forge
-        ? particle % 2
-          ? '#ef9f45'
-          : '#f8da87'
-        : 'rgba(215,193,148,' + (0.6 * (1 - travel)).toFixed(2) + ')';
-      g.save();
-      g.translate(px, py);
-      g.fillRect(0, 0, forge ? 0.8 : 1.1, forge ? 1.5 : 0.7);
-      g.restore();
+      g.rect(px, py, forge ? 0.8 : 1.1, forge ? 1.5 : 0.7).fill(
+        forge
+          ? particle % 2
+            ? 0xef9f45
+            : 0xf8da87
+          : { color: 0xd7c194, alpha: 0.6 * (1 - travel) },
+      );
     }
   }
 
@@ -735,21 +736,16 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
 
 export interface VillageSubsystem {
   villageWorkTime: (b: Building) => number;
-  drawVillageYard: (g: CanvasRenderingContext2D, b: Building) => void;
-  drawVillageDetails: (g: CanvasRenderingContext2D, b: Building) => void;
-  drawVillageConstruction: (g: CanvasRenderingContext2D, b: Building, progress: number) => void;
-  drawVillageWorkEffects: (
-    g: CanvasRenderingContext2D,
-    b: Building,
-    work: string,
-    now: number,
-  ) => void;
+  drawVillageYard: (s: SceneLayer, b: Building) => void;
+  drawVillageDetails: (s: SceneLayer, b: Building) => void;
+  drawVillageConstruction: (s: SceneLayer, b: Building, progress: number) => void;
+  drawVillageWorkEffects: (s: SceneLayer, b: Building, work: string, now: number) => void;
 }
 
 /** Test-only view of closure internals; never merged into the runtime. */
 export interface VillageInternals {
   villageStockPlan: (b: Building) => VillageStockSlot[];
-  drawVillageStock: (g: CanvasRenderingContext2D, b: Building) => void;
+  drawVillageStock: (s: SceneLayer, b: Building) => void;
   villageConstructionStage: (progress: number) => number;
   villageSite: (type: BuildingType, stage: number) => Sprite;
   villageSites: Record<string, Sprite>;

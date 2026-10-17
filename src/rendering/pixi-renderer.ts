@@ -1,58 +1,61 @@
 import {
+  CanvasTextMetrics,
   Container,
   Graphics,
-  Matrix,
   Rectangle,
   Sprite,
   Text,
+  TextStyle,
   Texture,
   WebGLRenderer,
 } from 'pixi.js';
 import type { TextStyleOptions } from 'pixi.js';
 import type { LayerName } from '../types.ts';
 import type { GameRuntime } from '../runtime.ts';
-import type { RendererPresentation } from './renderer.ts';
-import { createPixiContext, type CapturedTextStyle, type DrawingState } from './pixi-context.ts';
+import type {
+  RendererPresentation,
+  SceneLayer,
+  SceneRect,
+  SceneTextStyle,
+  SceneView,
+} from './scene.ts';
 import { createShadowQuad } from './pixi-shadows.ts';
 import { createProductionAtmosphere } from './pixi-atmosphere.ts';
-import { CanvasContextError, requireCanvas2D } from './canvas-context.ts';
+import { requireCanvas2D } from './canvas-context.ts';
 
-interface ImagePart {
+/** One GPU texture of a cached canvas; huge canvases split into tiles on old GPUs. */
+interface CanvasPart {
   texture: Texture;
   x: number;
   y: number;
   width: number;
   height: number;
   canvas?: HTMLCanvasElement;
-  frames: Map<string, Texture>;
   viewport?: Texture;
-  slot?: CommandSlot;
+  sprite?: Sprite;
+  shadow?: ReturnType<typeof createShadowQuad>;
 }
-interface ImageEntry {
+interface CachedCanvas {
   width: number;
   height: number;
-  parts: ImagePart[];
+  parts: CanvasPart[];
 }
-interface CommandSlot {
+interface LayerState {
   root: Container;
-  frame: number;
-  sprite?: Sprite;
-  graphics?: Graphics;
-  text?: Text;
-  shadow?: ReturnType<typeof createShadowQuad>;
-  mask?: Graphics;
-  clipKey?: string;
-  textKey?: string;
-}
-
-interface CommandLayer {
-  root: Container;
-  slots: CommandSlot[];
-  cursor: number;
+  runs: Graphics[];
+  masks: (Graphics | undefined)[];
+  texts: Text[];
+  textKeys: string[];
+  runCursor: number;
+  textCursor: number;
+  /** Child index for the next object placed this frame. */
   order: number;
+  open: Graphics | null;
+  clip: SceneRect | null;
 }
 
-/** Native GPU presentation of the production renderer's ordered draw commands.
+/** Native GPU presentation of the production renderer's ordered scene layers.
+ * World layers sit under the camera transform; backdrop and overlay use screen pixels.
  * A separate input surface retains the existing camera and interaction controls.
  * Artwork is uploaded once; cached terrain is refreshed only on invalidation.
  */
@@ -90,94 +93,82 @@ export async function createPixiRenderer() {
   stage.addChild(scene);
   const atmosphere = createProductionAtmosphere(scene);
   const screenTint: [number, number, number, number] = [0, 0, 0, 0];
-  const images = new Map<CanvasImageSource, ImageEntry>();
-  const frames = new Set<Texture>();
-  const cachedCanvases = new WeakSet<CanvasImageSource>();
-  const slots: CommandSlot[] = [];
-  const ownedSlot = new WeakMap<Container, CommandSlot>();
-  const layers = new Map<LayerName, CommandLayer>();
-  let activeLayer: CommandLayer;
-  let frame = 0;
-  let cursor = 0,
-    nativeSprites = 0,
+  // Large invalidated canvases (terrain, borders, shadow planes).
+  const canvases = new Map<CanvasImageSource, CachedCanvas>();
+  // Prepared offscreen artwork, uploaded once, plus its frame views.
+  const artwork = new Map<CanvasImageSource, Texture>();
+  const frames = new Map<CanvasImageSource, Map<string, Texture>>();
+  const layers = new Map<LayerName, LayerState>();
+  const textStyles = new Map<string, TextStyle>();
+  const view: SceneView = {
+    width: 1,
+    height: 1,
+    cssWidth: 1,
+    cssHeight: 1,
+    dpr: 1,
+    scale: 1,
+    camX: 0,
+    camY: 0,
+  };
+  let nativeSprites = 0,
     nativeGraphics = 0,
-    nativeTexts = 0;
-  let spriteFrameUpdates = 0,
+    nativeTexts = 0,
+    graphicsBuilds = 0,
+    spriteFrameUpdates = 0,
     textureUpdates = 0,
     partialTextureUpdates = 0,
     textureUploads = 0,
     gpuDestroyed = false,
     disposed = false;
-  let game: GameRuntime;
+  let game: GameRuntime | undefined;
   let renderError = '';
-  // Reused per-frame temporaries; none may escape into retained state.
-  const scratchM = new Matrix();
   const scratchFrame = new Rectangle();
-  const fontCache = new Map<string, { fontSize: number; fontFamily: string; fontWeight: string }>();
   const statsObject: Record<string, unknown> = {};
   let scratchUploadCanvas: HTMLCanvasElement | null = null;
   let scratchUploadCtx: CanvasRenderingContext2D | null = null;
 
-  function slot(kind: 'sprite' | 'graphics' | 'text' | 'shadow', dedicated?: ImagePart) {
-    const index = activeLayer.cursor;
-    let entry = dedicated ? dedicated.slot : activeLayer.slots[index];
-    if (!entry) {
-      entry = { root: new Container(), frame };
-      slots.push(entry);
-      if (dedicated) dedicated.slot = entry;
-      else activeLayer.slots[index] = entry;
-      activeLayer.root.addChild(entry.root);
-    }
-    if (!dedicated) activeLayer.cursor++;
-    if (activeLayer.root.children[activeLayer.order] !== entry.root)
-      activeLayer.root.setChildIndex(entry.root, activeLayer.order);
-    activeLayer.order++;
-    entry.frame = frame;
-    cursor++;
-    entry.root.visible = true;
-    entry.root.mask = null;
-    if (entry.mask) entry.mask.visible = false;
-    if (entry.sprite) entry.sprite.visible = kind === 'sprite';
-    if (entry.graphics) entry.graphics.visible = kind === 'graphics';
-    if (entry.text) entry.text.visible = kind === 'text';
-    if (entry.shadow) entry.shadow.mesh.visible = kind === 'shadow';
-    return entry;
+  /** Place a node at this layer's draw-order cursor for the current frame. */
+  function place(layer: LayerState, node: Container) {
+    if (node.parent !== layer.root) layer.root.addChildAt(node, layer.order);
+    else if (layer.root.children[layer.order] !== node) layer.root.setChildIndex(node, layer.order);
+    layer.order++;
+    node.visible = true;
   }
-  function clip(node: Container, rect?: { x: number; y: number; width: number; height: number }) {
-    const entry = ownedSlot.get(node);
-    if (!entry || !rect) return;
-    if (!entry.mask) {
-      entry.mask = new Graphics();
-      entry.root.addChild(entry.mask);
+  function openRun(layer: LayerState): Graphics {
+    const index = layer.runCursor++;
+    let run = layer.runs[index];
+    if (!run) layer.runs[index] = run = new Graphics();
+    else run.clear();
+    place(layer, run);
+    if (layer.clip) {
+      let mask = layer.masks[index];
+      if (!mask) {
+        mask = layer.masks[index] = new Graphics();
+        layer.root.addChild(mask);
+      }
+      const { x, y, width, height } = layer.clip;
+      mask.clear().rect(x, y, width, height).fill(0xffffff);
+      mask.visible = true;
+      run.mask = mask;
+    } else {
+      // A detached Pixi mask renders as an ordinary shape again.
+      run.mask = null;
+      const mask = layer.masks[index];
+      if (mask) mask.visible = false;
     }
-    const key = `${rect.x},${rect.y},${rect.width},${rect.height}`;
-    if (key !== entry.clipKey) {
-      entry.mask.clear().rect(rect.x, rect.y, rect.width, rect.height).fill(0xffffff);
-      entry.clipKey = key;
-    }
-    entry.mask.visible = true;
-    entry.root.mask = entry.mask;
-  }
-  function graphics() {
-    const entry = slot('graphics');
-    if (!entry.graphics) {
-      entry.graphics = new Graphics();
-      entry.root.addChild(entry.graphics);
-      ownedSlot.set(entry.graphics, entry);
-    }
-    entry.graphics.visible = true;
     nativeGraphics++;
-    return entry.graphics;
+    graphicsBuilds++;
+    layer.open = run;
+    return run;
   }
-  function baseTexture(source: CanvasImageSource) {
-    let entry = images.get(source);
+  function closeRun(layer: LayerState) {
+    layer.open = null;
+  }
+  function cachedCanvas(source: CanvasImageSource) {
+    let entry = canvases.get(source);
     if (entry) return entry;
-    const width = Number(
-      (source as any).naturalWidth || (source as any).videoWidth || (source as any).width,
-    );
-    const height = Number(
-      (source as any).naturalHeight || (source as any).videoHeight || (source as any).height,
-    );
+    const width = Number((source as HTMLCanvasElement).width);
+    const height = Number((source as HTMLCanvasElement).height);
     if (!width || !height) return null;
     entry = { width, height, parts: [] };
     // Older GPUs can still display the terrain cache through smaller texture tiles.
@@ -201,197 +192,167 @@ export async function createPixiRenderer() {
           );
           const texture = Texture.from(part, true);
           texture.source.scaleMode = 'linear';
-          entry.parts.push({
-            texture,
-            x,
-            y,
-            width: part.width,
-            height: part.height,
-            canvas: part,
-            frames: new Map(),
-          });
+          entry.parts.push({ texture, x, y, width: part.width, height: part.height, canvas: part });
           textureUploads++;
         }
     } else {
-      const texture = Texture.from(source as any, true);
+      const texture = Texture.from(source as HTMLCanvasElement, true);
       texture.source.scaleMode = 'linear';
-      entry.parts.push({ texture, x: 0, y: 0, width, height, frames: new Map() });
+      entry.parts.push({ texture, x: 0, y: 0, width, height });
       textureUploads++;
     }
-    images.set(source, entry);
+    canvases.set(source, entry);
     return entry;
   }
-  function image(args: readonly unknown[], state: DrawingState, tint = 0xffffff) {
-    const [source, ...values] = args as [CanvasImageSource, ...number[]];
-    const base = baseTexture(source);
-    if (!base) return;
-    let sx = 0,
-      sy = 0,
-      sw = base.width,
-      sh = base.height;
-    let dx: number, dy: number, dw: number, dh: number;
-    if (values.length === 8) [sx, sy, sw, sh, dx, dy, dw, dh] = values;
-    else if (values.length === 4) [dx, dy, dw, dh] = values;
-    else {
-      [dx, dy] = values;
-      dw = sw;
-      dh = sh;
+  function texture(source: CanvasImageSource, region?: SceneRect): Texture {
+    let base = artwork.get(source);
+    if (!base) {
+      base = Texture.from(source as HTMLCanvasElement, true);
+      base.source.scaleMode = 'linear';
+      artwork.set(source, base);
+      textureUploads++;
     }
-    if (sw <= 0 || sh <= 0 || dw <= 0 || dh <= 0 || state.alpha <= 0) return;
-    const t = state.transform;
-    for (const part of base.parts) {
-      const left = Math.max(sx, part.x),
-        top = Math.max(sy, part.y);
-      const right = Math.min(sx + sw, part.x + part.width),
-        bottom = Math.min(sy + sh, part.y + part.height);
-      if (right <= left || bottom <= top) continue;
-      const entry = slot('sprite', cachedCanvases.has(source) ? part : undefined);
-      if (!entry.sprite) {
-        entry.sprite = new Sprite(Texture.EMPTY);
-        entry.root.addChild(entry.sprite);
-        ownedSlot.set(entry.sprite, entry);
-      }
-      const item = entry.sprite;
-      scratchFrame.set(left - part.x, top - part.y, right - left, bottom - top);
-      let texture: Texture;
-      if (cachedCanvases.has(source)) {
-        // These canvases are blitted once per frame. Their bounded, dedicated
-        // views retain one source while the camera changes the crop rectangle.
-        if (!part.viewport) {
-          part.viewport = new Texture({
-            source: part.texture.source,
-            frame: scratchFrame,
-            dynamic: true,
-          });
-          frames.add(part.viewport);
-        } else if (
-          part.viewport.frame.x !== scratchFrame.x ||
-          part.viewport.frame.y !== scratchFrame.y ||
-          part.viewport.frame.width !== scratchFrame.width ||
-          part.viewport.frame.height !== scratchFrame.height
-        ) {
-          part.viewport.frame.copyFrom(scratchFrame);
-          part.viewport.update();
-          spriteFrameUpdates++;
-        }
-        texture = part.viewport;
-      } else {
-        const key = `${scratchFrame.x},${scratchFrame.y},${scratchFrame.width},${scratchFrame.height}`;
-        const existing = part.frames.get(key);
-        if (existing) texture = existing;
-        else {
-          texture = new Texture({ source: part.texture.source, frame: scratchFrame });
-          part.frames.set(key, texture);
-          frames.add(texture);
-        }
-      }
-      if (item.texture !== texture) item.texture = texture;
-      const x = dx + ((left - sx) / sw) * dw,
-        y = dy + ((top - sy) / sh) * dh;
-      item.setFromMatrix(
-        scratchM.set(
-          (t.a * dw) / sw,
-          (t.b * dw) / sw,
-          (t.c * dh) / sh,
-          (t.d * dh) / sh,
-          t.a * x + t.c * y + t.e,
-          t.b * x + t.d * y + t.f,
-        ),
-      );
-      item.alpha = state.alpha;
-      item.tint = tint;
-      item.blendMode =
-        state.blendMode === 'lighter'
-          ? 'add'
-          : state.blendMode === 'multiply'
-            ? 'multiply'
-            : state.blendMode === 'screen'
-              ? 'screen'
-              : 'normal';
-      item.visible = true;
-      clip(item, state.clip);
-      nativeSprites++;
+    if (!region) return base;
+    let views = frames.get(source);
+    if (!views) frames.set(source, (views = new Map()));
+    const key = `${region.x},${region.y},${region.width},${region.height}`;
+    let framed = views.get(key);
+    if (!framed) {
+      scratchFrame.set(region.x, region.y, region.width, region.height);
+      framed = new Texture({ source: base.source, frame: scratchFrame });
+      views.set(key, framed);
     }
+    return framed;
   }
-  function text(
-    value: string,
-    x: number,
-    y: number,
-    style: CapturedTextStyle,
-    state: DrawingState,
-  ) {
-    const entry = slot('text');
-    if (!entry.text) {
-      entry.text = new Text({ text: '', style: { fontSize: 12 } });
-      entry.root.addChild(entry.text);
-      ownedSlot.set(entry.text, entry);
-    }
-    const item = entry.text;
-    const font = style.font || '12px sans-serif';
-    let parsed = fontCache.get(font);
-    if (!parsed) {
-      const match = font.match(/(?:(\d{3}|bold|normal)\s+)?([\d.]+)px\s+(.+)/);
-      parsed = {
+  function layerScene(layer: LayerState): SceneLayer {
+    return {
+      get g() {
+        return layer.open || openRun(layer);
+      },
+      texture,
+      image(source, x, y, width, height, alpha = 1, region) {
+        if (alpha <= 0 || width <= 0 || height <= 0) return;
+        const run = layer.open || openRun(layer);
+        run.setFillStyle({ alpha });
+        run.texture(texture(source, region), 0xffffff, x, y, width, height);
+        nativeSprites++;
+      },
+      blit(source, sx, sy, sw, sh, dx, dy, dw, dh) {
+        const base = cachedCanvas(source);
+        if (!base || sw <= 0 || sh <= 0) return;
+        closeRun(layer);
+        for (const part of base.parts) {
+          const left = Math.max(sx, part.x),
+            top = Math.max(sy, part.y);
+          const right = Math.min(sx + sw, part.x + part.width),
+            bottom = Math.min(sy + sh, part.y + part.height);
+          if (right <= left || bottom <= top) continue;
+          scratchFrame.set(left - part.x, top - part.y, right - left, bottom - top);
+          // These canvases are blitted once per frame. Their bounded, dedicated
+          // views retain one source while the camera changes the crop rectangle.
+          if (!part.viewport) {
+            part.viewport = new Texture({
+              source: part.texture.source,
+              frame: scratchFrame,
+              dynamic: true,
+            });
+          } else if (
+            part.viewport.frame.x !== scratchFrame.x ||
+            part.viewport.frame.y !== scratchFrame.y ||
+            part.viewport.frame.width !== scratchFrame.width ||
+            part.viewport.frame.height !== scratchFrame.height
+          ) {
+            part.viewport.frame.copyFrom(scratchFrame);
+            part.viewport.update();
+            spriteFrameUpdates++;
+          }
+          if (!part.sprite) part.sprite = new Sprite(part.viewport);
+          const sprite = part.sprite;
+          sprite.x = dx + ((left - sx) / sw) * dw;
+          sprite.y = dy + ((top - sy) / sh) * dh;
+          sprite.scale.set(dw / sw, dh / sh);
+          place(layer, sprite);
+          nativeSprites++;
+        }
+      },
+      shadows(cast, contacts, castOpacity, contactOpacity) {
+        const casts = cachedCanvas(cast),
+          roots = cachedCanvas(contacts);
+        if (!casts || !roots) return;
+        closeRun(layer);
+        casts.parts.forEach((part, i) => {
+          const root = roots.parts[i];
+          if (!root) return;
+          if (!part.shadow)
+            part.shadow = createShadowQuad(part.texture, root.texture, part.width, part.height);
+          part.shadow.mesh.position.set(part.x, part.y);
+          part.shadow.update(castOpacity, contactOpacity);
+          place(layer, part.shadow.mesh);
+          nativeSprites++;
+        });
+      },
+      text(value, x, y, style) {
+        closeRun(layer);
+        const index = layer.textCursor++;
+        let item = layer.texts[index];
+        if (!item) layer.texts[index] = item = new Text({ text: '', style: { fontSize: 12 } });
+        const key = style.font + '|' + style.fill;
+        if (layer.textKeys[index] !== key) {
+          item.style = textStyle(style);
+          layer.textKeys[index] = key;
+        }
+        if (item.text !== value) item.text = value;
+        const resolution = Math.min(2, Math.max(1, view.dpr));
+        if (item.resolution !== resolution) item.resolution = resolution;
+        item.anchor.set(
+          style.align === 'center' ? 0.5 : style.align === 'right' ? 1 : 0,
+          style.baseline === 'middle' ? 0.5 : 0.8,
+        );
+        item.position.set(x, y);
+        item.scale.set(style.scale ?? 1);
+        place(layer, item);
+        nativeTexts++;
+      },
+      measureText(value, font) {
+        return CanvasTextMetrics.measureText(value, textStyle({ font, fill: '#fff' })).width;
+      },
+      clip(rect) {
+        closeRun(layer);
+        layer.clip = rect || null;
+      },
+    };
+  }
+  function textStyle(style: SceneTextStyle): TextStyle {
+    const key = style.font + '|' + style.fill;
+    let cached = textStyles.get(key);
+    if (!cached) {
+      const match = style.font.match(/(?:(\d{3}|bold|normal)\s+)?([\d.]+)px\s+(.+)/);
+      const options: TextStyleOptions = {
         fontSize: match ? Number(match[2]) : 12,
         fontFamily: match?.[3] || 'sans-serif',
-        fontWeight: match?.[1] || 'normal',
-      };
-      fontCache.set(font, parsed);
-    }
-    const fill = typeof style.fillStyle === 'string' ? style.fillStyle : '#ffffff';
-    const stroke = style.stroke as { color: string; width: number } | undefined;
-    const key = `${parsed.fontSize}|${parsed.fontFamily}|${parsed.fontWeight}|${fill}|${stroke?.color ?? ''}|${stroke?.width ?? ''}`;
-    if (key !== entry.textKey) {
-      const textStyle: TextStyleOptions = {
-        fontSize: parsed.fontSize,
-        fontFamily: parsed.fontFamily,
-        fontWeight: parsed.fontWeight as TextStyleOptions['fontWeight'],
-        fill,
+        fontWeight: (match?.[1] || 'normal') as TextStyleOptions['fontWeight'],
+        fill: style.fill,
         padding: 2,
-        stroke,
       };
-      item.style = textStyle;
-      entry.textKey = key;
+      textStyles.set(key, (cached = new TextStyle(options)));
     }
-    item.text = value;
-    const resolution = Math.min(2, Math.max(1, game ? canvas.width / Math.max(1, game.vw) : 1));
-    if (item.resolution !== resolution) item.resolution = resolution;
-    item.anchor.set(
-      style.align === 'center' ? 0.5 : style.align === 'right' || style.align === 'end' ? 1 : 0,
-      style.baseline === 'middle'
-        ? 0.5
-        : style.baseline === 'top' || style.baseline === 'hanging'
-          ? 0
-          : style.baseline === 'bottom'
-            ? 1
-            : 0.8,
-    );
-    const t = state.transform;
-    item.setFromMatrix(
-      scratchM.set(t.a, t.b, t.c, t.d, t.a * x + t.c * y + t.e, t.b * x + t.d * y + t.f),
-    );
-    item.alpha = state.alpha;
-    item.visible = true;
-    clip(item, state.clip);
-    nativeTexts++;
+    return cached;
   }
-  const commands = createPixiContext({ graphics, image, text, clip });
-
   function stats() {
     statsObject.backend = presentation.available ? 'PixiJS WebGL' : 'unavailable';
     statsObject.error = renderError;
     statsObject.nativeSprites = nativeSprites;
     statsObject.nativeGraphics = nativeGraphics;
     statsObject.nativeTexts = nativeTexts;
-    statsObject.cachedTextures = images.size;
-    statsObject.cachedFrames = frames.size;
+    statsObject.cachedTextures = artwork.size + canvases.size;
+    statsObject.cachedFrames = [...frames.values()].reduce((n, views) => n + views.size, 0);
     statsObject.textureUploads = textureUploads;
     statsObject.textureUpdates = textureUpdates;
     statsObject.partialTextureUpdates = partialTextureUpdates;
     statsObject.spriteFrameUpdates = spriteFrameUpdates;
-    statsObject.graphicsBuilds = commands.graphicsBuilds;
-    statsObject.commands = cursor;
-    statsObject.resolution = game ? canvas.width / Math.max(1, game.vw) : 1;
+    statsObject.graphicsBuilds = graphicsBuilds;
+    statsObject.commands = nativeSprites + nativeGraphics + nativeTexts;
+    statsObject.resolution = view.dpr;
     statsObject.maxTextureSize = maxTextureSize;
     (window as unknown as Record<string, unknown>)['productionRendererStats'] = statsObject;
   }
@@ -401,8 +362,7 @@ export async function createPixiRenderer() {
     renderError = reason;
     canvas.style.display = 'none';
     // Presentation reports the failure; the HUD owns pausing the colony.
-    if (game && typeof game.emitGameEvent === 'function')
-      game.emitGameEvent('rendererFailed', { reason });
+    game?.emitGameEvent('rendererFailed', { reason });
     document.documentElement.dataset.renderer = 'unavailable';
     if (!game?.showGraphicsRecovery) {
       const status = document.createElement('div');
@@ -424,14 +384,20 @@ export async function createPixiRenderer() {
     if (gpuDestroyed) return;
     gpuDestroyed = true;
     canvas.removeEventListener('webglcontextlost', onContextLost);
-    commands.destroy();
     atmosphere.destroy();
     stage.destroy({ children: true });
-    for (const entry of slots) entry.shadow?.destroy();
-    for (const frame of frames) frame.destroy(false);
+    for (const style of textStyles.values()) style.destroy();
+    for (const views of frames.values()) for (const framed of views.values()) framed.destroy(false);
+    for (const base of artwork.values()) base.destroy(true);
+    for (const entry of canvases.values())
+      for (const part of entry.parts) {
+        part.shadow?.destroy();
+        part.viewport?.destroy(false);
+        part.texture.destroy(true);
+      }
     frames.clear();
-    for (const entry of images.values()) for (const part of entry.parts) part.texture.destroy(true);
-    images.clear();
+    artwork.clear();
+    canvases.clear();
     renderer.destroy({ removeView: true, releaseGlobalResources: true });
   }
   function guardGraphics(work: () => void) {
@@ -446,103 +412,66 @@ export async function createPixiRenderer() {
    * Returns false when the fast path is unavailable; the caller then falls back
    * to a full source update. (ix/iy are part-relative, which equals source
    * coordinates for both single sources and the canvases of tiled sources.)
+   * Pixi has no public sub-image upload, so this reaches its GL texture system.
    */
   function partialUpload(
-    part: ImagePart,
+    part: CanvasPart,
     source: CanvasImageSource,
     ix: number,
     iy: number,
     iw: number,
     ih: number,
   ) {
-    try {
-      const textureSource = part.texture.source;
-      if ((textureSource as any).resource !== source || textureSource.mipLevelCount > 1)
-        return false;
-      if (!scratchUploadCanvas || !scratchUploadCtx) {
-        scratchUploadCanvas = document.createElement('canvas');
-        scratchUploadCtx = requireCanvas2D(scratchUploadCanvas, loseGpu, {
-          willReadFrequently: true,
-        });
-      }
-      const scratch = scratchUploadCanvas;
-      const g = scratchUploadCtx;
-      const w = Math.max(1, Math.round(iw)),
-        h = Math.max(1, Math.round(ih));
-      if (scratch.width !== w) scratch.width = w;
-      if (scratch.height !== h) scratch.height = h;
-      g.clearRect(0, 0, w, h);
-      g.drawImage(source, ix, iy, iw, ih, 0, 0, w, h);
-      const sys = renderer.texture as any;
-      if (!sys || typeof sys.getGlSource !== 'function') return false;
-      // getGlSource initialises the GPU texture (performing the initial full
-      // upload) on first use, so prior content is valid before texSubImage2D.
-      const glTexture = sys.getGlSource(textureSource);
-      const gl = renderer.gl;
-      if (glTexture.target !== gl.TEXTURE_2D) return false;
-      sys.bindSource(textureSource, 0);
-      // Match onSourceUpdate's unpack state and keep Pixi's private cache truthful.
-      const premult = textureSource.alphaMode === 'premultiply-alpha-on-upload';
-      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, premult);
-      try {
-        sys._premultiplyAlpha = premult;
-      } catch {}
-      const resolution = textureSource.resolution;
-      gl.texSubImage2D(
-        glTexture.target,
-        0,
-        Math.round(ix * resolution),
-        Math.round(iy * resolution),
-        glTexture.format,
-        glTexture.type,
-        scratch,
-      );
-      partialTextureUpdates++;
-      return true;
-    } catch (error) {
-      if (error instanceof CanvasContextError) throw error;
-      return false;
+    const textureSource = part.texture.source;
+    if ((textureSource as any).resource !== source || textureSource.mipLevelCount > 1) return false;
+    if (!scratchUploadCanvas || !scratchUploadCtx) {
+      scratchUploadCanvas = document.createElement('canvas');
+      scratchUploadCtx = requireCanvas2D(scratchUploadCanvas, loseGpu, {
+        willReadFrequently: true,
+      });
     }
+    const scratch = scratchUploadCanvas;
+    const g = scratchUploadCtx;
+    const w = Math.max(1, Math.round(iw)),
+      h = Math.max(1, Math.round(ih));
+    if (scratch.width !== w) scratch.width = w;
+    if (scratch.height !== h) scratch.height = h;
+    g.clearRect(0, 0, w, h);
+    g.drawImage(source, ix, iy, iw, ih, 0, 0, w, h);
+    const textures = renderer.texture as any;
+    if (typeof textures?.getGlSource !== 'function') return false;
+    // getGlSource initialises the GPU texture (performing the initial full
+    // upload) on first use, so prior content is valid before texSubImage2D.
+    const glTexture = textures.getGlSource(textureSource);
+    const gl = renderer.gl;
+    if (glTexture.target !== gl.TEXTURE_2D) return false;
+    textures.bindSource(textureSource, 0);
+    // Match onSourceUpdate's unpack state and keep Pixi's private cache truthful.
+    const premultiply = textureSource.alphaMode === 'premultiply-alpha-on-upload';
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, premultiply);
+    textures._premultiplyAlpha = premultiply;
+    const resolution = textureSource.resolution;
+    gl.texSubImage2D(
+      glTexture.target,
+      0,
+      Math.round(ix * resolution),
+      Math.round(iy * resolution),
+      glTexture.format,
+      glTexture.type,
+      scratch,
+    );
+    partialTextureUpdates++;
+    return true;
   }
   const presentation: RendererPresentation = {
     available: true,
-    shadowLayer(cast, contacts, ctx, castOpacity, contactOpacity) {
-      const casts = baseTexture(cast),
-        roots = baseTexture(contacts);
-      if (!casts || !roots) return;
-      const t = ctx.getTransform();
-      casts.parts.forEach((part, i) => {
-        const root = roots.parts[i];
-        if (!root) return;
-        const entry = slot('shadow', part);
-        if (!entry.shadow) {
-          entry.shadow = createShadowQuad(part.texture, root.texture, part.width, part.height);
-          entry.root.addChild(entry.shadow.mesh);
-        }
-        const mesh = entry.shadow.mesh;
-        mesh.visible = true;
-        mesh.setFromMatrix(
-          scratchM.set(
-            t.a,
-            t.b,
-            t.c,
-            t.d,
-            t.e + part.x * t.a + part.y * t.c,
-            t.f + part.x * t.b + part.y * t.d,
-          ),
-        );
-        entry.shadow.update(castOpacity, contactOpacity);
-        nativeSprites++;
-      });
-    },
     reportFailure: loseGpu,
     screenTint(tint) {
       for (let i = 0; i < 4; i++) screenTint[i] = tint[i];
     },
-    invalidate(source, rect?: { x: number; y: number; width: number; height: number }) {
-      cachedCanvases.add(source);
+    invalidate(source, rect) {
       guardGraphics(() => {
-        const entry = images.get(source);
+        const entry = canvases.get(source);
         if (!entry) return;
         for (const part of entry.parts) {
           if (rect) {
@@ -562,11 +491,8 @@ export async function createPixiRenderer() {
               const g = requireCanvas2D(part.canvas, loseGpu);
               g.clearRect(ix, iy, iw, ih);
               g.drawImage(source, left, top, iw, ih, ix, iy, iw, ih);
-              if (!partialUpload(part, part.canvas, ix, iy, iw, ih)) {
-                part.texture.source.update();
-                textureUpdates++;
-              }
-            } else if (!partialUpload(part, source, ix, iy, iw, ih)) {
+            }
+            if (!partialUpload(part, part.canvas || source, ix, iy, iw, ih)) {
               part.texture.source.update();
               textureUpdates++;
             }
@@ -592,45 +518,73 @@ export async function createPixiRenderer() {
         }
       });
     },
-    begin(ctx) {
+    begin(next) {
       guardGraphics(() => {
-        cursor = nativeSprites = nativeGraphics = nativeTexts = 0;
-        frame++;
-        for (const layer of layers.values()) layer.cursor = layer.order = 0;
-        commands.beginFrame();
-        if (ctx.canvas.width > maxRenderSize || ctx.canvas.height > maxRenderSize)
+        nativeSprites = nativeGraphics = nativeTexts = 0;
+        Object.assign(view, next);
+        if (view.width > maxRenderSize || view.height > maxRenderSize)
           loseGpu('Viewport exceeds GPU render-target limits');
         if (!presentation.available) return;
-        if (renderer.width !== ctx.canvas.width || renderer.height !== ctx.canvas.height)
-          renderer.resize(ctx.canvas.width, ctx.canvas.height);
-        canvas.style.width = ctx.canvas.style.width;
-        canvas.style.height = ctx.canvas.style.height;
+        if (renderer.width !== view.width || renderer.height !== view.height)
+          renderer.resize(view.width, view.height);
+        canvas.style.width = view.cssWidth + 'px';
+        canvas.style.height = view.cssHeight + 'px';
+        for (const layer of layers.values()) {
+          layer.runCursor = layer.textCursor = layer.order = 0;
+          layer.open = null;
+          layer.clip = null;
+        }
       });
     },
-    layer(name, ctx, paint) {
+    layer(name, paint) {
       guardGraphics(() => {
         let layer = layers.get(name);
         if (!layer) {
-          layer = { root: new Container(), slots: [], cursor: 0, order: 0 };
+          layer = {
+            root: new Container(),
+            runs: [],
+            masks: [],
+            texts: [],
+            textKeys: [],
+            runCursor: 0,
+            textCursor: 0,
+            order: 0,
+            open: null,
+            clip: null,
+          };
           layers.set(name, layer);
           // Lantern glows, rain and captions sit above the veiled, graded scene.
-          (name === 'above-atmosphere' ? stage : scene).addChild(layer.root);
+          (name === 'above-atmosphere' || name === 'overlay' ? stage : scene).addChild(layer.root);
         }
-        activeLayer = layer;
-        commands.capture(ctx, paint);
+        if (name === 'backdrop' || name === 'overlay') {
+          layer.root.scale.set(view.dpr);
+          layer.root.position.set(0, 0);
+        } else {
+          layer.root.scale.set(view.scale);
+          layer.root.position.set(-view.camX * view.scale, -view.camY * view.scale);
+        }
+        paint(layerScene(layer));
+        closeRun(layer);
       });
     },
     end() {
-      if (!presentation.available || disposed) {
+      const runtime = game;
+      if (!presentation.available || disposed || !runtime) {
         stats();
         return;
       }
-      for (const entry of slots) if (entry.frame !== frame) entry.root.visible = false;
       guardGraphics(() => {
-        atmosphere.update(game, renderer.width, renderer.height, screenTint);
+        // Objects not placed this frame stay pooled but hidden.
+        for (const layer of layers.values()) {
+          const used = layer.order;
+          for (let i = used; i < layer.root.children.length; i++) {
+            const child = layer.root.children[i];
+            if (!layer.masks.includes(child as Graphics)) child.visible = false;
+          }
+        }
+        atmosphere.update(runtime, renderer.width, renderer.height, screenTint);
         renderer.render({ container: stage });
         atmosphere.afterRender();
-        commands.endFrame();
       });
       stats();
     },

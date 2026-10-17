@@ -122,7 +122,9 @@ test('repeated native frames reuse installed painted textures without uploads', 
   expect(result.after.textureUpdates).toBe(result.before.textureUpdates);
   expect(result.after.cachedTextures).toBe(result.before.cachedTextures);
   expect(result.after.spriteFrameUpdates).toBe(result.before.spriteFrameUpdates);
-  expect(result.after.graphicsBuilds).toBe(result.before.graphicsBuilds);
+  // Vector work is rebuilt each frame into a handful of pooled Graphics runs.
+  expect(result.after.nativeGraphics).toBe(result.before.nativeGraphics);
+  expect(result.after.nativeGraphics).toBeLessThan(16);
   expect(result.unchangedUploads).toBe(0);
   expect(result.simulationUnchanged).toBe(true);
   // A dirty tile must refresh the terrain texture — as a full update or a
@@ -224,7 +226,7 @@ test('road plans render and refresh through real terrain events while paused', a
   await page.screenshot({ path: test.info().outputPath('road-plan-built.png') });
 });
 
-test('scene capture failure pauses the colony and reports the graphics error visibly', async ({
+test('a scene drawing failure pauses the colony and reports the graphics error visibly', async ({
   page,
 }) => {
   const errors = captureErrors(page);
@@ -233,12 +235,12 @@ test('scene capture failure pauses the colony and reports the graphics error vis
     const game = window.productionArtPreview.game;
     game.state.paused = false;
     game.drawVillageYard = () => {
-      throw new Error('Scene capture failed');
+      throw new Error('Scene drawing failed');
     };
     game.draw();
   });
   await expect(page.locator('html')).toHaveAttribute('data-renderer', 'unavailable');
-  await expect(page.locator('#renderer-status')).toContainText('Scene capture failed');
+  await expect(page.locator('#renderer-status')).toContainText('Scene drawing failed');
   await expect(page.locator('#renderer-status')).toHaveAttribute('role', 'alert');
   expect(await page.evaluate(() => window.productionArtPreview.game.state.paused)).toBe(true);
   await page.evaluate(() => window.productionArtPreview.game.draw());
@@ -304,7 +306,8 @@ test('clarity keeps camera, simulation and artwork anchors intact and reuses nat
   expect(result.after.textureUploads).toBe(result.warm.textureUploads);
   expect(result.after.textureUpdates).toBe(result.warm.textureUpdates);
   expect(result.after.partialTextureUpdates).toBe(result.warm.partialTextureUpdates);
-  expect(result.after.graphicsBuilds).toBe(result.warm.graphicsBuilds);
+  expect(result.after.nativeGraphics).toBe(result.warm.nativeGraphics);
+  expect(result.after.nativeTexts).toBe(result.warm.nativeTexts);
   await page.screenshot({ path: test.info().outputPath('clarity-view.png') });
   expect(errors).toEqual([]);
 });
@@ -440,26 +443,20 @@ test('actual frame loop shows restrained economic transitions at 8x even when mu
   expect(errors).toEqual([]);
 });
 
-test('failed artwork sheet preserves a usable native renderer and shows fallback', async ({
-  page,
-}) => {
+test('a failed artwork sheet stops boot with a reload prompt and no colony', async ({ page }) => {
   const errors = captureErrors(page);
+  await page.addInitScript(() => localStorage.setItem('recovery-sentinel', 'keep'));
   await page.route('**/assets/art/foliage.png', (route) =>
     route.fulfill({ status: 404, body: 'Artwork unavailable' }),
   );
-  await frozenGame(page);
-  await expect(page.locator('#painted-art-status')).toContainText('Standard artwork is active');
-  const result = await page.evaluate(() => ({
-    status: window.productionArtPreview.game.ART.paintedStatus.state,
-    terrain: Boolean(window.productionArtPreview.game.ART.paintedTerrain),
-    buildingTypes: Object.keys(window.productionArtPreview.game.ART.bld).length,
-    renderer: window.productionRendererStats,
-  }));
-  expect(result.status).toBe('fallback');
-  expect(result.terrain).toBe(false);
-  expect(result.buildingTypes).toBe(22);
-  expect(result.renderer.backend).toBe('PixiJS WebGL');
-  expect(result.renderer.nativeSprites).toBeGreaterThan(0);
+  await page.goto('/tests/game.html?seed=2024');
+  await expect(page.locator('#boot')).toHaveAttribute('role', 'alert');
+  await expect(page.locator('#boot-stage')).toContainText('Painted artwork could not load');
+  await expect(page.locator('#boot-stage')).toContainText('foliage.png');
+  await expect(page.locator('#boot-reload')).toBeVisible();
+  await expect(page.locator('#pixi-view')).toHaveCount(0);
+  expect(await page.evaluate(() => Boolean(window.productionArtPreview?.game))).toBe(false);
+  expect(await page.evaluate(() => localStorage.getItem('recovery-sentinel'))).toBe('keep');
   expect(errors).toEqual([]);
 });
 
@@ -893,10 +890,11 @@ for (const tiled of [false, true])
     expect(errors).toEqual([]);
   });
 
-test('paused cameras retain vector geometry as wall time advances', async ({ page }) => {
+test('paused cameras hold decorative motion still as wall time advances', async ({ page }) => {
   await frozenGame(page);
   const result = await page.evaluate(() => {
     const game = window.productionArtPreview.game;
+    const canvas = window.productionArtPreview.canvas;
     game.presentationPrefs.reducedMotion = false;
     game.presentationPrefs.weather = false;
     game.state.paused = true;
@@ -905,20 +903,24 @@ test('paused cameras retain vector geometry as wall time advances', async ({ pag
     game.draw();
     game.draw();
     const before = { ...window.productionRendererStats };
+    const pixels = canvas.toDataURL('image/png');
     const rng = game.SR.getState();
+    let still = true;
     for (let frame = 0; frame < 5; frame++) {
       now += 317;
       game.draw();
+      still &&= canvas.toDataURL('image/png') === pixels;
     }
     return {
       before,
       after: { ...window.productionRendererStats },
+      still,
       rng,
       nextRng: game.SR.getState(),
     };
   });
   expect(result.after.backend).toBe('PixiJS WebGL');
-  expect(result.after.graphicsBuilds).toBe(result.before.graphicsBuilds);
+  expect(result.still).toBe(true);
   expect(result.after.textureUploads).toBe(result.before.textureUploads);
   expect(result.after.textureUpdates).toBe(result.before.textureUpdates);
   expect(result.nextRng).toBe(result.rng);

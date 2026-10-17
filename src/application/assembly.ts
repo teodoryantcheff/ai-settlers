@@ -8,11 +8,8 @@ import { createLoop, type LoopInternals } from './loop.ts';
 import { createAudio, type AudioInternals } from '../audio/audio.ts';
 import { createArt } from '../rendering/art.ts';
 import { createLandscape, type LandscapeInternals } from '../rendering/landscape.ts';
-import {
-  createRenderer,
-  type RendererInternals,
-  type RendererPresentation,
-} from '../rendering/renderer.ts';
+import { createRenderer, type RendererInternals } from '../rendering/renderer.ts';
+import type { RendererPresentation } from '../rendering/scene.ts';
 import { createVillage, type VillageInternals } from '../rendering/village.ts';
 import { attachSubsystem, type GameRuntime } from '../runtime.ts';
 import { createSaveView } from '../ui/save-view.ts';
