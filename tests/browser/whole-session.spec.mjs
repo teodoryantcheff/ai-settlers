@@ -1,4 +1,4 @@
-import { test, expect } from './helpers/test.mjs';
+import { test, expect, frame } from './helpers/test.mjs';
 import { openAtlas } from './helpers/atlas.mjs';
 
 test.setTimeout(120000);
@@ -28,10 +28,9 @@ async function paint(page) {
     game.draw();
   });
 }
-async function capture(page, name) {
+async function expectReadableLayout(page) {
   await expect(page.locator('#goods .gd')).toHaveCount(17);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.screenshot({ path: test.info().outputPath(name + '.png') });
 }
 
 test('native first colony carries Journey construction through real deliveries, output and durable reports', async ({
@@ -39,29 +38,24 @@ test('native first colony carries Journey construction through real deliveries, 
 }) => {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.addInitScript(() => {
-    window.requestAnimationFrame = (callback) => {
-      window.__acceptanceFrame = callback;
-      return 0;
-    };
+  // Full quality with motion, weather and muted audio, applied as boot applies it.
+  await page.evaluate(() => {
     localStorage.setItem(
       'settlers.prefs',
       JSON.stringify({ quality: 1, reducedMotion: false, weather: true, muted: true }),
     );
+    const game = window.productionArtPreview.game;
+    game.loadPrefs();
+    game.resize();
   });
-  await page.goto('/tests/game.html?seed=2024');
-  await expect(page.locator('#boot')).toHaveCount(0, { timeout: 30000 });
-  await page.waitForFunction(() => window.productionArtPreview?.game);
-  await page.evaluate(() => window.__acceptanceFrame(1000));
+  await frame(page, 1000);
   await expect(page.locator('html')).toHaveAttribute('data-renderer', 'pixi');
-  await page.locator('#startb').click();
   await paint(page);
-  await capture(page, 'fresh-map-1440-q1');
+  await expectReadableLayout(page);
   for (const workspace of ['attention', 'activity', 'economy']) {
     await openAtlas(page);
     await page.locator(`#workspace-nav [data-workspace="${workspace}"]`).click();
-    await capture(page, `fresh-${workspace}-1440-q1`);
+    await expectReadableLayout(page);
   }
   await expect(page.locator('#economy-coverage')).toContainText('History unavailable');
   await openAtlas(page);
@@ -143,7 +137,7 @@ test('native first colony carries Journey construction through real deliveries, 
   expect(arrival.done).toBe(false);
   await paint(page);
   await expect(page.locator('#infobody')).toContainText(/[1-9]\d* \/ [1-9]\d* delivered/);
-  await capture(page, 'first-material-arrival-1440-q1');
+  await expectReadableLayout(page);
   const production = await page.evaluate((id) => {
     const game = window.productionArtPreview.game,
       b = game.byId(id);
@@ -209,7 +203,7 @@ test('native first colony carries Journey construction through real deliveries, 
           .locator(`#workspace-${workspace}`)
           .evaluate((element) => (element.scrollTop = 0));
       await paint(page);
-      await capture(page, `first-colony-${workspace}-${width}-q${quality}`);
+      await expectReadableLayout(page);
     }
   }
   // Cross-quality map canaries use the same colony and camera, without advancing its world.
@@ -225,7 +219,7 @@ test('native first colony carries Journey construction through real deliveries, 
       game.resize();
     }, quality);
     await paint(page);
-    await capture(page, `cross-quality-map-${width}-q${quality}`);
+    await expectReadableLayout(page);
   }
   expect(await page.evaluate(() => window.productionArtPreview.game.exportSave())).toBe(before);
   expect(errors).toEqual([]);

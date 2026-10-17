@@ -1,21 +1,12 @@
-import { test, expect } from './helpers/test.mjs';
+import { test, expect, frame, holdFrames, seedPrefs, load } from './helpers/test.mjs';
 
 test.setTimeout(90000);
+// The welcome screen before any colony starts, at full quality with motion.
 async function boot(page) {
-  await page.addInitScript(() => {
-    localStorage.setItem(
-      'settlers.prefs',
-      JSON.stringify({ quality: 1, reducedMotion: false, muted: true, weather: false }),
-    );
-    window.requestAnimationFrame = (callback) => {
-      window.__surfacesFrame = callback;
-      return 0;
-    };
-  });
-  await page.goto('/tests/game.html?seed=2024');
-  await expect(page.locator('#boot')).toHaveCount(0, { timeout: 30000 });
-  await page.waitForFunction(() => window.productionArtPreview?.game);
-  await page.evaluate(() => window.__surfacesFrame(1000));
+  await holdFrames(page);
+  await seedPrefs(page, { quality: 1, reducedMotion: false, muted: true, weather: false });
+  await load(page);
+  await frame(page);
 }
 async function readableField(field) {
   const contrast = await field.evaluate((element) => {
@@ -39,7 +30,7 @@ async function readableField(field) {
 }
 
 test('utility fields stay readable and preserve editing through nested checkpoint review', async ({
-  page,
+  freshPage: page,
 }) => {
   await boot(page);
   for (const [width, height] of [
@@ -51,7 +42,6 @@ test('utility fields stay readable and preserve editing through nested checkpoin
     await page.locator('#start .panel').evaluate((element) => {
       element.scrollTop = 0;
     });
-    await page.screenshot({ path: test.info().outputPath(`welcome-${width}.png`) });
   }
   await page.locator('#load-colonyb').click();
   await expect(page.locator('#save-list')).toContainText('No checkpoints');
@@ -63,7 +53,6 @@ test('utility fields stay readable and preserve editing through nested checkpoin
   ]) {
     await page.setViewportSize({ width, height });
     await page.locator('#savecode').focus();
-    await page.screenshot({ path: test.info().outputPath(`empty-saves-${width}.png`) });
     await expect(page.locator('#savecode')).toHaveValue('A colony file can be pasted here');
   }
   await page.keyboard.press('Escape');

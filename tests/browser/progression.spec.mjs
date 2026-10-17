@@ -1,28 +1,19 @@
-import { test, expect } from './helpers/test.mjs';
+import { test, expect, frame, holdFrames, seedPrefs, load } from './helpers/test.mjs';
 import { openAtlas } from './helpers/atlas.mjs';
 test.setTimeout(120000);
-async function boot(page, quality = 0.75) {
-  await page.addInitScript((quality) => {
-    window.requestAnimationFrame = (callback) => {
-      window.__progressionFrame = callback;
-      return 0;
-    };
-    if (!localStorage.getItem('settlers.prefs'))
-      localStorage.setItem(
-        'settlers.prefs',
-        JSON.stringify({ quality, reducedMotion: true, weather: false, muted: true }),
-      );
-  }, quality);
-  await page.goto('/tests/game.html?seed=2024');
-  await expect(page.locator('#boot')).toHaveCount(0, { timeout: 30000 });
-  await page.waitForFunction(() => window.productionArtPreview?.game);
-  await page.evaluate(() => window.__progressionFrame(1000));
-  await page.locator('#startb').click();
+// Full-resolution effects for the tests that capture them; reset restores 0.75.
+async function fullQuality(page) {
+  await page.evaluate(() => {
+    const g = window.productionArtPreview.game;
+    g.presentationPrefs.quality = 1;
+    g.resize();
+    g.draw();
+  });
 }
 test('V opens Colony guidance over the live map and retains native window context', async ({
   page,
 }) => {
-  await boot(page, 1);
+  await fullQuality(page);
   await expect(page.locator('#adv')).toBeHidden();
   await page.evaluate(() => {
     const g = window.productionArtPreview.game;
@@ -85,14 +76,12 @@ test('V opens Colony guidance over the live map and retains native window contex
     await expect(page.locator('#advdetails summary')).toBeFocused();
     expect(await window.boundingBox()).toEqual(box);
     expect(await page.locator('#workspace-colony').evaluate((el) => el.scrollTop)).toBe(scroll);
-    await page.screenshot({ path: test.info().outputPath(`colony-guidance-${width}.png`) });
   }
 });
 
 test('Advisor keeps live action focus, and V respects native input and blocking utilities', async ({
   page,
 }) => {
-  await boot(page);
   const id = await page.evaluate(() => {
     const g = window.productionArtPreview.game;
     const hq = g.anyStorage();
@@ -118,15 +107,29 @@ test('Advisor keeps live action focus, and V respects native input and blocking 
   });
   await page.keyboard.press('v');
   const advice = page.locator(`#adv [data-focus="${id}"]`);
+  // The HUD redraws at most every 250 ms; tick until the armory advice renders.
+  await expect
+    .poll(() =>
+      page.evaluate((id) => {
+        window.productionArtPreview.game.hudTick();
+        return !!document.querySelector(`#adv [data-focus="${id}"]`);
+      }, id),
+    )
+    .toBe(true);
   await advice.focus();
-  await page.waitForTimeout(300);
-  await page.evaluate((id) => {
-    const g = window.productionArtPreview.game;
-    g.anyStorage().stock.iron_bars = 1;
-    g.hudTick();
-  }, id);
+  await page.evaluate(() => {
+    window.productionArtPreview.game.anyStorage().stock.iron_bars = 1;
+  });
+  // The HUD redraws at most every 250 ms; tick until the advice re-renders.
+  await expect
+    .poll(() =>
+      page.evaluate((id) => {
+        window.productionArtPreview.game.hudTick();
+        return document.querySelector(`#adv [data-focus="${id}"]`)?.textContent;
+      }, id),
+    )
+    .toContain('Improve Armory deliveries');
   await expect(advice).toBeFocused();
-  await expect(advice).toContainText('Improve Armory deliveries');
   await advice.press('Enter');
   await expect(page.getByRole('region', { name: 'Colony window', exact: true })).toBeHidden();
   expect(await page.evaluate(() => window.productionArtPreview.game.selected.id)).toBe(id);
@@ -150,9 +153,14 @@ test('Advisor keeps live action focus, and V respects native input and blocking 
 });
 
 test('Colony connects live Journey actions, spending conditions and saved autoplay state', async ({
-  page,
+  freshPage: page,
 }) => {
-  await boot(page);
+  // Reloads to continue the saved colony, so it needs a page of its own.
+  await holdFrames(page);
+  await seedPrefs(page, { quality: 0.75, reducedMotion: true, weather: false, muted: true });
+  await load(page);
+  await frame(page);
+  await page.locator('#startb').click();
   await openAtlas(page);
   await page.locator('[data-workspace="colony"]').click();
   await expect(page.locator('#colony-journey-body')).toContainText('Start the timber chain');
@@ -207,7 +215,7 @@ test('Colony connects live Journey actions, spending conditions and saved autopl
   await page.reload();
   await expect(page.locator('#boot')).toHaveCount(0, { timeout: 30000 });
   await page.locator('#continueb').click();
-  await page.evaluate(() => window.__progressionFrame(1000));
+  await frame(page);
   await page.evaluate(() => window.productionArtPreview.game.gameplayHUD());
   await expect(page.locator('#autob')).toHaveText('AUTO ON');
   await openAtlas(page);
@@ -220,18 +228,15 @@ test('Colony connects live Journey actions, spending conditions and saved autopl
     await page.setViewportSize({ width, height });
     await page.locator('#colony-objective').scrollIntoViewIfNeeded();
     await expect(page.locator('#goods .gd')).toHaveCount(17);
-    await page.screenshot({ path: test.info().outputPath(`colony-${width}.png`) });
     await page.locator('#availability-upgrade-haul-summary').scrollIntoViewIfNeeded();
     if (!(await page.locator('#availability-upgrade-haul').evaluate((element) => element.open)))
       await page.locator('#availability-upgrade-haul-summary').click();
-    await page.screenshot({ path: test.info().outputPath(`colony-stock-${width}.png`) });
   }
 });
 
 test('Colony explains and spends reclaimable optional warehouse promises exactly once', async ({
   page,
 }) => {
-  await boot(page);
   await page.evaluate(() => {
     const g = window.productionArtPreview.game;
     g.anyStorage().stock.planks = 12;
@@ -290,7 +295,7 @@ test('earned victory stays achieved after spending and continues through Home wi
   expect(game.state.gold).toBe(199);
   expect(game.state.won).toBe(false);
   const raw = game.exportSave();
-  await boot(page, 1);
+  await fullQuality(page);
   await page.evaluate((raw) => {
     const game = window.productionArtPreview.game;
     game.importSave(raw);
@@ -317,7 +322,6 @@ test('earned victory stays achieved after spending and continues through Home wi
     await page.setViewportSize({ width, height });
     await expect(page.locator('#wingo')).toBeInViewport();
     await expect(page.locator('#winhome')).toBeInViewport();
-    await page.screenshot({ path: test.info().outputPath(`victory-${width}.png`) });
   }
   await page.locator('#wingo').click();
   await expect(page.locator('#win')).toBeHidden();

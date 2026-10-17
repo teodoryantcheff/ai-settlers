@@ -1,29 +1,10 @@
-import { test, expect } from './helpers/test.mjs';
+import { test, expect, frame } from './helpers/test.mjs';
 import { openAtlas, expectMapFocus } from './helpers/atlas.mjs';
 test.setTimeout(120000);
-async function boot(page) {
-  await page.addInitScript(() => {
-    window.requestAnimationFrame = (callback) => {
-      window.__logisticsFrame = callback;
-      return 0;
-    };
-    localStorage.setItem(
-      'settlers.prefs',
-      JSON.stringify({ quality: 0.75, reducedMotion: true, weather: false }),
-    );
-  });
-  await page.goto('/tests/game.html?seed=2024');
-  await expect(page.locator('#boot')).toHaveCount(0, { timeout: 30000 });
-  await page.waitForFunction(() => window.productionArtPreview?.game);
-  await page.evaluate(() => window.__logisticsFrame(1000));
-  await page.locator('#startb').click();
-  await page.evaluate(() => window.productionArtPreview.game.hudTick());
-}
-
 test('Logistics distinguishes real job stages, completed arrivals and actual route evidence', async ({
   page,
 }) => {
-  await boot(page);
+  await frame(page);
   await openAtlas(page);
   await page.getByRole('button', { name: 'Logistics', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Logistics window', exact: true })).toBeVisible();
@@ -108,11 +89,9 @@ test('Logistics distinguishes real job stages, completed arrivals and actual rou
       game.hudTick();
     }, quality);
     await page.locator('#workspace-logistics').evaluate((element) => (element.scrollTop = 0));
-    await page.screenshot({ path: test.info().outputPath(`logistics-overview-${width}.png`) });
     await page
       .locator('#logistics-detail')
       .evaluate((element) => element.scrollIntoView({ block: 'start' }));
-    await page.screenshot({ path: test.info().outputPath(`logistics-route-${width}.png`) });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
@@ -142,7 +121,7 @@ test('Logistics distinguishes real job stages, completed arrivals and actual rou
 test('rerouted recovered cargo stays physical and removed contributors retain former-site navigation', async ({
   page,
 }) => {
-  await boot(page);
+  await frame(page);
   const evidence = await page.evaluate(() => {
     const game = window.productionArtPreview.game,
       hq = game.anyStorage();
@@ -185,7 +164,7 @@ test('rerouted recovered cargo stays physical and removed contributors retain fo
 test('missing live assignment evidence has its own count and filter without asserting pickup state', async ({
   page,
 }) => {
-  await boot(page);
+  await frame(page);
   const key = await page.evaluate(() => {
     const game = window.productionArtPreview.game,
       hq = game.anyStorage();
@@ -218,7 +197,7 @@ test('missing live assignment evidence has its own count and filter without asse
 test('Logistics route action shares the central diagnostic choice without changing the colony', async ({
   page,
 }) => {
-  await boot(page);
+  await frame(page);
   await openAtlas(page);
   await page.getByRole('button', { name: 'Logistics', exact: true }).click();
   const before = await page.evaluate(() => {
@@ -252,7 +231,7 @@ test('Logistics route action shares the central diagnostic choice without changi
 test('Logistics keeps its own window and live native context across Economy, inspection and Locate', async ({
   page,
 }) => {
-  await boot(page);
+  await frame(page);
   const cargo = await page.evaluate(() => {
     const g = window.productionArtPreview.game,
       hq = g.anyStorage();
@@ -325,7 +304,7 @@ test('Logistics keeps its own window and live native context across Economy, ins
   expect(await host.evaluate((el) => el.scrollTop)).toBe(scroll);
   expect(await page.evaluate(() => window.productionArtPreview.game.exportSave())).toBe(before);
   const age = await page.evaluate(() => window.productionArtPreview.game.state.time);
-  await page.evaluate(() => window.__logisticsFrame(1100));
+  await frame(page, 1100);
   expect(await page.evaluate(() => window.productionArtPreview.game.state.time)).toBeGreaterThan(
     age,
   );

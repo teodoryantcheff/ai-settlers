@@ -1,24 +1,11 @@
-import { test, expect } from './helpers/test.mjs';
+// Every case opens on the first-run welcome screen and reloads to prove persistence.
+import { test, expect, frame, holdFrames, load, seedPrefs } from './helpers/test.mjs';
 test.setTimeout(60000);
 async function boot(page) {
-  await page.addInitScript(() => {
-    window.requestAnimationFrame = (callback) => {
-      window.__sessionFrame = callback;
-      return 0;
-    };
-    if (localStorage.getItem('settlers.prefs') === null)
-      localStorage.setItem(
-        'settlers.prefs',
-        JSON.stringify({ quality: 0.75, reducedMotion: true, weather: false }),
-      );
-  });
-  await page.goto('/tests/game.html?seed=2024');
-  await expect(page.locator('#boot')).toHaveCount(0, { timeout: 30000 });
-  await page.waitForFunction(() => window.productionArtPreview?.game);
-  await page.evaluate(() => window.__sessionFrame(1000));
-}
-async function frame(page, time) {
-  await page.evaluate((time) => window.__sessionFrame(time), time);
+  await holdFrames(page);
+  await seedPrefs(page);
+  await load(page);
+  await frame(page, 1000);
 }
 async function menu(page) {
   if (!(await page.locator('#utility').evaluate((element) => element.open)))
@@ -39,7 +26,7 @@ async function speedLabel(page, text) {
 }
 
 test('named seeded colony, guarded replacement and Home Continue preserve the actual live world', async ({
-  page,
+  freshPage: page,
 }) => {
   await boot(page);
   await expect(page.locator('#continueb')).toBeDisabled();
@@ -50,7 +37,6 @@ test('named seeded colony, guarded replacement and Home Continue preserve the ac
   ]) {
     await page.setViewportSize({ width, height });
     await expect(page.locator('#startb')).toBeInViewport();
-    await page.screenshot({ path: test.info().outputPath(`first-welcome-${width}.png`) });
   }
   await page.locator('#new-colony-name').fill('Oakbridge');
   await page.locator('#new-colony-seed').fill('42');
@@ -112,7 +98,6 @@ test('named seeded colony, guarded replacement and Home Continue preserve the ac
   ]) {
     await page.setViewportSize({ width, height });
     await expect(page.locator('#continueb')).toBeInViewport();
-    await page.screenshot({ path: test.info().outputPath(`welcome-${width}.png`) });
   }
   const harbor = await snapshot(page);
   await page.locator('#load-colonyb').click();
@@ -137,7 +122,7 @@ test('named seeded colony, guarded replacement and Home Continue preserve the ac
 });
 
 test('initial Continue loads the validated checkpoint rather than a new seed world', async ({
-  page,
+  freshPage: page,
 }) => {
   await boot(page);
   await page.locator('#new-colony-name').fill('Saved colony');
@@ -158,7 +143,7 @@ test('initial Continue loads the validated checkpoint rather than a new seed wor
 });
 
 test('nested settings preserve running and paused states, native input, persistence and failed writes', async ({
-  page,
+  freshPage: page,
 }) => {
   await boot(page);
   await page.locator('#startb').click();
@@ -217,13 +202,6 @@ test('nested settings preserve running and paused states, native input, persiste
   expect(
     await page.evaluate(() => window.productionArtPreview.game.presentationPrefs.quality),
   ).toBe(0.75);
-  for (const [width, height] of [
-    [1440, 900],
-    [1280, 720],
-  ]) {
-    await page.setViewportSize({ width, height });
-    await page.screenshot({ path: test.info().outputPath(`settings-${width}.png`) });
-  }
   await page.keyboard.press('Escape');
   await expect(page.locator('#start')).toBeVisible();
   await page.locator('#welcome-about').click();

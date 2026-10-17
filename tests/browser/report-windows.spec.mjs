@@ -1,22 +1,6 @@
-import { test, expect } from './helpers/test.mjs';
+import { test, expect, frame } from './helpers/test.mjs';
 import { openAtlas } from './helpers/atlas.mjs';
 test.setTimeout(120000);
-async function boot(page) {
-  await page.addInitScript(() => {
-    window.requestAnimationFrame = (callback) => {
-      window.__reportFrame = callback;
-      return 0;
-    };
-    localStorage.setItem(
-      'settlers.prefs',
-      JSON.stringify({ quality: 0.75, reducedMotion: true, weather: false }),
-    );
-  });
-  await page.goto('/tests/game.html?seed=2024');
-  await expect(page.locator('#boot')).toHaveCount(0, { timeout: 30000 });
-  await page.evaluate(() => window.__reportFrame(1000));
-  await page.locator('#startb').press('Enter');
-}
 async function economy(page) {
   await openAtlas(page);
   await page.locator('[data-workspace="economy"]').press('Enter');
@@ -25,7 +9,8 @@ async function economy(page) {
 test('Economy opens as one nonblocking window beside inspection without resizing or moving the map', async ({
   page,
 }) => {
-  await boot(page);
+  // The frame loop's clock starts here; the next frame advances it by 0.1 s.
+  await frame(page, 1000);
   await page.evaluate(() => {
     const g = window.productionArtPreview.game;
     g.inspectContributor(g.anyStorage().id);
@@ -47,7 +32,7 @@ test('Economy opens as one nonblocking window beside inspection without resizing
       return { cam: { ...g.cam }, width: g.vw, height: g.vh };
     }),
   ).toEqual({ cam: before.cam, width: before.width, height: before.height });
-  await page.evaluate(() => window.__reportFrame(1100));
+  await frame(page, 1100);
   expect(await page.evaluate(() => window.productionArtPreview.game.state.time)).toBeGreaterThan(
     before.time,
   );
@@ -64,7 +49,6 @@ test('Economy opens as one nonblocking window beside inspection without resizing
 test('pointer and keyboard window geometry survives closing and remains reachable after viewport resize', async ({
   page,
 }) => {
-  await boot(page);
   await economy(page);
   const report = page.getByRole('region', { name: 'Economy window', exact: true });
   const original = await report.boundingBox();
@@ -114,7 +98,6 @@ test('pointer and keyboard window geometry survives closing and remains reachabl
 test('Economy restores edited filters, useful focus, disclosures and scroll after close or report switch', async ({
   page,
 }) => {
-  await boot(page);
   await page.evaluate(() => {
     const g = window.productionArtPreview.game,
       b = g.newBuilding('sawmill', 51, 48);
@@ -162,7 +145,6 @@ test('Economy restores edited filters, useful focus, disclosures and scroll afte
 test('Inspect retains Economy and its camera; Locate cancels pending zoom and reveals the site in clear map space', async ({
   page,
 }) => {
-  await boot(page);
   await openAtlas(page);
   const id = await page.evaluate(() => {
     const g = window.productionArtPreview.game,
@@ -184,10 +166,12 @@ test('Inspect retains Economy and its camera; Locate cancels pending zoom and re
   });
   const save = await page.evaluate(() => window.productionArtPreview.game.exportSave());
   await page.mouse.move(1000, 880);
+  const wheeled = await page.evaluate(() => performance.now());
   await page.mouse.wheel(0, -120);
   await page.locator(`[data-economy-locate="${id}"]`).click();
   await expect(report).toBeHidden();
-  await page.waitForTimeout(180);
+  // Past the 150 ms zoom animation, which Locate must have cancelled.
+  await page.waitForFunction((at) => performance.now() >= at + 150, wheeled, { polling: 20 });
   const point = await page.evaluate((id) => {
     const g = window.productionArtPreview.game,
       b = g.byId(id);
@@ -224,7 +208,6 @@ test('Inspect retains Economy and its camera; Locate cancels pending zoom and re
 test('opening and switching reports ends held map gestures while new gestures and inspection remain usable', async ({
   page,
 }) => {
-  await boot(page);
   const camera = () => page.evaluate(() => ({ ...window.productionArtPreview.game.cam }));
   const saved = await page.evaluate(() => window.productionArtPreview.game.exportSave());
   // Keep the original right button down across V, reproducing the native review finding.
@@ -293,10 +276,4 @@ test('opening and switching reports ends held map gestures while new gestures an
   expect(await page.evaluate(() => window.productionArtPreview.game.selected)).toBe(null);
   await expect(page.getByRole('region', { name: 'Colony window', exact: true })).toBeVisible();
   expect(await page.evaluate(() => window.productionArtPreview.game.exportSave())).toBe(saved);
-  await page.evaluate(() => {
-    const g = window.productionArtPreview.game;
-    g.draw();
-    g.drawMini();
-  });
-  await page.screenshot({ path: test.info().outputPath('report-gesture-navigation.png') });
 });

@@ -1,4 +1,6 @@
-import { test, expect } from './helpers/test.mjs';
+// Every case boots its own scenario (?devshot, ?economyshot, a failed boot or the
+// release page) or fakes browser APIs before boot, so each takes a fresh page.
+import { test, expect, holdFrames, seedPrefs } from './helpers/test.mjs';
 
 test.setTimeout(60000);
 
@@ -9,23 +11,17 @@ function captureErrors(page) {
 }
 
 async function frozenGame(page) {
-  await page.addInitScript(() => {
-    // Manual draws make cache verification independent of browser scheduling.
-    window.requestAnimationFrame = (frame) => {
-      window.__testGameFrame = frame;
-      return 0;
-    };
-    localStorage.setItem(
-      'settlers.prefs',
-      JSON.stringify({ reducedMotion: true, weather: false, quality: 1 }),
-    );
-  });
+  // Manual draws make cache verification independent of browser scheduling.
+  await holdFrames(page);
+  await seedPrefs(page, { reducedMotion: true, weather: false, quality: 1 });
   await page.goto('/tests/game.html?devshot&detail&capture&seed=2024');
   await page.waitForFunction(() => window.productionArtPreview?.game, null, { polling: 100 });
   await page.evaluate(() => window.productionArtPreview.game.draw());
 }
 
-test('production boots with painted artwork and native Pixi rendering', async ({ page }) => {
+test('production boots with painted artwork and native Pixi rendering', async ({
+  freshPage: page,
+}) => {
   const errors = captureErrors(page);
   const sheets = new Map();
   page.on('response', (response) => {
@@ -57,7 +53,7 @@ test('production boots with painted artwork and native Pixi rendering', async ({
 });
 
 test('repeated native frames reuse installed painted textures without uploads', async ({
-  page,
+  freshPage: page,
 }) => {
   const errors = captureErrors(page);
   await frozenGame(page);
@@ -124,7 +120,9 @@ test('repeated native frames reuse installed painted textures without uploads', 
   expect(errors).toEqual([]);
 });
 
-test('road plans render and refresh through real terrain events while paused', async ({ page }) => {
+test('road plans render and refresh through real terrain events while paused', async ({
+  freshPage: page,
+}) => {
   const errors = captureErrors(page);
   await frozenGame(page);
   const before = await page.evaluate(() => {
@@ -185,7 +183,6 @@ test('road plans render and refresh through real terrain events while paused', a
   expect(before.preview.afterSeconds).toBeLessThan(before.preview.beforeSeconds);
   expect(before.reused).toBe(true);
   expect(before.unchanged).toBe(true);
-  await page.screenshot({ path: test.info().outputPath('road-plan-preview.png') });
   const after = await page.evaluate(({ a, b }) => {
     const game = window.productionArtPreview.game;
     const committed = game.commitRoad(a, b);
@@ -211,11 +208,10 @@ test('road plans render and refresh through real terrain events while paused', a
   expect(after.rng).toBe(before.rng);
   expect(after.backend).toBe('PixiJS WebGL');
   expect(errors).toEqual([]);
-  await page.screenshot({ path: test.info().outputPath('road-plan-built.png') });
 });
 
 test('a scene drawing failure pauses the colony and reports the graphics error visibly', async ({
-  page,
+  freshPage: page,
 }) => {
   const errors = captureErrors(page);
   await frozenGame(page);
@@ -236,7 +232,7 @@ test('a scene drawing failure pauses the colony and reports the graphics error v
 });
 
 test('clarity keeps camera, simulation and artwork anchors intact and reuses native textures', async ({
-  page,
+  freshPage: page,
 }) => {
   const errors = captureErrors(page);
   await frozenGame(page);
@@ -249,7 +245,6 @@ test('clarity keeps camera, simulation and artwork anchors intact and reuses nat
     sawmill.stock.logs = 0;
     game.draw();
   });
-  await page.screenshot({ path: test.info().outputPath('standard-view.png') });
   const result = await page.evaluate(() => {
     const game = window.productionArtPreview.game;
     const snapshot = () =>
@@ -296,12 +291,11 @@ test('clarity keeps camera, simulation and artwork anchors intact and reuses nat
   expect(result.after.partialTextureUpdates).toBe(result.warm.partialTextureUpdates);
   expect(result.after.nativeGraphics).toBe(result.warm.nativeGraphics);
   expect(result.after.nativeTexts).toBe(result.warm.nativeTexts);
-  await page.screenshot({ path: test.info().outputPath('clarity-view.png') });
   expect(errors).toEqual([]);
 });
 
 test('producer inspector switches recent and lifetime rates without changing paused history', async ({
-  page,
+  freshPage: page,
 }) => {
   const errors = captureErrors(page);
   await frozenGame(page);
@@ -341,7 +335,6 @@ test('producer inspector switches recent and lifetime rates without changing pau
   await expect(stats).toContainText('Observed 105.0s of simulation time');
   await window.selectOption('120');
   await expect(window).toHaveValue('120');
-  await page.screenshot({ path: test.info().outputPath('recent-rates-inspector.png') });
   const after = await page.evaluate(() => {
     const game = window.productionArtPreview.game;
     for (let i = 0; i < 3; i++) game.draw();
@@ -352,7 +345,7 @@ test('producer inspector switches recent and lifetime rates without changing pau
 });
 
 test('actual frame loop shows restrained economic transitions at 8x even when muted', async ({
-  page,
+  freshPage: page,
 }) => {
   const errors = captureErrors(page);
   await frozenGame(page);
@@ -387,18 +380,18 @@ test('actual frame loop shows restrained economic transitions at 8x even when mu
     // capture, avoiding hundreds of unnecessary software-WebGL draws.
     const draw = game.draw;
     game.draw = () => {};
-    window.__testGameFrame(now);
+    window.__frame(now);
     for (let i = 0; i < 10; i++) {
       mill.stock.logs = 4;
       mill.stock.planks = 0;
-      window.__testGameFrame((now += 100));
+      window.__frame((now += 100));
     }
     mill.stock.logs = mill.stock.planks = 0;
-    for (let i = 0; i < 220; i++) window.__testGameFrame((now += 100));
+    for (let i = 0; i < 220; i++) window.__frame((now += 100));
     for (let i = 0; i < 200; i++) {
       mill.stock.logs = 4;
       mill.stock.planks = 0;
-      window.__testGameFrame((now += 100));
+      window.__frame((now += 100));
     }
     game.draw = draw;
     game.selected = mill;
@@ -412,7 +405,6 @@ test('actual frame loop shows restrained economic transitions at 8x even when mu
   expect(notices[2].at - notices[1].at).toBeGreaterThanOrEqual(20000);
   await expect(page.locator('#msgs')).toHaveAttribute('role', 'log');
   await expect(page.locator('#msgs')).toContainText('production resumed');
-  await page.screenshot({ path: test.info().outputPath('muted-economic-recovery.png') });
   const stableLog = await page.evaluate(() => {
     const feed = document.getElementById('msgs');
     const notice = [...feed.children].find((node) =>
@@ -431,7 +423,9 @@ test('actual frame loop shows restrained economic transitions at 8x even when mu
   expect(errors).toEqual([]);
 });
 
-test('a failed artwork sheet stops boot with a reload prompt and no colony', async ({ page }) => {
+test('a failed artwork sheet stops boot with a reload prompt and no colony', async ({
+  freshPage: page,
+}) => {
   const errors = captureErrors(page);
   await page.addInitScript(() => localStorage.setItem('recovery-sentinel', 'keep'));
   await page.route('**/assets/art/foliage.png', (route) =>
@@ -448,7 +442,9 @@ test('a failed artwork sheet stops boot with a reload prompt and no colony', asy
   expect(errors).toEqual([]);
 });
 
-test('unavailable WebGL shows a useful boot error without starting a colony', async ({ page }) => {
+test('unavailable WebGL shows a useful boot error without starting a colony', async ({
+  freshPage: page,
+}) => {
   const errors = captureErrors(page);
   await page.addInitScript(() => {
     const getContext = HTMLCanvasElement.prototype.getContext;
@@ -469,7 +465,7 @@ test('unavailable WebGL shows a useful boot error without starting a colony', as
 });
 
 test('WebGL context loss pauses the colony and reports rendering as unavailable', async ({
-  page,
+  freshPage: page,
 }) => {
   const errors = captureErrors(page);
   await frozenGame(page);
@@ -509,7 +505,7 @@ test('WebGL context loss pauses the colony and reports rendering as unavailable'
 });
 
 test('domain actions retain outpost, gold, contract and upgrade feedback in the native game', async ({
-  page,
+  freshPage: page,
 }) => {
   const errors = captureErrors(page);
   await frozenGame(page);
@@ -573,22 +569,13 @@ test('domain actions retain outpost, gold, contract and upgrade feedback in the 
   });
   await expect(page.locator('#msgs')).toContainText('Contract fulfilled: Timber for the realm');
   await expect(page.locator('#msgs')).toContainText('Carrier training upgraded to level 1');
-  await page.screenshot({ path: test.info().outputPath('domain-feedback.png') });
   expect(errors).toEqual([]);
 });
 
-test('expanded economy buildings render and expose their recipes', async ({ page }) => {
+test('expanded economy buildings render and expose their recipes', async ({ freshPage: page }) => {
   const errors = captureErrors(page);
-  await page.addInitScript(() => {
-    window.requestAnimationFrame = (frame) => {
-      window.__testGameFrame = frame;
-      return 0;
-    };
-    localStorage.setItem(
-      'settlers.prefs',
-      JSON.stringify({ reducedMotion: true, weather: false, quality: 0.75, clarity: true }),
-    );
-  });
+  await holdFrames(page);
+  await seedPrefs(page, { reducedMotion: true, weather: false, quality: 0.75, clarity: true });
   await page.goto('/tests/game.html?economyshot&seed=2024&z=4');
   await page.waitForFunction(() => window.productionArtPreview?.game, null, { polling: 100 });
   const result = await page.evaluate(() => {
@@ -631,11 +618,12 @@ test('expanded economy buildings render and expose their recipes', async ({ page
   expect(result.unchanged).toBe(true);
   await expect(page.locator('#infobody')).toContainText('iron ore');
   await expect(page.locator('#infobody')).toContainText('Iron bars');
-  await page.screenshot({ path: test.info().outputPath('expanded-economy.png') });
   expect(errors).toEqual([]);
 });
 
-test('mine production dashboard compares edible deliveries and consumption', async ({ page }) => {
+test('mine production dashboard compares edible deliveries and consumption', async ({
+  freshPage: page,
+}) => {
   await frozenGame(page);
   await page.evaluate(() => {
     const game = window.productionArtPreview.game;
@@ -671,16 +659,14 @@ test('mine production dashboard compares edible deliveries and consumption', asy
   await expect(stats.locator('.production-resource')).toHaveCount(2);
   await expect(stats.locator('[aria-label="Bread: Consumed 1.5 per minute"]')).toBeVisible();
   await expect(stats.locator('[aria-label="Fish: Delivered in 2.5 per minute"]')).toBeVisible();
-  await page.screenshot({ path: test.info().outputPath('production-dashboard.png') });
   await page.setViewportSize({ width: 390, height: 844 });
   const info = page.locator('#info');
   await expect(info).toBeVisible();
   expect(await info.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
-  await page.screenshot({ path: test.info().outputPath('production-dashboard-mobile.png') });
 });
 
 test('graphical workload overlay preserves jobs and renders at both quality levels', async ({
-  page,
+  freshPage: page,
 }) => {
   const errors = captureErrors(page);
   await frozenGame(page);
@@ -707,7 +693,6 @@ test('graphical workload overlay preserves jobs and renders at both quality leve
     game.draw();
     return JSON.stringify({ jobs: game.jobs, units: game.units, rng: game.state.rng });
   });
-  await page.screenshot({ path: test.info().outputPath('workload.png') });
   const after = await page.evaluate(() => {
     const game = window.productionArtPreview.game;
     game.presentationPrefs.quality = 0.75;
@@ -726,13 +711,12 @@ test('graphical workload overlay preserves jobs and renders at both quality leve
     game.resize();
     game.draw();
   });
-  await page.screenshot({ path: test.info().outputPath('workload-empty-mobile.png') });
   expect(errors).toEqual([]);
 });
 
 for (const tiled of [false, true])
   test(`incremental borders and minimap match full paints (${tiled ? 'tiled' : 'single'} textures)`, async ({
-    page,
+    freshPage: page,
   }) => {
     test.setTimeout(120000);
     const errors = captureErrors(page);
@@ -878,7 +862,9 @@ for (const tiled of [false, true])
     expect(errors).toEqual([]);
   });
 
-test('paused cameras hold decorative motion still as wall time advances', async ({ page }) => {
+test('paused cameras hold decorative motion still as wall time advances', async ({
+  freshPage: page,
+}) => {
   await frozenGame(page);
   const result = await page.evaluate(() => {
     const game = window.productionArtPreview.game;
@@ -914,7 +900,7 @@ test('paused cameras hold decorative motion still as wall time advances', async 
   expect(result.nextRng).toBe(result.rng);
 });
 
-test('art views stay bounded while every zoom pans across the map', async ({ page }) => {
+test('art views stay bounded while every zoom pans across the map', async ({ freshPage: page }) => {
   test.setTimeout(180000);
   const errors = captureErrors(page);
   await frozenGame(page);
@@ -946,7 +932,7 @@ test('art views stay bounded while every zoom pans across the map', async ({ pag
 
 for (const tiled of [false, true])
   test(`shadow patches match full shadow rebuilds (${tiled ? 'tiled' : 'single'} textures)`, async ({
-    page,
+    freshPage: page,
   }) => {
     test.setTimeout(180000);
     const errors = captureErrors(page);

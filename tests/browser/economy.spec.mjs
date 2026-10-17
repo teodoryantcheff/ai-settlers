@@ -3,25 +3,9 @@ import { openAtlas } from './helpers/atlas.mjs';
 
 test.setTimeout(120000);
 
-async function boot(page) {
-  await page.addInitScript(() => {
-    window.requestAnimationFrame = () => 0;
-    localStorage.setItem(
-      'settlers.prefs',
-      JSON.stringify({ quality: 0.75, reducedMotion: true, weather: false }),
-    );
-  });
-  await page.goto('/tests/game.html?seed=2024');
-  await expect(page.locator('#boot')).toHaveCount(0, { timeout: 30000 });
-  await page.waitForFunction(() => window.productionArtPreview?.game);
-  await page.locator('#startb').click();
-  await page.evaluate(() => window.productionArtPreview.game.hudTick());
-}
-
 test('Economy reports real stock and honest simulation coverage without changing colony state', async ({
   page,
 }) => {
-  await boot(page);
   await openAtlas(page);
   await page.getByRole('button', { name: 'Economy', exact: true }).click();
   await expect(page.locator('#economy-coverage')).toContainText('History unavailable');
@@ -50,7 +34,6 @@ test('Economy reports real stock and honest simulation coverage without changing
 test('real chain drilldowns preserve navigation, show nominal capacity and retain former contributors', async ({
   page,
 }) => {
-  await boot(page);
   const mill = await page.evaluate(() => {
     const game = window.productionArtPreview.game,
       hq = game.anyStorage();
@@ -130,11 +113,9 @@ test('real chain drilldowns preserve navigation, show nominal capacity and retai
       game.draw();
     }, quality);
     await page.locator('#workspace-economy').evaluate((element) => (element.scrollTop = 0));
-    await page.screenshot({ path: test.info().outputPath(`economy-overview-${width}.png`) });
     await page
       .locator('#economy-resource-heading')
       .evaluate((element) => element.scrollIntoView({ block: 'start' }));
-    await page.screenshot({ path: test.info().outputPath(`economy-detail-${width}.png`) });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
