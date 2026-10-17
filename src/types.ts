@@ -71,13 +71,13 @@ export interface ProductionMetrics {
   consumed: Inventory;
   delivered: Inventory;
   /** Completed producer input arrivals, excluding construction and warehouse transfers. */
-  inputDelivered?: Inventory;
+  inputDelivered: Inventory;
   /** Producer cargo that actually reached storage, attributed to its delivery job. */
-  outputDelivered?: Inventory;
+  outputDelivered: Inventory;
   /** Lifetime elapsed time when the distinguishable delivery counters began. */
-  deliveryStarted?: number;
+  deliveryStarted: number;
   /** Persisted cumulative samples: at most 301, spanning at most 600 simulation seconds. */
-  recent?: ProductionSample[];
+  recent: ProductionSample[];
 }
 export type ProductionRateWindow = 30 | 120 | 600 | 'lifetime';
 export interface ProductionSample {
@@ -89,7 +89,7 @@ export interface ProductionSample {
   outputDelivered: Inventory;
 }
 export interface ProductionWindowMetrics extends ProductionSample {
-  /** Delivery rates can have shorter coverage than legacy lifetime production totals. */
+  /** Delivery rates can have shorter coverage than lifetime production totals. */
   deliveryElapsed: number;
   /** Recent snapshots are two simulation seconds apart; lifetime counters are exact. */
   sampleInterval: number;
@@ -120,7 +120,6 @@ export interface Building {
   foodBlockedNoticeSent: boolean;
   /** Records the quarry's reported exhaustion, cleared when it produces stone again. */
   rocksExhaustedNoticeSent: boolean;
-  legacyIndustry?: boolean;
   produced: number;
   /** Transient display cache; never serialized or accepted from imported saves. */
 }
@@ -324,13 +323,13 @@ export interface GameEvents {
 export type SavedDeposit = ['gold' | 'iron' | 'coal', number, number?] | null;
 export type SavedUnit = Omit<Unit, 'job' | 'dead' | 'moving'> & { ji: number };
 export interface SaveData {
-  v: 1 | 2;
-  economy?: 2;
-  identity?: ColonyIdentity;
-  observations?: EconomicObservations;
-  attention?: import('./observations/attention.ts').AttentionData;
+  v: 2;
+  economy: 2;
+  identity: ColonyIdentity;
+  observations: EconomicObservations;
+  attention: import('./observations/attention.ts').AttentionData;
   seed: number;
-  rng?: number;
+  rng: number;
   nextId: number;
   t: [number[], number[], number[], number[], SavedDeposit[]];
   b: Building[];
@@ -348,12 +347,8 @@ export interface SaveData {
     treeGrowthT: number;
   };
 }
-/** The validator has supplied the historical defaults required to adopt a world. */
-export type ValidatedSave = SaveData & {
-  identity: ColonyIdentity;
-  observations: EconomicObservations;
-  attention: import('./observations/attention.ts').AttentionData;
-} & ({ v: 1 } | { v: 2; rng: number });
+/** A save returned by validateSave, safe to hydrate. */
+export type ValidatedSave = SaveData;
 
 export interface PreparedSave {
   data: ValidatedSave;
@@ -402,7 +397,7 @@ export interface CargoWindow {
 export interface EconomicObservations {
   /** All carrier goods actually delivered; coverage is independent of earlier economic flows. */
   cargo: CargoObservations;
-  /** Each new metric begins here on historical saves; no past activity is inferred. */
+  /** Lifetime coverage begins here; no earlier activity is inferred. */
   started: number;
   totals: EconomicTotals;
   recent: EconomicSample[];
@@ -451,7 +446,7 @@ export interface ColonyIdentity {
 export interface SaveMetadata {
   id: string;
   name: string;
-  kind: 'manual' | 'autosave' | 'legacy';
+  kind: 'manual' | 'autosave';
   colonyName: string;
   seed: number;
   savedAt: number | null;

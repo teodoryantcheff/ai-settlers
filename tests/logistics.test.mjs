@@ -63,7 +63,7 @@ test('recovered fetch arrivals have independent coverage and exclude pickup and 
   );
 });
 
-test('cargo coverage migrates independently and survives deterministic save continuation', () => {
+test('cargo coverage survives deterministic save continuation and reads leave it unchanged', () => {
   const { game, hq } = colony();
   game.spawnCarrier(hq);
   game.step(0.1);
@@ -73,14 +73,6 @@ test('cargo coverage migrates independently and survives deterministic save cont
   game.importSave(checkpoint);
   for (let tick = 0; tick < 100; tick++) game.step(0.1);
   assert.deepEqual(JSON.parse(game.exportSave()), JSON.parse(expected));
-  const old = JSON.parse(expected);
-  delete old.observations.cargo;
-  game.importSave(JSON.stringify(old));
-  assert.equal(game.cargoWindow('lifetime').available, false);
-  assert.ok(game.economicWindow('lifetime').available, 'earlier economic coverage is preserved');
-  assert.equal(game.cargoWindow('lifetime').from, old.st.time);
-  game.step(0.1);
-  assert.ok(game.cargoWindow('lifetime').elapsed > 0);
   const before = game.exportSave();
   for (let i = 0; i < 20; i++) game.cargoWindow(600);
   assert.equal(game.exportSave(), before);

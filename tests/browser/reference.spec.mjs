@@ -38,12 +38,6 @@ test('searchable reference retains native keyboard focus and exact recipes throu
   await expect(search).toHaveValue('mine coal');
   await expect(page.locator('#reference-results')).toContainText('Fish, bread, meat or provisions');
   await expect(page.locator('#reference-results')).not.toContainText('Iron Smelter');
-  await search.fill('legacy');
-  await page.locator('#reference-topic').selectOption('buildings');
-  await expect(page.locator('#reference-results')).toContainText('Iron ore + 1 Coal');
-  await expect(page.locator('#reference-results')).toContainText(
-    'original wood-and-stone toolsmith',
-  );
   await search.fill('water');
   await expect(page.locator('#reference-results')).toContainText('no transported water');
   await page.keyboard.press('Escape');

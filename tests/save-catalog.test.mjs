@@ -97,15 +97,12 @@ test('named checkpoints keep metadata and identity, autosave remains separate, a
   );
 });
 
-test('failed overwrite, deletion, migration and import preserve the old catalog and live world', () => {
+test('failed creation, overwrite, deletion and import preserve the old catalog and live world', () => {
   const { game, values, setBlocked } = colony();
   game.setColonyName('Northbank');
-  const legacy = game.exportSave();
-  values.set('settlers.save', legacy);
-  assert.equal(game.listSaves()[0].kind, 'legacy');
+  const exported = game.exportSave();
   setBlocked(true);
-  assert.throws(() => game.saveCheckpoint('First migrated checkpoint'), /quota/i);
-  assert.equal(values.get('settlers.save'), legacy);
+  assert.throws(() => game.saveCheckpoint('First checkpoint'), /quota/i);
   assert.equal(values.has('settlers.saves.v1'), false);
   setBlocked(false);
   const saved = game.saveCheckpoint('Original');
@@ -115,9 +112,8 @@ test('failed overwrite, deletion, migration and import preserve the old catalog 
   setBlocked(true);
   assert.throws(() => game.saveCheckpoint('Replacement', saved.id), /quota/i);
   assert.throws(() => game.deleteCheckpoint(saved.id), /quota/i);
-  assert.throws(() => game.importSave(legacy), /quota/i);
+  assert.throws(() => game.importSave(exported), /quota/i);
   assert.equal(values.get('settlers.saves.v1'), catalog);
-  assert.equal(values.get('settlers.save'), legacy);
   assert.deepEqual(worldWithoutAttention(game.exportSave()), worldWithoutAttention(live));
   const events = game.activityHistory().events;
   assert.ok(events.some((event) => event.kind === 'storage-failed'));
@@ -198,67 +194,6 @@ test('autosave neither reads nor rewrites named checkpoints and still continues'
   assert.equal(game.state.time, 0.25);
   assert.equal(game.hasUnsavedProgress(), false);
   assert.equal(game.saveHealth.ok, true);
-});
-
-test('a catalog autosave from before the split continues, then migrates on the next autosave', () => {
-  const { game: old, values } = colony();
-  old.setColonyName('Oldtown');
-  old.saveCheckpoint('First');
-  old.saveCheckpoint('Second');
-  old.step(0.25);
-  const catalog = JSON.parse(values.get('settlers.saves.v1'));
-  catalog.entries.push({
-    id: 'autosave',
-    name: 'Autosave',
-    kind: 'autosave',
-    savedAt: Date.now() + 1000,
-    data: JSON.parse(old.exportSave()),
-  });
-  values.set('settlers.saves.v1', JSON.stringify(catalog));
-
-  const { game, setBlocked } = colony(values);
-  assert.deepEqual(
-    game
-      .listSaves()
-      .map((entry) => entry.kind)
-      .sort(),
-    ['autosave', 'manual', 'manual'],
-  );
-  assert.equal(game.loadGame(), true);
-  assert.equal(game.state.time, 0.25);
-  assert.equal(game.colonyName, 'Oldtown');
-
-  game.step(0.25);
-  setBlocked(true);
-  assert.equal(game.saveGame(true), false);
-  assert.equal(game.saveHealth.ok, false);
-  assert.equal(game.listSaves().find((entry) => entry.kind === 'autosave').simulationAge, 0.25);
-
-  setBlocked(false);
-  assert.equal(game.saveGame(true), true);
-  assert.equal(game.saveHealth.ok, true);
-  const migrated = JSON.parse(values.get('settlers.saves.v1'));
-  assert.deepEqual(
-    migrated.entries.map((entry) => entry.name),
-    ['First', 'Second'],
-  );
-  assert.deepEqual(migrated.entries, catalog.entries.slice(0, 2));
-  const saves = game.listSaves();
-  assert.equal(saves.length, 3);
-  assert.equal(saves[0].kind, 'autosave');
-  assert.equal(saves[0].simulationAge, 0.5);
-
-  // A tab still on the old bundle may write a newer autosave into the catalog.
-  const stale = JSON.parse(values.get('settlers.saves.v1'));
-  stale.entries.push({ ...catalog.entries.at(-1), savedAt: Date.now() + 60_000 });
-  values.set('settlers.saves.v1', JSON.stringify(stale));
-  assert.equal(game.listSaves()[0].simulationAge, 0.25);
-  values.set('settlers.saves.v1', JSON.stringify(migrated));
-
-  const { game: reopened } = colony(values);
-  assert.equal(reopened.loadGame(), true);
-  assert.equal(reopened.state.time, 0.5);
-  assert.equal(reopened.hasUnsavedProgress(), false);
 });
 
 test('a damaged autosave is reported without hiding checkpoints and stays deletable', () => {

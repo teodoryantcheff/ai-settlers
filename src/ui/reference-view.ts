@@ -4,7 +4,7 @@ import { html as markup, trusted, formatGoods } from './markup.ts';
 import { artworkAssetURL } from '../rendering/painted-assets.ts';
 import type { GameRuntime } from '../runtime.ts';
 import type { BuildingType, Good } from '../types.ts';
-import { recipeRequirements, edibleGoods } from '../gameplay/production-rules.ts';
+import { edibleGoods } from '../gameplay/production-rules.ts';
 import { buildingPurposes } from './catalog-view.ts';
 import { resourceIcon } from './resource-icons.ts';
 
@@ -27,7 +27,7 @@ export function createReferenceView(game: GameRuntime): ReferenceViewSubsystem {
       spec.prod === 'mine' && spec.out
         ? `Fish, bread, meat or provisions: consume 1 of any → 1 ${game.GOODS[spec.out].name}. The best-stocked meal is chosen; grain, flour, pigs and beer are not mine meals.`
         : spec.in && spec.out
-          ? `${formatGoods(game.GOODS, recipeRequirements({ type }, spec), { empty: 'None' })} → 1 ${game.GOODS[spec.out].name}.`
+          ? `${formatGoods(game.GOODS, spec.in, { empty: 'None' })} → 1 ${game.GOODS[spec.out].name}.`
           : spec.out
             ? `${spec.prod === 'gather' ? '2' : '1'} ${game.GOODS[spec.out].name} per successful local work cycle.`
             : type === 'well'
@@ -49,11 +49,6 @@ export function createReferenceView(game: GameRuntime): ReferenceViewSubsystem {
       requirements +=
         ' Production needs a completed, working, connected well within 6 tiles. Water is local coverage, never carried cargo.';
     let extra = '';
-    if (type === 'armory')
-      extra = markup`<p><strong>Retained legacy armory recipe:</strong> ${formatGoods(game.GOODS, recipeRequirements({ type, legacyIndustry: true }, spec), { empty: 'None' })} → 1 Weapons. Existing migrated armories keep this recipe; new armories use iron bars. ${game.buildings.filter((b) => b.type === 'armory' && b.legacyIndustry).length} retained legacy armories in this colony.</p>`;
-    if (type === 'workshop' || type === 'toolsmith')
-      extra +=
-        '<p>Legacy toolsmith migration: older saves migrate the original wood-and-stone toolsmith into the basic Workshop, preserving stock, delivered materials, timers and pickups. The current Toolsmith uses iron bars and planks.</p>';
     if (spec.prod === 'mine')
       extra +=
         '<p>Legacy provisions remain an eligible meal. Different stocked food types can improve mining speed; inspect actual food variety and measured output separately.</p>';
@@ -212,7 +207,7 @@ export function createReferenceView(game: GameRuntime): ReferenceViewSubsystem {
                       ? 'Mine meals: fish, bread, meat or provisions; one of any.'
                       : game.BSPEC[b.type].in && output
                         ? 'Actual recipe: ' +
-                          formatGoods(game.GOODS, recipeRequirements(b, game.BSPEC[b.type]), {
+                          formatGoods(game.GOODS, game.BSPEC[b.type].in, {
                             empty: 'None',
                           }) +
                           ' → ' +
