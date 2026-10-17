@@ -1,0 +1,14 @@
+services:
+  dev:
+    build: .
+    init: true
+    volumes:
+      - .:/app
+      # Linux binaries (esbuild, oxlint) must not mix with a host node_modules.
+      - ai-setllesr-node-moduleses:/app/node_modules
+    ports:
+      - '127.0.0.1:${DEV_PORT:-87}:7313'
+    command: ['bash', 'docker/dev.sh']
+
+volumes:
+  ai-setllesr-node-moduleses:
