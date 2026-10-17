@@ -14,6 +14,16 @@ npm run dev
 
 Open `http://127.0.0.1:8765/`. Add `?seed=2024` for a reproducible map. All runtime code and artwork are served locally.
 
+### Docker development environment
+
+Alternatively, run the same workflow in a container with only Docker installed:
+
+```sh
+docker compose up --build
+```
+
+The container mounts the checkout, installs dependencies into a Linux-only volume whenever `package-lock.json` changes, typechecks, serves the repository on `http://127.0.0.1:87/` and rebuilds both bundles when `src/` changes; reload the browser afterwards. 
+
 Click to inspect or build, right-drag or use arrow keys to pan, scroll to zoom, and press Space to pause. Colony Atlas starts collapsed; open it for Map and live Economy, Logistics, Colony, Attention and Activity windows. V opens or toggles Advisor/Journey guidance in Colony. Buildings opens a searchable five-column palette; hover or focus an entry for details. Five illustrated map modes and contextual Help sit at bottom center, and the lower-right minimap can be collapsed. Economy, Logistics, Attention and Activity connect current goods, deliveries, persistent constraints and recorded colony events; Inspect keeps map context and Locate returns to the relevant site. Inspect buildings to adjust priority, pause work or request warehouse reserves.
 
 Welcome offers Continue, New Colony with an optional name/seed, and Load. Menu includes Home, which keeps the live colony for Continue, plus saves, settings and help. Saves provide named checkpoints, a separate autosave, and JSON file import/export; the toolbar save-health button opens recovery when browser storage fails. Settings include Reduced Motion and Economical rendering.
@@ -34,7 +44,7 @@ Edit TypeScript in `src/` and the interface in `index.html`, then rebuild. `src/
 
 The world uses native GPU sprites, graphics and text. Offscreen Canvas prepares cached artwork and terrain; Canvas also draws the minimap. WebGL is required for play. The painted pack and its crop manifest live in `assets/art/`; generation provenance is recorded in [prompts.md](assets/art/prompts.md). After changing a sheet or an authored region, run `npm run crop:art` to rewrite each region's trimmed `crop` in the manifest.
 
-[SPEC.md](SPEC.md) documents current mechanics and architecture. [AGENTS.md](AGENTS.md) provides contributor guidance. Track bugs, plans and implementation work in [GitHub Issues](https://github.com/teodoryantcheff/ai-settlers/issues), using the [tracker conventions](docs/agents/issue-tracker.md). The current map/window presentation follows [ADR-0004](docs/adr/0004-full-map-and-game-windows.md), with an [acceptance record](docs/game-first-ui-acceptance.md). The [earlier redesign specification](docs/ui-redesign-spec.md) preserves the historical accounting, observation and session contract.
+[SPEC.md](SPEC.md) documents current mechanics, issues and architecture; [ROADMAP.md](ROADMAP.md) lists how we evolved. [AGENTS.md](AGENTS.md) provides contributor guidance. Track bugs, plans and implementation work in [GitHub Issues](https://github.com/teodoryantcheff/ai-settlers/issues), using the [tracker conventions](docs/agents/issue-tracker.md). The current map/window presentation follows [ADR-0004](docs/adr/0004-full-map-and-game-windows.md), with an [acceptance record](docs/game-first-ui-acceptance.md). The [earlier redesign specification](docs/ui-redesign-spec.md) preserves the historical accounting, observation and session contract.
 
 Reference searches buildings, actual recipes, resources, transport and diagnostic terms; compact explanations stay live, while full reference and About use the shared utility layers. About links the bundled artwork provenance. If graphics stop, export the paused live colony before reviewing a reload; a reload can only restore a checkpoint or imported JSON. An incomplete painted pack keeps standard artwork playable.
 
