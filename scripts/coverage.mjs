@@ -67,50 +67,69 @@ const runtimeSources = new Set(
     .filter((name) => name.endsWith('.ts') && !name.startsWith('src/dev/')),
 );
 const isRuntimeSource = (file) => runtimeSources.has(repositoryPath(file));
-const mcr = new CoverageReport({
-  name: 'Settlers coverage',
-  outputDir: path.join(output, 'report'),
-  reports: ['v8', 'console-summary'],
-  logging: 'error',
-  all: {
-    dir: ['./src'],
-    filter: (file) => file.endsWith('.ts') && isRuntimeSource(file) && 'js',
-    transformer: (entry) => {
-      entry.source = stripTypeScriptTypes(entry.source);
+
+/**
+ * One environment's per-file coverage. Node runs type-stripped TypeScript; the
+ * browser runs esbuild output mapped back through source maps. Their branch
+ * structures differ (esbuild lowers `??=` and `?.` into new branches), so the two
+ * are measured and guarded separately rather than merged into one number.
+ */
+async function measure(environment, add) {
+  const mcr = new CoverageReport({
+    name: `Settlers ${environment} coverage`,
+    outputDir: path.join(output, 'report', environment),
+    reports: ['v8', 'console-summary'],
+    logging: 'error',
+    all: {
+      dir: ['./src'],
+      filter: (file) => file.endsWith('.ts') && isRuntimeSource(file) && 'js',
+      transformer: (entry) => {
+        entry.source = stripTypeScriptTypes(entry.source);
+      },
     },
-  },
-  // Node and browser coverage of one module merge under the same repository path.
-  sourcePath: repositoryPath,
-  entryFilter: (entry) =>
-    /\/game\.(?:min|test)\.js$/.test(entry.url) ||
-    (entry.url.startsWith(baseUrl) && isRuntimeSource(entry.url)),
-  sourceFilter: isRuntimeSource,
-  // Node executes type-stripped TypeScript; give the parser the same code V8 ran.
-  onEntry: (entry) => {
-    if (entry.url.startsWith(baseUrl) && entry.url.endsWith('.ts'))
-      entry.source = stripTypeScriptTypes(entry.source);
-  },
-});
-await mcr.addFromDir(path.join(raw, 'node'));
-const bundles = {};
-for (const name of await fs.readdir(path.join(raw, 'browser'))) {
-  const { result } = JSON.parse(await fs.readFile(path.join(raw, 'browser', name), 'utf8'));
-  for (const entry of result) {
-    const file = fileURLToPath(entry.url);
-    bundles[file] ??= {
-      source: await fs.readFile(file, 'utf8'),
-      sourceMap: JSON.parse(await fs.readFile(file + '.map', 'utf8')),
+    sourcePath: repositoryPath,
+    entryFilter: (entry) =>
+      /\/game\.(?:min|test)\.js$/.test(entry.url) ||
+      (entry.url.startsWith(baseUrl) && isRuntimeSource(entry.url)),
+    sourceFilter: isRuntimeSource,
+    // Give the parser the same type-stripped code V8 ran.
+    onEntry: (entry) => {
+      if (entry.url.startsWith(baseUrl) && entry.url.endsWith('.ts'))
+        entry.source = stripTypeScriptTypes(entry.source);
+    },
+  });
+  await add(mcr);
+  console.log(`${environment}:`);
+  const results = await mcr.generate();
+  const measured = {};
+  for (const file of results.files) {
+    if (measured[file.sourcePath]) throw new Error(`Duplicate coverage for ${file.sourcePath}`);
+    measured[file.sourcePath] = {
+      lines: file.summary.lines.pct,
+      branches: file.summary.branches.pct,
     };
-    await mcr.add([{ ...entry, ...bundles[file] }]);
   }
+  return measured;
 }
-const results = await mcr.generate();
+
+const nodeCoverage = await measure('node', (mcr) => mcr.addFromDir(path.join(raw, 'node')));
+const browserCoverage = await measure('browser', async (mcr) => {
+  const bundles = {};
+  for (const name of await fs.readdir(path.join(raw, 'browser'))) {
+    const { result } = JSON.parse(await fs.readFile(path.join(raw, 'browser', name), 'utf8'));
+    for (const entry of result) {
+      const file = fileURLToPath(entry.url);
+      bundles[file] ??= {
+        source: await fs.readFile(file, 'utf8'),
+        sourceMap: JSON.parse(await fs.readFile(file + '.map', 'utf8')),
+      };
+      await mcr.add([{ ...entry, ...bundles[file] }]);
+    }
+  }
+});
 const current = {};
-for (const file of results.files)
-  current[file.sourcePath] = {
-    lines: file.summary.lines.pct,
-    branches: file.summary.branches.pct,
-  };
+for (const file of new Set([...Object.keys(nodeCoverage), ...Object.keys(browserCoverage)]))
+  current[file] = { node: nodeCoverage[file], browser: browserCoverage[file] };
 const sorted = Object.fromEntries(Object.entries(current).sort(([a], [b]) => a.localeCompare(b)));
 
 if (values.update) {
@@ -119,14 +138,17 @@ if (values.update) {
 } else {
   const baseline = JSON.parse(await fs.readFile(baselineFile, 'utf8'));
   const failures = [];
-  for (const [file, expected] of Object.entries(baseline)) {
-    const actual = current[file];
-    // A removed file has no coverage to lose; its lines leave the denominator with it.
-    if (!actual) continue;
-    for (const metric of ['lines', 'branches'])
-      if (actual[metric] < expected[metric] - TOLERANCE)
-        failures.push(`${file} ${metric}: ${actual[metric]}% < baseline ${expected[metric]}%`);
-  }
+  for (const [file, environments] of Object.entries(baseline))
+    for (const [environment, expected] of Object.entries(environments)) {
+      const actual = current[file]?.[environment];
+      // A removed file has no coverage to lose; its lines leave the denominator with it.
+      if (!actual || !expected) continue;
+      for (const metric of ['lines', 'branches'])
+        if (actual[metric] < expected[metric] - TOLERANCE)
+          failures.push(
+            `${file} ${environment} ${metric}: ${actual[metric]}% < baseline ${expected[metric]}%`,
+          );
+    }
   for (const file of Object.keys(current))
     if (!baseline[file]) failures.push(`${file}: not in baseline (run with --update)`);
   if (failures.length) {

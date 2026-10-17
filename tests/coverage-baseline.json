@@ -1,318 +1,792 @@
 {
   "src/app.ts": {
-    "lines": 11.11,
-    "branches": 0
+    "node": {
+      "lines": 11.11,
+      "branches": 0
+    },
+    "browser": {
+      "lines": 85,
+      "branches": 50
+    }
   },
   "src/application/assembly.ts": {
-    "lines": 67.19,
-    "branches": 100
+    "node": {
+      "lines": 67.19,
+      "branches": 100
+    },
+    "browser": {
+      "lines": 98.53,
+      "branches": 44.44
+    }
   },
   "src/application/loop.ts": {
-    "lines": 88.04,
-    "branches": 65.22
+    "node": {
+      "lines": 88.04,
+      "branches": 65.22
+    },
+    "browser": {
+      "lines": 92,
+      "branches": 79.22
+    }
   },
   "src/audio/ambience.ts": {
-    "lines": 98.23,
-    "branches": 85.71
+    "node": {
+      "lines": 98.23,
+      "branches": 85.71
+    },
+    "browser": {
+      "lines": 64.94,
+      "branches": 47.95
+    }
   },
   "src/audio/audio-runtime.ts": {
-    "lines": "",
-    "branches": ""
+    "node": {
+      "lines": "",
+      "branches": ""
+    },
+    "browser": {
+      "lines": "",
+      "branches": ""
+    }
   },
   "src/audio/audio-types.ts": {
-    "lines": "",
-    "branches": ""
+    "node": {
+      "lines": "",
+      "branches": ""
+    },
+    "browser": {
+      "lines": "",
+      "branches": ""
+    }
   },
   "src/audio/audio.ts": {
-    "lines": 91.6,
-    "branches": 85.33
+    "node": {
+      "lines": 91.6,
+      "branches": 85.33
+    },
+    "browser": {
+      "lines": 85.99,
+      "branches": 63.85
+    }
   },
   "src/audio/bell-options.ts": {
-    "lines": 100,
-    "branches": ""
+    "node": {
+      "lines": 100,
+      "branches": ""
+    },
+    "browser": {
+      "lines": 100,
+      "branches": ""
+    }
   },
   "src/audio/interface-sounds.ts": {
-    "lines": 100,
-    "branches": ""
+    "node": {
+      "lines": 100,
+      "branches": ""
+    },
+    "browser": {
+      "lines": 93.55,
+      "branches": ""
+    }
   },
   "src/audio/music.ts": {
-    "lines": 99.43,
-    "branches": 96.77
+    "node": {
+      "lines": 99.43,
+      "branches": 96.77
+    },
+    "browser": {
+      "lines": 67.34,
+      "branches": 54.87
+    }
   },
   "src/audio/world-effects.ts": {
-    "lines": 98.68,
-    "branches": 89.71
+    "node": {
+      "lines": 98.68,
+      "branches": 89.71
+    },
+    "browser": {
+      "lines": 80.1,
+      "branches": 55.56
+    }
   },
   "src/bootstrap.ts": {
-    "lines": 85.45,
-    "branches": 48.57
+    "node": {
+      "lines": 0,
+      "branches": 0
+    },
+    "browser": {
+      "lines": 85.45,
+      "branches": 48.57
+    }
   },
   "src/core/attach.ts": {
-    "lines": 100,
-    "branches": 100
+    "node": {
+      "lines": 100,
+      "branches": 100
+    },
+    "browser": {
+      "lines": 85.71,
+      "branches": 50
+    }
   },
   "src/core/events.ts": {
-    "lines": 100,
-    "branches": ""
+    "node": {
+      "lines": 100,
+      "branches": ""
+    },
+    "browser": {
+      "lines": 100,
+      "branches": ""
+    }
   },
   "src/core/persistence.ts": {
-    "lines": 90.83,
-    "branches": 81.69
+    "node": {
+      "lines": 90.83,
+      "branches": 81.69
+    },
+    "browser": {
+      "lines": 84.99,
+      "branches": 48.26
+    }
   },
   "src/core/save-catalog.ts": {
-    "lines": 91.03,
-    "branches": 83.72
+    "node": {
+      "lines": 91.03,
+      "branches": 83.72
+    },
+    "browser": {
+      "lines": 79.41,
+      "branches": 56.82
+    }
   },
   "src/core/save-codec.ts": {
-    "lines": 93.58,
-    "branches": 90.11
+    "node": {
+      "lines": 93.58,
+      "branches": 90.11
+    },
+    "browser": {
+      "lines": 88.03,
+      "branches": 62
+    }
   },
   "src/core/state.ts": {
-    "lines": 90.46,
-    "branches": 87.73
+    "node": {
+      "lines": 90.46,
+      "branches": 87.73
+    },
+    "browser": {
+      "lines": 80.21,
+      "branches": 58.52
+    }
   },
   "src/core/world.ts": {
-    "lines": 100,
-    "branches": 100
+    "node": {
+      "lines": 100,
+      "branches": 100
+    },
+    "browser": {
+      "lines": 99.37,
+      "branches": 93.33
+    }
   },
   "src/gameplay/advisor.ts": {
-    "lines": 96.77,
-    "branches": 95.81
+    "node": {
+      "lines": 96.77,
+      "branches": 95.81
+    },
+    "browser": {
+      "lines": 80.57,
+      "branches": 61.31
+    }
   },
   "src/gameplay/colony-rules.ts": {
-    "lines": 98.67,
-    "branches": 97.37
+    "node": {
+      "lines": 98.67,
+      "branches": 97.37
+    },
+    "browser": {
+      "lines": 97.87,
+      "branches": 80.7
+    }
   },
   "src/gameplay/production-rules.ts": {
-    "lines": 94.83,
-    "branches": 92.31
+    "node": {
+      "lines": 94.83,
+      "branches": 92.31
+    },
+    "browser": {
+      "lines": 95,
+      "branches": 70.18
+    }
   },
   "src/gameplay/progression.ts": {
-    "lines": 96.74,
-    "branches": 87.5
+    "node": {
+      "lines": 96.74,
+      "branches": 87.5
+    },
+    "browser": {
+      "lines": 91.74,
+      "branches": 56.98
+    }
   },
   "src/main.ts": {
-    "lines": 100,
-    "branches": ""
+    "node": {
+      "lines": 0,
+      "branches": ""
+    },
+    "browser": {
+      "lines": 100,
+      "branches": ""
+    }
   },
   "src/observations/attention.ts": {
-    "lines": 95.39,
-    "branches": 90.76
+    "node": {
+      "lines": 95.39,
+      "branches": 90.76
+    },
+    "browser": {
+      "lines": 85.31,
+      "branches": 50
+    }
   },
   "src/observations/production-condition.ts": {
-    "lines": 100,
-    "branches": 100
+    "node": {
+      "lines": 100,
+      "branches": 100
+    },
+    "browser": {
+      "lines": 91.3,
+      "branches": 48.72
+    }
   },
   "src/observations/validate-attention.ts": {
-    "lines": 99.19,
-    "branches": 98.73
+    "node": {
+      "lines": 99.19,
+      "branches": 98.73
+    },
+    "browser": {
+      "lines": 93.85,
+      "branches": 61.7
+    }
   },
   "src/rendering/art.ts": {
-    "lines": 0.18,
-    "branches": 0
+    "node": {
+      "lines": 0.18,
+      "branches": 0
+    },
+    "browser": {
+      "lines": 99.64,
+      "branches": 96.77
+    }
   },
   "src/rendering/canvas-context.ts": {
-    "lines": 100,
-    "branches": 100
+    "node": {
+      "lines": 100,
+      "branches": 100
+    },
+    "browser": {
+      "lines": 63.16,
+      "branches": 50
+    }
   },
   "src/rendering/landscape.ts": {
-    "lines": 86.88,
-    "branches": 74.55
+    "node": {
+      "lines": 86.88,
+      "branches": 74.55
+    },
+    "browser": {
+      "lines": 98.29,
+      "branches": 88.03
+    }
   },
   "src/rendering/painted-assets.ts": {
-    "lines": 14.68,
-    "branches": 4.05
+    "node": {
+      "lines": 14.68,
+      "branches": 4.05
+    },
+    "browser": {
+      "lines": 91.88,
+      "branches": 72.64
+    }
   },
   "src/rendering/pixi-atmosphere.ts": {
-    "lines": 40.4,
-    "branches": 0
+    "node": {
+      "lines": 40.4,
+      "branches": 0
+    },
+    "browser": {
+      "lines": 100,
+      "branches": 100
+    }
   },
   "src/rendering/pixi-renderer.ts": {
-    "lines": 2.61,
-    "branches": 0
+    "node": {
+      "lines": 2.61,
+      "branches": 0
+    },
+    "browser": {
+      "lines": 94.43,
+      "branches": 80
+    }
   },
   "src/rendering/pixi-shadows.ts": {
-    "lines": 44.44,
-    "branches": ""
+    "node": {
+      "lines": 44.44,
+      "branches": ""
+    },
+    "browser": {
+      "lines": 100,
+      "branches": ""
+    }
   },
   "src/rendering/renderer.ts": {
-    "lines": 52.68,
-    "branches": 47.59
+    "node": {
+      "lines": 52.32,
+      "branches": 47.33
+    },
+    "browser": {
+      "lines": 85.64,
+      "branches": 65.42
+    }
   },
   "src/rendering/scene.ts": {
-    "lines": 20,
-    "branches": 7.14
+    "node": {
+      "lines": 20,
+      "branches": 7.14
+    },
+    "browser": {
+      "lines": 99.19,
+      "branches": 54.17
+    }
   },
   "src/rendering/shadow-cache.ts": {
-    "lines": 91.58,
-    "branches": 83.87
+    "node": {
+      "lines": 91.71,
+      "branches": 83.87
+    },
+    "browser": {
+      "lines": 97.45,
+      "branches": 86.27
+    }
   },
   "src/rendering/village.ts": {
-    "lines": 91.45,
-    "branches": 81.3
+    "node": {
+      "lines": 91.45,
+      "branches": 81.3
+    },
+    "browser": {
+      "lines": 90.95,
+      "branches": 70.63
+    }
   },
   "src/runtime.ts": {
-    "lines": 100,
-    "branches": ""
+    "node": {
+      "lines": 100,
+      "branches": ""
+    },
+    "browser": {
+      "lines": 0,
+      "branches": ""
+    }
   },
   "src/simulation/assembly.ts": {
-    "lines": 100,
-    "branches": 100
+    "node": {
+      "lines": 100,
+      "branches": 100
+    },
+    "browser": {
+      "lines": 98.81,
+      "branches": 50
+    }
   },
   "src/simulation/autoplay.ts": {
-    "lines": 92.12,
-    "branches": 90.43
+    "node": {
+      "lines": 92.12,
+      "branches": 90.43
+    },
+    "browser": {
+      "lines": 26.85,
+      "branches": 10.59
+    }
   },
   "src/simulation/delivery-stage.ts": {
-    "lines": 100,
-    "branches": 100
+    "node": {
+      "lines": 100,
+      "branches": 100
+    },
+    "browser": {
+      "lines": 100,
+      "branches": 50
+    }
   },
   "src/simulation/economy.ts": {
-    "lines": 89.78,
-    "branches": 86.46
+    "node": {
+      "lines": 89.78,
+      "branches": 86.46
+    },
+    "browser": {
+      "lines": 81.4,
+      "branches": 53.2
+    }
   },
   "src/simulation/engine.ts": {
-    "lines": 100,
-    "branches": ""
+    "node": {
+      "lines": 100,
+      "branches": ""
+    },
+    "browser": {
+      "lines": 0,
+      "branches": ""
+    }
   },
   "src/simulation/map.ts": {
-    "lines": 74.48,
-    "branches": 71.11
+    "node": {
+      "lines": 74.48,
+      "branches": 71.11
+    },
+    "browser": {
+      "lines": 68.36,
+      "branches": 57.65
+    }
   },
   "src/simulation/navigation.ts": {
-    "lines": 97.02,
-    "branches": 97.18
+    "node": {
+      "lines": 97.02,
+      "branches": 97.18
+    },
+    "browser": {
+      "lines": 95.56,
+      "branches": 62.5
+    }
   },
   "src/simulation/observations.ts": {
-    "lines": 94.76,
-    "branches": 87.01
+    "node": {
+      "lines": 94.76,
+      "branches": 87.01
+    },
+    "browser": {
+      "lines": 96.35,
+      "branches": 71.93
+    }
   },
   "src/simulation/roads.ts": {
-    "lines": 100,
-    "branches": 100
+    "node": {
+      "lines": 100,
+      "branches": 100
+    },
+    "browser": {
+      "lines": 96.84,
+      "branches": 52
+    }
   },
   "src/simulation/startup.ts": {
-    "lines": 100,
-    "branches": 100
+    "node": {
+      "lines": 100,
+      "branches": 100
+    },
+    "browser": {
+      "lines": 98.9,
+      "branches": 75
+    }
   },
   "src/simulation/state.ts": {
-    "lines": 100,
-    "branches": ""
+    "node": {
+      "lines": 100,
+      "branches": ""
+    },
+    "browser": {
+      "lines": 100,
+      "branches": ""
+    }
   },
   "src/simulation/transport.ts": {
-    "lines": 96.34,
-    "branches": 92.31
+    "node": {
+      "lines": 96.34,
+      "branches": 92.31
+    },
+    "browser": {
+      "lines": 96.92,
+      "branches": 74.51
+    }
   },
   "src/types.ts": {
-    "lines": "",
-    "branches": ""
+    "node": {
+      "lines": "",
+      "branches": ""
+    },
+    "browser": {
+      "lines": "",
+      "branches": ""
+    }
   },
   "src/ui/attention-view.ts": {
-    "lines": 2.1,
-    "branches": 0
+    "node": {
+      "lines": 2.1,
+      "branches": 0
+    },
+    "browser": {
+      "lines": 89.8,
+      "branches": 66.53
+    }
   },
   "src/ui/catalog-view.ts": {
-    "lines": 71.15,
-    "branches": 57.27
+    "node": {
+      "lines": 71.15,
+      "branches": 57.27
+    },
+    "browser": {
+      "lines": 91.08,
+      "branches": 78.92
+    }
   },
   "src/ui/dom.ts": {
-    "lines": 99.54,
-    "branches": 75
+    "node": {
+      "lines": 99.54,
+      "branches": 75
+    },
+    "browser": {
+      "lines": 99.08,
+      "branches": 66.67
+    }
   },
   "src/ui/domain-feedback.ts": {
-    "lines": 87.16,
-    "branches": 74.29
+    "node": {
+      "lines": 87.16,
+      "branches": 74.29
+    },
+    "browser": {
+      "lines": 64.24,
+      "branches": 30.19
+    }
   },
   "src/ui/economic-feedback.ts": {
-    "lines": 96.74,
-    "branches": 94.66
+    "node": {
+      "lines": 96.74,
+      "branches": 94.66
+    },
+    "browser": {
+      "lines": 87.25,
+      "branches": 58.99
+    }
   },
   "src/ui/economic-notices.ts": {
-    "lines": 95.24,
-    "branches": 100
+    "node": {
+      "lines": 95.24,
+      "branches": 100
+    },
+    "browser": {
+      "lines": 94.74,
+      "branches": 88.46
+    }
   },
   "src/ui/economy-view.ts": {
-    "lines": 32.85,
-    "branches": 11.92
+    "node": {
+      "lines": 32.85,
+      "branches": 11.92
+    },
+    "browser": {
+      "lines": 95.86,
+      "branches": 70.53
+    }
   },
   "src/ui/hud.ts": {
-    "lines": 49.4,
-    "branches": 50.98
+    "node": {
+      "lines": 49.4,
+      "branches": 50.98
+    },
+    "browser": {
+      "lines": 86.6,
+      "branches": 69.17
+    }
   },
   "src/ui/inspector-view.ts": {
-    "lines": 64.54,
-    "branches": 64.82
+    "node": {
+      "lines": 64.54,
+      "branches": 64.82
+    },
+    "browser": {
+      "lines": 87.5,
+      "branches": 63.01
+    }
   },
   "src/ui/interaction.ts": {
-    "lines": 88.94,
-    "branches": 94.12
+    "node": {
+      "lines": 88.94,
+      "branches": 94.12
+    },
+    "browser": {
+      "lines": 97.44,
+      "branches": 55.17
+    }
   },
   "src/ui/live-report.ts": {
-    "lines": 39.13,
-    "branches": 29.03
+    "node": {
+      "lines": 39.13,
+      "branches": 29.03
+    },
+    "browser": {
+      "lines": 96.15,
+      "branches": 68.63
+    }
   },
   "src/ui/logistics-view.ts": {
-    "lines": 28.28,
-    "branches": 4.44
+    "node": {
+      "lines": 28.28,
+      "branches": 4.44
+    },
+    "browser": {
+      "lines": 92.83,
+      "branches": 60.33
+    }
   },
   "src/ui/map-controls.ts": {
-    "lines": 30.99,
-    "branches": 20
+    "node": {
+      "lines": 30.99,
+      "branches": 20
+    },
+    "browser": {
+      "lines": 95.95,
+      "branches": 81.82
+    }
   },
   "src/ui/markup.ts": {
-    "lines": 89.47,
-    "branches": 85.11
+    "node": {
+      "lines": 89.47,
+      "branches": 85.11
+    },
+    "browser": {
+      "lines": 94.29,
+      "branches": 82.61
+    }
   },
   "src/ui/messages.ts": {
-    "lines": 91.67,
-    "branches": 100
+    "node": {
+      "lines": 91.67,
+      "branches": 100
+    },
+    "browser": {
+      "lines": 93.33,
+      "branches": 85.71
+    }
   },
   "src/ui/placement-feedback.ts": {
-    "lines": 37.04,
-    "branches": 16.67
+    "node": {
+      "lines": 37.04,
+      "branches": 16.67
+    },
+    "browser": {
+      "lines": 88.14,
+      "branches": 54.76
+    }
   },
   "src/ui/progression-view.ts": {
-    "lines": 67.5,
-    "branches": 54.05
+    "node": {
+      "lines": 67.5,
+      "branches": 54.05
+    },
+    "browser": {
+      "lines": 93.98,
+      "branches": 80
+    }
   },
   "src/ui/recovery-view.ts": {
-    "lines": 42.22,
-    "branches": 0
+    "node": {
+      "lines": 42.22,
+      "branches": 0
+    },
+    "browser": {
+      "lines": 81.63,
+      "branches": 0
+    }
   },
   "src/ui/reference-view.ts": {
-    "lines": 72.81,
-    "branches": 59.35
+    "node": {
+      "lines": 72.81,
+      "branches": 59.35
+    },
+    "browser": {
+      "lines": 96.68,
+      "branches": 70.83
+    }
   },
   "src/ui/report-navigation.ts": {
-    "lines": 0,
-    "branches": 0
+    "node": {
+      "lines": 0,
+      "branches": 0
+    },
+    "browser": {
+      "lines": 80,
+      "branches": 40
+    }
   },
   "src/ui/report-windows.ts": {
-    "lines": 8.58,
-    "branches": 6.25
+    "node": {
+      "lines": 8.58,
+      "branches": 6.25
+    },
+    "browser": {
+      "lines": 94.96,
+      "branches": 67.32
+    }
   },
   "src/ui/resource-icons.ts": {
-    "lines": 100,
-    "branches": ""
+    "node": {
+      "lines": 100,
+      "branches": ""
+    },
+    "browser": {
+      "lines": 100,
+      "branches": ""
+    }
   },
   "src/ui/save-view.ts": {
-    "lines": 0.71,
-    "branches": 0
+    "node": {
+      "lines": 0.71,
+      "branches": 0
+    },
+    "browser": {
+      "lines": 87.93,
+      "branches": 57.66
+    }
   },
   "src/ui/session-view.ts": {
-    "lines": 36.56,
-    "branches": 32.65
+    "node": {
+      "lines": 36.56,
+      "branches": 32.65
+    },
+    "browser": {
+      "lines": 88.75,
+      "branches": 63.77
+    }
   },
   "src/ui/transient-help.ts": {
-    "lines": 30.19,
-    "branches": 8.47
+    "node": {
+      "lines": 30.19,
+      "branches": 8.47
+    },
+    "browser": {
+      "lines": 88.82,
+      "branches": 63.27
+    }
   },
   "src/ui/utility-art.ts": {
-    "lines": 11.11,
-    "branches": 0
+    "node": {
+      "lines": 11.11,
+      "branches": 0
+    },
+    "browser": {
+      "lines": 90.91,
+      "branches": 75
+    }
   },
   "src/ui/workspace.ts": {
-    "lines": 71.1,
-    "branches": 52.15
+    "node": {
+      "lines": 71.1,
+      "branches": 52.15
+    },
+    "browser": {
+      "lines": 87.53,
+      "branches": 60.69
+    }
   }
 }
