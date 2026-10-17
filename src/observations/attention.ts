@@ -197,7 +197,8 @@ export function createAttention(game: AttentionDependencies): AttentionSubsystem
     lastSample = Math.floor((game.state.time + 1e-9) * 2);
     storageFailed = false;
     rendererFailed = false;
-    // Historical saves begin coverage silently. Existing production is never a new start.
+    // Loaded buildings without a recorded condition begin coverage silently. Existing
+    // production is never a new start.
     for (const b of game.buildings)
       if (
         b.done &&

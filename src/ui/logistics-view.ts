@@ -103,7 +103,7 @@ export function createLogisticsView(game: GameRuntime): LogisticsViewSubsystem {
       const known = new Set<Good>();
       const output = game.BSPEC[building.type].out;
       if (output) known.add(output);
-      // Retained legacy output is also identifiable by a real producer-collection job.
+      // Output is also identifiable by a real producer-collection job.
       for (const row of rows)
         if (row.kind === 'deliver' && row.sourceId === building.id) known.add(row.good);
       return [...known]
@@ -130,8 +130,7 @@ export function createLogisticsView(game: GameRuntime): LogisticsViewSubsystem {
             .map((building) => {
               const spec = game.BSPEC[building.type];
               const inbound = rows.filter(
-                (row) =>
-                  row.targetId === building.id && !!eligibleIngredients(building, spec)[row.good],
+                (row) => row.targetId === building.id && !!eligibleIngredients(spec)[row.good],
               );
               const shortages =
                 spec.prod === 'mine'

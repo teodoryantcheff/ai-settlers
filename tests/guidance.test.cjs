@@ -81,21 +81,6 @@ test('inland autoplay produces bread through the complete grain chain', () => {
   assert.ok(g.buildings.some((b) => b.type === 'workshop' && b.done));
 });
 
-test('advisor diagnoses retained legacy armory ore inputs', () => {
-  const g = colony();
-  const armory = g.newBuilding('armory', 48, 50);
-  armory.done = true;
-  armory.legacyIndustry = true;
-  armory.stock.coal = 1;
-  armory.metrics.elapsed = 60;
-  armory.metrics.inputBlocked = 60;
-  g.buildings.push(armory);
-  const decision = g.advisorDecision();
-  assert.equal(decision.bottleneck, armory);
-  assert.equal(decision.missing, 'iron');
-  armory.stock.iron = 1;
-  assert.equal(g.advisorDecision().bottleneck, undefined);
-});
 test('advisor requests another well when the existing service footprint is full', () => {
   const g = colony();
   for (const type of ['lumberjack', 'sawmill', 'quarry', 'farm', 'windmill', 'well']) {

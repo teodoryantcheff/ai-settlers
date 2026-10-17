@@ -86,7 +86,7 @@ test('shared presentation keeps session, inspector and Reference on loaded and r
   game.initializeColony();
   game.beginSession();
   const armory = game.newBuilding('armory', 51, 48);
-  Object.assign(armory, { done: true, legacyIndustry: true });
+  Object.assign(armory, { done: true });
   game.buildings.push(armory);
   game.inspectContributor(armory.id);
   const beforeLoad = game.buildings;
@@ -99,7 +99,6 @@ test('shared presentation keeps session, inspector and Reference on loaded and r
   assert.notEqual(game.selected, armory);
   dom.node('welcome-reference').onclick();
   assert.equal(game.blockingLayerOpen(), true);
-  assert.match(dom.node('reference-results').innerHTML, /1 retained legacy armories/);
   game.closeAllLayers();
   assert.equal(game.newColony('New valley', 42), true);
   assert.equal(game.colonyName, 'New valley');
@@ -108,7 +107,7 @@ test('shared presentation keeps session, inspector and Reference on loaded and r
   game.openWelcome();
   assert.match(dom.node('welcome-continuation').textContent, /New valley.*Seed 42/);
   game.openReference();
-  assert.match(dom.node('reference-results').innerHTML, /0 retained legacy armories/);
+  assert.equal(game.blockingLayerOpen(), true);
   const checkpoints = [...storage];
   const live = game.exportSave();
   game.emitGameEvent('rendererFailed', { reason: 'WebGL context lost' });

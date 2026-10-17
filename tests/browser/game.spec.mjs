@@ -24,16 +24,18 @@ async function boot(page, url) {
   await expect(page.locator('#boot')).toHaveCount(0, { timeout: 30000 });
 }
 
-test('legacy armory shows the same iron-ore shortage in its inspector and muted persistent notice', async ({
+test('armory shows the same iron-bar shortage in its inspector and muted persistent notice', async ({
   page,
 }) => {
   await boot(page, '/tests/game.html?shortagefeedback&seed=2024');
   await expect(page.locator('html')).toHaveAttribute('data-renderer', 'pixi');
-  await expect(page.locator('#infobody')).toContainText('no iron ore');
-  await expect(page.locator('#msgs')).toContainText('blocked — needs iron ore', { timeout: 30000 });
-  await expect(page.locator('#msgs')).not.toContainText('needs iron bars');
+  await expect(page.locator('#infobody')).toContainText('no iron bars');
+  await expect(page.locator('#msgs')).toContainText('blocked — needs iron bars', {
+    timeout: 30000,
+  });
+  await expect(page.locator('#msgs')).not.toContainText('needs coal');
   expect(await page.evaluate(() => window.productionArtPreview.game.muted)).toBe(true);
-  await page.screenshot({ path: test.info().outputPath('legacy-armory-shortage.png') });
+  await page.screenshot({ path: test.info().outputPath('armory-shortage.png') });
 });
 
 test('all resources remain visible at desktop sizes', async ({ page }) => {
@@ -271,7 +273,6 @@ test('shared interaction transitions preserve real map, inspector, road, Journey
     Object.assign(armory, {
       done: true,
       constructionProgress: 1,
-      legacyIndustry: true,
       stock: { coal: 1 },
     });
     armory.metrics.elapsed = 60;

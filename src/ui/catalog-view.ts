@@ -1,7 +1,6 @@
 import { requireElement } from './dom.ts';
 import { requireCanvas2D } from '../rendering/canvas-context.ts';
 import { html as markup, trusted, formatGoods } from './markup.ts';
-import { recipeRequirements } from '../gameplay/production-rules.ts';
 import type { TransientHelp } from './transient-help.ts';
 import type { PlacementFeedback } from './placement-feedback.ts';
 import type { GameRuntime } from '../runtime.ts';
@@ -61,9 +60,7 @@ function toolDetails(game: GameRuntime, type: CatalogTool) {
     sp.prod === 'mine' && sp.out
       ? 'Fish, bread, meat or provisions (1 of any) → 1 ' + game.GOODS[sp.out].name
       : sp.in && sp.out
-        ? formatGoods(game.GOODS, recipeRequirements({ type }, sp)) +
-          ' → 1 ' +
-          game.GOODS[sp.out].name
+        ? formatGoods(game.GOODS, sp.in) + ' → 1 ' + game.GOODS[sp.out].name
         : sp.out
           ? 'Produces ' + game.GOODS[sp.out].name + ' from local work.'
           : type === 'well'
@@ -71,7 +68,6 @@ function toolDetails(game: GameRuntime, type: CatalogTool) {
             : type === 'forester'
               ? 'Plants trees on clear owned ground.'
               : 'No production recipe.';
-  if (type === 'armory') recipe += ' Existing legacy armories retain iron ore + coal.';
   if (sp.time && (sp.prod === 'craft' || sp.prod === 'mine'))
     recipe += ' · Base cycle ' + sp.time + 's.';
   let requirements =

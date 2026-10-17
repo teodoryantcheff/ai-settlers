@@ -1,20 +1,9 @@
 import type { Building, BuildingSpec, Good, Inventory } from '../types.ts';
 
-type RecipeBuilding = Pick<Building, 'type' | 'legacyIndustry'>;
-
 /** Order is part of deterministic meal selection and ingredient job scheduling. */
 export const edibleGoods: readonly Good[] = Object.freeze(['bread', 'meat', 'fish', 'food']);
 const meals: Readonly<Inventory> = Object.freeze({ bread: 1, meat: 1, fish: 1, food: 1 });
-const legacyArmory: Readonly<Inventory> = Object.freeze({ iron: 1, coal: 1 });
 const noIngredients: Readonly<Inventory> = Object.freeze({});
-
-/** Nominal requirements; a mine's food requirement means any edible good. */
-export function recipeRequirements(
-  building: RecipeBuilding,
-  spec: BuildingSpec,
-): Readonly<Inventory> | undefined {
-  return building.type === 'armory' && building.legacyIndustry ? legacyArmory : spec.in;
-}
 
 /** Alternatives for one requirement, not a choice of the next meal to consume. */
 export function ingredientAlternatives(spec: BuildingSpec, good: Good): readonly Good[] {
@@ -22,19 +11,16 @@ export function ingredientAlternatives(spec: BuildingSpec, good: Good): readonly
 }
 
 /** Eligible deliveries with their recipe quantities; mine meals are alternatives. */
-export function eligibleIngredients(
-  building: RecipeBuilding,
-  spec: BuildingSpec,
-): Readonly<Inventory> {
-  return spec.prod === 'mine' ? meals : recipeRequirements(building, spec) || noIngredients;
+export function eligibleIngredients(spec: BuildingSpec): Readonly<Inventory> {
+  return spec.prod === 'mine' ? meals : spec.in || noIngredients;
 }
 
 /** Pure selection: callers retain readiness checks, stock mutation and cycle timing. */
 export function ingredientsConsumedNext(
-  building: RecipeBuilding & Pick<Building, 'stock'>,
+  building: Pick<Building, 'stock'>,
   spec: BuildingSpec,
 ): Readonly<Inventory> {
-  if (spec.prod !== 'mine') return recipeRequirements(building, spec) || noIngredients;
+  if (spec.prod !== 'mine') return spec.in || noIngredients;
   let good: Good | undefined;
   for (const meal of edibleGoods)
     if ((building.stock[meal] || 0) > (good ? building.stock[good] || 0 : 0)) good = meal;
@@ -44,7 +30,7 @@ export function ingredientsConsumedNext(
 
 /** Current shortages for the cycle selected from stock; never mutates that stock. */
 export function ingredientShortages(
-  building: RecipeBuilding & Pick<Building, 'stock'>,
+  building: Pick<Building, 'stock'>,
   spec: BuildingSpec,
 ): ReadonlyArray<{ good: Good; have: number; need: number }> {
   const inputs = ingredientsConsumedNext(building, spec);

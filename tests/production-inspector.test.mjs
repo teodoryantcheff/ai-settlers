@@ -169,27 +169,6 @@ test('mine inspector reports actual edible cargo instead of hiding it behind leg
   assert.match(e.body.innerHTML, /Meat: Delivered in 2\.0 per minute/);
 });
 
-test('migrated armory inspector shows the preserved ore recipe', () => {
-  const e = inspectorHarness();
-  e.context.selected.type = 'armory';
-  e.context.selected.legacyIndustry = true;
-  e.context.BSPEC.armory = {
-    name: 'Armory',
-    prod: 'craft',
-    in: { iron_bars: 1, coal: 1 },
-    out: 'weapons',
-    time: 22,
-  };
-  e.context.GOODS = {
-    iron: { name: 'Iron ore' },
-    coal: { name: 'Coal' },
-    weapons: { name: 'Weapons' },
-  };
-  e.context.updateInfo();
-  assert.match(e.body.innerHTML, /original iron ore and coal recipe/);
-  assert.match(e.body.innerHTML, /Input 1 iron ore \+ 1 coal/);
-});
-
 test('mine inspector preserves observed historical goods outside its current eligible meals', () => {
   const e = inspectorHarness();
   e.context.selected.type = 'mine_gold';
