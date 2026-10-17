@@ -152,21 +152,26 @@ export function createShadowCache(
       }
     for (const [id, old] of buildings) if (!current.has(id)) dirtyBuilding(old.x, old.y, old.art);
     buildings = current;
+    const chunk = (key: number) => {
+      const x = (key % columns) * chunkSize,
+        y = Math.floor(key / columns) * chunkSize;
+      return {
+        x,
+        y,
+        width: Math.min(chunkSize, width - x),
+        height: Math.min(chunkSize, height - y),
+      };
+    };
     if (full) {
-      paint({ x: 0, y: 0, width, height });
+      // Paint chunk by chunk, exactly as patches do: clipped and unclipped skewed
+      // image draws resample differently, so a rebuild must take the patch path.
+      for (let key = 0; key < columns * rows; key++) paint(chunk(key));
       for (let i = 0; i < trees.length; i++) trees[i] = game.tiles[i].tree;
       presentation.invalidate(cast);
       presentation.invalidate(contacts);
     } else
       for (const key of dirty) {
-        const x = (key % columns) * chunkSize,
-          y = Math.floor(key / columns) * chunkSize;
-        const rect = {
-          x,
-          y,
-          width: Math.min(chunkSize, width - x),
-          height: Math.min(chunkSize, height - y),
-        };
+        const rect = chunk(key);
         paint(rect);
         presentation.invalidate(cast, rect);
         presentation.invalidate(contacts, rect);

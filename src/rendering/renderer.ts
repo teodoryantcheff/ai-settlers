@@ -672,7 +672,10 @@ export function createRenderer(
   let badgeGradient: FillGradient | null = null,
     progressGradient: FillGradient | null = null;
   function drawBadge(s: SceneLayer, cx: number, cy: number) {
-    const pulse = renderPrefs().reducedMotion ? 1 : 1 + Math.sin(NOW / 420 + cx * 0.3) * 0.035,
+    // Decorative pulse: holds still with the paused frame clock.
+    const pulse = renderPrefs().reducedMotion
+        ? 1
+        : 1 + Math.sin((_pausedNow ?? NOW) / 420 + cx * 0.3) * 0.035,
       g = s.g;
     badgeGradient ??= new FillGradient({
       type: 'linear',
