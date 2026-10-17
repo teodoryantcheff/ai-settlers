@@ -1,6 +1,5 @@
 import {
   ACTIVITY_KINDS,
-  freshAttention,
   type AttentionData,
   type EntityReference,
   type IssueBaseline,
@@ -26,7 +25,6 @@ export function validateAttention(
   buildings: Building[],
   nextEntityId: number,
 ): AttentionData {
-  if (raw === undefined) return freshAttention(time);
   const fail: () => never = () => {
     throw new Error('Invalid attention/activity history');
   };

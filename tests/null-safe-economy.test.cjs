@@ -101,35 +101,3 @@ test('a cargo job with no good cannot reserve stock or start a carrier pickup', 
     assert.equal(game.exportSave(), before);
   }
 });
-
-test('producer arrivals record goods in their delivery counters', () => {
-  for (const field of ['inputDelivered', 'outputDelivered']) {
-    const { game, internals } = colony();
-    flatWorld(game);
-    const store = game.newBuilding('hq', 5, 5);
-    const producer = game.newBuilding('sawmill', 7, 5);
-    store.done = producer.done = true;
-    game.buildings.push(store, producer);
-    const input = field === 'inputDelivered';
-    const good = input ? 'logs' : 'planks';
-    const source = input ? store : producer;
-    source.stock[good] = 1;
-    if (input) store.reservedStock.logs = 1;
-    const job = input
-      ? { kind: 'fetch', good, sourceId: store.id, to: producer.id, status: 'pending' }
-      : { kind: 'deliver', good, sourceId: producer.id, status: 'pending' };
-    game.jobs.push(job);
-    game.spawnCarrier(store);
-    const unit = game.units[0];
-    const rng = game.SR.getState();
-    internals.economy.startJob(unit, job);
-    internals.economy.stepUnit(unit, 10);
-    assert.equal(producer.metrics[field][good], 1);
-    assert.equal((input ? producer : store).stock[good], 1);
-    assert.equal(source.stock[good], 0);
-    assert.equal(unit.carry, null);
-    assert.equal(unit.job, null);
-    assert.equal(game.jobs.length, 0);
-    assert.equal(game.SR.getState(), rng);
-  }
-});

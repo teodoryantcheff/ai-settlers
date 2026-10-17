@@ -4,7 +4,7 @@ import { createGame, DEFAULT_MODULES } from './helpers/game.cjs';
 import { createEconomicFeedback } from '../src/ui/economic-feedback.ts';
 import { ingredientShortages, ingredientsConsumedNext } from '../src/gameplay/production-rules.ts';
 
-function colony(type, stock, legacyIndustry = false, audio = false) {
+function colony(type, stock, audio = false) {
   const { game, internals } = createGame({
     seed: 2024,
     headless: true,
@@ -20,7 +20,7 @@ function colony(type, stock, legacyIndustry = false, audio = false) {
   }));
   game.state.paused = false;
   const b = game.newBuilding(type, 12, 8);
-  Object.assign(b, { done: true, stock, legacyIndustry, timer: 100 });
+  Object.assign(b, { done: true, stock, timer: 100 });
   game.buildings.push(b);
   if (type.startsWith('mine_')) {
     const tile = game.tiles[game.idx(13, 8)];
@@ -48,33 +48,33 @@ function observe(game) {
   };
 }
 
-test('both armory recipes report each missing ingredient and run when supplied', () => {
-  for (const legacy of [true, false]) {
-    const metal = legacy ? 'iron' : 'iron_bars';
-    const metalName = legacy ? 'iron ore' : 'iron bars';
-    for (const missing of [metal, 'coal', null]) {
-      const stock = { [metal]: 1, coal: 1 };
-      if (missing) delete stock[missing];
-      const { game, b, hooks } = colony('armory', stock, legacy);
+test('armory readiness, status and persistent notice report each missing ingredient', () => {
+  for (const [missing, name] of [
+    ['iron_bars', 'iron bars'],
+    ['coal', 'coal'],
+    [null, null],
+  ]) {
+    const stock = { iron_bars: 1, coal: 1 };
+    if (missing) delete stock[missing];
+    const { game, b, hooks } = colony('armory', stock);
+    hooks.bTick(b, 0.25);
+    assert.equal(b.blockedReason, missing ? 'inputs' : '');
+    const status = game.buildingStatus(b);
+    assert.equal(status.bad, !!missing);
+    if (missing)
+      assert.match(status.lines.map((line) => line.t).join('\n'), new RegExp('no ' + name));
+    const feedback = observe(game);
+    feedback.advance(12_000);
+    if (missing) {
+      assert.equal(feedback.notices.length, 1);
+      assert.match(feedback.notices[0].message, new RegExp('blocked — needs ' + name + '$'));
+    } else {
+      assert.deepEqual(feedback.notices, []);
+      b.timer = 0;
       hooks.bTick(b, 0.25);
-      assert.equal(b.blockedReason, missing ? 'inputs' : '');
-      const status = game.buildingStatus(b);
-      assert.equal(status.bad, !!missing);
-      const feedback = observe(game);
-      feedback.advance(12_000);
-      if (missing) {
-        const name = missing === metal ? metalName : 'coal';
-        assert.match(status.lines.map((line) => line.t).join('\n'), new RegExp('no ' + name));
-        assert.equal(feedback.notices.length, 1);
-        assert.ok(feedback.notices[0].message.endsWith('blocked — needs ' + name));
-      } else {
-        assert.deepEqual(feedback.notices, []);
-        b.timer = 0;
-        hooks.bTick(b, 0.25);
-        assert.equal(b.produced, 1);
-        assert.equal(b.stock[metal], 0);
-        assert.equal(b.stock.coal, 0);
-      }
+      assert.equal(b.produced, 1);
+      assert.equal(b.stock.iron_bars, 0);
+      assert.equal(b.stock.coal, 0);
     }
   }
 });
@@ -106,13 +106,13 @@ test('each edible good satisfies readiness, status and feedback; empty mines nee
 
 test('carrier arrivals at the blockage threshold invalidate stale input reasons in the same step', () => {
   const deliveries = [
-    ['armory', { coal: 1 }, 'iron', true],
-    ['armory', { iron: 1 }, 'coal', true],
-    ...['bread', 'meat', 'fish', 'food'].map((good) => ['mine_iron', {}, good, false]),
-    ['sawmill', { logs: 1 }, 'logs', false],
+    ['armory', { coal: 1 }, 'iron_bars'],
+    ['armory', { iron_bars: 1 }, 'coal'],
+    ...['bread', 'meat', 'fish', 'food'].map((good) => ['mine_iron', {}, good]),
+    ['sawmill', { logs: 1 }, 'logs'],
   ];
-  for (const [type, stock, good, legacy] of deliveries) {
-    const { game, b } = colony(type, stock, legacy);
+  for (const [type, stock, good] of deliveries) {
+    const { game, b } = colony(type, stock);
     game.step(0.25, true);
     const feedback = observe(game);
     feedback.advance(11_750);
@@ -164,12 +164,12 @@ test('recipe shortage queries preserve quantities, most-plentiful meals and stab
   ]);
 });
 
-test('musical starvation and activity use the same live legacy and alternate-meal recipes', () => {
-  for (const [type, stock, legacy] of [
-    ['armory', { iron: 1, coal: 1 }, true],
-    ['mine_iron', { bread: 1 }, false],
+test('musical starvation and activity use the same live recipes and alternate meals', () => {
+  for (const [type, stock] of [
+    ['armory', { iron_bars: 1, coal: 1 }],
+    ['mine_iron', { bread: 1 }],
   ]) {
-    const { b, audioHooks } = colony(type, stock, legacy, true);
+    const { b, audioHooks } = colony(type, stock, true);
     b.timer = 0;
     assert.equal(audioHooks.starvingCount(), 0);
     assert.equal(audioHooks.musicColony().active, 1);

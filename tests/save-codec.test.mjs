@@ -73,7 +73,7 @@ test('a grown colony saves in a fraction of the space and continues exactly', ()
   assert.equal(game.exportSave(), packed);
 });
 
-test('older plain-array saves still load and continue identically', () => {
+test('plain-array histories load and continue identically', () => {
   const { game } = grownColony(6);
   const packed = game.exportSave();
   const plain = JSON.stringify(plainSave(packed));

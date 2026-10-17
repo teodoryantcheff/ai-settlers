@@ -92,7 +92,7 @@ export function createSaveView(game: GameRuntime): SaveViewSubsystem {
     row.className = 'save-entry';
     row.dataset.saveId = entry.id;
     const title = document.createElement('strong');
-    title.textContent = entry.name + (entry.kind === 'legacy' ? ' · Legacy' : '');
+    title.textContent = entry.name;
     const metadata = document.createElement('p');
     metadata.textContent =
       entry.colonyName +

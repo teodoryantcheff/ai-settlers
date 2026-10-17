@@ -85,30 +85,6 @@ function colony(seed = 2024) {
 
 const snapshot = (e) => JSON.parse(JSON.stringify(e.snapshotGame()));
 
-test('imported unknown production block reasons normalize to no reason', () => {
-  const e = colony();
-  for (const version of [1, 2]) {
-    for (const reason of [
-      undefined,
-      'none',
-      'input',
-      'resouces',
-      'constructor',
-      '__proto__',
-      7,
-      null,
-      {},
-    ]) {
-      const imported = snapshot(e);
-      imported.v = version;
-      imported.b[0].blockedReason = reason;
-      e.importSave(JSON.stringify(imported));
-      assert.equal(e.buildings[0].blockedReason, '', JSON.stringify(reason));
-      assert.equal(JSON.parse(e.exportSave()).b[0].blockedReason, '', JSON.stringify(reason));
-    }
-  }
-});
-
 test('every production block reason round-trips through exported files and checkpoints', () => {
   const e = colony();
   const mill = e.newBuilding('sawmill', 51, 48);
@@ -160,30 +136,31 @@ test('version-two save continues RNG, timers, cargo and production exactly', () 
   assert.deepEqual(snapshot(e), expected);
 });
 
-test('malformed load leaves both active colony and saved slot untouched', () => {
+test('malformed load leaves both active colony and saved autosave untouched', () => {
   const e = colony();
   e.saveGame(true);
   const before = snapshot(e),
-    saved = e.storage.get('settlers.save');
+    saved = e.storage.get('settlers.autosave.v1');
+  assert.ok(saved);
   const broken = structuredClone(before);
   broken.t[0].pop();
   assert.throws(() => e.prepareLoad(JSON.stringify(broken)), /dimensions/);
   assert.deepEqual(snapshot(e), before);
-  assert.equal(e.storage.get('settlers.save'), saved);
+  assert.equal(e.storage.get('settlers.autosave.v1'), saved);
   const hostile = structuredClone(before);
   hostile.b[0].stock = { bogus: 100 };
   assert.throws(() => e.prepareLoad(JSON.stringify(hostile)), /quantity/);
   const brokenJob = structuredClone(before);
-  brokenJob.j.push({ kind: 'transfer', good: 'food', from: 999, to: 1, state: 'p' });
+  brokenJob.j.push({ kind: 'transfer', good: 'food', sourceId: 999, to: 1, status: 'pending' });
   assert.throws(() => e.prepareLoad(JSON.stringify(brokenJob)), /source/);
   e.buildings.push(e.newBuilding('sawmill', 46, 50));
   const idleJob = snapshot(e);
   idleJob.j.push({
     kind: 'fetch',
     good: 'planks',
-    s: idleJob.b[0].id,
+    sourceId: idleJob.b[0].id,
     to: idleJob.b[1].id,
-    state: 't',
+    status: 'assigned',
   });
   idleJob.b[0].reservedStock.planks = 1;
   idleJob.u[0].ji = 0;
@@ -230,22 +207,6 @@ test('cancelled soldiers are excluded from a saved population', () => {
   e.units.push({ id: e.nextId++, kind: 'soldier', dead: true, phase: 'idle', job: null });
   assert.equal(e.snapshotGame().u.length, 8);
   assert.doesNotThrow(() => e.prepareLoad(JSON.stringify(e.snapshotGame())));
-});
-
-test('legacy saves migrate defaults without losing the colony', () => {
-  const e = colony();
-  const legacy = snapshot(e);
-  legacy.v = 1;
-  delete legacy.rng;
-  delete legacy.st.upgrades;
-  delete legacy.st.contracts;
-  delete legacy.p.treeGrowthT;
-  const prepared = e.prepareLoad(JSON.stringify(legacy));
-  e.commitLoad(prepared);
-  assert.equal(e.buildings.length, 1);
-  assert.equal(e.units.length, 8);
-  assert.deepEqual({ ...e.state.upgrades }, { haul: 0, production: 0 });
-  assert.equal(e.treeGrowthT, 0);
 });
 
 test('advisor distinguishes missing supply from transport delays and historical waits', () => {
@@ -393,7 +354,13 @@ test('imported job, settler, and building extras cannot introduce inherited game
   const e = colony();
   e.buildings.push(e.newBuilding('sawmill', 46, 50));
   const data = snapshot(e);
-  data.j.push({ kind: 'fetch', good: 'planks', s: data.b[0].id, to: data.b[1].id, state: 'p' });
+  data.j.push({
+    kind: 'fetch',
+    good: 'planks',
+    sourceId: data.b[0].id,
+    to: data.b[1].id,
+    status: 'pending',
+  });
   data.b[0].reservedStock.planks = 1;
   for (const entity of [data.j[0], data.u[0], data.b[0]]) {
     Object.defineProperty(entity, '__proto__', {
@@ -462,52 +429,6 @@ test('event bus subscriptions can be removed independently', () => {
   off();
   bus.emit('produced', 3);
   assert.equal(calls, 2);
-});
-
-test('old version-one and version-two saves begin honest recent and delivery coverage', () => {
-  for (const version of [1, 2]) {
-    const e = colony();
-    const mill = e.newBuilding('sawmill', 46, 50);
-    mill.done = true;
-    mill.constructionProgress = 1;
-    e.buildings.push(mill);
-    mill.metrics.elapsed = 240;
-    mill.metrics.active = 240;
-    mill.metrics.produced.planks = 24;
-    mill.metrics.consumed.logs = 48;
-    mill.metrics.delivered.logs = 99;
-    e.state.time = 240;
-    const legacy = snapshot(e);
-    legacy.v = version;
-    if (version === 1) delete legacy.rng;
-    for (const b of legacy.b)
-      for (const key of ['recent', 'deliveryStarted', 'inputDelivered', 'outputDelivered'])
-        delete b.metrics[key];
-    e.commitLoad(e.prepareLoad(JSON.stringify(legacy)));
-    const metrics = e.buildings[1].metrics;
-    assert.equal(metrics.elapsed, 240);
-    assert.equal(metrics.produced.planks, 24);
-    assert.equal(metrics.consumed.logs, 48);
-    assert.equal(metrics.delivered.logs, 99);
-    assert.equal(metrics.deliveryStarted, 240);
-    assert.deepEqual({ ...metrics.inputDelivered }, {});
-    assert.equal(metrics.recent.length, 1);
-    assert.equal(metrics.recent[0].elapsed, 240);
-    assert.equal(e.productionWindow(e.buildings[1].metrics, 30).elapsed, 0);
-    assert.equal(e.productionWindow(e.buildings[1].metrics, 120).elapsed, 0);
-    assert.equal(e.productionWindow(e.buildings[1].metrics, 'lifetime').deliveryElapsed, 0);
-    for (let tick = 0; tick < 20 * 60; tick++) {
-      e.buildings[1].stock.logs = 4;
-      e.buildings[1].stock.planks = 0;
-      e.step(1 / 60);
-    }
-    assert.ok(e.productionWindow(e.buildings[1].metrics, 30).elapsed > 19.9);
-    assert.ok(e.productionWindow(e.buildings[1].metrics, 30).produced.planks > 0);
-    assert.ok(metrics.produced.planks > 24);
-    assert.ok(
-      Math.abs(e.productionWindow(e.buildings[1].metrics, 'lifetime').deliveryElapsed - 20) < 1e-8,
-    );
-  }
 });
 
 test('invalid or unbounded persisted production history is rejected before load', () => {

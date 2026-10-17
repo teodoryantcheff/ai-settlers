@@ -39,9 +39,6 @@ export function createPersistence(
   let baseline: string | null = null;
   let baselineId: string | null = null;
   let lastReportedError: unknown;
-  // Catalogs written before the autosave got its own key may still hold one; the first
-  // successful separate autosave drops it from the catalog.
-  let catalogHoldsAutosave = false;
   // A damaged separate autosave is reported once, not on every listing that skips it.
   let autosaveDamaged = false;
   const catalog = createSaveCatalog(storage, (data) =>
@@ -51,7 +48,6 @@ export function createPersistence(
   if (storage) {
     try {
       const entries = catalog.read().entries;
-      catalogHoldsAutosave = holdsAutosave(entries);
       let autosave: CatalogEntry | null = null;
       try {
         autosave = catalog.readAutosave();
@@ -65,7 +61,7 @@ export function createPersistence(
             (error instanceof Error ? error.message : String(error)),
         };
       }
-      const existing = withAutosave(entries, autosave).sort(
+      const existing = (autosave ? entries.concat(autosave) : entries).sort(
         (a, b) => (b.savedAt || 0) - (a.savedAt || 0),
       )[0];
       if (existing && saveHealth.ok)
@@ -115,7 +111,6 @@ export function createPersistence(
         produced: b.produced,
         timer: b.timer,
         foodBlockedNoticeSent: !!b.foodBlockedNoticeSent,
-        legacyIndustry: b.legacyIndustry,
         rocksExhaustedNoticeSent: !!b.rocksExhaustedNoticeSent,
         metrics: b.metrics,
         blockedReason: b.blockedReason,
@@ -173,7 +168,7 @@ export function createPersistence(
       b: B,
       j: J,
       u: U,
-      // Validation may rewrite invalid upgrade levels; never let that reach live state.
+      // Saved state never aliases live state.
       st: { ...game.state, upgrades: { ...game.state.upgrades } },
       p: {
         serfPool: game.serfPool,
@@ -208,20 +203,17 @@ export function createPersistence(
       reportFailure(error);
       throw error;
     }
-    catalogHoldsAutosave = holdsAutosave(next.entries);
     reportSuccess(message, quiet);
   }
   function readCatalog(operation: 'save' | 'load' = 'save') {
     try {
-      const next = catalog.read();
-      catalogHoldsAutosave = holdsAutosave(next.entries);
-      return next;
+      return catalog.read();
     } catch (error) {
       reportFailure(error, operation);
       throw error;
     }
   }
-  /** Every stored save: the catalog plus the separate autosave, which supersedes a catalog one. */
+  /** Every stored save: the catalog plus the separate autosave. */
   function readEntries(operation: 'save' | 'load' = 'save'): CatalogEntry[] {
     const entries = readCatalog(operation).entries;
     let autosave: CatalogEntry | null = null;
@@ -233,7 +225,7 @@ export function createPersistence(
       if (!autosaveDamaged) reportFailure(error, operation);
       autosaveDamaged = true;
     }
-    return withAutosave(entries, autosave);
+    return autosave ? entries.concat(autosave) : entries;
   }
   function setColonyName(name: string) {
     colonyName = saveName(name);
@@ -278,12 +270,7 @@ export function createPersistence(
       }
       baseline = text;
       baselineId = 'autosave';
-      // One-time migration, only after the new autosave is stored so nothing is lost.
-      if (catalogHoldsAutosave) {
-        const next = readCatalog();
-        next.entries = next.entries.filter((candidate) => candidate.kind !== 'autosave');
-        writeCatalog(next, 'Autosave saved', true);
-      } else reportSuccess('Autosave saved', true, savedAt);
+      reportSuccess('Autosave saved', true, savedAt);
       return true;
     } catch (error) {
       if (lastReportedError !== error) reportFailure(error);
@@ -341,15 +328,6 @@ export function createPersistence(
     if (typeof raw !== 'string' || raw.length > MAX_SAVE_TEXT)
       throw new Error('Save code is too large');
     const d = validateSave(JSON.parse(raw), game.W, game.H, game.BSPEC, game.GOODS);
-    if (d.economy !== undefined && d.economy !== 2) throw new Error('Unsupported economy version');
-    // Legacy toolsmiths are the same basic wood-and-stone workshop: preserve
-    // their stock, construction materials, timers and already assigned pickups.
-    if (d.economy === undefined)
-      for (const b of d.b) {
-        if (b.type === 'toolsmith') b.type = 'workshop';
-        if (b.type === 'armory') b.legacyIndustry = true;
-      }
-    d.economy = 2;
     const T = d.t[0],
       TR = d.t[1],
       RK = d.t[2],
@@ -371,8 +349,7 @@ export function createPersistence(
     const newUnits = d.u.map(function (u) {
       return Object.assign({}, u, { job: u.ji >= 0 ? newJobs[u.ji] : null, dead: false });
     });
-    const rng = game.mulberry32(d.seed + 0x5bd1e995);
-    if (d.v === 2) rng.setState(d.rng);
+    const rng = game.mulberry32(d.rng);
     return { data: d, tiles: newTiles, buildings: d.b, jobs: newJobs, units: newUnits, rng: rng };
   }
   function commitLoad(prepared: PreparedSave) {
@@ -529,20 +506,6 @@ export interface StoragePort {
   getItem: (key: string) => string | null;
   setItem: (key: string, value: string) => void;
   removeItem: (key: string) => void;
-}
-
-function holdsAutosave(entries: CatalogEntry[]) {
-  return entries.some((entry) => entry.kind === 'autosave');
-}
-
-/**
- * Combine the catalog with the separate autosave, keeping only the newer autosave: a tab still
- * running a bundle from before the split may have written a newer one into the catalog.
- */
-function withAutosave(entries: CatalogEntry[], autosave: CatalogEntry | null): CatalogEntry[] {
-  const older = entries.find((entry) => entry.kind === 'autosave');
-  if (!autosave || (older && (older.savedAt || 0) > (autosave.savedAt || 0))) return entries;
-  return entries.filter((entry) => entry !== older).concat(autosave);
 }
 
 export interface PersistenceDependencies

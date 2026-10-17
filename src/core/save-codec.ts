@@ -8,7 +8,7 @@
  * column by column instead: every numeric leaf becomes an array with one value per sample,
  * and `null` where that sample lacks the key. Unpacking rebuilds the same samples, numbers,
  * keys and key order, before validation sees them, so loading and continuation are unchanged.
- * Histories that do not fit that shape stay plain arrays, and older plain saves still load.
+ * Histories that do not fit that shape stay plain arrays.
  */
 
 /** Marks a packed history in save text; plain histories are arrays. */

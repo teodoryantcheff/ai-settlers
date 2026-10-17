@@ -9,7 +9,7 @@ function failureDetail(e: unknown) {
 
 export function runScenarios(game: GameRuntime) {
   if (/[?&]shortagefeedback(?:&|$)/.test(location.search)) {
-    // A legacy producer with no suppliers isolates the real persistent-notice path.
+    // A producer with no suppliers isolates the real persistent-notice path.
     game.closeLayer('start');
     const hq = game.anyStorage();
     if (!hq) throw new Error('Scenario requires colony storage');
@@ -25,8 +25,7 @@ export function runScenarios(game: GameRuntime) {
     Object.assign(armory, {
       done: true,
       constructionProgress: 1,
-      legacyIndustry: true,
-      stock: /[?&]missing=coal(?:&|$)/.test(location.search) ? { iron: 1 } : { coal: 1 },
+      stock: /[?&]missing=coal(?:&|$)/.test(location.search) ? { iron_bars: 1 } : { coal: 1 },
     });
     hq.stock = {};
     game.buildings = [hq, armory];

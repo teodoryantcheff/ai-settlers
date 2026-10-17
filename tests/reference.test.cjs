@@ -18,11 +18,8 @@ function reference() {
   game.initializeColony();
   return { game, dom };
 }
-test('reference explains actual standard and retained recipes without changing colony state', () => {
+test('reference explains actual recipes without changing colony state', () => {
   const { game: g, dom } = reference();
-  const legacy = g.newBuilding('armory', 51, 48);
-  Object.assign(legacy, { done: true, legacyIndustry: true });
-  g.buildings.push(legacy);
   const before = {
     rng: g.SR.getState(),
     jobs: g.jobs.length,
@@ -33,7 +30,6 @@ test('reference explains actual standard and retained recipes without changing c
   const html = dom.node('reference-results').innerHTML;
   assert.match(html, /Fish, bread, meat or provisions/);
   assert.match(html, /Iron bars/);
-  assert.match(html, /legacy.*Iron ore.*Coal/is);
   assert.match(html, /local water/i);
   assert.match(html, /6 tiles/);
   assert.equal(g.SR.getState(), before.rng);

@@ -70,10 +70,10 @@ test('countdown uses actual upgraded mine work speed and preserves recipe, water
   assert.equal(g.productionProgress(bakery).reason, 'water');
   assert.equal(g.buildingWorking(bakery), false);
   const armory = g.newBuilding('armory', 55, 48);
-  Object.assign(armory, { done: true, legacyIndustry: true, stock: { iron: 1, coal: 1 } });
+  Object.assign(armory, { done: true, stock: { iron_bars: 1, coal: 1 } });
   assert.equal(g.productionProgress(armory).reason, '');
-  assert.equal(g.buildingWorking(armory), true, 'legacy recipes count their real ingredients');
-  armory.stock = { iron_bars: 1, coal: 1 };
+  assert.equal(g.buildingWorking(armory), true, 'recipes count their real ingredients');
+  armory.stock = { iron: 1, coal: 1 };
   assert.equal(g.productionProgress(armory).reason, 'inputs');
   assert.equal(g.buildingWorking(armory), false);
   const quarry = g.newBuilding('quarry', 90, 90);

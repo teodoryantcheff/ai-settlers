@@ -7,7 +7,6 @@ import { createPlacementFeedback } from './placement-feedback.ts';
 import { createTransientHelp } from './transient-help.ts';
 import { createMapControls } from './map-controls.ts';
 import { createCatalogView } from './catalog-view.ts';
-import { recipeRequirements } from '../gameplay/production-rules.ts';
 import { RESOURCE_GROUPS, resourceIcon } from './resource-icons.ts';
 import { observePresentation } from './domain-feedback.ts';
 import type { GameRuntime } from '../runtime.ts';
@@ -112,11 +111,11 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
           ? markup`<small>Consumes ${observedFlows(
               m.consumed,
               elapsed,
-              sp.prod === 'mine' ? undefined : recipeRequirements(b, sp),
+              sp.prod === 'mine' ? undefined : sp.in,
             )}/min · Arrivals ${observedFlows(
               m.delivered,
               elapsed,
-              sp.prod === 'mine' ? undefined : recipeRequirements(b, sp),
+              sp.prod === 'mine' ? undefined : sp.in,
             )}/min</small>`
           : '',
       )}</div>`;

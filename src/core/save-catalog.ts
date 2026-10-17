@@ -43,9 +43,8 @@ export function saveMetadata(entry: CatalogEntry): SaveMetadata {
 }
 
 /**
- * One envelope is the atomic storage transaction for named checkpoints; the legacy slot is
- * never rewritten. The autosave lives under its own key so writing it never reads, parses or
- * rewrites the checkpoints. Catalogs written before that split may still hold an autosave entry.
+ * One envelope is the atomic storage transaction for named checkpoints. The autosave lives
+ * under its own key so writing it never reads, parses or rewrites the checkpoints.
  */
 export function createSaveCatalog(
   storage: StoragePort | undefined,
@@ -78,18 +77,14 @@ export function createSaveCatalog(
       if (
         !object(entry) ||
         typeof entry.id !== 'string' ||
-        !/^(save-[1-9]\d{0,8}|autosave|legacy)$/.test(entry.id) ||
+        !/^save-[1-9]\d{0,8}$/.test(entry.id) ||
         ids.has(entry.id) ||
-        (entry.kind !== 'manual' && entry.kind !== 'autosave' && entry.kind !== 'legacy') ||
-        (entry.kind === 'autosave') !== (entry.id === 'autosave') ||
-        (entry.kind === 'legacy') !== (entry.id === 'legacy') ||
-        (entry.id.startsWith('save-') && +entry.id.slice(5) >= nextId) ||
-        (entry.savedAt !== null &&
-          (typeof entry.savedAt !== 'number' ||
-            !Number.isSafeInteger(entry.savedAt) ||
-            entry.savedAt < 0 ||
-            entry.savedAt > MAX_SAVED_AT)) ||
-        (entry.savedAt === null && entry.kind !== 'legacy')
+        entry.kind !== 'manual' ||
+        +entry.id.slice(5) >= nextId ||
+        typeof entry.savedAt !== 'number' ||
+        !Number.isSafeInteger(entry.savedAt) ||
+        entry.savedAt < 0 ||
+        entry.savedAt > MAX_SAVED_AT
       )
         throw new Error('Invalid save catalog entry');
       ids.add(entry.id);
@@ -98,7 +93,7 @@ export function createSaveCatalog(
         id: entry.id,
         name: saveName(entry.name, 'Checkpoint'),
         kind: entry.kind,
-        savedAt: typeof entry.savedAt === 'number' ? entry.savedAt : null,
+        savedAt: entry.savedAt,
         data: checkedSave(text),
       };
     });
@@ -107,26 +102,9 @@ export function createSaveCatalog(
   function read(): SaveCatalog {
     if (!storage) throw new Error('Browser storage is unavailable');
     const raw = storage.getItem(SAVE_CATALOG_KEY);
-    if (raw !== null) {
-      if (raw.length > MAX_CATALOG_TEXT) throw new Error('Save catalog is too large');
-      return validate(JSON.parse(raw));
-    }
-    const legacy = storage.getItem('settlers.save');
-    return {
-      v: 1,
-      nextId: 1,
-      entries: legacy
-        ? [
-            {
-              id: 'legacy',
-              name: 'Legacy checkpoint',
-              kind: 'legacy',
-              savedAt: null,
-              data: checkedSave(legacy),
-            },
-          ]
-        : [],
-    };
+    if (raw === null) return { v: 1, nextId: 1, entries: [] };
+    if (raw.length > MAX_CATALOG_TEXT) throw new Error('Save catalog is too large');
+    return validate(JSON.parse(raw));
   }
   /** The separately stored autosave, or null when none has been written under its own key. */
   function readAutosave(): CatalogEntry | null {

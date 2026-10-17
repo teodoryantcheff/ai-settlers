@@ -108,7 +108,6 @@ test('Advisor keeps live action focus, and V respects native input and blocking 
     Object.assign(armory, {
       done: true,
       constructionProgress: 1,
-      legacyIndustry: true,
       stock: { coal: 1 },
     });
     armory.metrics.elapsed = 60;
@@ -370,12 +369,4 @@ test('earned victory stays achieved after spending and continues through Home wi
   await expect(page.locator('#start')).toBeVisible();
   await page.locator('#continueb').click();
   expect(await page.evaluate(() => window.productionArtPreview.game.exportSave())).toBe(current);
-  const legacy = JSON.parse(current);
-  delete legacy.observations;
-  await page.evaluate((raw) => {
-    const g = window.productionArtPreview.game;
-    g.importSave(raw);
-    g.showVictory();
-  }, JSON.stringify(legacy));
-  await expect(page.locator('#winstats')).toContainText('Economic measurements unavailable');
 });

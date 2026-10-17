@@ -6,7 +6,7 @@ import type { PlacementFeedback } from './placement-feedback.ts';
 import type { GameRuntime } from '../runtime.ts';
 import type { Building, Good, Inventory, ProductionRateWindow, TilePoint } from '../types.ts';
 import type { DemolitionQuote } from '../simulation/economy.ts';
-import { eligibleIngredients, recipeRequirements } from '../gameplay/production-rules.ts';
+import { eligibleIngredients } from '../gameplay/production-rules.ts';
 import { resourceIcon } from './resource-icons.ts';
 import { buildingPurposes as buildingHelp } from './catalog-view.ts';
 import { observePresentation } from './domain-feedback.ts';
@@ -69,9 +69,7 @@ export function createInspectorView(game: GameRuntime, feedback: PlacementFeedba
       if (sp.store)
         html += markup`<p>Reserved (part of stored): ${trusted(formatGoods(game.GOODS, b.reservedStock, { positiveOnly: true, separator: ' · ', empty: 'None', icons: true }))}</p>`;
       if (game.incomingDeliveryStages) {
-        const relevant = sp.store
-          ? Object.keys(game.GOODS)
-          : Object.keys(eligibleIngredients(b, sp));
+        const relevant = sp.store ? Object.keys(game.GOODS) : Object.keys(eligibleIngredients(sp));
         const inbound = relevant
           .map((g) => {
             const s = game.incomingDeliveryStages(g as Good, b.id);
@@ -187,7 +185,7 @@ export function createInspectorView(game: GameRuntime, feedback: PlacementFeedba
       }</p></details>`;
     }
     if (sp.in) {
-      const allowed = sp.prod === 'mine' ? undefined : recipeRequirements(b, sp);
+      const allowed = sp.prod === 'mine' ? undefined : sp.in;
       const goods = [
         ...new Set([
           ...Object.keys(allowed || {}),
@@ -290,17 +288,12 @@ export function createInspectorView(game: GameRuntime, feedback: PlacementFeedba
       quoteHTML = quote ? shortcut(b, quote) : '';
       h = markup`<div data-inspector-live>${trusted(liveHTML)}</div><div data-inspector-controls>`;
       const referenceStart = h.length;
-      if (buildingHelp[b.type])
-        h += markup`<p class="muted">${
-          b.type === 'armory' && b.legacyIndustry
-            ? 'This established armory retains its original iron ore and coal recipe.'
-            : buildingHelp[b.type]
-        }</p>`;
+      if (buildingHelp[b.type]) h += markup`<p class="muted">${buildingHelp[b.type]}</p>`;
       if (sp.out && (sp.prod === 'craft' || sp.prod === 'mine'))
         h += markup`<span style="color:#c8b890">Input ${
           sp.prod === 'mine'
             ? '1 fish, bread, meat or provisions'
-            : formatGoods(game.GOODS, recipeRequirements(b, sp), { lowerCase: true })
+            : formatGoods(game.GOODS, sp.in, { lowerCase: true })
         } → ${game.GOODS[sp.out].name} / ${(
           work?.duration ??
           (sp.time ?? 0) *

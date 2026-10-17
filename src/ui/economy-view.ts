@@ -156,21 +156,19 @@ export function createEconomyView(game: GameRuntime): EconomyViewSubsystem {
   function recipe(building: Building) {
     const spec = game.BSPEC[building.type];
     if (!spec.out) return '';
-    const inputs = eligibleIngredients(building, spec);
+    const inputs = eligibleIngredients(spec);
     const link = (good: Good, quantity: number, role: string) =>
       markup`<button data-economy-resource="${good}" data-economy-key="recipe-${building.id}-${role}-${good}">${quantity} ${game.GOODS[good].name}</button>`;
     const input = Object.entries(inputs)
       .map(([good, quantity]) => link(good as Good, quantity, 'input'))
       .join(spec.prod === 'mine' ? ' or ' : ' + ');
-    return markup`<p class="economy-recipe">${trusted(input || 'Natural resources')} → ${trusted(link(spec.out, spec.prod === 'gather' ? 2 : 1, 'output'))} per cycle${spec.prod === 'mine' ? ' · choose one edible alternative' : ''}${building.legacyIndustry ? ' · legacy recipe' : ''}${spec.water ? ' · working well within 6 tiles (local support, not cargo)' : ''}</p>`;
+    return markup`<p class="economy-recipe">${trusted(input || 'Natural resources')} → ${trusted(link(spec.out, spec.prod === 'gather' ? 2 : 1, 'output'))} per cycle${spec.prod === 'mine' ? ' · choose one edible alternative' : ''}${spec.water ? ' · working well within 6 tiles (local support, not cargo)' : ''}</p>`;
   }
   function contributors(good: Good) {
     const holders = new Set(game.resourceAccounting(good).contributors.map((entry) => entry.id));
     const relevant = game.buildings.filter((building) => {
       const spec = game.BSPEC[building.type];
-      return (
-        spec.out === good || !!eligibleIngredients(building, spec)[good] || holders.has(building.id)
-      );
+      return spec.out === good || !!eligibleIngredients(spec)[good] || holders.has(building.id);
     });
     const former =
       inspected && !game.byId(inspected.id)
@@ -182,7 +180,7 @@ export function createEconomyView(game: GameRuntime): EconomyViewSubsystem {
             .map((building) => {
               const spec = game.BSPEC[building.type];
               const producer = spec.out === good;
-              const consumer = !!eligibleIngredients(building, spec)[good];
+              const consumer = !!eligibleIngredients(spec)[good];
               const metric = game.productionWindow(building.metrics, window);
               const roles = [
                 producer ? 'Producer' : '',

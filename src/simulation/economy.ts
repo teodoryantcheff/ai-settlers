@@ -289,10 +289,7 @@ export function createEconomy(
         }) ?? productionSample(m);
     }
     const elapsed = Math.max(0, m.elapsed - baseline.elapsed),
-      deliveryElapsed =
-        m.deliveryStarted === undefined
-          ? 0
-          : Math.max(0, m.elapsed - Math.max(baseline.elapsed, m.deliveryStarted));
+      deliveryElapsed = Math.max(0, m.elapsed - Math.max(baseline.elapsed, m.deliveryStarted));
     function difference(current: Inventory, before: Inventory): Inventory {
       const out: Inventory = {};
       for (const good in current)
@@ -1277,7 +1274,7 @@ export function createEconomy(
         continue;
       }
       if (sp.in && !b.disabled && !b.exhausted) {
-        const fetchInputs = eligibleIngredients(b, sp);
+        const fetchInputs = eligibleIngredients(sp);
         for (g in fetchInputs) {
           const want = 3,
             have = (b.stock[g] ?? 0) | 0;
@@ -1607,7 +1604,7 @@ export function createEconomy(
     game.recordCargoArrival(g);
     b.metrics.delivered[g] = ((b.metrics.delivered[g] ?? 0) | 0) + 1;
     const sp = game.BSPEC[b.type];
-    if (b.done && !sp.store && sp.in && eligibleIngredients(b, sp)[g]) {
+    if (b.done && !sp.store && sp.in && eligibleIngredients(sp)[g]) {
       b.metrics.inputDelivered[g] = (b.metrics.inputDelivered[g] || 0) + 1;
       game.recordEconomicFlow('inputArrived', g, 1);
     }
