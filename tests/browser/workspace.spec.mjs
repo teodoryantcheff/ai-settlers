@@ -1,21 +1,30 @@
-import { test, expect } from './helpers/test.mjs';
+import { test, expect, frame, load, seedPrefs } from './helpers/test.mjs';
 import { openAtlas } from './helpers/atlas.mjs';
 
 test.setTimeout(120000);
 
-async function boot(page) {
-  await page.addInitScript(() =>
-    localStorage.setItem('settlers.prefs', JSON.stringify({ quality: 0.75 })),
-  );
-  await page.goto('/tests/game.html?seed=2024');
-  await expect(page.locator('#boot')).toHaveCount(0, { timeout: 30000 });
+// Suspension is observed against the browser's own animation frames.
+async function bootLive(page) {
+  await seedPrefs(page, { quality: 0.75 });
+  await load(page);
   await page.locator('#startb').press('Enter');
+}
+/** Let the browser run `count` real animation frames, each one a game-loop turn. */
+function liveFrames(page, count) {
+  return page.evaluate(
+    (count) =>
+      new Promise((resolve) => {
+        const next = () => (--count <= 0 ? resolve() : requestAnimationFrame(next));
+        requestAnimationFrame(next);
+      }),
+    count,
+  );
 }
 
 test('live analysis preserves map and selection while leaving placement safely', async ({
-  page,
+  freshPage: page,
 }) => {
-  await boot(page);
+  await bootLive(page);
   await page.locator('#sp0').press('Enter');
   await page.evaluate(() => {
     const g = window.productionArtPreview.game;
@@ -50,8 +59,10 @@ test('live analysis preserves map and selection while leaving placement safely',
   );
 });
 
-test('nested utility dialogs suspend running time and return keyboard focus', async ({ page }) => {
-  await boot(page);
+test('nested utility dialogs suspend running time and return keyboard focus', async ({
+  freshPage: page,
+}) => {
+  await bootLive(page);
   await page.locator('#utility summary').press('Enter');
   await page.locator('#mixb').press('Enter');
   await expect(page.locator('#mix')).toBeVisible();
@@ -61,7 +72,7 @@ test('nested utility dialogs suspend running time and return keyboard focus', as
   await page.keyboard.press('Tab');
   await expect(page.locator('#speedpref')).toBeFocused();
   const time = await page.evaluate(() => window.productionArtPreview.game.state.time);
-  await page.waitForTimeout(200);
+  await liveFrames(page, 10);
   expect(await page.evaluate(() => window.productionArtPreview.game.state.time)).toBe(time);
   await expect(page.locator('#settings-help')).toBeVisible();
   await page.locator('#settings-help').press('Enter');
@@ -89,8 +100,8 @@ test('atlas layout keeps stored goods visible and map input aligned at desktop s
   page,
 }) => {
   test.setTimeout(240000);
-  await boot(page);
   await page.locator('#sp0').press('Enter');
+  let now = 1000;
   for (const [width, height, quality, motion] of [
     [1440, 900, '1', false],
     [1280, 720, '0.75', true],
@@ -103,6 +114,7 @@ test('atlas layout keeps stored goods visible and map input aligned at desktop s
     await page.keyboard.press('Escape');
     await openAtlas(page);
     await page.getByRole('button', { name: 'Map', exact: true }).press('Enter');
+    await frame(page, (now += 100));
     const point = await page.evaluate(() => {
       const g = window.productionArtPreview.game;
       const hq = g.anyStorage();
@@ -113,6 +125,7 @@ test('atlas layout keeps stored goods visible and map input aligned at desktop s
       };
     });
     await page.mouse.click(point.x, point.y);
+    await frame(page, (now += 100));
     await expect(page.locator('#info')).toBeVisible();
     await expect(page.locator('#infobody')).toContainText('Headquarters');
     const boxes = await page.locator('#goods .gd').evaluateAll((goods) =>

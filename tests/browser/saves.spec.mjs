@@ -1,21 +1,7 @@
 import { test, expect } from './helpers/test.mjs';
 
 test.setTimeout(60000);
-async function boot(page) {
-  await page.addInitScript(() => {
-    window.requestAnimationFrame = (callback) => {
-      window.__saveFrame = callback;
-      return 0;
-    };
-    localStorage.setItem(
-      'settlers.prefs',
-      JSON.stringify({ reducedMotion: true, weather: false, quality: 0.75 }),
-    );
-  });
-  await page.goto('/tests/game.html?seed=2024');
-  await expect(page.locator('#boot')).toHaveCount(0, { timeout: 30000 });
-  await page.waitForFunction(() => window.productionArtPreview?.game);
-  await page.locator('#startb').click();
+async function openSaves(page) {
   await page.evaluate(() => {
     const game = window.productionArtPreview.game;
     game.hudTick();
@@ -32,7 +18,7 @@ test('checkpoint metadata, rename, confirmations, separate autosave and files wo
 }) => {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await boot(page);
+  await openSaves(page);
   await page.locator('#colony-name').fill('Riverbend');
   await page.locator('#colony-name').press('Tab');
   await page.locator('#checkpoint-name').fill('Before expansion');
@@ -110,7 +96,7 @@ test('checkpoint metadata, rename, confirmations, separate autosave and files wo
 test('storage failure preserves valid checkpoints, reports quiet autosave failure and allows file export', async ({
   page,
 }) => {
-  await boot(page);
+  await openSaves(page);
   await page.locator('#checkpoint-name').fill('Safe checkpoint');
   await page.locator('#create-checkpoint').click();
   const prior = await page.evaluate(() => localStorage.getItem('settlers.saves.v1'));

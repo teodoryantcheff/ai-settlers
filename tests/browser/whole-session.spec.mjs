@@ -1,4 +1,4 @@
-import { test, expect } from './helpers/test.mjs';
+import { test, expect, frame } from './helpers/test.mjs';
 import { openAtlas } from './helpers/atlas.mjs';
 
 test.setTimeout(120000);
@@ -39,23 +39,18 @@ test('native first colony carries Journey construction through real deliveries, 
 }) => {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.addInitScript(() => {
-    window.requestAnimationFrame = (callback) => {
-      window.__acceptanceFrame = callback;
-      return 0;
-    };
+  // Full quality with motion, weather and muted audio, applied as boot applies it.
+  await page.evaluate(() => {
     localStorage.setItem(
       'settlers.prefs',
       JSON.stringify({ quality: 1, reducedMotion: false, weather: true, muted: true }),
     );
+    const game = window.productionArtPreview.game;
+    game.loadPrefs();
+    game.resize();
   });
-  await page.goto('/tests/game.html?seed=2024');
-  await expect(page.locator('#boot')).toHaveCount(0, { timeout: 30000 });
-  await page.waitForFunction(() => window.productionArtPreview?.game);
-  await page.evaluate(() => window.__acceptanceFrame(1000));
+  await frame(page, 1000);
   await expect(page.locator('html')).toHaveAttribute('data-renderer', 'pixi');
-  await page.locator('#startb').click();
   await paint(page);
   await capture(page, 'fresh-map-1440-q1');
   for (const workspace of ['attention', 'activity', 'economy']) {

@@ -1,31 +1,31 @@
-import { test, expect } from './helpers/test.mjs';
+import { test, expect, bootStandard } from './helpers/test.mjs';
 
 test.setTimeout(90000);
-async function boot(page) {
-  await page.addInitScript(() => {
-    window.requestAnimationFrame = (callback) => {
-      window.__topbarFrame = callback;
-      return 0;
-    };
-    if (!localStorage.getItem('settlers.prefs'))
-      localStorage.setItem(
-        'settlers.prefs',
-        JSON.stringify({ quality: 0.75, reducedMotion: true, weather: false }),
-      );
-  });
-  await page.goto('/tests/game.html?seed=2024');
-  await expect(page.locator('#boot')).toHaveCount(0, { timeout: 30000 });
-  await page.waitForFunction(() => window.productionArtPreview?.game);
-  await page.locator('#startb').click();
-  await page.evaluate(() => window.productionArtPreview.game.hudTick());
+// Queued after transient help's 120 ms leave timer, so it runs once that has fired.
+function afterLeaveTimer(page) {
+  return page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 120)));
+}
+// The HUD redraws at most every 250 ms; tick until it shows the expected text.
+async function expectHud(page, selector, text) {
+  await expect
+    .poll(() =>
+      page.evaluate((selector) => {
+        window.productionArtPreview.game.hudTick();
+        return document.querySelector(selector).textContent;
+      }, selector),
+    )
+    .toBe(text);
 }
 async function settings(page) {
   await page.locator('#utility summary').click();
   await page.locator('#mixb').click();
 }
 
-test('FPS is optional and settings honestly report persistence failures', async ({ page }) => {
-  await boot(page);
+// Reloads with remembered settings, then replaces Storage.prototype.setItem.
+test('FPS is optional and settings honestly report persistence failures', async ({
+  freshPage: page,
+}) => {
+  await bootStandard(page);
   await expect(page.locator('#fps')).toBeHidden();
   await settings(page);
   await page.getByRole('checkbox', { name: 'Show FPS counter' }).check();
@@ -55,7 +55,6 @@ test('FPS is optional and settings honestly report persistence failures', async 
 });
 
 test('only urgent save failure occupies the bar and opens file recovery', async ({ page }) => {
-  await boot(page);
   await expect(page.locator('#atlas-toggle')).toHaveAttribute('aria-expanded', 'false');
   await expect(page.locator('#save-recovery')).toBeHidden();
   await page.evaluate(() => {
@@ -80,7 +79,6 @@ test('population and stored-resource explanations support pointer reading, keybo
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
-  await boot(page);
   await page.evaluate(() => window.productionArtPreview.game.setMode('road'));
   await page.locator('#ppl').hover();
   const population = page.getByRole('tooltip').filter({ hasText: 'Carrier capacity' });
@@ -93,7 +91,7 @@ test('population and stored-resource explanations support pointer reading, keybo
     return { mode: g.mode, selected: g.selected?.id, time: g.state.time, paused: g.state.paused };
   });
   await population.hover();
-  await page.waitForTimeout(180);
+  await afterLeaveTimer(page);
   await expect(population).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('population-help-1280.png') });
   await population.click();
@@ -115,7 +113,7 @@ test('population and stored-resource explanations support pointer reading, keybo
   await page.screenshot({ path: test.info().outputPath('stored-gold-help-1280.png') });
   await page.keyboard.press('Escape');
   await expect(gold).toBeHidden();
-  await page.waitForTimeout(180);
+  await afterLeaveTimer(page);
   await expect(gold).toBeHidden();
   await page.evaluate(() => {
     document.getElementById('sp0').focus();
@@ -136,7 +134,6 @@ test('population and stored-resource explanations support pointer reading, keybo
 test('two compact rows retain dense stock, banked objective and essential controls at both desktop sizes', async ({
   page,
 }) => {
-  await boot(page);
   await page.evaluate(() => {
     const g = window.productionArtPreview.game;
     const hq = g.anyStorage();
@@ -145,9 +142,7 @@ test('two compact rows retain dense stock, banked objective and essential contro
     hq.reservedStock.logs = 345;
     g.state.gold = 37;
   });
-  await page.waitForTimeout(280);
-  await page.evaluate(() => window.productionArtPreview.game.hudTick());
-  await expect(page.locator('#goods [data-good="logs"] b')).toHaveText('12345');
+  await expectHud(page, '#goods [data-good="logs"] b', '12345');
   await expect(page.locator('#goods [data-good="gold"] b')).toHaveText('98765');
   await expect(page.locator('#goaltxt')).toHaveText('Banked gold 37 / 200');
   for (const [width, height, quality, motion] of [
@@ -194,13 +189,9 @@ test('two compact rows retain dense stock, banked objective and essential contro
     ).toEqual([]);
     await expect(page.locator('#ppl')).toHaveText('8 carriers');
     await page.locator('#sp0').click();
-    await page.waitForTimeout(280);
-    await page.evaluate(() => window.productionArtPreview.game.hudTick());
-    await expect(page.locator('#spd')).toHaveText('PAUSED');
+    await expectHud(page, '#spd', 'PAUSED');
     await settings(page);
-    await page.waitForTimeout(280);
-    await page.evaluate(() => window.productionArtPreview.game.hudTick());
-    await expect(page.locator('#spd')).toHaveText('SUSPENDED · 1×');
+    await expectHud(page, '#spd', 'SUSPENDED · 1×');
     await page.keyboard.press('Escape');
     await page.locator('#sp1').click();
     await page.evaluate(() => {
@@ -215,9 +206,7 @@ test('two compact rows retain dense stock, banked objective and essential contro
       };
       g.saveGame(true);
     });
-    await page.waitForTimeout(280);
-    await page.evaluate(() => window.productionArtPreview.game.hudTick());
-    await expect(page.locator('#goaltxt')).toHaveText('✓ Goal achieved · 37 banked');
+    await expectHud(page, '#goaltxt', '✓ Goal achieved · 37 banked');
     await expect(page.locator('#save-recovery')).toBeInViewport();
     await expect(page.locator('#utility summary')).toBeInViewport();
     const camera = await page.evaluate(() => ({ ...window.productionArtPreview.game.cam }));

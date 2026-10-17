@@ -1188,6 +1188,9 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
       toggleMute,
       toggleMusic,
       toggleAdvisorDetails,
+      resetHudThrottle: () => {
+        hudT = 0;
+      },
     });
     Object.defineProperties(internals, {
       pan: {
@@ -1300,6 +1303,8 @@ export interface HudInternals {
   toggleMute: () => void;
   toggleMusic: () => void;
   toggleAdvisorDetails: () => void;
+  /** Let the next hudTick() refresh at once instead of waiting out its 250 ms. */
+  resetHudThrottle: () => void;
   readonly pan: PanDrag | null;
   readonly miniDown: boolean;
 }

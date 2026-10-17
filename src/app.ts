@@ -3,11 +3,18 @@ import { assemblePresentation } from './application/assembly.ts';
 import type { RendererPresentation } from './rendering/scene.ts';
 import type { GameRuntime } from './runtime.ts';
 import type { PersistenceInternals } from './core/persistence.ts';
+import type { HudInternals } from './ui/hud.ts';
+
+/** Test-only hooks the development bundle passes at boot; the release passes none. */
+export interface DevInternals {
+  persistence?: PersistenceInternals;
+  hud?: HudInternals;
+}
 
 /** Assemble before starting: no module starts a frame loop when imported. */
 export function createGame(
   presentation: RendererPresentation,
-  persistenceInternals?: PersistenceInternals,
+  internals?: DevInternals,
 ): GameRuntime {
   const search = location.search;
   const seedMatch = search.match(/[?&]seed=(\d+)/);
@@ -20,8 +27,8 @@ export function createGame(
       setItem: (key, value) => localStorage.setItem(key, value),
       removeItem: (key) => localStorage.removeItem(key),
     },
-    persistenceInternals,
+    persistenceInternals: internals?.persistence,
   }) as GameRuntime;
-  assemblePresentation(game, { presentation });
+  assemblePresentation(game, { presentation, hudInternals: internals?.hud });
   return game;
 }

@@ -1,5 +1,7 @@
 import type { PersistenceInternals } from '../core/persistence.ts';
+import type { HudInternals } from '../ui/hud.ts';
 import type { GameRuntime } from '../runtime.ts';
+import { PAGE_ELEMENT_IDS } from '../ui/dom.ts';
 
 /** What a shared browser-test page must return to between tests. */
 export interface TestFingerprint {
@@ -11,8 +13,10 @@ export interface TestFingerprint {
   jobs: number;
   colony: boolean;
   unsaved: boolean;
+  saveHealth: boolean;
   workspace: string;
   openPanels: number;
+  changedChrome: number;
   selected: number | null;
   mode: string | null;
   messages: number;
@@ -35,6 +39,23 @@ interface Baseline {
   advisorVisible: boolean;
   details: Map<HTMLDetailsElement, boolean>;
   messages: GameRuntime['msgs'];
+  chrome: Map<HTMLElement, ChromeState>;
+  controls: Map<FormControl, { value: string; checked: boolean }>;
+}
+
+type FormControl = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+interface ChromeState {
+  className: string;
+  hidden: HTMLElement['hidden'];
+  expanded: string | null;
+}
+
+function chromeState(element: HTMLElement): ChromeState {
+  return {
+    className: element.className,
+    hidden: element.hidden,
+    expanded: element.getAttribute('aria-expanded'),
+  };
 }
 
 function storageEntries(): [string, string][] {
@@ -53,8 +74,17 @@ function storageEntries(): [string, string][] {
  * storage and UI the load does not own. Each call returns the fingerprint that
  * the shared Playwright fixture compares with the first one.
  */
-export function createTestReset(game: GameRuntime, persistence: PersistenceInternals) {
+export function createTestReset(
+  game: GameRuntime,
+  { persistence, hud }: { persistence: PersistenceInternals; hud: HudInternals },
+) {
   let baseline: Baseline | null = null;
+  const nativeStorage = {
+    getItem: Storage.prototype.getItem,
+    setItem: Storage.prototype.setItem,
+    removeItem: Storage.prototype.removeItem,
+    clear: Storage.prototype.clear,
+  };
 
   function capture(): Baseline {
     return {
@@ -69,15 +99,44 @@ export function createTestReset(game: GameRuntime, persistence: PersistenceInter
       advisorVisible: game.advisorVisible,
       details: new Map([...document.querySelectorAll('details')].map((d) => [d, d.open])),
       messages: structuredClone(game.msgs),
+      // The static page: palette and panel state, and every filter or setting control.
+      chrome: new Map(
+        PAGE_ELEMENT_IDS.flatMap((id) => {
+          const element = document.getElementById(id);
+          return element ? [[element, chromeState(element)] as const] : [];
+        }),
+      ),
+      controls: new Map(
+        [...document.querySelectorAll<FormControl>('input, select, textarea')].map((control) => [
+          control,
+          { value: control.value, checked: control instanceof HTMLInputElement && control.checked },
+        ]),
+      ),
     };
   }
 
   function restore(base: Baseline) {
+    // Tests inject storage faults and clocks by patching browser objects.
+    Object.assign(Storage.prototype, nativeStorage);
+    if (Object.hasOwn(performance, 'now')) delete (performance as { now?: unknown }).now;
     persistence.commitLoad(persistence.prepareLoad(base.save));
+    // An injected storage fault leaves save health failed until a save succeeds;
+    // storage is restored below, which also discards this autosave.
+    if (!game.saveHealth.ok) game.saveAutosave();
     persistence.forgetBaseline();
     // The load announces itself; keep the booted messages instead.
     game.msgs.splice(0, game.msgs.length, ...structuredClone(base.messages));
     for (const [details, open] of base.details) details.open = open;
+    for (const [element, state] of base.chrome) {
+      element.className = state.className;
+      element.hidden = state.hidden;
+      if (state.expanded === null) element.removeAttribute('aria-expanded');
+      else element.setAttribute('aria-expanded', state.expanded);
+    }
+    for (const [control, state] of base.controls) {
+      control.value = state.value;
+      if (control instanceof HTMLInputElement) control.checked = state.checked;
+    }
     Object.assign(game.presentationPrefs, structuredClone(base.prefs));
     if (game.muted !== base.muted) game.setMuted(base.muted);
     if (game.musicOn !== base.musicOn) game.setMusicVol(base.musicOn);
@@ -99,7 +158,10 @@ export function createTestReset(game: GameRuntime, persistence: PersistenceInter
     // The frame loop restarts its clock the way it does when a tab returns.
     document.dispatchEvent(new Event('visibilitychange'));
     (document.activeElement as HTMLElement | null)?.blur();
+    // Show the restored colony, then leave the test's first hudTick() unthrottled.
+    hud.resetHudThrottle();
     game.hudTick();
+    hud.resetHudThrottle();
   }
 
   function requireStyle(id: string) {
@@ -120,10 +182,14 @@ export function createTestReset(game: GameRuntime, persistence: PersistenceInter
       // Compared as validated saves: validation normalizes the raw snapshot.
       colony: game.exportSave() === base.export,
       unsaved: game.hasUnsavedProgress(),
+      saveHealth: game.saveHealth.ok,
       workspace: game.workspace,
       openPanels:
         document.querySelectorAll('[aria-modal="true"]').length +
         [...base.details].filter(([details, open]) => details.open !== open).length,
+      changedChrome: [...base.chrome].filter(
+        ([element, state]) => JSON.stringify(chromeState(element)) !== JSON.stringify(state),
+      ).length,
       selected: game.selected?.id ?? null,
       mode: game.mode ? JSON.stringify(game.mode) : null,
       messages: game.msgs.length,

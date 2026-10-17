@@ -1,22 +1,14 @@
-import { test, expect } from './helpers/test.mjs';
+// The welcome screen, failing boots and a lost WebGL context each need their own page.
+import { test, expect, frame, holdFrames, load, seedPrefs } from './helpers/test.mjs';
 test.setTimeout(90000);
 async function boot(page) {
-  await page.addInitScript(() => {
-    localStorage.setItem(
-      'settlers.prefs',
-      JSON.stringify({ quality: 0.75, reducedMotion: true, weather: false }),
-    );
-    window.requestAnimationFrame = (callback) => {
-      window.__referenceFrame = callback;
-      return 0;
-    };
-  });
-  await page.goto('/tests/game.html?seed=2024');
-  await expect(page.locator('#boot')).toHaveCount(0, { timeout: 30000 });
-  await page.evaluate(() => window.__referenceFrame(1000));
+  await seedPrefs(page);
+  await holdFrames(page);
+  await load(page);
+  await frame(page, 1000);
 }
 test('searchable reference retains native keyboard focus and exact recipes through nested session layers', async ({
-  page,
+  freshPage: page,
 }) => {
   await boot(page);
   await page.locator('#welcome-reference').click();
@@ -120,7 +112,7 @@ test('searchable reference retains native keyboard focus and exact recipes throu
 });
 
 test('loading stages explain artwork work and report an incomplete pack before play', async ({
-  page,
+  freshPage: page,
 }) => {
   let release;
   const gate = new Promise((resolve) => (release = resolve));
@@ -152,7 +144,7 @@ test('loading stages explain artwork work and report an incomplete pack before p
 });
 
 test('unavailable WebGL has explicit browser recovery and leaves checkpoints untouched', async ({
-  page,
+  freshPage: page,
 }) => {
   await page.addInitScript(() => {
     localStorage.setItem('recovery-sentinel', 'keep');
@@ -177,7 +169,7 @@ test('unavailable WebGL has explicit browser recovery and leaves checkpoints unt
 });
 
 test('actual WebGL context loss pauses and exports the preserved live colony even when storage fails', async ({
-  page,
+  freshPage: page,
 }) => {
   await boot(page);
   await page.locator('#startb').click();

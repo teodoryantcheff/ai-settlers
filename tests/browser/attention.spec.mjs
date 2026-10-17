@@ -1,20 +1,8 @@
 import { test, expect } from './helpers/test.mjs';
 import { openAtlas, expectMapFocus } from './helpers/atlas.mjs';
 test.setTimeout(120000);
-async function boot(page) {
+function logErrors(page) {
   page.on('pageerror', (error) => console.log('Browser error:', error.message));
-  await page.addInitScript(() => {
-    window.requestAnimationFrame = () => 0;
-    localStorage.setItem(
-      'settlers.prefs',
-      JSON.stringify({ quality: 0.75, reducedMotion: true, weather: false }),
-    );
-  });
-  await page.goto('/tests/game.html?seed=2024');
-  await expect(page.locator('#boot')).toHaveCount(0, { timeout: 30000 });
-  await page.waitForFunction(() => window.productionArtPreview?.game);
-  await page.locator('#startb').click();
-  await page.evaluate(() => window.productionArtPreview.game.hudTick());
 }
 async function shortage(page) {
   return page.evaluate(() => {
@@ -35,7 +23,7 @@ async function shortage(page) {
 test('Attention shows an actual shortage, pure drilldowns and live keyboard state; Activity survives saves and removal', async ({
   page,
 }, testInfo) => {
-  await boot(page);
+  logErrors(page);
   const issue = await shortage(page);
   await openAtlas(page);
   await page.locator('#workspace-nav [data-workspace="attention"]').click();
@@ -147,7 +135,7 @@ test('Attention shows an actual shortage, pure drilldowns and live keyboard stat
 test('production pause suppresses a persisted issue while globally paused and urgent storage recovery remains accessible', async ({
   page,
 }) => {
-  await boot(page);
+  logErrors(page);
   const issue = await shortage(page);
   await page.evaluate((id) => {
     const game = window.productionArtPreview.game;
@@ -169,6 +157,8 @@ test('production pause suppresses a persisted issue while globally paused and ur
     game.saveGame();
     Storage.prototype.setItem = original;
     game.hudTick();
+    // hudTick refreshes at most every 250 ms; the Attention view need not wait for it.
+    game.updateAttentionView();
   });
   await expect(page.locator('#attention-list')).toContainText(
     'Urgent · Browser storage unavailable',
@@ -181,7 +171,7 @@ test('production pause suppresses a persisted issue while globally paused and ur
 test('collapsed Atlas counts current issues and urgent evidence, with immediate paused recovery and a keyboard route', async ({
   page,
 }) => {
-  await boot(page);
+  logErrors(page);
   const toggle = page.locator('#atlas-toggle');
   const badge = page.locator('#atlas-attention-count');
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
@@ -245,7 +235,7 @@ test('collapsed Atlas counts current issues and urgent evidence, with immediate 
 test('crowded muted notices stay below the bar, clear of palette and map controls, and keep evidence links and timing', async ({
   page,
 }, testInfo) => {
-  await boot(page);
+  logErrors(page);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const issue = await shortage(page);
   await page.evaluate(
@@ -350,12 +340,14 @@ test('crowded muted notices stay below the bar, clear of palette and map control
           .evaluate((el) => el.style.opacity),
       ).toBe(opacity);
   }
+  // The shared page keeps the browser clock for later tests.
+  await page.evaluate(() => delete performance.now);
 });
 
 test('Attention and Activity retain independent window context and recover focus when paused current evidence disappears', async ({
   page,
 }) => {
-  await boot(page);
+  logErrors(page);
   const issue = await shortage(page);
   await openAtlas(page);
   await page.locator('[data-workspace="attention"]').press('Enter');

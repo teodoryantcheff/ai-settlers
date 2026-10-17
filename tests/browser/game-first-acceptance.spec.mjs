@@ -1,4 +1,5 @@
-import { test, expect } from './helpers/test.mjs';
+// Each case fixes wall time before boot and boots its own quality and motion preferences.
+import { test, expect, holdFrames, load, seedPrefs } from './helpers/test.mjs';
 import { openAtlas, expectMapFocus } from './helpers/atlas.mjs';
 
 test.setTimeout(120000);
@@ -6,7 +7,7 @@ test.setTimeout(120000);
 async function frame(page) {
   await page.evaluate(() => {
     window.__gameFirstTime += 300;
-    window.__gameFirstFrame(window.__gameFirstTime);
+    window.__frame(window.__gameFirstTime);
   });
 }
 async function usable(control) {
@@ -33,29 +34,18 @@ for (const [width, height, quality, reducedMotion] of [
   [1280, 720, 0.75, false],
 ]) {
   test(`combined game surfaces preserve control at ${width} q${quality} motion ${reducedMotion}`, async ({
-    page,
+    freshPage: page,
   }) => {
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.setViewportSize({ width, height });
-    await page.addInitScript(
-      ({ quality, reducedMotion }) => {
-        localStorage.setItem(
-          'settlers.prefs',
-          JSON.stringify({ quality, reducedMotion, muted: true, weather: false }),
-        );
-        window.__gameFirstTime = 100000;
-        performance.now = () => window.__gameFirstTime;
-        window.requestAnimationFrame = (callback) => {
-          window.__gameFirstFrame = callback;
-          return 0;
-        };
-      },
-      { quality, reducedMotion },
-    );
-    await page.goto('/tests/game.html?seed=2024');
-    await expect(page.locator('#boot')).toHaveCount(0, { timeout: 30000 });
-    await page.waitForFunction(() => window.productionArtPreview?.game);
+    await seedPrefs(page, { quality, reducedMotion, muted: true, weather: false });
+    await page.addInitScript(() => {
+      window.__gameFirstTime = 100000;
+      performance.now = () => window.__gameFirstTime;
+    });
+    await holdFrames(page);
+    await load(page);
     await frame(page);
     await page.locator('#startb').press('Enter');
     await page.locator('#sp0').press('Enter');

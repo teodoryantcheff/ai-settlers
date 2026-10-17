@@ -1,5 +1,7 @@
 import { bootGame, reportBootError } from '../bootstrap.ts';
+import type { DevInternals } from '../app.ts';
 import type { PersistenceInternals } from '../core/persistence.ts';
+import type { HudInternals } from '../ui/hud.ts';
 import { paintedRegions, scanPaintedCrop } from '../rendering/painted-crop.ts';
 import { runScenarios } from './scenarios.ts';
 import { createTestReset } from './test-reset.ts';
@@ -9,9 +11,12 @@ import { preparePrototypeMap } from './ui-prototype-map.ts';
 if (new URLSearchParams(location.search).has('uiPrototype')) {
   mountUIPrototype();
 } else {
-  // Filled by the persistence factory; development builds only.
-  const persistence = {} as PersistenceInternals;
-  bootGame(persistence)
+  // Filled by the persistence and HUD factories; development builds only.
+  const internals = {
+    persistence: {} as PersistenceInternals,
+    hud: {} as HudInternals,
+  } satisfies DevInternals;
+  bootGame(internals)
     .then((game) => {
       if (new URLSearchParams(location.search).has('uiPrototypeMap')) preparePrototypeMap(game);
       else runScenarios(game);
@@ -22,7 +27,7 @@ if (new URLSearchParams(location.search).has('uiPrototype')) {
         paintedRegions,
         scanPaintedCrop,
         // Shared browser-test pages return to their booted state between tests.
-        resetForTest: createTestReset(game, persistence),
+        resetForTest: createTestReset(game, internals),
       };
     })
     .catch(reportBootError);

@@ -1,20 +1,15 @@
-import { test, expect } from './helpers/test.mjs';
+// The ?economyshot scenario and fixed dusk wall time need their own page.
+import { test, expect, holdFrames, seedPrefs } from './helpers/test.mjs';
 
 test.setTimeout(60000);
 
-test('illustrated village stays stable in daylight, dusk and compact layouts', async ({ page }) => {
+test('illustrated village stays stable in daylight, dusk and compact layouts', async ({
+  freshPage: page,
+}) => {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.addInitScript(() => {
-    window.requestAnimationFrame = (callback) => {
-      window.__polishFrame = callback;
-      return 0;
-    };
-    localStorage.setItem(
-      'settlers.prefs',
-      JSON.stringify({ reducedMotion: true, weather: false, quality: 1, clarity: false }),
-    );
-  });
+  await holdFrames(page);
+  await seedPrefs(page, { reducedMotion: true, weather: false, quality: 1, clarity: false });
   await page.goto('/tests/game.html?economyshot&seed=2024&z=5');
   await page.waitForFunction(() => window.productionArtPreview?.game, null, { polling: 100 });
   const before = await page.evaluate(() => {

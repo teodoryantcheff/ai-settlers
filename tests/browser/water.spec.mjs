@@ -1,19 +1,15 @@
-import { test, expect } from './helpers/test.mjs';
+import { test, expect, holdFrames, seedPrefs } from './helpers/test.mjs';
 test.use({ viewport: { width: 1200, height: 850 } });
 test.setTimeout(60000);
 
+// Fresh page: the ?capture scenario at quality 1 in its own viewport.
 test('painted water keeps the shoreline and simulation stable across motion and quality settings', async ({
-  page,
+  freshPage: page,
 }) => {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.addInitScript(() => {
-    window.requestAnimationFrame = () => 0;
-    localStorage.setItem(
-      'settlers.prefs',
-      JSON.stringify({ quality: 1, reducedMotion: true, weather: false }),
-    );
-  });
+  await holdFrames(page);
+  await seedPrefs(page, { quality: 1, reducedMotion: true, weather: false });
   await page.goto('/tests/game.html?capture&seed=2024');
   await page.waitForFunction(() => window.productionArtPreview?.game, null, { polling: 100 });
   const before = await page.evaluate(() => {

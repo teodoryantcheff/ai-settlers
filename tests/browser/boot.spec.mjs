@@ -3,7 +3,7 @@ import { test, expect } from './helpers/test.mjs';
 for (const missing of ['goaltxt', 'boot-stage']) {
   test(
     'missing #' + missing + ' shows an accessible boot failure before graphics starts',
-    async ({ page }) => {
+    async ({ freshPage: page }) => {
       await page.route('**/tests/game.html?seed=2024', async (route) => {
         const response = await route.fetch();
         const html = await response.text();
@@ -25,7 +25,9 @@ for (const missing of ['goaltxt', 'boot-stage']) {
   );
 }
 
-test('manifest crops match a full alpha scan of the browser-decoded sheets', async ({ page }) => {
+test('manifest crops match a full alpha scan of the browser-decoded sheets', async ({
+  freshPage: page,
+}) => {
   await page.goto('/tests/game.html?seed=2024');
   await page.waitForFunction(() => window.productionArtPreview?.scanPaintedCrop);
   const scan = await page.evaluate(async () => {

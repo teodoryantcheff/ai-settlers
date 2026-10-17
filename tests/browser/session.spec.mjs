@@ -1,24 +1,11 @@
-import { test, expect } from './helpers/test.mjs';
+// Every case opens on the first-run welcome screen and reloads to prove persistence.
+import { test, expect, frame, holdFrames, load, seedPrefs } from './helpers/test.mjs';
 test.setTimeout(60000);
 async function boot(page) {
-  await page.addInitScript(() => {
-    window.requestAnimationFrame = (callback) => {
-      window.__sessionFrame = callback;
-      return 0;
-    };
-    if (localStorage.getItem('settlers.prefs') === null)
-      localStorage.setItem(
-        'settlers.prefs',
-        JSON.stringify({ quality: 0.75, reducedMotion: true, weather: false }),
-      );
-  });
-  await page.goto('/tests/game.html?seed=2024');
-  await expect(page.locator('#boot')).toHaveCount(0, { timeout: 30000 });
-  await page.waitForFunction(() => window.productionArtPreview?.game);
-  await page.evaluate(() => window.__sessionFrame(1000));
-}
-async function frame(page, time) {
-  await page.evaluate((time) => window.__sessionFrame(time), time);
+  await holdFrames(page);
+  await seedPrefs(page);
+  await load(page);
+  await frame(page, 1000);
 }
 async function menu(page) {
   if (!(await page.locator('#utility').evaluate((element) => element.open)))
@@ -39,7 +26,7 @@ async function speedLabel(page, text) {
 }
 
 test('named seeded colony, guarded replacement and Home Continue preserve the actual live world', async ({
-  page,
+  freshPage: page,
 }) => {
   await boot(page);
   await expect(page.locator('#continueb')).toBeDisabled();
@@ -137,7 +124,7 @@ test('named seeded colony, guarded replacement and Home Continue preserve the ac
 });
 
 test('initial Continue loads the validated checkpoint rather than a new seed world', async ({
-  page,
+  freshPage: page,
 }) => {
   await boot(page);
   await page.locator('#new-colony-name').fill('Saved colony');
@@ -158,7 +145,7 @@ test('initial Continue loads the validated checkpoint rather than a new seed wor
 });
 
 test('nested settings preserve running and paused states, native input, persistence and failed writes', async ({
-  page,
+  freshPage: page,
 }) => {
   await boot(page);
   await page.locator('#startb').click();

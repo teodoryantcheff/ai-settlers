@@ -1,31 +1,21 @@
 import { test, expect } from './helpers/test.mjs';
 test.setTimeout(120000);
-async function boot(page) {
-  await page.addInitScript(() => {
-    localStorage.setItem(
-      'settlers.prefs',
-      JSON.stringify({ quality: 0.75, reducedMotion: true, weather: false }),
-    );
-    window.requestAnimationFrame = (callback) => {
-      window.__inspectorFrame = callback;
-      return 0;
-    };
-  });
-  await page.goto('/tests/game.html?seed=2024');
-  await expect(page.locator('#boot')).toHaveCount(0, { timeout: 30000 });
-  await page.evaluate(() => window.__inspectorFrame(1000));
-  await page.locator('#startb').press('Enter');
+async function pause(page) {
   await page.locator('#sp0').press('Enter');
-  await page.waitForFunction(() => {
-    const g = window.productionArtPreview.game;
-    g.hudTick();
-    return document.getElementById('spd').textContent === 'PAUSED';
-  });
+  await page.waitForFunction(
+    () => {
+      const g = window.productionArtPreview.game;
+      g.hudTick();
+      return document.getElementById('spd').textContent === 'PAUSED';
+    },
+    null,
+    { polling: 100 },
+  );
 }
 test('inspector shows live stock while preserving native target focus and exact demolition confirmation', async ({
   page,
 }) => {
-  await boot(page);
+  await pause(page);
   await page.evaluate(() => {
     const g = window.productionArtPreview.game;
     const b = g.newBuilding('warehouse', 51, 48);
@@ -72,7 +62,7 @@ test('inspector shows live stock while preserving native target focus and exact 
 test('producer, construction and outpost inspectors expose evidence and retain focused controls', async ({
   page,
 }) => {
-  await boot(page);
+  await pause(page);
   await page.evaluate(() => {
     const g = window.productionArtPreview.game;
     const b = g.newBuilding('bakery', 51, 48);
@@ -184,7 +174,7 @@ test('producer, construction and outpost inspectors expose evidence and retain f
 test('demolition hover presents exact recovery before the deliberate Shift shortcut', async ({
   page,
 }) => {
-  await boot(page);
+  await pause(page);
   const point = await page.evaluate(() => {
     const g = window.productionArtPreview.game;
     const b = g.newBuilding('farm', 51, 48);
@@ -216,7 +206,7 @@ test('demolition hover presents exact recovery before the deliberate Shift short
 test('real producer countdown suspends for a full batch and resumes without losing work or native focus', async ({
   page,
 }) => {
-  await boot(page);
+  await pause(page);
   await page.evaluate(() => {
     const g = window.productionArtPreview.game;
     g.units.length = 0;
@@ -293,7 +283,7 @@ test('real producer countdown suspends for a full batch and resumes without losi
 test('loading a replacement colony discards stale inspector edits and disclosures for reused building IDs', async ({
   page,
 }) => {
-  await boot(page);
+  await pause(page);
   await page.evaluate(() => {
     const g = window.productionArtPreview.game;
     const b = g.newBuilding('warehouse', 51, 48);
@@ -324,7 +314,7 @@ test('loading a replacement colony discards stale inspector edits and disclosure
 test('completion preserves a focused construction priority until focus leaves, then mounts producer controls', async ({
   page,
 }) => {
-  await boot(page);
+  await pause(page);
   await page.evaluate(() => {
     const g = window.productionArtPreview.game;
     const b = g.newBuilding('farm', 51, 48);

@@ -7,21 +7,7 @@ test('real production inspector exposes ten-minute coverage and reconciled colon
 }) => {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.addInitScript(() => {
-    window.requestAnimationFrame = (callback) => {
-      window.__observationFrame = callback;
-      return 0;
-    };
-    localStorage.setItem(
-      'settlers.prefs',
-      JSON.stringify({ quality: 0.75, reducedMotion: true, weather: false }),
-    );
-  });
-  await page.goto('/tests/game.html?seed=2024');
-  await expect(page.locator('#boot')).toHaveCount(0, { timeout: 30000 });
-  await page.waitForFunction(() => window.productionArtPreview?.game);
   await expect(page.locator('html')).toHaveAttribute('data-renderer', 'pixi');
-  await page.getByRole('button', { name: 'SETTLE!', exact: true }).click();
   const evidence = await page.evaluate(() => {
     const game = window.productionArtPreview.game;
     const hq = game.anyStorage();
