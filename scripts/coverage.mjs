@@ -10,8 +10,11 @@ const root = path.resolve(import.meta.dirname, '..');
 const output = path.join(root, 'output/coverage');
 const raw = path.join(output, 'raw');
 const baselineFile = path.join(root, 'tests/coverage-baseline.json');
-// Percentage points a file may lose before the guard fails; absorbs refactor noise.
-const TOLERANCE = 0.5;
+// The guard compares uncovered counts, not percentages: deleting covered code (a
+// redundant guard) shrinks the denominator without losing any coverage, while
+// deleting a test leaves code that ran uncovered. A file may gain this share of
+// its total in uncovered lines or branches, absorbing timing-dependent paths.
+const TOLERANCE = 0.005;
 
 const { values } = parseArgs({
   options: {
@@ -104,9 +107,10 @@ async function measure(environment, add) {
   const measured = {};
   for (const file of results.files) {
     if (measured[file.sourcePath]) throw new Error(`Duplicate coverage for ${file.sourcePath}`);
+    const { lines, branches } = file.summary;
     measured[file.sourcePath] = {
-      lines: file.summary.lines.pct,
-      branches: file.summary.branches.pct,
+      lines: { uncovered: lines.uncovered, total: lines.total },
+      branches: { uncovered: branches.uncovered, total: branches.total },
     };
   }
   return measured;
@@ -143,16 +147,18 @@ if (values.update) {
       const actual = current[file]?.[environment];
       // A removed file has no coverage to lose; its lines leave the denominator with it.
       if (!actual || !expected) continue;
-      for (const metric of ['lines', 'branches'])
-        if (actual[metric] < expected[metric] - TOLERANCE)
+      for (const metric of ['lines', 'branches']) {
+        const allowed = expected[metric].uncovered + Math.ceil(TOLERANCE * actual[metric].total);
+        if (actual[metric].uncovered > allowed)
           failures.push(
-            `${file} ${environment} ${metric}: ${actual[metric]}% < baseline ${expected[metric]}%`,
+            `${file} ${environment}: ${actual[metric].uncovered} uncovered ${metric}, baseline ${expected[metric].uncovered}`,
           );
+      }
     }
   for (const file of Object.keys(current))
     if (!baseline[file]) failures.push(`${file}: not in baseline (run with --update)`);
   if (failures.length) {
     console.error(`Coverage regressed:\n  ${failures.join('\n  ')}`);
     process.exitCode = 1;
-  } else console.log(`Coverage holds against the baseline (${TOLERANCE} pp tolerance).`);
+  } else console.log('Coverage holds: no file leaves more lines or branches uncovered.');
 }

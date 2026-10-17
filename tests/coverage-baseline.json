@@ -1,792 +1,1740 @@
 {
   "src/app.ts": {
     "node": {
-      "lines": 11.11,
-      "branches": 0
+      "lines": {
+        "uncovered": 16,
+        "total": 18
+      },
+      "branches": {
+        "uncovered": 4,
+        "total": 4
+      }
     },
     "browser": {
-      "lines": 85,
-      "branches": 50
+      "lines": {
+        "uncovered": 3,
+        "total": 20
+      },
+      "branches": {
+        "uncovered": 3,
+        "total": 6
+      }
     }
   },
   "src/application/assembly.ts": {
     "node": {
-      "lines": 67.19,
-      "branches": 100
+      "lines": {
+        "uncovered": 21,
+        "total": 64
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 5
+      }
     },
     "browser": {
-      "lines": 98.53,
-      "branches": 44.44
+      "lines": {
+        "uncovered": 1,
+        "total": 68
+      },
+      "branches": {
+        "uncovered": 5,
+        "total": 9
+      }
     }
   },
   "src/application/loop.ts": {
     "node": {
-      "lines": 88.04,
-      "branches": 65.22
+      "lines": {
+        "uncovered": 11,
+        "total": 89
+      },
+      "branches": {
+        "uncovered": 14,
+        "total": 38
+      }
     },
     "browser": {
-      "lines": 92,
-      "branches": 79.22
+      "lines": {
+        "uncovered": 8,
+        "total": 97
+      },
+      "branches": {
+        "uncovered": 13,
+        "total": 62
+      }
     }
   },
   "src/audio/ambience.ts": {
     "node": {
-      "lines": 98.23,
-      "branches": 85.71
+      "lines": {
+        "uncovered": 4,
+        "total": 226
+      },
+      "branches": {
+        "uncovered": 6,
+        "total": 42
+      }
     },
     "browser": {
-      "lines": 64.94,
-      "branches": 47.95
+      "lines": {
+        "uncovered": 86,
+        "total": 231
+      },
+      "branches": {
+        "uncovered": 43,
+        "total": 73
+      }
     }
   },
   "src/audio/audio-runtime.ts": {
     "node": {
-      "lines": "",
-      "branches": ""
+      "lines": {
+        "uncovered": 0,
+        "total": 0
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 0
+      }
     },
     "browser": {
-      "lines": "",
-      "branches": ""
+      "lines": {
+        "uncovered": 0,
+        "total": 0
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 0
+      }
     }
   },
   "src/audio/audio-types.ts": {
     "node": {
-      "lines": "",
-      "branches": ""
+      "lines": {
+        "uncovered": 0,
+        "total": 0
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 0
+      }
     },
     "browser": {
-      "lines": "",
-      "branches": ""
+      "lines": {
+        "uncovered": 0,
+        "total": 0
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 0
+      }
     }
   },
   "src/audio/audio.ts": {
     "node": {
-      "lines": 91.6,
-      "branches": 85.33
+      "lines": {
+        "uncovered": 32,
+        "total": 381
+      },
+      "branches": {
+        "uncovered": 22,
+        "total": 150
+      }
     },
     "browser": {
-      "lines": 85.99,
-      "branches": 63.85
+      "lines": {
+        "uncovered": 60,
+        "total": 414
+      },
+      "branches": {
+        "uncovered": 96,
+        "total": 260
+      }
     }
   },
   "src/audio/bell-options.ts": {
     "node": {
-      "lines": 100,
-      "branches": ""
+      "lines": {
+        "uncovered": 0,
+        "total": 21
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 0
+      }
     },
     "browser": {
-      "lines": 100,
-      "branches": ""
+      "lines": {
+        "uncovered": 0,
+        "total": 21
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 0
+      }
     }
   },
   "src/audio/interface-sounds.ts": {
     "node": {
-      "lines": 100,
-      "branches": ""
+      "lines": {
+        "uncovered": 0,
+        "total": 60
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 0
+      }
     },
     "browser": {
-      "lines": 93.55,
-      "branches": ""
+      "lines": {
+        "uncovered": 4,
+        "total": 62
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 0
+      }
     }
   },
   "src/audio/music.ts": {
     "node": {
-      "lines": 99.43,
-      "branches": 96.77
+      "lines": {
+        "uncovered": 2,
+        "total": 521
+      },
+      "branches": {
+        "uncovered": 4,
+        "total": 124
+      }
     },
     "browser": {
-      "lines": 67.34,
-      "branches": 54.87
+      "lines": {
+        "uncovered": 176,
+        "total": 541
+      },
+      "branches": {
+        "uncovered": 88,
+        "total": 195
+      }
     }
   },
   "src/audio/world-effects.ts": {
     "node": {
-      "lines": 98.68,
-      "branches": 89.71
+      "lines": {
+        "uncovered": 5,
+        "total": 378
+      },
+      "branches": {
+        "uncovered": 7,
+        "total": 63
+      }
     },
     "browser": {
-      "lines": 80.1,
-      "branches": 55.56
+      "lines": {
+        "uncovered": 77,
+        "total": 391
+      },
+      "branches": {
+        "uncovered": 45,
+        "total": 99
+      }
     }
   },
   "src/bootstrap.ts": {
     "node": {
-      "lines": 0,
-      "branches": 0
+      "lines": {
+        "uncovered": 108,
+        "total": 108
+      },
+      "branches": {
+        "uncovered": 20,
+        "total": 20
+      }
     },
     "browser": {
-      "lines": 85.45,
-      "branches": 48.57
+      "lines": {
+        "uncovered": 15,
+        "total": 109
+      },
+      "branches": {
+        "uncovered": 16,
+        "total": 31
+      }
     }
   },
   "src/core/attach.ts": {
     "node": {
-      "lines": 100,
-      "branches": 100
+      "lines": {
+        "uncovered": 0,
+        "total": 7
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 2
+      }
     },
     "browser": {
-      "lines": 85.71,
-      "branches": 50
+      "lines": {
+        "uncovered": 1,
+        "total": 7
+      },
+      "branches": {
+        "uncovered": 2,
+        "total": 4
+      }
     }
   },
   "src/core/events.ts": {
     "node": {
-      "lines": 100,
-      "branches": ""
+      "lines": {
+        "uncovered": 0,
+        "total": 5
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 0
+      }
     },
     "browser": {
-      "lines": 100,
-      "branches": ""
+      "lines": {
+        "uncovered": 0,
+        "total": 10
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 0
+      }
     }
   },
   "src/core/persistence.ts": {
     "node": {
-      "lines": 90.83,
-      "branches": 81.69
+      "lines": {
+        "uncovered": 42,
+        "total": 458
+      },
+      "branches": {
+        "uncovered": 26,
+        "total": 142
+      }
     },
     "browser": {
-      "lines": 84.99,
-      "branches": 48.26
+      "lines": {
+        "uncovered": 80,
+        "total": 533
+      },
+      "branches": {
+        "uncovered": 104,
+        "total": 201
+      }
     }
   },
   "src/core/save-catalog.ts": {
     "node": {
-      "lines": 91.03,
-      "branches": 83.72
+      "lines": {
+        "uncovered": 14,
+        "total": 156
+      },
+      "branches": {
+        "uncovered": 14,
+        "total": 86
+      }
     },
     "browser": {
-      "lines": 79.41,
-      "branches": 56.82
+      "lines": {
+        "uncovered": 35,
+        "total": 170
+      },
+      "branches": {
+        "uncovered": 57,
+        "total": 132
+      }
     }
   },
   "src/core/save-codec.ts": {
     "node": {
-      "lines": 93.58,
-      "branches": 90.11
+      "lines": {
+        "uncovered": 7,
+        "total": 109
+      },
+      "branches": {
+        "uncovered": 9,
+        "total": 91
+      }
     },
     "browser": {
-      "lines": 88.03,
-      "branches": 62
+      "lines": {
+        "uncovered": 14,
+        "total": 117
+      },
+      "branches": {
+        "uncovered": 57,
+        "total": 150
+      }
     }
   },
   "src/core/state.ts": {
     "node": {
-      "lines": 90.46,
-      "branches": 87.73
+      "lines": {
+        "uncovered": 60,
+        "total": 629
+      },
+      "branches": {
+        "uncovered": 68,
+        "total": 554
+      }
     },
     "browser": {
-      "lines": 80.21,
-      "branches": 58.52
+      "lines": {
+        "uncovered": 129,
+        "total": 652
+      },
+      "branches": {
+        "uncovered": 365,
+        "total": 880
+      }
     }
   },
   "src/core/world.ts": {
     "node": {
-      "lines": 100,
-      "branches": 100
+      "lines": {
+        "uncovered": 0,
+        "total": 136
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 9
+      }
     },
     "browser": {
-      "lines": 99.37,
-      "branches": 93.33
+      "lines": {
+        "uncovered": 1,
+        "total": 159
+      },
+      "branches": {
+        "uncovered": 1,
+        "total": 15
+      }
     }
   },
   "src/gameplay/advisor.ts": {
     "node": {
-      "lines": 96.77,
-      "branches": 95.81
+      "lines": {
+        "uncovered": 9,
+        "total": 279
+      },
+      "branches": {
+        "uncovered": 9,
+        "total": 215
+      }
     },
     "browser": {
-      "lines": 80.57,
-      "branches": 61.31
+      "lines": {
+        "uncovered": 61,
+        "total": 314
+      },
+      "branches": {
+        "uncovered": 118,
+        "total": 305
+      }
     }
   },
   "src/gameplay/colony-rules.ts": {
     "node": {
-      "lines": 98.67,
-      "branches": 97.37
+      "lines": {
+        "uncovered": 1,
+        "total": 75
+      },
+      "branches": {
+        "uncovered": 1,
+        "total": 38
+      }
     },
     "browser": {
-      "lines": 97.87,
-      "branches": 80.7
+      "lines": {
+        "uncovered": 2,
+        "total": 94
+      },
+      "branches": {
+        "uncovered": 11,
+        "total": 57
+      }
     }
   },
   "src/gameplay/production-rules.ts": {
     "node": {
-      "lines": 94.83,
-      "branches": 92.31
+      "lines": {
+        "uncovered": 3,
+        "total": 58
+      },
+      "branches": {
+        "uncovered": 3,
+        "total": 39
+      }
     },
     "browser": {
-      "lines": 95,
-      "branches": 70.18
+      "lines": {
+        "uncovered": 3,
+        "total": 60
+      },
+      "branches": {
+        "uncovered": 17,
+        "total": 57
+      }
     }
   },
   "src/gameplay/progression.ts": {
     "node": {
-      "lines": 96.74,
-      "branches": 87.5
+      "lines": {
+        "uncovered": 6,
+        "total": 184
+      },
+      "branches": {
+        "uncovered": 7,
+        "total": 56
+      }
     },
     "browser": {
-      "lines": 91.74,
-      "branches": 56.98
+      "lines": {
+        "uncovered": 19,
+        "total": 230
+      },
+      "branches": {
+        "uncovered": 37,
+        "total": 86
+      }
     }
   },
   "src/main.ts": {
     "node": {
-      "lines": 0,
-      "branches": ""
+      "lines": {
+        "uncovered": 2,
+        "total": 2
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 0
+      }
     },
     "browser": {
-      "lines": 100,
-      "branches": ""
+      "lines": {
+        "uncovered": 0,
+        "total": 2
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 0
+      }
     }
   },
   "src/observations/attention.ts": {
     "node": {
-      "lines": 95.39,
-      "branches": 90.76
+      "lines": {
+        "uncovered": 17,
+        "total": 369
+      },
+      "branches": {
+        "uncovered": 11,
+        "total": 119
+      }
     },
     "browser": {
-      "lines": 85.31,
-      "branches": 50
+      "lines": {
+        "uncovered": 63,
+        "total": 429
+      },
+      "branches": {
+        "uncovered": 100,
+        "total": 200
+      }
     }
   },
   "src/observations/production-condition.ts": {
     "node": {
-      "lines": 100,
-      "branches": 100
+      "lines": {
+        "uncovered": 0,
+        "total": 18
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 22
+      }
     },
     "browser": {
-      "lines": 91.3,
-      "branches": 48.72
+      "lines": {
+        "uncovered": 2,
+        "total": 23
+      },
+      "branches": {
+        "uncovered": 20,
+        "total": 39
+      }
     }
   },
   "src/observations/validate-attention.ts": {
     "node": {
-      "lines": 99.19,
-      "branches": 98.73
+      "lines": {
+        "uncovered": 1,
+        "total": 124
+      },
+      "branches": {
+        "uncovered": 1,
+        "total": 79
+      }
     },
     "browser": {
-      "lines": 93.85,
-      "branches": 61.7
+      "lines": {
+        "uncovered": 8,
+        "total": 130
+      },
+      "branches": {
+        "uncovered": 54,
+        "total": 141
+      }
     }
   },
   "src/rendering/art.ts": {
     "node": {
-      "lines": 0.18,
-      "branches": 0
+      "lines": {
+        "uncovered": 551,
+        "total": 552
+      },
+      "branches": {
+        "uncovered": 89,
+        "total": 89
+      }
     },
     "browser": {
-      "lines": 99.64,
-      "branches": 96.77
+      "lines": {
+        "uncovered": 2,
+        "total": 560
+      },
+      "branches": {
+        "uncovered": 4,
+        "total": 124
+      }
     }
   },
   "src/rendering/canvas-context.ts": {
     "node": {
-      "lines": 100,
-      "branches": 100
+      "lines": {
+        "uncovered": 0,
+        "total": 19
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 2
+      }
     },
     "browser": {
-      "lines": 63.16,
-      "branches": 50
+      "lines": {
+        "uncovered": 7,
+        "total": 19
+      },
+      "branches": {
+        "uncovered": 2,
+        "total": 4
+      }
     }
   },
   "src/rendering/landscape.ts": {
     "node": {
-      "lines": 86.88,
-      "branches": 74.55
+      "lines": {
+        "uncovered": 87,
+        "total": 663
+      },
+      "branches": {
+        "uncovered": 71,
+        "total": 279
+      }
     },
     "browser": {
-      "lines": 98.29,
-      "branches": 88.03
+      "lines": {
+        "uncovered": 12,
+        "total": 700
+      },
+      "branches": {
+        "uncovered": 51,
+        "total": 426
+      }
     }
   },
   "src/rendering/painted-assets.ts": {
     "node": {
-      "lines": 14.68,
-      "branches": 4.05
+      "lines": {
+        "uncovered": 215,
+        "total": 252
+      },
+      "branches": {
+        "uncovered": 71,
+        "total": 74
+      }
     },
     "browser": {
-      "lines": 91.88,
-      "branches": 72.64
+      "lines": {
+        "uncovered": 22,
+        "total": 271
+      },
+      "branches": {
+        "uncovered": 29,
+        "total": 106
+      }
     }
   },
   "src/rendering/pixi-atmosphere.ts": {
     "node": {
-      "lines": 40.4,
-      "branches": 0
+      "lines": {
+        "uncovered": 90,
+        "total": 151
+      },
+      "branches": {
+        "uncovered": 21,
+        "total": 21
+      }
     },
     "browser": {
-      "lines": 100,
-      "branches": 100
+      "lines": {
+        "uncovered": 0,
+        "total": 153
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 23
+      }
     }
   },
   "src/rendering/pixi-renderer.ts": {
     "node": {
-      "lines": 2.61,
-      "branches": 0
+      "lines": {
+        "uncovered": 523,
+        "total": 537
+      },
+      "branches": {
+        "uncovered": 168,
+        "total": 168
+      }
     },
     "browser": {
-      "lines": 94.43,
-      "branches": 80
+      "lines": {
+        "uncovered": 32,
+        "total": 575
+      },
+      "branches": {
+        "uncovered": 54,
+        "total": 270
+      }
     }
   },
   "src/rendering/pixi-shadows.ts": {
     "node": {
-      "lines": 44.44,
-      "branches": ""
+      "lines": {
+        "uncovered": 30,
+        "total": 54
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 0
+      }
     },
     "browser": {
-      "lines": 100,
-      "branches": ""
+      "lines": {
+        "uncovered": 0,
+        "total": 54
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 0
+      }
     }
   },
   "src/rendering/renderer.ts": {
     "node": {
-      "lines": 52.32,
-      "branches": 47.33
+      "lines": {
+        "uncovered": 1316,
+        "total": 2772
+      },
+      "branches": {
+        "uncovered": 565,
+        "total": 1078
+      }
     },
     "browser": {
-      "lines": 85.64,
-      "branches": 65.42
+      "lines": {
+        "uncovered": 408,
+        "total": 2952
+      },
+      "branches": {
+        "uncovered": 556,
+        "total": 1622
+      }
     }
   },
   "src/rendering/scene.ts": {
     "node": {
-      "lines": 20,
-      "branches": 7.14
+      "lines": {
+        "uncovered": 44,
+        "total": 55
+      },
+      "branches": {
+        "uncovered": 13,
+        "total": 14
+      }
     },
     "browser": {
-      "lines": 99.19,
-      "branches": 54.17
+      "lines": {
+        "uncovered": 1,
+        "total": 123
+      },
+      "branches": {
+        "uncovered": 11,
+        "total": 24
+      }
     }
   },
   "src/rendering/shadow-cache.ts": {
     "node": {
-      "lines": 91.71,
-      "branches": 83.87
+      "lines": {
+        "uncovered": 16,
+        "total": 193
+      },
+      "branches": {
+        "uncovered": 5,
+        "total": 31
+      }
     },
     "browser": {
-      "lines": 97.45,
-      "branches": 86.27
+      "lines": {
+        "uncovered": 5,
+        "total": 196
+      },
+      "branches": {
+        "uncovered": 7,
+        "total": 51
+      }
     }
   },
   "src/rendering/village.ts": {
     "node": {
-      "lines": 91.45,
-      "branches": 81.3
+      "lines": {
+        "uncovered": 59,
+        "total": 689
+      },
+      "branches": {
+        "uncovered": 49,
+        "total": 262
+      }
     },
     "browser": {
-      "lines": 90.95,
-      "branches": 70.63
+      "lines": {
+        "uncovered": 64,
+        "total": 716
+      },
+      "branches": {
+        "uncovered": 111,
+        "total": 378
+      }
     }
   },
   "src/runtime.ts": {
     "node": {
-      "lines": 100,
-      "branches": ""
+      "lines": {
+        "uncovered": 0,
+        "total": 1
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 0
+      }
     },
     "browser": {
-      "lines": 0,
-      "branches": ""
+      "lines": {
+        "uncovered": 1,
+        "total": 1
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 0
+      }
     }
   },
   "src/simulation/assembly.ts": {
     "node": {
-      "lines": 100,
-      "branches": 100
+      "lines": {
+        "uncovered": 0,
+        "total": 58
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 2
+      }
     },
     "browser": {
-      "lines": 98.81,
-      "branches": 50
+      "lines": {
+        "uncovered": 1,
+        "total": 83
+      },
+      "branches": {
+        "uncovered": 1,
+        "total": 2
+      }
     }
   },
   "src/simulation/autoplay.ts": {
     "node": {
-      "lines": 92.12,
-      "branches": 90.43
+      "lines": {
+        "uncovered": 42,
+        "total": 532
+      },
+      "branches": {
+        "uncovered": 36,
+        "total": 376
+      }
     },
     "browser": {
-      "lines": 26.85,
-      "branches": 10.59
+      "lines": {
+        "uncovered": 424,
+        "total": 579
+      },
+      "branches": {
+        "uncovered": 532,
+        "total": 595
+      }
     }
   },
   "src/simulation/delivery-stage.ts": {
     "node": {
-      "lines": 100,
-      "branches": 100
+      "lines": {
+        "uncovered": 0,
+        "total": 12
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 6
+      }
     },
     "browser": {
-      "lines": 100,
-      "branches": 50
+      "lines": {
+        "uncovered": 0,
+        "total": 14
+      },
+      "branches": {
+        "uncovered": 6,
+        "total": 12
+      }
     }
   },
   "src/simulation/economy.ts": {
     "node": {
-      "lines": 89.78,
-      "branches": 86.46
+      "lines": {
+        "uncovered": 190,
+        "total": 2049
+      },
+      "branches": {
+        "uncovered": 166,
+        "total": 1299
+      }
     },
     "browser": {
-      "lines": 81.4,
-      "branches": 53.2
+      "lines": {
+        "uncovered": 400,
+        "total": 2242
+      },
+      "branches": {
+        "uncovered": 876,
+        "total": 1894
+      }
     }
   },
   "src/simulation/engine.ts": {
     "node": {
-      "lines": 100,
-      "branches": ""
+      "lines": {
+        "uncovered": 0,
+        "total": 4
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 0
+      }
     },
     "browser": {
-      "lines": 0,
-      "branches": ""
+      "lines": {
+        "uncovered": 4,
+        "total": 4
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 0
+      }
     }
   },
   "src/simulation/map.ts": {
     "node": {
-      "lines": 74.48,
-      "branches": 71.11
+      "lines": {
+        "uncovered": 99,
+        "total": 388
+      },
+      "branches": {
+        "uncovered": 52,
+        "total": 180
+      }
     },
     "browser": {
-      "lines": 68.36,
-      "branches": 57.65
+      "lines": {
+        "uncovered": 137,
+        "total": 433
+      },
+      "branches": {
+        "uncovered": 119,
+        "total": 281
+      }
     }
   },
   "src/simulation/navigation.ts": {
     "node": {
-      "lines": 97.02,
-      "branches": 97.18
+      "lines": {
+        "uncovered": 5,
+        "total": 168
+      },
+      "branches": {
+        "uncovered": 2,
+        "total": 71
+      }
     },
     "browser": {
-      "lines": 95.56,
-      "branches": 62.5
+      "lines": {
+        "uncovered": 8,
+        "total": 180
+      },
+      "branches": {
+        "uncovered": 45,
+        "total": 120
+      }
     }
   },
   "src/simulation/observations.ts": {
     "node": {
-      "lines": 94.76,
-      "branches": 87.01
+      "lines": {
+        "uncovered": 10,
+        "total": 191
+      },
+      "branches": {
+        "uncovered": 10,
+        "total": 77
+      }
     },
     "browser": {
-      "lines": 96.35,
-      "branches": 71.93
+      "lines": {
+        "uncovered": 8,
+        "total": 219
+      },
+      "branches": {
+        "uncovered": 32,
+        "total": 114
+      }
     }
   },
   "src/simulation/roads.ts": {
     "node": {
-      "lines": 100,
-      "branches": 100
+      "lines": {
+        "uncovered": 0,
+        "total": 70
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 30
+      }
     },
     "browser": {
-      "lines": 96.84,
-      "branches": 52
+      "lines": {
+        "uncovered": 3,
+        "total": 95
+      },
+      "branches": {
+        "uncovered": 24,
+        "total": 50
+      }
     }
   },
   "src/simulation/startup.ts": {
     "node": {
-      "lines": 100,
-      "branches": 100
+      "lines": {
+        "uncovered": 0,
+        "total": 57
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 6
+      }
     },
     "browser": {
-      "lines": 98.9,
-      "branches": 75
+      "lines": {
+        "uncovered": 1,
+        "total": 91
+      },
+      "branches": {
+        "uncovered": 2,
+        "total": 8
+      }
     }
   },
   "src/simulation/state.ts": {
     "node": {
-      "lines": 100,
-      "branches": ""
+      "lines": {
+        "uncovered": 0,
+        "total": 280
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 0
+      }
     },
     "browser": {
-      "lines": 100,
-      "branches": ""
+      "lines": {
+        "uncovered": 0,
+        "total": 305
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 0
+      }
     }
   },
   "src/simulation/transport.ts": {
     "node": {
-      "lines": 96.34,
-      "branches": 92.31
+      "lines": {
+        "uncovered": 3,
+        "total": 82
+      },
+      "branches": {
+        "uncovered": 3,
+        "total": 39
+      }
     },
     "browser": {
-      "lines": 96.92,
-      "branches": 74.51
+      "lines": {
+        "uncovered": 4,
+        "total": 130
+      },
+      "branches": {
+        "uncovered": 13,
+        "total": 51
+      }
     }
   },
   "src/types.ts": {
     "node": {
-      "lines": "",
-      "branches": ""
+      "lines": {
+        "uncovered": 0,
+        "total": 0
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 0
+      }
     },
     "browser": {
-      "lines": "",
-      "branches": ""
+      "lines": {
+        "uncovered": 0,
+        "total": 0
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 0
+      }
     }
   },
   "src/ui/attention-view.ts": {
     "node": {
-      "lines": 2.1,
-      "branches": 0
+      "lines": {
+        "uncovered": 223,
+        "total": 228
+      },
+      "branches": {
+        "uncovered": 156,
+        "total": 156
+      }
     },
     "browser": {
-      "lines": 89.8,
-      "branches": 66.53
+      "lines": {
+        "uncovered": 25,
+        "total": 235
+      },
+      "branches": {
+        "uncovered": 75,
+        "total": 226
+      }
     }
   },
   "src/ui/catalog-view.ts": {
     "node": {
-      "lines": 71.15,
-      "branches": 57.27
+      "lines": {
+        "uncovered": 88,
+        "total": 304
+      },
+      "branches": {
+        "uncovered": 45,
+        "total": 106
+      }
     },
     "browser": {
-      "lines": 91.08,
-      "branches": 78.92
+      "lines": {
+        "uncovered": 28,
+        "total": 313
+      },
+      "branches": {
+        "uncovered": 33,
+        "total": 158
+      }
     }
   },
   "src/ui/dom.ts": {
     "node": {
-      "lines": 99.54,
-      "branches": 75
+      "lines": {
+        "uncovered": 1,
+        "total": 217
+      },
+      "branches": {
+        "uncovered": 1,
+        "total": 4
+      }
     },
     "browser": {
-      "lines": 99.08,
-      "branches": 66.67
+      "lines": {
+        "uncovered": 2,
+        "total": 217
+      },
+      "branches": {
+        "uncovered": 2,
+        "total": 6
+      }
     }
   },
   "src/ui/domain-feedback.ts": {
     "node": {
-      "lines": 87.16,
-      "branches": 74.29
+      "lines": {
+        "uncovered": 19,
+        "total": 148
+      },
+      "branches": {
+        "uncovered": 9,
+        "total": 35
+      }
     },
     "browser": {
-      "lines": 64.24,
-      "branches": 30.19
+      "lines": {
+        "uncovered": 54,
+        "total": 151
+      },
+      "branches": {
+        "uncovered": 37,
+        "total": 53
+      }
     }
   },
   "src/ui/economic-feedback.ts": {
     "node": {
-      "lines": 96.74,
-      "branches": 94.66
+      "lines": {
+        "uncovered": 7,
+        "total": 215
+      },
+      "branches": {
+        "uncovered": 7,
+        "total": 131
+      }
     },
     "browser": {
-      "lines": 87.25,
-      "branches": 58.99
+      "lines": {
+        "uncovered": 32,
+        "total": 251
+      },
+      "branches": {
+        "uncovered": 89,
+        "total": 217
+      }
     }
   },
   "src/ui/economic-notices.ts": {
     "node": {
-      "lines": 95.24,
-      "branches": 100
+      "lines": {
+        "uncovered": 3,
+        "total": 63
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 19
+      }
     },
     "browser": {
-      "lines": 94.74,
-      "branches": 88.46
+      "lines": {
+        "uncovered": 4,
+        "total": 76
+      },
+      "branches": {
+        "uncovered": 3,
+        "total": 26
+      }
     }
   },
   "src/ui/economy-view.ts": {
     "node": {
-      "lines": 32.85,
-      "branches": 11.92
+      "lines": {
+        "uncovered": 185,
+        "total": 274
+      },
+      "branches": {
+        "uncovered": 132,
+        "total": 147
+      }
     },
     "browser": {
-      "lines": 95.86,
-      "branches": 70.53
+      "lines": {
+        "uncovered": 12,
+        "total": 287
+      },
+      "branches": {
+        "uncovered": 55,
+        "total": 186
+      }
     }
   },
   "src/ui/hud.ts": {
     "node": {
-      "lines": 49.4,
-      "branches": 50.98
+      "lines": {
+        "uncovered": 629,
+        "total": 1227
+      },
+      "branches": {
+        "uncovered": 299,
+        "total": 596
+      }
     },
     "browser": {
-      "lines": 86.6,
-      "branches": 69.17
+      "lines": {
+        "uncovered": 163,
+        "total": 1285
+      },
+      "branches": {
+        "uncovered": 289,
+        "total": 930
+      }
     }
   },
   "src/ui/inspector-view.ts": {
     "node": {
-      "lines": 64.54,
-      "branches": 64.82
+      "lines": {
+        "uncovered": 163,
+        "total": 454
+      },
+      "branches": {
+        "uncovered": 124,
+        "total": 355
+      }
     },
     "browser": {
-      "lines": 87.5,
-      "branches": 63.01
+      "lines": {
+        "uncovered": 51,
+        "total": 458
+      },
+      "branches": {
+        "uncovered": 179,
+        "total": 480
+      }
     }
   },
   "src/ui/interaction.ts": {
     "node": {
-      "lines": 88.94,
-      "branches": 94.12
+      "lines": {
+        "uncovered": 22,
+        "total": 199
+      },
+      "branches": {
+        "uncovered": 2,
+        "total": 34
+      }
     },
     "browser": {
-      "lines": 97.44,
-      "branches": 55.17
+      "lines": {
+        "uncovered": 6,
+        "total": 234
+      },
+      "branches": {
+        "uncovered": 26,
+        "total": 58
+      }
     }
   },
   "src/ui/live-report.ts": {
     "node": {
-      "lines": 39.13,
-      "branches": 29.03
+      "lines": {
+        "uncovered": 28,
+        "total": 46
+      },
+      "branches": {
+        "uncovered": 22,
+        "total": 31
+      }
     },
     "browser": {
-      "lines": 96.15,
-      "branches": 68.63
+      "lines": {
+        "uncovered": 2,
+        "total": 52
+      },
+      "branches": {
+        "uncovered": 16,
+        "total": 51
+      }
     }
   },
   "src/ui/logistics-view.ts": {
     "node": {
-      "lines": 28.28,
-      "branches": 4.44
+      "lines": {
+        "uncovered": 174,
+        "total": 240
+      },
+      "branches": {
+        "uncovered": 128,
+        "total": 131
+      }
     },
     "browser": {
-      "lines": 92.83,
-      "branches": 60.33
+      "lines": {
+        "uncovered": 18,
+        "total": 247
+      },
+      "branches": {
+        "uncovered": 72,
+        "total": 180
+      }
     }
   },
   "src/ui/map-controls.ts": {
     "node": {
-      "lines": 30.99,
-      "branches": 20
+      "lines": {
+        "uncovered": 47,
+        "total": 68
+      },
+      "branches": {
+        "uncovered": 21,
+        "total": 24
+      }
     },
     "browser": {
-      "lines": 95.95,
-      "branches": 81.82
+      "lines": {
+        "uncovered": 1,
+        "total": 71
+      },
+      "branches": {
+        "uncovered": 5,
+        "total": 36
+      }
     }
   },
   "src/ui/markup.ts": {
     "node": {
-      "lines": 89.47,
-      "branches": 85.11
+      "lines": {
+        "uncovered": 6,
+        "total": 57
+      },
+      "branches": {
+        "uncovered": 7,
+        "total": 47
+      }
     },
     "browser": {
-      "lines": 94.29,
-      "branches": 82.61
+      "lines": {
+        "uncovered": 4,
+        "total": 70
+      },
+      "branches": {
+        "uncovered": 12,
+        "total": 69
+      }
     }
   },
   "src/ui/messages.ts": {
     "node": {
-      "lines": 91.67,
-      "branches": 100
+      "lines": {
+        "uncovered": 3,
+        "total": 36
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 13
+      }
     },
     "browser": {
-      "lines": 93.33,
-      "branches": 85.71
+      "lines": {
+        "uncovered": 3,
+        "total": 45
+      },
+      "branches": {
+        "uncovered": 3,
+        "total": 21
+      }
     }
   },
   "src/ui/placement-feedback.ts": {
     "node": {
-      "lines": 37.04,
-      "branches": 16.67
+      "lines": {
+        "uncovered": 32,
+        "total": 52
+      },
+      "branches": {
+        "uncovered": 22,
+        "total": 26
+      }
     },
     "browser": {
-      "lines": 88.14,
-      "branches": 54.76
+      "lines": {
+        "uncovered": 5,
+        "total": 57
+      },
+      "branches": {
+        "uncovered": 14,
+        "total": 34
+      }
     }
   },
   "src/ui/progression-view.ts": {
     "node": {
-      "lines": 67.5,
-      "branches": 54.05
+      "lines": {
+        "uncovered": 78,
+        "total": 234
+      },
+      "branches": {
+        "uncovered": 48,
+        "total": 103
+      }
     },
     "browser": {
-      "lines": 93.98,
-      "branches": 80
+      "lines": {
+        "uncovered": 15,
+        "total": 243
+      },
+      "branches": {
+        "uncovered": 26,
+        "total": 136
+      }
     }
   },
   "src/ui/recovery-view.ts": {
     "node": {
-      "lines": 42.22,
-      "branches": 0
+      "lines": {
+        "uncovered": 26,
+        "total": 45
+      },
+      "branches": {
+        "uncovered": 2,
+        "total": 2
+      }
     },
     "browser": {
-      "lines": 81.63,
-      "branches": 0
+      "lines": {
+        "uncovered": 9,
+        "total": 49
+      },
+      "branches": {
+        "uncovered": 2,
+        "total": 2
+      }
     }
   },
   "src/ui/reference-view.ts": {
     "node": {
-      "lines": 72.81,
-      "branches": 59.35
+      "lines": {
+        "uncovered": 62,
+        "total": 228
+      },
+      "branches": {
+        "uncovered": 50,
+        "total": 123
+      }
     },
     "browser": {
-      "lines": 96.68,
-      "branches": 70.83
+      "lines": {
+        "uncovered": 8,
+        "total": 241
+      },
+      "branches": {
+        "uncovered": 49,
+        "total": 168
+      }
     }
   },
   "src/ui/report-navigation.ts": {
     "node": {
-      "lines": 0,
-      "branches": 0
+      "lines": {
+        "uncovered": 7,
+        "total": 7
+      },
+      "branches": {
+        "uncovered": 4,
+        "total": 4
+      }
     },
     "browser": {
-      "lines": 80,
-      "branches": 40
+      "lines": {
+        "uncovered": 2,
+        "total": 7
+      },
+      "branches": {
+        "uncovered": 4,
+        "total": 6
+      }
     }
   },
   "src/ui/report-windows.ts": {
     "node": {
-      "lines": 8.58,
-      "branches": 6.25
+      "lines": {
+        "uncovered": 209,
+        "total": 229
+      },
+      "branches": {
+        "uncovered": 80,
+        "total": 86
+      }
     },
     "browser": {
-      "lines": 94.96,
-      "branches": 67.32
+      "lines": {
+        "uncovered": 12,
+        "total": 254
+      },
+      "branches": {
+        "uncovered": 45,
+        "total": 139
+      }
     }
   },
   "src/ui/resource-icons.ts": {
     "node": {
-      "lines": 100,
-      "branches": ""
+      "lines": {
+        "uncovered": 0,
+        "total": 45
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 0
+      }
     },
     "browser": {
-      "lines": 100,
-      "branches": ""
+      "lines": {
+        "uncovered": 0,
+        "total": 46
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 0
+      }
     }
   },
   "src/ui/save-view.ts": {
     "node": {
-      "lines": 0.71,
-      "branches": 0
+      "lines": {
+        "uncovered": 279,
+        "total": 281
+      },
+      "branches": {
+        "uncovered": 68,
+        "total": 68
+      }
     },
     "browser": {
-      "lines": 87.93,
-      "branches": 57.66
+      "lines": {
+        "uncovered": 35,
+        "total": 288
+      },
+      "branches": {
+        "uncovered": 44,
+        "total": 101
+      }
     }
   },
   "src/ui/session-view.ts": {
     "node": {
-      "lines": 36.56,
-      "branches": 32.65
+      "lines": {
+        "uncovered": 144,
+        "total": 225
+      },
+      "branches": {
+        "uncovered": 32,
+        "total": 47
+      }
     },
     "browser": {
-      "lines": 88.75,
-      "branches": 63.77
+      "lines": {
+        "uncovered": 27,
+        "total": 236
+      },
+      "branches": {
+        "uncovered": 22,
+        "total": 65
+      }
     }
   },
   "src/ui/transient-help.ts": {
     "node": {
-      "lines": 30.19,
-      "branches": 8.47
+      "lines": {
+        "uncovered": 111,
+        "total": 159
+      },
+      "branches": {
+        "uncovered": 54,
+        "total": 59
+      }
     },
     "browser": {
-      "lines": 88.82,
-      "branches": 63.27
+      "lines": {
+        "uncovered": 19,
+        "total": 170
+      },
+      "branches": {
+        "uncovered": 36,
+        "total": 98
+      }
     }
   },
   "src/ui/utility-art.ts": {
     "node": {
-      "lines": 11.11,
-      "branches": 0
+      "lines": {
+        "uncovered": 8,
+        "total": 9
+      },
+      "branches": {
+        "uncovered": 2,
+        "total": 2
+      }
     },
     "browser": {
-      "lines": 90.91,
-      "branches": 75
+      "lines": {
+        "uncovered": 1,
+        "total": 11
+      },
+      "branches": {
+        "uncovered": 1,
+        "total": 4
+      }
     }
   },
   "src/ui/workspace.ts": {
     "node": {
-      "lines": 71.1,
-      "branches": 52.15
+      "lines": {
+        "uncovered": 99,
+        "total": 339
+      },
+      "branches": {
+        "uncovered": 81,
+        "total": 168
+      }
     },
     "browser": {
-      "lines": 87.53,
-      "branches": 60.69
+      "lines": {
+        "uncovered": 46,
+        "total": 370
+      },
+      "branches": {
+        "uncovered": 105,
+        "total": 261
+      }
     }
   }
 }
