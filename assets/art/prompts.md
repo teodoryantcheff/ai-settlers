@@ -2,7 +2,7 @@ Generated with the built-in image generation tool, using `assets/art/reference/g
 
 ## expanded economy buildings
 
-Generated on 2026-10-14 with the built-in image generation tool, one transparent image per building. `buildings.png` is the style reference. Original generated RGBA files are preserved unchanged at `windmill.png`, `bakery.png`, `pigfarm.png`, `butcher.png`, `well.png`, `brewery.png`, `smelter.png`, and `workshop.png`. Manifest regions cover original dimensions; runtime trimming and uniform fitting preserve cached canvas dimensions and single-tile gameplay anchors. The pack validates every building before atomic installation.
+Generated on 2026-10-14 with the built-in image generation tool, one transparent image per building. `buildings.png` is the style reference. Original generated RGBA files are preserved unchanged at `windmill.png`, `bakery.png`, `pigfarm.png`, `butcher.png`, `well.png`, `brewery.png`, `smelter.png`, and `workshop.png`. Manifest regions cover original dimensions; their `crop` rectangles, written by `npm run crop:art`, trim transparent padding, and uniform fitting preserves cached canvas dimensions and single-tile gameplay anchors. The pack validates every building before atomic installation.
 
 Exact generation prompts:
 

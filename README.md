@@ -32,7 +32,7 @@ Edit TypeScript in `src/` and the interface in `index.html`, then rebuild. `src/
 - `src/ui/` and `src/audio/` — controls, HUD, preferences, music and sound.
 - `src/dev/` — scenarios included only in the development bundle.
 
-The world uses native GPU sprites, graphics and text. Offscreen Canvas prepares cached artwork and terrain; Canvas also draws the minimap. WebGL is required for play. The painted pack and its crop manifest live in `assets/art/`; generation provenance is recorded in [prompts.md](assets/art/prompts.md).
+The world uses native GPU sprites, graphics and text. Offscreen Canvas prepares cached artwork and terrain; Canvas also draws the minimap. WebGL is required for play. The painted pack and its crop manifest live in `assets/art/`; generation provenance is recorded in [prompts.md](assets/art/prompts.md). After changing a sheet or an authored region, run `npm run crop:art` to rewrite each region's trimmed `crop` in the manifest; it fails on art that leaves its sheet, has no visible pixels or lacks a transparent background, and a browser test rejects stale crops.
 
 [SPEC.md](SPEC.md) documents current mechanics and architecture. [AGENTS.md](AGENTS.md) provides contributor guidance. Track bugs, plans and implementation work in [GitHub Issues](https://github.com/teodoryantcheff/ai-settlers/issues), using the [tracker conventions](docs/agents/issue-tracker.md). The current map/window presentation follows [ADR-0004](docs/adr/0004-full-map-and-game-windows.md), with an [acceptance record](docs/game-first-ui-acceptance.md). The [earlier redesign specification](docs/ui-redesign-spec.md) preserves the historical accounting, observation and session contract.
 

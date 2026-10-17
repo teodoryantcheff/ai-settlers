@@ -29,8 +29,9 @@ const types = [
   'guard',
 ];
 function manifest() {
-  const region = { sheet: 'sprites', x: 0, y: 0, w: 64, h: 64 };
-  const mountain = { sheet: 'mountains', x: 0, y: 0, w: 64, h: 64 };
+  const crop = { x: 8, y: 4, w: 40, h: 56 };
+  const region = { sheet: 'sprites', x: 0, y: 0, w: 64, h: 64, crop };
+  const mountain = { sheet: 'mountains', x: 0, y: 0, w: 64, h: 64, crop };
   return {
     version: 1,
     sheets: { sprites: 'sprites.png', meadow: 'meadow.png', mountains: 'mountains.png' },
@@ -49,16 +50,15 @@ function manifest() {
 function harness(pack = manifest()) {
   const requests = [];
   const warnings = [];
+  const draws = [];
   class Canvas {
     width = 1;
     height = 1;
     getContext() {
       return {
-        drawImage() {},
+        drawImage: (source, ...args) => draws.push({ source, args }),
         getImageData: () => {
-          const data = new Uint8ClampedArray(this.width * this.height * 4);
-          data[((this.height >> 1) * this.width + (this.width >> 1)) * 4 + 3] = 255;
-          return { data };
+          throw new Error('Artwork installation must not read pixels.');
         },
       };
     }
@@ -98,7 +98,7 @@ function harness(pack = manifest()) {
     staticDirty: false,
     reportGraphicsFailure: (reason) => failures.push(reason),
   };
-  return { ...painted, game, requests, warnings, failures };
+  return { ...painted, game, requests, warnings, failures, draws, Image };
 }
 
 test('painted manifests reject missing building art and invalid pixel crops', () => {
@@ -123,6 +123,21 @@ test('painted manifests reject missing building art and invalid pixel crops', ()
   const outside = manifest();
   outside.buildings.hq.x = 0.9;
   assert.throws(() => api.validatePaintedManifest(outside), /hq/);
+  const uncropped = manifest();
+  delete uncropped.site.crop;
+  assert.throws(() => api.validatePaintedManifest(uncropped), /construction site/);
+  const spilling = manifest();
+  spilling.trees[2] = { ...spilling.trees[2], crop: { x: 30, y: 4, w: 40, h: 56 } };
+  assert.throws(() => api.validatePaintedManifest(spilling), /tree 2/);
+});
+
+test('installation draws each precomputed crop straight from its sheet', async () => {
+  const api = harness();
+  await api.loadPaintedAssets(api.game);
+  const fromSheets = api.draws.filter((draw) => draw.source instanceof api.Image);
+  // 22 buildings, the site, three trees, two rocks and six mountains.
+  assert.equal(fromSheets.length, 34);
+  for (const { args } of fromSheets) assert.deepEqual(args, [8, 4, 40, 56, 0, 0, 40, 56]);
 });
 
 test('uniform painted fitting keeps proportions and scales trees around their root', () => {
@@ -236,7 +251,11 @@ test('painted mountains require complete valid dry, snowy, and foothill crops', 
 
 test('an out-of-sheet mountain crop leaves the atlas untouched', async () => {
   const invalid = manifest();
-  invalid.mountains.foothill.x = 250;
+  invalid.mountains.foothill = {
+    ...invalid.mountains.foothill,
+    x: 250,
+    crop: { x: 250, y: 4, w: 40, h: 56 },
+  };
   const api = harness(invalid);
   const before = { ...api.game.ART };
   await assert.rejects(() => api.loadPaintedAssets(api.game), /Artwork crop exceeds its sheet/);

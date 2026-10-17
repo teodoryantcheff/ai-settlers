@@ -11,6 +11,7 @@
     "capture:production-art": "npm run build && node scripts/capture-production-art.mjs",
     "bench:render": "npm run build && node scripts/bench-render.mjs",
     "build": "npm run typecheck && node scripts/build.mjs",
+    "crop:art": "node scripts/crop-pack.mjs",
     "build:pages": "npm run build && node scripts/package-pages.mjs",
     "deploy": "npm test && npm run build:pages && wrangler pages deploy dist --project-name settlers-tribute --branch main",
     "preview:pages": "npm run build:pages && wrangler pages dev dist --compatibility-date 2026-10-12",

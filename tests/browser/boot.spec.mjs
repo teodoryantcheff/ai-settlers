@@ -24,3 +24,47 @@ for (const missing of ['goaltxt', 'boot-stage']) {
     },
   );
 }
+
+test('manifest crops match a full alpha scan of the browser-decoded sheets', async ({ page }) => {
+  await page.goto('/tests/game.html?seed=2024');
+  await page.waitForFunction(() => window.productionArtPreview?.scanPaintedCrop);
+  const scan = await page.evaluate(async () => {
+    const { scanPaintedCrop } = window.productionArtPreview;
+    const base = new URL('../assets/art/', location.href);
+    const manifest = await (await fetch(new URL('manifest.json', base))).json();
+    const pixels = new Map();
+    async function sheet(name) {
+      if (!pixels.has(name)) {
+        const image = new Image();
+        image.src = new URL(manifest.sheets[name], base).href;
+        await image.decode();
+        const canvas = document.createElement('canvas');
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+        context.drawImage(image, 0, 0);
+        pixels.set(name, context.getImageData(0, 0, canvas.width, canvas.height));
+      }
+      return pixels.get(name);
+    }
+    const regions = [
+      ...Object.entries(manifest.buildings),
+      ['site', manifest.site],
+      ...manifest.trees.map((region, index) => ['tree ' + index, region]),
+      ...manifest.rocks.map((region, index) => ['rock ' + index, region]),
+      ...manifest.mountains.dry.map((region, index) => ['dry mountain ' + index, region]),
+      ...manifest.mountains.snowy.map((region, index) => ['snowy mountain ' + index, region]),
+      ['mountain foothill', manifest.mountains.foothill],
+    ];
+    const mismatches = [];
+    for (const [name, region] of regions) {
+      const { data, width, height } = await sheet(region.sheet);
+      const scanned = scanPaintedCrop(data, width, height, region);
+      if (JSON.stringify(scanned) !== JSON.stringify(region.crop))
+        mismatches.push({ name, manifest: region.crop, scanned });
+    }
+    return { regions: regions.length, mismatches };
+  });
+  // Stale crops mean the pack changed without `node scripts/crop-pack.mjs`.
+  expect(scan).toEqual({ regions: 34, mismatches: [] });
+});

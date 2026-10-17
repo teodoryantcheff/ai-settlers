@@ -1,13 +1,13 @@
 import type { GameRuntime } from '../runtime.ts';
 import type { BuildingType, Sprite } from '../types.ts';
 import { CanvasContextError, requireCanvas2D } from './canvas-context.ts';
+import type { CropRect } from './painted-crop.ts';
 
-interface PaintedRegion {
+/** An authored sheet region and the trimmed rectangle `scripts/crop-pack.mjs`
+ * derived from it; both are in sheet pixels. */
+interface PaintedRegion extends CropRect {
   sheet: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
+  crop: CropRect;
 }
 interface PaintedManifest {
   version: 1;
@@ -59,15 +59,24 @@ export function validatePaintedManifest(input: unknown): PaintedManifest {
   const manifest = input as PaintedManifest;
   if (!manifest || manifest.version !== 1 || !manifest.sheets || !manifest.buildings)
     throw new Error('Unsupported painted artwork manifest.');
+  const rect = (value: CropRect | undefined): value is CropRect =>
+    !!value &&
+    [value.x, value.y, value.w, value.h].every(Number.isInteger) &&
+    value.x >= 0 &&
+    value.y >= 0 &&
+    value.w > 0 &&
+    value.h > 0;
   function region(value: PaintedRegion, name: string) {
+    const crop = value?.crop;
     if (
       !value ||
       !manifest.sheets[value.sheet] ||
-      ![value.x, value.y, value.w, value.h].every(Number.isInteger) ||
-      value.x < 0 ||
-      value.y < 0 ||
-      value.w <= 0 ||
-      value.h <= 0
+      !rect(value) ||
+      !rect(crop) ||
+      crop.x < value.x ||
+      crop.y < value.y ||
+      crop.x + crop.w > value.x + value.w ||
+      crop.y + crop.h > value.y + value.h
     )
       throw new Error('Invalid painted artwork region: ' + name);
   }
@@ -151,43 +160,13 @@ function loadImage(url: URL): Promise<HTMLImageElement> {
   });
 }
 
-function cropRegion(image: HTMLImageElement, region: PaintedRegion): HTMLCanvasElement {
-  const x = region.x;
-  const y = region.y;
-  const right = x + region.w;
-  const bottom = y + region.h;
-  if (right > image.naturalWidth || bottom > image.naturalHeight || right <= x || bottom <= y)
+/** Copy the manifest's precomputed crop; the pixel scan runs offline. */
+function cropRegion(image: HTMLImageElement, { crop }: PaintedRegion): HTMLCanvasElement {
+  if (crop.x + crop.w > image.naturalWidth || crop.y + crop.h > image.naturalHeight)
     throw new Error('Artwork crop exceeds its sheet.');
-  const canvas = makeCanvas(right - x, bottom - y);
-  const context = canvasContext(canvas);
-  context.drawImage(image, x, y, canvas.width, canvas.height, 0, 0, canvas.width, canvas.height);
-  const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
-  let left = canvas.width;
-  let top = canvas.height;
-  let maxX = -1;
-  let maxY = -1;
-  let transparent = false;
-  for (let py = 0; py < canvas.height; py++)
-    for (let px = 0; px < canvas.width; px++) {
-      // Retain antialiasing and painted contact shadows, discard only empty padding.
-      if (pixels[(py * canvas.width + px) * 4 + 3] <= 3) {
-        transparent = true;
-        continue;
-      }
-      left = Math.min(left, px);
-      top = Math.min(top, py);
-      maxX = Math.max(maxX, px);
-      maxY = Math.max(maxY, py);
-    }
-  if (maxX < left || maxY < top) throw new Error('Artwork crop contains no visible pixels.');
-  if (!transparent) throw new Error('Artwork sprite requires a transparent background.');
-  left = Math.max(0, left - 2);
-  top = Math.max(0, top - 2);
-  const width = Math.min(canvas.width, maxX + 3) - left;
-  const height = Math.min(canvas.height, maxY + 3) - top;
-  const trimmed = makeCanvas(width, height);
-  canvasContext(trimmed).drawImage(canvas, left, top, width, height, 0, 0, width, height);
-  return trimmed;
+  const canvas = makeCanvas(crop.w, crop.h);
+  canvasContext(canvas).drawImage(image, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h);
+  return canvas;
 }
 
 function fittedCanvas(
