@@ -43,7 +43,7 @@ export type BuildingType =
 /** Structured, transient placement failures; display copy is derived from the code. */
 export type PlacementRefusal =
   | { code: 'out-of-bounds' | 'choose-map-tile' }
-  | { code: 'water' | 'mountain' | 'territory' | 'shore-land' | 'no-water' | 'meadow' }
+  | { code: 'water' | 'mountain' | 'territory' | 'no-water' | 'meadow' }
   | { code: 'deposit'; good: 'coal' | 'iron' | 'gold' }
   | { code: 'no-rocks' | 'blocked' | 'unreachable-stock' }
   | { code: 'spacing'; building: BuildingType }
@@ -71,13 +71,13 @@ export interface ProductionMetrics {
   consumed: Inventory;
   delivered: Inventory;
   /** Completed producer input arrivals, excluding construction and warehouse transfers. */
-  inputDelivered?: Inventory;
+  inputDelivered: Inventory;
   /** Producer cargo that actually reached storage, attributed to its delivery job. */
-  outputDelivered?: Inventory;
+  outputDelivered: Inventory;
   /** Lifetime elapsed time when the distinguishable delivery counters began. */
-  deliveryStarted?: number;
+  deliveryStarted: number;
   /** Persisted cumulative samples: at most 301, spanning at most 600 simulation seconds. */
-  recent?: ProductionSample[];
+  recent: ProductionSample[];
 }
 export type ProductionRateWindow = 30 | 120 | 600 | 'lifetime';
 export interface ProductionSample {

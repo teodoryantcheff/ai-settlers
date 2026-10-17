@@ -137,18 +137,7 @@ export function createRenderer(
     BAR_H = 44,
     terrainRevision = 0;
   function renderPrefs(): PresentationPreferences {
-    return typeof game.presentationPrefs === 'object'
-      ? game.presentationPrefs
-      : {
-          showFps: false,
-          atlasExpanded: false,
-          minimapVisible: true,
-          reducedMotion: false,
-          weather: true,
-          clarity: false,
-          quality: 1,
-          overlay: 'none',
-        };
+    return game.presentationPrefs;
   }
   function motionTime(now: number): number {
     return renderPrefs().reducedMotion ? 0 : now;
@@ -2381,18 +2370,17 @@ export function createRenderer(
   let workPulses: Record<string, WorkPulse> = {},
     _renderEventsReady = false;
   function initRenderEvents() {
-    if (_renderEventsReady || typeof game.gameEvents === 'undefined') return;
+    if (_renderEventsReady) return;
     _renderEventsReady = true;
     observePresentation(game, 'goodsProduced', function (e) {
       const b = e.building;
-      if (!b) return;
       workPulses[b.id] = { t: performance.now(), good: e.good };
       if (visibleAt(b.x, b.y) && !renderPrefs().reducedMotion)
         FX.spark(b.x + 0.9, b.y + 0.65, game.GOODS[e.good].c, 3);
     });
     observePresentation(game, 'goodsDelivered', function (e) {
       const b = e.building;
-      if (!b || !visibleAt(b.x, b.y)) return;
+      if (!visibleAt(b.x, b.y)) return;
       workPulses[b.id] = { t: performance.now(), good: e.good };
     });
     observePresentation(

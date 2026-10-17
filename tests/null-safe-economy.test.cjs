@@ -102,7 +102,7 @@ test('a cargo job with no good cannot reserve stock or start a carrier pickup', 
   }
 });
 
-test('producer arrivals initialize an absent optional delivery counter before recording goods', () => {
+test('producer arrivals record goods in their delivery counters', () => {
   for (const field of ['inputDelivered', 'outputDelivered']) {
     const { game, internals } = colony();
     flatWorld(game);
@@ -110,8 +110,6 @@ test('producer arrivals initialize an absent optional delivery counter before re
     const producer = game.newBuilding('sawmill', 7, 5);
     store.done = producer.done = true;
     game.buildings.push(store, producer);
-    // ProductionMetrics permits these legacy counters independently of coverage.
-    delete producer.metrics[field];
     const input = field === 'inputDelivered';
     const good = input ? 'logs' : 'planks';
     const source = input ? store : producer;

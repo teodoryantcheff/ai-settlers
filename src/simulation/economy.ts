@@ -46,7 +46,6 @@ const placementAdvice: Record<PlacementRefusal['code'], PlacementAdvice> = {
   water: '',
   mountain: '',
   territory: 'build an Outpost toward that spot — it pushes your border out',
-  'shore-land': '',
   'no-water': 'place it on a shore inside your border (grass or sand both work)',
   meadow: '',
   deposit: 'click mountains to scout them, then build against the wall with the colored dots',
@@ -258,27 +257,11 @@ export function createEconomy(
       inputBlocked: m.inputBlocked,
       produced: copyObj(m.produced),
       consumed: copyObj(m.consumed),
-      inputDelivered: copyObj(m.inputDelivered || {}),
-      outputDelivered: copyObj(m.outputDelivered || {}),
+      inputDelivered: copyObj(m.inputDelivered),
+      outputDelivered: copyObj(m.outputDelivered),
     };
   }
-  function ensureProductionHistory(
-    m: ProductionMetrics,
-  ): asserts m is ProductionMetrics &
-    Required<Pick<ProductionMetrics, 'recent' | 'inputDelivered' | 'outputDelivered'>> {
-    // Older saves retain their lifetime production/consumption, but cannot reconstruct
-    // arrivals separately from construction, or outgoing delivery completion.
-    if (m.deliveryStarted === undefined) {
-      m.deliveryStarted = m.elapsed;
-      m.inputDelivered = {};
-      m.outputDelivered = {};
-    }
-    if (!m.recent || !m.recent.length) m.recent = [productionSample(m)];
-    m.inputDelivered ??= {};
-    m.outputDelivered ??= {};
-  }
   function sampleProduction(m: ProductionMetrics) {
-    ensureProductionHistory(m);
     const samples = m.recent;
     if (m.elapsed - samples[samples.length - 1].elapsed >= 2 - 1e-9)
       samples.push(productionSample(m));
@@ -301,7 +284,7 @@ export function createEconomy(
     let baseline: ProductionSample = empty;
     if (window !== 'lifetime') {
       baseline =
-        (m.recent || []).find(function (sample) {
+        m.recent.find(function (sample) {
           return sample.elapsed >= m.elapsed - window - 1e-9;
         }) ?? productionSample(m);
     }
@@ -321,8 +304,8 @@ export function createEconomy(
       inputBlocked: Math.max(0, m.inputBlocked - baseline.inputBlocked),
       produced: difference(m.produced, baseline.produced),
       consumed: difference(m.consumed, baseline.consumed),
-      inputDelivered: difference(m.inputDelivered || {}, baseline.inputDelivered),
-      outputDelivered: difference(m.outputDelivered || {}, baseline.outputDelivered),
+      inputDelivered: difference(m.inputDelivered, baseline.inputDelivered),
+      outputDelivered: difference(m.outputDelivered, baseline.outputDelivered),
       deliveryElapsed: deliveryElapsed,
       sampleInterval: window === 'lifetime' ? 0 : 2,
     };
@@ -331,7 +314,6 @@ export function createEconomy(
     const accepted = Math.min(n, Math.max(0, productionOutputLimit - ((b.stock[g] ?? 0) | 0)));
     b.stock[g] = ((b.stock[g] ?? 0) | 0) + accepted;
     b.produced = (b.produced | 0) + accepted;
-    if (!b.metrics) b.metrics = productionMetrics();
     b.metrics.produced[g] = ((b.metrics.produced[g] ?? 0) | 0) + accepted;
     game.recordEconomicFlow('produced', g, accepted);
     if (accepted) gameEvent('goodsProduced', { building: b, good: g as Good, amount: accepted });
@@ -533,9 +515,6 @@ export function createEconomy(
     if (!game.owned[i]) if (fail('ownership', { code: 'territory' })) return checks;
     const sp = game.BSPEC[type];
     if (type === 'fisherman') {
-      if (!game.owned[i]) if (fail('ownership', { code: 'territory' })) return checks;
-      if (tl.t !== game.GRASS && tl.t !== game.SAND)
-        if (fail('terrain', { code: 'shore-land' })) return checks;
       let wa = false;
       for (let wy2 = y - 2; wy2 <= y + 2 && !wa; wy2++)
         for (let wx2 = x - 2; wx2 <= x + 2 && !wa; wx2++)
@@ -622,8 +601,6 @@ export function createEconomy(
         return 'Cannot build on mountains';
       case 'territory':
         return 'Outside your territory';
-      case 'shore-land':
-        return 'Must stand on land by the shore';
       case 'no-water':
         return 'No water nearby';
       case 'meadow':
@@ -921,8 +898,6 @@ export function createEconomy(
       return;
     }
     if (sp.prod === 'none' || sp.store) return;
-    if (!b.metrics) b.metrics = productionMetrics();
-    ensureProductionHistory(b.metrics);
     const reason = productionConstraint(b);
     let g: Good;
     b.blockedReason = reason;
@@ -1630,8 +1605,6 @@ export function createEconomy(
   }
   function recordDelivery(b: Building, g: Good, transfer: boolean) {
     game.recordCargoArrival(g);
-    if (!b.metrics) b.metrics = productionMetrics();
-    ensureProductionHistory(b.metrics);
     b.metrics.delivered[g] = ((b.metrics.delivered[g] ?? 0) | 0) + 1;
     const sp = game.BSPEC[b.type];
     if (b.done && !sp.store && sp.in && eligibleIngredients(b, sp)[g]) {
@@ -1646,8 +1619,6 @@ export function createEconomy(
     if (!u.carryProducer || u.carryTransfer) return;
     const source = byId(u.carryProducer);
     if (source) {
-      if (!source.metrics) source.metrics = productionMetrics();
-      ensureProductionHistory(source.metrics);
       source.metrics.outputDelivered[g] = (source.metrics.outputDelivered[g] || 0) + 1;
     }
     game.recordEconomicFlow('outputStored', g, 1);
@@ -1801,8 +1772,7 @@ export function createEconomy(
     for (let i = 0; i < game.buildings.length; i++) {
       const b = game.buildings[i],
         sp = game.BSPEC[b.type];
-      if (b.done && sp.prod && sp.prod !== 'none' && !sp.store && b.metrics)
-        sampleProduction(b.metrics);
+      if (b.done && sp.prod && sp.prod !== 'none' && !sp.store) sampleProduction(b.metrics);
     }
     // Reaping dead units only allocates when a death actually happened; the
     // identity check keeps save-load array replacements authoritative.

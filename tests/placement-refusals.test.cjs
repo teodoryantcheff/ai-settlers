@@ -123,13 +123,6 @@ test('territory refusal preserves its code, text and advice', () => {
   );
 });
 
-test('shore-land refusal preserves its code, text and advice', () => {
-  const g = colony();
-  // The four valid terrains are either allowed or rejected earlier; retain the defensive copy.
-  g.tiles[g.idx(51, 48)].t = 99;
-  refusal(g, 'fisherman', 51, 48, { code: 'shore-land' }, 'Must stand on land by the shore', '');
-});
-
 test('no-water refusal preserves its code, text and advice', () => {
   const g = colony();
 

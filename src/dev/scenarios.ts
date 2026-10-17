@@ -478,7 +478,7 @@ export function runScenarios(game: GameRuntime) {
                   const r3 = cp[1]?.code;
                   if (!r3) throw new Error('Rejected placement is missing its reason');
                   rej[r3] = (rej[r3] | 0) + 1;
-                  if (r3 === 'territory' || r3 === 'meadow' || r3 === 'shore-land') contr++;
+                  if (r3 === 'territory' || r3 === 'meadow') contr++;
                 }
               }
             const bad = rej.territory || 0;
