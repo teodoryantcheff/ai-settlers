@@ -1,14 +1,12 @@
 import { test, expect, frame } from './helpers/test.mjs';
 test.setTimeout(120000);
 // Paused, so frames redraw placement feedback without advancing the colony. The
-// catalog runs on a live frame loop, as players see it; only the visual fixture
-// below submits explicit frames.
-async function begin(page, live = true) {
+// catalog runs on a live frame loop, as players see it.
+async function begin(page) {
   await page.locator('#sp0').press('Enter');
-  if (live)
-    await page.evaluate(() => {
-      window.__liveFrames = setInterval(() => window.__frame(performance.now()), 16);
-    });
+  await page.evaluate(() => {
+    window.__liveFrames = setInterval(() => window.__frame(performance.now()), 16);
+  });
   await draw(page);
 }
 test.afterEach(({ page }) => page.evaluate(() => clearInterval(window.__liveFrames)));
@@ -140,8 +138,7 @@ test('road plans show zero resource cost and rejection evidence before committin
 });
 
 test('catalog and placement feedback remain legible at both desktop sizes', async ({ page }) => {
-  test.setTimeout(180000);
-  await begin(page, false);
+  await begin(page);
   await clearSites(page);
   for (const [width, height, quality, motion] of [
     [1440, 900, '1', false],
@@ -161,11 +158,9 @@ test('catalog and placement feedback remain legible at both desktop sizes', asyn
     const palette = await page.locator('#palette').boundingBox();
     const atlas = await page.locator('#atlas-toggle').boundingBox();
     expect(palette.y).toBeGreaterThanOrEqual(atlas.y + atlas.height + 8);
-    await draw(page);
     await page.locator('#catalog-chain').selectOption('Timber & stone');
     await page.locator('.pb[data-b="lumberjack"]').focus();
     await expect(page.locator('#catalog-detail-lumberjack')).toBeVisible();
-    await draw(page);
     await page.locator('#catalog-chain').selectOption('all');
     await page.locator('.pb[data-b="farm"]').press('Enter');
     await page.evaluate(() => {
@@ -176,13 +171,10 @@ test('catalog and placement feedback remain legible at both desktop sizes', asyn
     const feedback = await page.locator('#placement-feedback').boundingBox();
     const minimap = await page.locator('#minimap-panel').boundingBox();
     expect(feedback.y + feedback.height).toBeLessThanOrEqual(minimap.y - 8);
-    await draw(page);
     await page.evaluate(() => {
       window.productionArtPreview.game.anyStorage().stock.planks = 3;
     });
-    await draw(page);
     await expect(page.locator('#placement-feedback')).toContainText('Ready to build');
-    await draw(page);
   }
 });
 

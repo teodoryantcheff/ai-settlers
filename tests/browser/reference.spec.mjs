@@ -32,6 +32,9 @@ test('searchable reference retains native keyboard focus and exact recipes throu
     'href',
     /\/assets\/art\/prompts\.md$/,
   );
+  // The colony starts at the size the reference sweep below ends on, so the
+  // camera comparison measures the reference window alone.
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.keyboard.press('Escape');
   await page.locator('#startb').click();
   await page.evaluate(() => {
