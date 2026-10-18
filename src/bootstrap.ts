@@ -26,7 +26,7 @@ export async function bootGame(internals?: DevInternals): Promise<GameRuntime> {
   await stage(1, 'Checking WebGL graphics…');
   let presenter: Awaited<ReturnType<typeof createPixiRenderer>>;
   try {
-    presenter = await createPixiRenderer();
+    presenter = await createPixiRenderer(internals?.pixi);
   } catch (error) {
     document.documentElement.dataset.renderer = 'unavailable';
     (window as unknown as Record<string, unknown>)['productionRendererStats'] = {

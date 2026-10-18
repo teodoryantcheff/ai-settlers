@@ -34,14 +34,14 @@ export interface SceneTextStyle {
   scale?: number;
 }
 
-/** One ordered layer of native Pixi primitives drawn in world pixels. */
-export interface SceneLayer {
+/** Stable local artwork prepared by an explicit owner update. */
+export interface SceneObject {
   /** The open Graphics run. Text, blits, shadows and clips start a new run after
    * them, so read this again after calling any of those. */
   readonly g: Graphics;
   /** Uploaded once: a prepared offscreen artwork canvas, or one frame of it. */
   texture(source: CanvasImageSource, frame?: SceneRect): Texture;
-  /** Draw prepared artwork into the open run at the current transform. */
+  /** Draw prepared artwork at the current local transform. */
   image(
     source: CanvasImageSource,
     x: number,
@@ -51,6 +51,16 @@ export interface SceneLayer {
     alpha?: number,
     frame?: SceneRect,
   ): void;
+}
+
+/** One ordered layer of native Pixi primitives drawn in world pixels. */
+export interface SceneLayer extends SceneObject {
+  /** A stable contiguous batch with independently retained GPU instructions.
+   * Use one per static span between moving objects, never one per sprite. */
+  group(key: object, paint: (scene: SceneLayer) => void): void;
+  /** Place a stable owner in this frame's depth order. Supply paint only to
+   * create/update its geometry; omit it to reuse the prepared native view. */
+  retain(owner: object, paint?: (scene: SceneObject) => void): void;
   /** Show a source rectangle of a large cached canvas (terrain, borders) through
    * a dedicated, bounded crop view. */
   blit(
@@ -85,6 +95,8 @@ export interface RendererPresentation {
   /** Refresh the GPU copy of a cached canvas. `rect` (canvas pixels) limits the
    * upload to the changed region; omitting it refreshes the whole canvas. */
   invalidate: (canvas: HTMLCanvasElement, rect?: SceneRect) => void;
+  /** Release an owner after removal/world replacement, outside a layer paint. */
+  release: (owner: object) => void;
   begin: (view: SceneView) => void;
   layer: (name: LayerName, paint: (scene: SceneLayer) => void) => void;
   end: () => void;

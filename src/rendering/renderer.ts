@@ -19,7 +19,7 @@ import type { GameRuntime } from '../runtime.ts';
 import { requireCanvas2D } from './canvas-context.ts';
 import { createShadowCache } from './shadow-cache.ts';
 import { circlePoints, dashed, rotate, scale, translate } from './scene.ts';
-import type { PremultipliedTint, RendererPresentation, SceneLayer } from './scene.ts';
+import type { PremultipliedTint, RendererPresentation, SceneLayer, SceneObject } from './scene.ts';
 
 /** Live display pose of one walker, keyed by unit id across frames. */
 export interface UnitPose {
@@ -94,11 +94,20 @@ export interface ZoomAnim {
 /** Reused y-sort entry; `o` carries the building/unit for its kind. */
 interface SortEntry {
   k: number;
-  t: number;
+  t: 0 | 1 | 2 | 3;
   x: number;
   y: number;
-  tl: Tile | null;
   o: Building | Unit | null;
+}
+interface NatureView {
+  x: number;
+  y: number;
+  hash: number;
+  source: CanvasImageSource | null;
+  tree: boolean;
+  clarity: boolean;
+  now: number;
+  paint: (scene: SceneObject) => void;
 }
 /** Border/preview segment as four endpoints: x1, y1, x2, y2. */
 type LineSeg = [number, number, number, number];
@@ -121,8 +130,8 @@ export function createRenderer(
   // Layered presentation over the unchanged simulation:
   //   scan  — cached connected terrain, mineral seams, shadows and roads
   //   bcan  — quiet territory survey line
-  //   per-frame — native Pixi graphics for water, y-sorted buildings/trees/rocks/units,
-  //   effects and overlays, rebuilt each frame from simulation state
+  //   retained — native tree/rock views in depth-ordered static batches
+  //   per-frame — native buildings, units, water, effects and interactive overlays
 
   const scan = game.Acan(game.W * game.TS * game.ST, game.H * game.TS * game.ST),
     sctx = requireCanvas2D(scan, reportGraphicsFailure, { willReadFrequently: true });
@@ -899,11 +908,20 @@ export function createRenderer(
       }
     }
   }
-  function drawTree(s: SceneLayer, x: number, y: number, tl: Tile, now: number) {
+  function treeArtwork(hash: number, stage: number, now: number) {
+    const sway = renderPrefs().reducedMotion ? 0 : ((now / 2400 + hash * 0.61) | 0) % 2;
+    return game.ART.tree[stage - 1][hash % 3][sway];
+  }
+  function drawTree(
+    s: SceneObject,
+    x: number,
+    y: number,
+    tl: Tile,
+    now: number,
+    prepared?: CanvasImageSource,
+  ) {
     const h = tileHash(game.idx(x, y)),
-      v = h % 3,
-      sw = renderPrefs().reducedMotion ? 0 : ((now / 2400 + h * 0.61) | 0) % 2;
-    const spr = game.ART.tree[tl.tree - 1][v][sw];
+      spr = prepared ?? treeArtwork(h, tl.tree, now);
     const jx = ((h >> 2) % 7) - 3,
       jy = ((h >> 5) % 5) - 2;
     const size = 0.87 + ((h >> 3) % 15) / 100,
@@ -935,22 +953,71 @@ export function createRenderer(
     pebbles[variant] = canvas;
     return canvas;
   }
-  function drawRock(s: SceneLayer, x: number, y: number) {
-    const h = tileHash(game.idx(x, y));
+  function rockArtwork(hash: number) {
+    return z < 0.75 ? pebble(hash % 3) : game.ART.rock[hash % 2];
+  }
+  function drawRock(s: SceneObject, x: number, y: number, prepared?: CanvasImageSource) {
+    const h = tileHash(game.idx(x, y)),
+      spr = prepared ?? rockArtwork(h);
     if (z < 0.75) {
       const rx2 = ((h >> 2) % 13) - 6,
         ry2 = ((h >> 5) % 11) - 5;
-      s.image(pebble(h % 3), x * game.TS + 6 + rx2, y * game.TS + 11 + ry2, 11, 7);
+      s.image(spr, x * game.TS + 6 + rx2, y * game.TS + 11 + ry2, 11, 7);
       return;
     }
     s.image(
-      game.ART.rock[h % 2],
+      spr,
       x * game.TS - 1 + ((h >> 4) % 5) - 2,
       y * game.TS + 6.4 + ((h >> 6) % 5) - 2,
       24,
       18,
       0.96,
     );
+  }
+  // Stable tile identities outlive camera culling. Only a changed image/alpha
+  // prepares native geometry again; unchanged frames merely place the owner.
+  const nature = new Map<number, NatureView>();
+  function drawNature(s: SceneLayer, x: number, y: number, tl: Tile, now: number) {
+    const index = game.idx(x, y);
+    let view = nature.get(index);
+    if (!view) {
+      view = {
+        x,
+        y,
+        hash: tileHash(index),
+        source: null,
+        tree: Boolean(tl.tree),
+        clarity: false,
+        now,
+        paint(scene) {
+          const tile = game.tiles[index],
+            source = this.source;
+          if (!source) throw new Error('Nature artwork must be selected before preparation');
+          if (tile.tree) drawTree(scene, x, y, tile, this.now, source);
+          else drawRock(scene, x, y, source);
+        },
+      };
+      // Bind once: the callback is retained rather than allocated per frame.
+      view.paint = view.paint.bind(view);
+      nature.set(index, view);
+    }
+    const tree = Boolean(tl.tree),
+      clarity = renderPrefs().clarity;
+    const source = tree ? treeArtwork(view.hash, tl.tree, now) : rockArtwork(view.hash);
+    const changed =
+      view.source !== source || view.tree !== tree || (tree && view.clarity !== clarity);
+    view.source = source;
+    view.tree = tree;
+    view.clarity = clarity;
+    view.now = now;
+    s.retain(view, changed ? view.paint : undefined);
+  }
+  function releaseNature(index: number) {
+    const view = nature.get(index);
+    if (view) {
+      presentation.release(view);
+      nature.delete(index);
+    }
   }
   let unitPoses: Record<string, UnitPose> = {};
   function unitDirection(dx: number, dy: number): string {
@@ -1015,12 +1082,17 @@ export function createRenderer(
     }
   }
   const objPool: SortEntry[] = [];
+  const firstNatureGroup = {};
+  const natureRows: SortEntry[][] = Array.from({ length: game.H }, () => []);
+  const natureKinds = new Uint8Array(game.W * game.H);
+  const dirtyNatureRows = new Set(Array.from({ length: game.H }, (_, row) => row));
+  const orderedObjects: SortEntry[] = [];
   let objN = 0; // reused y-sort entries — no per-frame object churn
   function objGet(): SortEntry {
-    let o;
+    let o: SortEntry;
     if (objN < objPool.length) o = objPool[objN++];
     else {
-      o = { k: 0, t: 0, x: 0, y: 0, tl: null, o: null };
+      o = { k: 0, t: 0, x: 0, y: 0, o: null };
       objPool.push(o);
       objN++;
     }
@@ -1032,25 +1104,30 @@ export function createRenderer(
       vx1 = Math.min(game.W - 1, Math.ceil((cam.x + vw / z) / game.TS) + 1);
     const vy0 = Math.max(0, Math.floor(cam.y / game.TS) - 1),
       vy1 = Math.min(game.H - 1, Math.ceil((cam.y + vh / z) / game.TS) + 1);
-    for (let wy = vy0; wy <= vy1; wy++)
-      for (let wx = vx0; wx <= vx1; wx++) {
-        const wi = game.idx(wx, wy),
-          tl = game.tiles[wi];
-        if (tl.tree) {
-          const ot = objGet();
-          ot.k = wy * game.TS + 19;
-          ot.t = 1;
-          ot.x = wx;
-          ot.y = wy;
-          ot.tl = tl;
-        } else if (tl.rock) {
-          const or2 = objGet();
-          or2.k = wy * game.TS + 21;
-          or2.t = 2;
-          or2.x = wx;
-          or2.y = wy;
-        }
+    for (const row of dirtyNatureRows) {
+      const entries = natureRows[row];
+      entries.length = 0;
+      for (let x = 0; x < game.W; x++) {
+        const index = game.idx(x, row),
+          tile = game.tiles[index];
+        const kind = tile.tree ? 1 : tile.rock ? 2 : 0;
+        natureKinds[index] = kind;
+        if (kind)
+          entries.push({
+            k: row * game.TS + (kind === 1 ? 19 : 21),
+            t: kind,
+            x,
+            y: row,
+            o: null,
+          });
       }
+      entries.sort((a, b) => a.k - b.k);
+    }
+    dirtyNatureRows.clear();
+    orderedObjects.length = 0;
+    for (let row = vy0; row <= vy1; row++)
+      for (const entry of natureRows[row])
+        if (entry.x >= vx0 && entry.x <= vx1) orderedObjects.push(entry);
     for (let bi = 0; bi < game.buildings.length; bi++) {
       const b = game.buildings[bi];
       if (b.x < vx0 - 1 || b.x > vx1 + 1 || b.y < vy0 - 1 || b.y > vy1 + 1) continue;
@@ -1071,15 +1148,42 @@ export function createRenderer(
     objPool.sort(function (a, b2) {
       return a.k - b2.k;
     });
-    // The whole sorted pass is one graphics run of sprites and small shapes.
+    // Merge the already ordered static rows with only the changing objects.
+    // Static ties precede buildings/settlers, just as in the original stable sort.
+    let stat = orderedObjects.length - 1,
+      moving = objPool.length - 1;
+    orderedObjects.length += objPool.length;
+    for (let out = orderedObjects.length - 1; moving >= 0; out--) {
+      if (stat >= 0 && orderedObjects[stat].k > objPool[moving].k)
+        orderedObjects[out] = orderedObjects[stat--];
+      else orderedObjects[out] = objPool[moving--];
+    }
+    // Contiguous nature spans share GPU instructions. A moving object splits
+    // only the spans it crosses; other static batches survive animated passes.
     presentation.layer('objects', function (s) {
-      for (let i = 0; i < objPool.length; i++) {
-        const q = objPool[i];
-        if (q.t === 0) drawBuilding(s, q.o as Building);
-        else if (q.t === 1) {
-          if (q.tl) drawTree(s, q.x, q.y, q.tl, now);
-        } else if (q.t === 2) drawRock(s, q.x, q.y);
-        else drawUnit(s, q.o as Unit, now);
+      let group: object = firstNatureGroup;
+      for (let i = 0; i < orderedObjects.length;) {
+        const q = orderedObjects[i];
+        if (q.t === 1 || q.t === 2) {
+          const start = i;
+          while (
+            i < orderedObjects.length &&
+            (orderedObjects[i].t === 1 || orderedObjects[i].t === 2)
+          )
+            i++;
+          const end = i;
+          s.group(group, function (batch) {
+            for (let j = start; j < end; j++) {
+              const entry = orderedObjects[j];
+              drawNature(batch, entry.x, entry.y, game.tiles[game.idx(entry.x, entry.y)], now);
+            }
+          });
+        } else {
+          if (q.t === 0) drawBuilding(s, q.o as Building);
+          else drawUnit(s, q.o as Unit, now);
+          if (q.o) group = q.o;
+          i++;
+        }
       }
     });
   }
@@ -2388,6 +2492,11 @@ export function createRenderer(
       'tileChanged',
       function (e) {
         shadowCache.tileChanged(e.index);
+        const tile = game.tiles[e.index];
+        if (!tile) return;
+        const kind = tile.tree ? 1 : tile.rock ? 2 : 0;
+        if (natureKinds[e.index] !== kind) dirtyNatureRows.add(Math.floor(e.index / game.W));
+        if (!kind) releaseNature(e.index);
         if (game.tiles[e.index] && !game.staticDirty) drawTile(sctx, e.index);
       },
       (error) => {
@@ -2411,6 +2520,9 @@ export function createRenderer(
   // A committed load clears every transient presentation cache through this one
   // sanctioned method; loaders never poke renderer internals field by field.
   function resetPresentation() {
+    for (const index of nature.keys()) releaseNature(index);
+    for (let row = 0; row < game.H; row++) dirtyNatureRows.add(row);
+    orderedObjects.length = objPool.length = 0;
     shadowCache.reset();
     _pausedNow = null;
     FXL.length = 0;
@@ -2772,6 +2884,9 @@ export function createRenderer(
       drawBuilding,
       shadowCache,
       drawTree,
+      drawObjects,
+      nature,
+      orderedObjects,
       drawSmoke,
       drawUnit,
       meadowParticles,
@@ -3065,13 +3180,16 @@ export const UNLIT_AT_NIGHT: ReadonlySet<BuildingType> = new Set<BuildingType>([
 
 /** Test-only view of closure internals; never merged into the runtime. */
 export interface RendererInternals {
+  nature: Map<number, NatureView>;
+  readonly orderedObjects: readonly SortEntry[];
+  drawObjects: (now: number) => void;
   shadowCache: ReturnType<typeof createShadowCache>;
   paintTileFull: (g: CanvasRenderingContext2D, i: number) => void;
   drawBorders: (full?: boolean) => void;
   drawMiniStatic: () => void;
   buildingContour: (img: Sprite) => HTMLCanvasElement;
   drawBuilding: (s: SceneLayer, b: Building) => void;
-  drawTree: (s: SceneLayer, x: number, y: number, tl: Tile, now: number) => void;
+  drawTree: (s: SceneObject, x: number, y: number, tl: Tile, now: number) => void;
   drawSmoke: (s: SceneLayer, x: number, y: number, now: number, sd: number) => void;
   drawUnit: (s: SceneLayer, u: Unit, now: number) => void;
   meadowParticles: (s: SceneLayer, now: number) => void;

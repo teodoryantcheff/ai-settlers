@@ -1,3 +1,4 @@
+import { createNativeObject, type NativeObject } from './native-object.ts';
 import {
   CanvasTextMetrics,
   Container,
@@ -42,6 +43,7 @@ interface CachedCanvas {
 }
 interface LayerState {
   root: Container;
+  groups: Map<object, LayerState>;
   runs: Graphics[];
   masks: (Graphics | undefined)[];
   texts: Text[];
@@ -51,6 +53,7 @@ interface LayerState {
   /** Child index for the next object placed this frame. */
   order: number;
   open: Graphics | null;
+  batchObjects: boolean;
   clip: SceneRect | null;
 }
 
@@ -59,7 +62,7 @@ interface LayerState {
  * A separate input surface retains the existing camera and interaction controls.
  * Artwork is uploaded once; cached terrain is refreshed only on invalidation.
  */
-export async function createPixiRenderer() {
+export async function createPixiRenderer(internals?: PixiRendererInternals) {
   const canvas = document.createElement('canvas');
   canvas.id = 'pixi-view';
   canvas.style.cssText = 'position:absolute;inset:0;pointer-events:none';
@@ -99,6 +102,11 @@ export async function createPixiRenderer() {
   const artwork = new Map<CanvasImageSource, Texture>();
   const frames = new Map<CanvasImageSource, Map<string, Texture>>();
   const layers = new Map<LayerName, LayerState>();
+  const owners = new Map<object, NativeObject>();
+  let retainedUpdates = 0,
+    frame = 0;
+  const placedFrame = new WeakMap<Container, number>();
+  const ownerRoots = new WeakSet<Container>();
   const textStyles = new Map<string, TextStyle>();
   const view: SceneView = {
     width: 1,
@@ -129,9 +137,11 @@ export async function createPixiRenderer() {
 
   /** Place a node at this layer's draw-order cursor for the current frame. */
   function place(layer: LayerState, node: Container) {
-    if (node.parent !== layer.root) layer.root.addChildAt(node, layer.order);
-    else if (layer.root.children[layer.order] !== node) layer.root.setChildIndex(node, layer.order);
-    layer.order++;
+    // Sort once after painting instead of repeatedly splicing thousands of
+    // unchanged owners when a moving unit splits an immediate Graphics run.
+    if (node.parent !== layer.root) layer.root.addChild(node);
+    node.zIndex = layer.order++;
+    placedFrame.set(node, frame);
     node.visible = true;
   }
   function openRun(layer: LayerState): Graphics {
@@ -139,6 +149,7 @@ export async function createPixiRenderer() {
     let run = layer.runs[index];
     if (!run) layer.runs[index] = run = new Graphics();
     else run.clear();
+    if (layer.batchObjects) run.context.batchMode = 'batch';
     place(layer, run);
     if (layer.clip) {
       let mask = layer.masks[index];
@@ -160,6 +171,54 @@ export async function createPixiRenderer() {
     graphicsBuilds++;
     layer.open = run;
     return run;
+  }
+  function makeLayer(batchObjects: boolean, isRenderGroup = false): LayerState {
+    return {
+      root: new Container({ sortableChildren: true, isRenderGroup }),
+      groups: new Map(),
+      runs: [],
+      masks: [],
+      texts: [],
+      textKeys: [],
+      runCursor: 0,
+      textCursor: 0,
+      order: 0,
+      open: null,
+      clip: null,
+      batchObjects,
+    };
+  }
+  function resetLayer(layer: LayerState) {
+    layer.runCursor = layer.textCursor = layer.order = 0;
+    layer.open = null;
+    layer.clip = null;
+    for (const [key, group] of layer.groups) {
+      if (!group.root.children.length) {
+        group.root.destroy({ children: true });
+        layer.groups.delete(key);
+      } else resetLayer(group);
+    }
+  }
+  function finishLayer(layer: LayerState) {
+    for (const child of layer.root.children) {
+      if (placedFrame.get(child) !== frame && !layer.masks.includes(child as Graphics))
+        child.visible = false;
+    }
+    for (const [key, group] of layer.groups) {
+      if (placedFrame.get(group.root) === frame) finishLayer(group);
+      else {
+        // Cull the batch, not its owners. Detached owned geometry can be placed
+        // again without retaining old moving-object identities/render groups.
+        discardGroup(group);
+        layer.groups.delete(key);
+      }
+    }
+  }
+  function discardGroup(group: LayerState) {
+    for (const child of group.groups.values()) discardGroup(child);
+    for (const child of group.root.removeChildren())
+      if (!ownerRoots.has(child)) child.destroy({ children: true });
+    group.root.destroy({ children: true });
   }
   function closeRun(layer: LayerState) {
     layer.open = null;
@@ -230,6 +289,32 @@ export async function createPixiRenderer() {
         return layer.open || openRun(layer);
       },
       texture,
+      group(key, paint) {
+        closeRun(layer);
+        let group = layer.groups.get(key);
+        if (!group) layer.groups.set(key, (group = makeLayer(true, true)));
+        if (placedFrame.get(group.root) === frame)
+          throw new Error('Native batch must be one contiguous span per frame');
+        place(layer, group.root);
+        paint(layerScene(group));
+        closeRun(group);
+      },
+      retain(key, paint) {
+        closeRun(layer);
+        let owner = owners.get(key);
+        if (!owner) {
+          if (!paint) throw new Error('Native owner must be prepared before placement');
+          owners.set(key, (owner = createNativeObject(texture, () => graphicsBuilds++)));
+          ownerRoots.add(owner.root);
+        }
+        if (paint) {
+          owner.update(paint);
+          retainedUpdates++;
+        }
+        place(layer, owner.root);
+        nativeSprites += owner.imageCount;
+        nativeGraphics += owner.graphicsCount;
+      },
       image(source, x, y, width, height, alpha = 1, region) {
         if (alpha <= 0 || width <= 0 || height <= 0) return;
         const run = layer.open || openRun(layer);
@@ -351,6 +436,8 @@ export async function createPixiRenderer() {
     statsObject.partialTextureUpdates = partialTextureUpdates;
     statsObject.spriteFrameUpdates = spriteFrameUpdates;
     statsObject.graphicsBuilds = graphicsBuilds;
+    statsObject.retainedOwners = owners.size;
+    statsObject.retainedUpdates = retainedUpdates;
     statsObject.commands = nativeSprites + nativeGraphics + nativeTexts;
     statsObject.resolution = view.dpr;
     statsObject.maxTextureSize = maxTextureSize;
@@ -385,6 +472,8 @@ export async function createPixiRenderer() {
     gpuDestroyed = true;
     canvas.removeEventListener('webglcontextlost', onContextLost);
     atmosphere.destroy();
+    for (const owner of owners.values()) owner.root.destroy({ children: true });
+    owners.clear();
     stage.destroy({ children: true });
     for (const style of textStyles.values()) style.destroy();
     for (const views of frames.values()) for (const framed of views.values()) framed.destroy(false);
@@ -518,9 +607,19 @@ export async function createPixiRenderer() {
         }
       });
     },
+    release(key) {
+      guardGraphics(() => {
+        const owner = owners.get(key);
+        if (owner) {
+          owner.root.destroy({ children: true });
+          owners.delete(key);
+        }
+      });
+    },
     begin(next) {
       guardGraphics(() => {
         nativeSprites = nativeGraphics = nativeTexts = 0;
+        frame++;
         Object.assign(view, next);
         if (view.width > maxRenderSize || view.height > maxRenderSize)
           loseGpu('Viewport exceeds GPU render-target limits');
@@ -529,29 +628,14 @@ export async function createPixiRenderer() {
           renderer.resize(view.width, view.height);
         canvas.style.width = view.cssWidth + 'px';
         canvas.style.height = view.cssHeight + 'px';
-        for (const layer of layers.values()) {
-          layer.runCursor = layer.textCursor = layer.order = 0;
-          layer.open = null;
-          layer.clip = null;
-        }
+        for (const layer of layers.values()) resetLayer(layer);
       });
     },
     layer(name, paint) {
       guardGraphics(() => {
         let layer = layers.get(name);
         if (!layer) {
-          layer = {
-            root: new Container(),
-            runs: [],
-            masks: [],
-            texts: [],
-            textKeys: [],
-            runCursor: 0,
-            textCursor: 0,
-            order: 0,
-            open: null,
-            clip: null,
-          };
+          layer = makeLayer(name === 'objects');
           layers.set(name, layer);
           // Lantern glows, rain and captions sit above the veiled, graded scene.
           (name === 'above-atmosphere' || name === 'overlay' ? stage : scene).addChild(layer.root);
@@ -575,13 +659,7 @@ export async function createPixiRenderer() {
       }
       guardGraphics(() => {
         // Objects not placed this frame stay pooled but hidden.
-        for (const layer of layers.values()) {
-          const used = layer.order;
-          for (let i = used; i < layer.root.children.length; i++) {
-            const child = layer.root.children[i];
-            if (!layer.masks.includes(child as Graphics)) child.visible = false;
-          }
-        }
+        for (const layer of layers.values()) finishLayer(layer);
         atmosphere.update(runtime, renderer.width, renderer.height, screenTint);
         renderer.render({ container: stage });
         atmosphere.afterRender();
@@ -589,6 +667,7 @@ export async function createPixiRenderer() {
       stats();
     },
   };
+  if (internals) Object.assign(internals, { presentation, owners, renderer });
   return {
     presentation,
     canvas,
@@ -606,4 +685,11 @@ export async function createPixiRenderer() {
       canvas.remove();
     },
   };
+}
+
+/** Test-only closure access, supplied by development boot only. */
+export interface PixiRendererInternals {
+  presentation: RendererPresentation;
+  owners: Map<object, NativeObject>;
+  renderer: WebGLRenderer;
 }

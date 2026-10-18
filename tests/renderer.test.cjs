@@ -1020,3 +1020,148 @@ test('the layers above the atmosphere follow the screen veil', (t) => {
     'overlay',
   ]);
 });
+
+test('nature keeps prepared artwork until its tile, sway frame or presentation changes', () => {
+  const calls = [];
+  const scene = recordingScene(calls);
+  const released = [];
+  const e = renderer({
+    presentation: {
+      available: true,
+      invalidate() {},
+      begin() {},
+      end() {},
+      release: (owner) => released.push(owner),
+      layer: (_name, paint) => paint(scene),
+    },
+  });
+  e.buildings = [];
+  e.units = [];
+  e.cam.x = e.cam.y = 40 * e.TS;
+  e.vw = 800;
+  e.vh = 600;
+  e.ART.tree = Array.from({ length: 4 }, (_, stage) =>
+    Array.from({ length: 3 }, (_, species) => [`${stage}/${species}/0`, `${stage}/${species}/1`]),
+  );
+  const index = e.idx(50, 50);
+  e.tiles[index].tree = 1;
+  e.drawObjects(1000);
+  const first = calls.find((c) => c.method === 'image');
+  assert.ok(first);
+  calls.length = 0;
+  e.drawObjects(1000);
+  assert.equal(
+    calls.filter((c) => c.method === 'image').length,
+    0,
+    'unchanged nature emits no image commands',
+  );
+  for (const stage of [2, 3, 4]) {
+    e.tiles[index].tree = stage;
+    e.emitGameEvent('tileChanged', { index });
+    calls.length = 0;
+    e.drawObjects(1000);
+    const image = calls.find((c) => c.method === 'image');
+    assert.ok(image.args[0].startsWith(`${stage - 1}/`));
+    assert.deepEqual(
+      image.args.slice(1),
+      first.args.slice(1),
+      'growth preserves the root and footprint',
+    );
+  }
+  calls.length = 0;
+  e.drawObjects(3400);
+  assert.equal(calls.filter((c) => c.method === 'image').length, 1, 'only the sway frame changes');
+  e.presentationPrefs.clarity = true;
+  calls.length = 0;
+  e.drawObjects(3400);
+  assert.equal(calls.find((c) => c.method === 'image').alpha, 0.62);
+  const rng = e.SR.getState();
+  e.tiles[index].tree = 0;
+  e.emitGameEvent('tileChanged', { index });
+  assert.equal(released.length, 1);
+  e.drawObjects(3400);
+  e.tiles[index].tree = 4;
+  e.emitGameEvent('tileChanged', { index });
+  e.drawObjects(3400);
+  e.emitGameEvent('worldLoaded', { reason: 'load' });
+  assert.equal(released.length, 2, 'world replacement releases native ownership');
+  assert.equal(e.SR.getState(), rng);
+});
+
+test('cached static rows preserve full depth keys and stable ties against moving settlers', () => {
+  const e = renderer();
+  e.vw = 800;
+  e.vh = 600;
+  e.cam.x = e.cam.y = 40 * e.TS;
+  const hq = e.buildings[0];
+  hq.x = hq.y = 50;
+  const extra = e.newBuilding('warehouse', 51, 50);
+  e.buildings.push(extra);
+  e.units = [];
+  for (let i = 0; i < 4; i++) e.spawnCarrier(hq);
+  const [before, tie, after, cross] = e.units;
+  before.y = 50;
+  tie.y = (1219 - 3) / 24;
+  after.y = (1221 - 3) / 24;
+  cross.y = 51;
+  e.tiles[e.idx(50, 50)].tree = 4;
+  e.tiles[e.idx(51, 50)].tree = 4;
+  e.tiles[e.idx(49, 50)].rock = { amt: 10 };
+  const labels = new Map([
+    [hq, 'hq'],
+    [extra, 'store'],
+    [before, 'before'],
+    [tie, 'tie'],
+    [after, 'after'],
+    [cross, 'cross'],
+  ]);
+  const order = () =>
+    e.orderedObjects.map((q) => (q.o ? labels.get(q.o) : `${q.t === 1 ? 'tree' : 'rock'}:${q.x}`));
+  const rng = e.SR.getState();
+  e.drawObjects(1000);
+  assert.deepEqual(order(), [
+    'before',
+    'tree:50',
+    'tree:51',
+    'tie',
+    'rock:49',
+    'after',
+    'hq',
+    'store',
+    'cross',
+  ]);
+  cross.y = (1222 - 3) / 24;
+  e.drawObjects(1000);
+  assert.deepEqual(
+    order(),
+    ['before', 'tree:50', 'tree:51', 'tie', 'rock:49', 'after', 'hq', 'store', 'cross'],
+    'settlers tied with buildings follow them',
+  );
+  cross.y = 49.5;
+  e.drawObjects(1000);
+  assert.deepEqual(order(), [
+    'cross',
+    'before',
+    'tree:50',
+    'tree:51',
+    'tie',
+    'rock:49',
+    'after',
+    'hq',
+    'store',
+  ]);
+  e.tiles[e.idx(50, 50)].tree = 0;
+  e.emitGameEvent('tileChanged', { index: e.idx(50, 50) });
+  e.drawObjects(1000);
+  assert.deepEqual(order(), [
+    'cross',
+    'before',
+    'tree:51',
+    'tie',
+    'rock:49',
+    'after',
+    'hq',
+    'store',
+  ]);
+  assert.equal(e.SR.getState(), rng);
+});

@@ -14,6 +14,8 @@ npm run dev
 
 Open `http://127.0.0.1:8765/`. Add `?seed=2024` for a reproducible map. All runtime code and artwork are served locally.
 
+Enable graphics/hardware acceleration in the browser and restart it after changing that setting. WebGL can run through a software renderer such as SwiftShader or llvmpipe, but that uses the CPU and is much slower; it is not representative of GPU performance. In Chromium, check `chrome://gpu` for hardware-accelerated WebGL. Integrated Intel graphics also count as hardware acceleration; selecting the discrete AMD GPU is a separate choice.
+
 Click to inspect or build, right-drag or use arrow keys to pan, scroll to zoom, and press Space to pause. Colony Atlas starts collapsed; open it for Map and live Economy, Logistics, Colony, Attention and Activity windows. V opens or toggles Advisor/Journey guidance in Colony. Buildings opens a searchable five-column palette; hover or focus an entry for details. Five illustrated map modes and contextual Help sit at bottom center, and the lower-right minimap can be collapsed. Economy, Logistics, Attention and Activity connect current goods, deliveries, persistent constraints and recorded colony events; Inspect keeps map context and Locate returns to the relevant site. Inspect buildings to adjust priority, pause work or request warehouse reserves.
 
 Welcome offers Continue, New Colony with an optional name/seed, and Load. Menu includes Home, which keeps the live colony for Continue, plus saves, settings and help. Saves provide named checkpoints, a separate autosave, and JSON file import/export; the toolbar save-health button opens recovery when browser storage fails. Settings include Reduced Motion and Economical rendering.
@@ -66,6 +68,15 @@ Run the slower `npm run check`, browser tests or visual captures only when expli
 Tests and builds run TypeScript 7 checking through `npm run typecheck`, which invokes the TypeScript 7 compiler explicitly. Strict null checks are enabled in the main `tsconfig.json` for all source and compiler contracts. Browser tests require Playwright Chromium (`npx playwright install chromium` once). If port 8765 is occupied by another server, use `PLAYWRIGHT_PORT=8766 npm run test:browser`. Development scenarios are available at `tests/game.html?uitest&buildrules&seed=2024`, `?saveload&seed=123`, and `?devshot&seed=2024`.
 
 `npm run bench:render` is opt-in and not part of `npm test`. It measures CPU and GPU frame time at every zoom on this machine's GPU (headless Chromium, real WebGL) and warns if Chromium falls back to software rendering. Add `-- --zooms 3 --profile 3` to narrow it and keep a CPU profile; `scripts/bench-render.mjs` lists every option. Results go to `output/bench/`; see [performance notes](docs/performance-60fps.md). After building, `node scripts/bench-territory.mjs` measures isolated territory-cache frames on hardware WebGL and saves raw samples plus a game screenshot to `output/bench-territory/`.
+
+On Linux/Mesa with multiple GPUs, set `DRI_PRIME` on the browser process or the command that launches Chromium, rather than on the static server. On this laptop, `pci-0000_02_00_0` selects the AMD Radeon 500 Series; other machines need their own device identifier. Browser tests and the render benchmark use ANGLE OpenGL (`--use-angle=gl`):
+
+```sh
+DRI_PRIME=pci-0000_02_00_0 npm run test:browser
+DRI_PRIME=pci-0000_02_00_0 npm run bench:render -- --modes running --speed 1 --ms 10000
+```
+
+Check the benchmark's printed GPU name before interpreting FPS or GPU timings. AMD and Intel hardware results are distinct configurations, and neither should be confused with software WebGL.
 
 Browser tests take no screenshots. With the local server running, `npm run capture` exports a curated set of views into `output/captures/`: the release frame and HUD, the minimap, the inspector and Colony, Economy and Logistics panels, the painted production buildings, development overview and detail scenes, `capture.json` renderer diagnostics and a particle animation (`particles.gif`). Capture additionally requires FFmpeg. Headless software-WebGL timings are diagnostics; profile target hardware for performance decisions.
 

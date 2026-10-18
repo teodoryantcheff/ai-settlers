@@ -1,0 +1,137 @@
+{
+  "weightedDrawingMicroseconds": 2408000,
+  "topSelf": [
+    {
+      "function": "retain",
+      "bundleLine": 89566,
+      "percent": 7.0
+    },
+    {
+      "function": "break",
+      "bundleLine": 52760,
+      "percent": 4.2
+    },
+    {
+      "function": "buildContextBatches",
+      "bundleLine": 55089,
+      "percent": 3.9
+    },
+    {
+      "function": "finishLayer",
+      "bundleLine": 89469,
+      "percent": 3.8
+    },
+    {
+      "function": "",
+      "bundleLine": 83300,
+      "percent": 3.7
+    },
+    {
+      "function": "place",
+      "bundleLine": 89409,
+      "percent": 3.7
+    },
+    {
+      "function": "",
+      "bundleLine": 55158,
+      "percent": 2.7
+    },
+    {
+      "function": "toFillStyle",
+      "bundleLine": 57597,
+      "percent": 2.2
+    },
+    {
+      "function": "drawNature",
+      "bundleLine": 83135,
+      "percent": 2.1
+    },
+    {
+      "function": "toStrokeStyle",
+      "bundleLine": 57618,
+      "percent": 2.0
+    },
+    {
+      "function": "get shapePath",
+      "bundleLine": 56581,
+      "percent": 2.0
+    },
+    {
+      "function": "fill",
+      "bundleLine": 57812,
+      "percent": 1.8
+    },
+    {
+      "function": "build",
+      "bundleLine": 54103,
+      "percent": 1.6
+    },
+    {
+      "function": "triangulate",
+      "bundleLine": 54209,
+      "percent": 1.5
+    },
+    {
+      "function": "drawBuilding",
+      "bundleLine": 82940,
+      "percent": 1.4
+    },
+    {
+      "function": "get imageCount",
+      "bundleLine": 89145,
+      "percent": 1.3
+    },
+    {
+      "function": "waterAnim",
+      "bundleLine": 83455,
+      "percent": 1.2
+    },
+    {
+      "function": "return",
+      "bundleLine": 34695,
+      "percent": 1.2
+    },
+    {
+      "function": "_callContextMethod",
+      "bundleLine": 59178,
+      "percent": 1.1
+    },
+    {
+      "function": "bufferSubData",
+      "bundleLine": 0,
+      "percent": 1.1
+    }
+  ],
+  "inclusive": [
+    {
+      "function": "end",
+      "percent": 47.6
+    },
+    {
+      "function": "drawObjects",
+      "percent": 41.6
+    },
+    {
+      "function": "drawNature",
+      "percent": 16.1
+    },
+    {
+      "function": "drawBuilding",
+      "percent": 16.6
+    },
+    {
+      "function": "buildContextBatches",
+      "percent": 16.3
+    },
+    {
+      "function": "_buildInstructions",
+      "percent": 26.7
+    },
+    {
+      "function": "packQuadAttributes",
+      "percent": 0.2
+    }
+  ],
+  "profileSHA256": "66c1a811bfe74ff0c128cbdfa26a727e95c1e123a4519e20fbd5f7563269d46b",
+  "rawProfile": "output/bench/2026-10-18T12-12-08-346Z/zoom3-running.cpuprofile"
+}

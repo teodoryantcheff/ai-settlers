@@ -14,7 +14,7 @@ export default defineConfig({
         '--headless=new',
         '--enable-gpu',
         '--ignore-gpu-blocklist',
-        '--use-angle=gl-egl',
+        '--use-angle=gl',
         '--enable-unsafe-swiftshader',
       ],
     },

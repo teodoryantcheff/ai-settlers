@@ -1,4 +1,4 @@
-// Frame-time benchmark on the machine's real GPU (headless Chromium, ANGLE/EGL).
+// Frame-time benchmark on the machine's real GPU (headless Chromium, ANGLE/OpenGL).
 // Grows a deterministic autoplay colony, then measures main-thread and GPU time
 // per frame at each zoom level with the simulation running and paused.
 //
@@ -137,7 +137,7 @@ try {
       '--headless=new',
       '--enable-gpu',
       '--ignore-gpu-blocklist',
-      '--use-angle=gl-egl',
+      '--use-angle=gl',
       // Exposes EXT_disjoint_timer_query_webgl2 for GPU frame timing.
       '--enable-privileged-webgl-extensions',
     ],
