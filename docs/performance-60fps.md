@@ -4,7 +4,53 @@ Measured on 2026-10-16 on the reference laptop: Intel Core i7-8550U (4C/8T, 15 W
 
 **Update, 2026-10-17.** The Canvas2D interception layer described below (`pixi-context.ts`) has been removed. Painters now draw straight into a few pooled PixiJS `Graphics` runs per layer, rebuilt each frame. On the same laptop with a 10-minute colony, CPU time per frame fell from 32/27/20 ms to 13/10/5.5 ms (zoom 0.55/1/2.2, running), every zoom reaches the 60 fps cap, and draw calls fell from about 44 to 15.
 
-**Verdict.** The frame is CPU-bound in rendering. The simulation, HUD and minimap together cost about 1 ms per frame at 1× speed. The world renderer re-describes every visible object each frame through intercepted Canvas2D calls, maps them onto a positional pool of PixiJS objects, and makes PixiJS re-batch the whole scene. That work grows with the number of visible objects (∝ 1/zoom²) and roughly doubles while the colony is running. Three cheap fixes halve the cost, but 60 fps at every zoom needs a retained world scene. A prototype of that scene on this machine costs 2–5 ms per frame.
+## Current native-renderer acceptance, 2026-10-18
+
+Measured `main` at `1f8e057fba857c40d02846f60558bcadfa408f67` on the reference i7-8550U / UHD 620 laptop, using hardware WebGL (`ANGLE (Intel, Mesa Intel(R) UHD Graphics 620 (KBL GT2), OpenGL ES 3.2)`), Node.js 24.18.1 and Playwright 1.64.0. The runs use seed 2024, 1920×1080, quality 1, full motion, muted audio and pinned noon without rain. Each starts with the same 20-minute autoplay colony: 30 buildings, 16 units and 2,463 trees. Every zoom has one second of warmup and ten seconds of measurement. The 1× run measures all zooms sequentially; each 8× zoom runs in a fresh browser and colony. Simulation advances during measurement, so these are not frozen-colony comparisons.
+
+```sh
+npm ci
+npm run bench:render -- --minutes 20 --modes running --speed 1 --ms 10000
+for zoom in 0 1 2 3 4 5 6; do
+  node scripts/bench-render.mjs --minutes 20 --modes running --speed 8 --zooms "$zoom" --ms 10000
+done
+```
+
+The 8× commands reuse the build from the 1× command. Saved benchmark summaries are committed alongside these notes: [1× results](benchmarks/2026-10-18/main-1x.json) and [isolated 8× results](benchmarks/2026-10-18/main-8x.json). They identify the hardware GPU and report CPU p95, GPU median/p95 and per-frame draw/upload counts. Timings below are milliseconds; fps remains capped at 60.
+
+| Zoom | 1× fps | CPU mean | CPU p95 | GPU median | GPU p95 |
+| ---- | ------ | -------- | ------- | ---------- | ------- |
+| 0.55 | 58.6   | 12.5     | 18.5    | 6.9        | 10.6    |
+| 0.7  | 57.2   | 12.5     | 17.5    | 6.9        | 9.4     |
+| 0.85 | 57.9   | 11.7     | 16.4    | 6.7        | 9.6     |
+| 1.0  | 59.3   | 10.1     | 14.3    | 6.0        | 8.8     |
+| 1.3  | 59.3   | 8.1      | 12.6    | 5.3        | 7.5     |
+| 1.7  | 60.0   | 6.3      | 7.7     | 4.8        | 6.8     |
+| 2.2  | 60.0   | 6.3      | 11.6    | 4.5        | 6.4     |
+
+At 1×, GPU median still exceeds #40's 6 ms ceiling at zooms 0.55–0.85. #47's CPU p95 ceiling of 10 ms is missed at every zoom except 1.7, and its GPU p95 ceiling of 10 ms is missed at 0.55. Reaching the 60 fps cap in a shorter or smaller-colony run does not establish these tail-latency budgets.
+
+An initial sequential 8× pass is excluded from acceptance: its last sample recorded zero simulation-step time and only 44.6 fps. The game can suspend simulation behind its victory modal, and the benchmark does not record modal or victory state. A sample without simulation work cannot establish the running 8× budget. The replacement measurements use a fresh 20-minute colony for each zoom; the closest-zoom repeat records simulation work again. The excluded pass remains locally under `output/bench/2026-10-18T08-35-55-874Z/` for diagnosis.
+
+| Zoom | 8× fps | CPU mean | CPU p95 | GPU median | GPU p95 |
+| ---- | ------ | -------- | ------- | ---------- | ------- |
+| 0.55 | 59.2   | 14.1     | 18.1    | 6.9        | 10.5    |
+| 0.7  | 55.9   | 15.1     | 21.4    | 7.0        | 10.2    |
+| 0.85 | 55.5   | 14.6     | 19.9    | 6.8        | 10.0    |
+| 1.0  | 57.2   | 12.8     | 18.8    | 6.1        | 9.8     |
+| 1.3  | 59.7   | 9.9      | 14.6    | 5.4        | 8.8     |
+| 1.7  | 59.2   | 9.4      | 14.6    | 5.0        | 7.6     |
+| 2.2  | 59.9   | 6.6      | 11.4    | 4.4        | 6.4     |
+
+At 8×, CPU p95 exceeds #47's 15 ms ceiling at zooms 0.55–1.0 (18.1–21.4 ms). The closer zooms meet that CPU ceiling in this session. These samples establish an open performance gap; they do not establish a regression against the earlier 10-minute-colony measurements or a same-session comparison with the pre-#54 renderer.
+
+The frame-phase measurements attribute most of the CPU mean to drawing: 11.8 of 12.5 ms at zoom 0.55 and 9.5 of 10.1 ms at zoom 1.0. Simulation means are 0.2–0.3 ms per frame at 1×. This supports profiling the current drawing path next; it does not identify a particular painter or prove that the old retained-scene design is the required fix. The renderer rebuilds six or seven native Graphics runs per frame; it no longer uses the removed Canvas-capture adapter.
+
+PR #52 is closed because its implementation plan predates the current native renderer. Its local `codex/pr52-integration` branch at `620c92459e1da39be6df2bec56d3dacd1a46b937` is preserved for reference. #40 and #47 remain open, and #42–#46 remain `needs-triage`: profile the native renderer, then rewrite only the tickets justified by the measured bottlenecks. These runs do not revalidate autosave or territory-change hitches, visual equivalence, or the full browser suite, so they cannot by themselves complete #47.
+
+## Original diagnosis, 2026-10-16 (before PR #54)
+
+The frame was CPU-bound in rendering. The simulation, HUD and minimap together cost about 1 ms per frame at 1× speed. The old world renderer re-described every visible object each frame through intercepted Canvas2D calls, mapped them onto a positional pool of PixiJS objects, and made PixiJS re-batch the whole scene. That work grew with the number of visible objects (∝ 1/zoom²) and roughly doubled while the colony was running. Three cheap fixes halved the cost, but the proposed next step was a retained world scene. A prototype of that scene on this machine cost 2–5 ms per frame. The diagnosis and plan below record that earlier renderer; they are not a description of current main.
 
 ## Method
 
