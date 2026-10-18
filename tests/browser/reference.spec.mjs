@@ -116,7 +116,7 @@ test('loading stages explain artwork work and report an incomplete pack before p
     await gate;
     await route.continue();
   });
-  await page.route('**/assets/art/foliage.png', (route) =>
+  await page.route('**/assets/art/tree-1.png', (route) =>
     route.fulfill({ status: 404, body: 'Artwork unavailable' }),
   );
   await page.goto('/tests/game.html?seed=2024');

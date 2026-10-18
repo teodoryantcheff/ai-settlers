@@ -18,7 +18,7 @@ try {
   const sheets = new Map();
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('response', (response) => {
-    const match = response.url().match(/\/assets\/art\/(buildings|foliage|meadow)\.png$/);
+    const match = new URL(response.url()).pathname.match(/\/assets\/art\/(.+\.png)$/);
     if (match) sheets.set(match[1], response.status());
   });
   await page.addInitScript(() => {
@@ -36,9 +36,18 @@ try {
   );
   assert.equal(await page.evaluate(() => window.productionRendererStats.backend), 'PixiJS WebGL');
   assert.equal(await page.locator('#painted-art-status').count(), 0);
-  assert.deepEqual(Object.fromEntries(sheets), { buildings: 200, foliage: 200, meadow: 200 });
   const script = await page.locator('script[src]').last().getAttribute('src');
   assert.match(script, /^releases\/[a-f0-9]{16}\/game\.min\.js$/);
+  const manifest = await page.request.get(
+    new URL('assets/art/manifest.json', new URL(script, base)).href,
+  );
+  assert.equal(manifest.status(), 200);
+  const activeFiles = Object.values((await manifest.json()).sheets);
+  assert.equal(activeFiles.length, 35);
+  assert.deepEqual(
+    Object.fromEntries(sheets),
+    Object.fromEntries(activeFiles.map((file) => [file, 200])),
+  );
   const bundle = await page.request.get(new URL(script, base).href);
   assert.equal(bundle.status(), 200);
   assert.equal(bundle.headers()['cache-control'], 'public, max-age=31536000, immutable');
