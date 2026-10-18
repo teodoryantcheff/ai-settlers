@@ -1,0 +1,978 @@
+{
+  "measuredAt": "2026-10-18T12:46:39.308Z",
+  "commit": "9e02e9267115e2f455aad3e96e98d0b6980dd952",
+  "DRI_PRIME": "pci-0000_02_00_0",
+  "angle": "gl",
+  "protocol": {
+    "minutes": 20,
+    "seed": 2024,
+    "viewport": "1920x1080",
+    "quality": 1,
+    "reducedMotion": false,
+    "weather": "noon, no rain",
+    "warmupMs": 1000,
+    "windowMs": 10000,
+    "freshColonyPerWindow": true
+  },
+  "hashes": {
+    "game.test.js": "8be855d01c78d5137e70c8c1aa9764c9aa75ce3a99b71eddce2a7e997ec7b56c",
+    "game.min.js": "233602ecc0d61c0df832344170b97e5bbde2d79ffe7d03a8775d37e6d8188688",
+    "output/native-nature/measure-amd.mjs": "0d8c8a91439dd5c7c623a6eb2fac463b97453c57f67713a0543d0bff8393649f"
+  },
+  "runs": [
+    {
+      "source": "output/bench/2026-10-18T12-46-39-772Z/results.json",
+      "gpu": "ANGLE (AMD, AMD Radeon 500 Series (radeonsi polaris12 ACO), OpenGL 4.6)",
+      "driPrime": "pci-0000_02_00_0",
+      "angle": "gl",
+      "software": false,
+      "seed": 2024,
+      "minutes": 20,
+      "speed": 1,
+      "quality": 1,
+      "scene": {
+        "time": "noon",
+        "rain": false
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "colony": {
+        "seconds": 1200,
+        "buildings": 30,
+        "units": 16,
+        "trees": 2463
+      },
+      "rows": [
+        {
+          "zoom": 0,
+          "mode": "running",
+          "scale": 0.55,
+          "fps": 59.7,
+          "cpuMean": 6.2,
+          "cpuP95": 8,
+          "drawMs": 5.8,
+          "stepMs": 0.2,
+          "miniMs": 0,
+          "hudMs": 0.1,
+          "gpuP50": 3.5,
+          "gpuP95": 6,
+          "sprites": 3575,
+          "graphics": 23,
+          "graphicsBuilds": 22.8,
+          "drawCalls": 46.5,
+          "uploadKB": 362,
+          "texUploads": 0.1,
+          "simulation": {
+            "start": 1200.9833333325698,
+            "pausedBefore": false,
+            "modalBefore": false,
+            "end": 1210.9999999992274,
+            "pausedAfter": false,
+            "modalAfter": false,
+            "speed": 1
+          }
+        }
+      ]
+    },
+    {
+      "source": "output/bench/2026-10-18T12-46-59-984Z/results.json",
+      "gpu": "ANGLE (AMD, AMD Radeon 500 Series (radeonsi polaris12 ACO), OpenGL 4.6)",
+      "driPrime": "pci-0000_02_00_0",
+      "angle": "gl",
+      "software": false,
+      "seed": 2024,
+      "minutes": 20,
+      "speed": 1,
+      "quality": 1,
+      "scene": {
+        "time": "noon",
+        "rain": false
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "colony": {
+        "seconds": 1200,
+        "buildings": 30,
+        "units": 16,
+        "trees": 2463
+      },
+      "rows": [
+        {
+          "zoom": 1,
+          "mode": "running",
+          "scale": 0.7,
+          "fps": 60,
+          "cpuMean": 6.7,
+          "cpuP95": 9.2,
+          "drawMs": 6.2,
+          "stepMs": 0.2,
+          "miniMs": 0,
+          "hudMs": 0.1,
+          "gpuP50": 3.3,
+          "gpuP95": 5.8,
+          "sprites": 2697,
+          "graphics": 23,
+          "graphicsBuilds": 22.8,
+          "drawCalls": 46.5,
+          "uploadKB": 346,
+          "texUploads": 0.1,
+          "simulation": {
+            "start": 1200.9999999992365,
+            "pausedBefore": false,
+            "modalBefore": false,
+            "end": 1210.9999999992274,
+            "pausedAfter": false,
+            "modalAfter": false,
+            "speed": 1
+          }
+        }
+      ]
+    },
+    {
+      "source": "output/bench/2026-10-18T12-47-19-834Z/results.json",
+      "gpu": "ANGLE (AMD, AMD Radeon 500 Series (radeonsi polaris12 ACO), OpenGL 4.6)",
+      "driPrime": "pci-0000_02_00_0",
+      "angle": "gl",
+      "software": false,
+      "seed": 2024,
+      "minutes": 20,
+      "speed": 1,
+      "quality": 1,
+      "scene": {
+        "time": "noon",
+        "rain": false
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "colony": {
+        "seconds": 1200,
+        "buildings": 30,
+        "units": 16,
+        "trees": 2463
+      },
+      "rows": [
+        {
+          "zoom": 2,
+          "mode": "running",
+          "scale": 0.85,
+          "fps": 59.8,
+          "cpuMean": 6.1,
+          "cpuP95": 8.3,
+          "drawMs": 5.7,
+          "stepMs": 0.2,
+          "miniMs": 0,
+          "hudMs": 0.1,
+          "gpuP50": 3.4,
+          "gpuP95": 4.3,
+          "sprites": 2315,
+          "graphics": 22,
+          "graphicsBuilds": 21.7,
+          "drawCalls": 46.5,
+          "uploadKB": 331,
+          "texUploads": 0.1,
+          "simulation": {
+            "start": 1200.9833333325698,
+            "pausedBefore": false,
+            "modalBefore": false,
+            "end": 1210.9999999992274,
+            "pausedAfter": false,
+            "modalAfter": false,
+            "speed": 1
+          }
+        }
+      ]
+    },
+    {
+      "source": "output/bench/2026-10-18T12-47-40-109Z/results.json",
+      "gpu": "ANGLE (AMD, AMD Radeon 500 Series (radeonsi polaris12 ACO), OpenGL 4.6)",
+      "driPrime": "pci-0000_02_00_0",
+      "angle": "gl",
+      "software": false,
+      "seed": 2024,
+      "minutes": 20,
+      "speed": 1,
+      "quality": 1,
+      "scene": {
+        "time": "noon",
+        "rain": false
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "colony": {
+        "seconds": 1200,
+        "buildings": 30,
+        "units": 16,
+        "trees": 2463
+      },
+      "rows": [
+        {
+          "zoom": 3,
+          "mode": "running",
+          "scale": 1,
+          "fps": 59.8,
+          "cpuMean": 5.2,
+          "cpuP95": 7.3,
+          "drawMs": 4.8,
+          "stepMs": 0.2,
+          "miniMs": 0,
+          "hudMs": 0.1,
+          "gpuP50": 2.9,
+          "gpuP95": 4.2,
+          "sprites": 1801,
+          "graphics": 22,
+          "graphicsBuilds": 21.7,
+          "drawCalls": 46.5,
+          "uploadKB": 294,
+          "texUploads": 0.1,
+          "simulation": {
+            "start": 1200.9999999992365,
+            "pausedBefore": false,
+            "modalBefore": false,
+            "end": 1210.9999999992274,
+            "pausedAfter": false,
+            "modalAfter": false,
+            "speed": 1
+          }
+        }
+      ]
+    },
+    {
+      "source": "output/bench/2026-10-18T12-48-00-909Z/results.json",
+      "gpu": "ANGLE (AMD, AMD Radeon 500 Series (radeonsi polaris12 ACO), OpenGL 4.6)",
+      "driPrime": "pci-0000_02_00_0",
+      "angle": "gl",
+      "software": false,
+      "seed": 2024,
+      "minutes": 20,
+      "speed": 1,
+      "quality": 1,
+      "scene": {
+        "time": "noon",
+        "rain": false
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "colony": {
+        "seconds": 1200,
+        "buildings": 30,
+        "units": 16,
+        "trees": 2463
+      },
+      "rows": [
+        {
+          "zoom": 4,
+          "mode": "running",
+          "scale": 1.3,
+          "fps": 59.9,
+          "cpuMean": 5.1,
+          "cpuP95": 10.8,
+          "drawMs": 4.7,
+          "stepMs": 0.2,
+          "miniMs": 0,
+          "hudMs": 0.1,
+          "gpuP50": 2.7,
+          "gpuP95": 4.8,
+          "sprites": 1161,
+          "graphics": 22,
+          "graphicsBuilds": 21.7,
+          "drawCalls": 46.5,
+          "uploadKB": 227,
+          "texUploads": 0.1,
+          "simulation": {
+            "start": 1200.9999999992365,
+            "pausedBefore": false,
+            "modalBefore": false,
+            "end": 1210.9999999992274,
+            "pausedAfter": false,
+            "modalAfter": false,
+            "speed": 1
+          }
+        }
+      ]
+    },
+    {
+      "source": "output/bench/2026-10-18T12-48-21-130Z/results.json",
+      "gpu": "ANGLE (AMD, AMD Radeon 500 Series (radeonsi polaris12 ACO), OpenGL 4.6)",
+      "driPrime": "pci-0000_02_00_0",
+      "angle": "gl",
+      "software": false,
+      "seed": 2024,
+      "minutes": 20,
+      "speed": 1,
+      "quality": 1,
+      "scene": {
+        "time": "noon",
+        "rain": false
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "colony": {
+        "seconds": 1200,
+        "buildings": 30,
+        "units": 16,
+        "trees": 2463
+      },
+      "rows": [
+        {
+          "zoom": 5,
+          "mode": "running",
+          "scale": 1.7,
+          "fps": 59.9,
+          "cpuMean": 4.9,
+          "cpuP95": 10.2,
+          "drawMs": 4.4,
+          "stepMs": 0.2,
+          "miniMs": 0,
+          "hudMs": 0.1,
+          "gpuP50": 2.7,
+          "gpuP95": 5,
+          "sprites": 834,
+          "graphics": 21,
+          "graphicsBuilds": 20.8,
+          "drawCalls": 43.5,
+          "uploadKB": 174,
+          "texUploads": 0.1,
+          "simulation": {
+            "start": 1200.9999999992365,
+            "pausedBefore": false,
+            "modalBefore": false,
+            "end": 1211.016666665894,
+            "pausedAfter": false,
+            "modalAfter": false,
+            "speed": 1
+          }
+        }
+      ]
+    },
+    {
+      "source": "output/bench/2026-10-18T12-48-41-546Z/results.json",
+      "gpu": "ANGLE (AMD, AMD Radeon 500 Series (radeonsi polaris12 ACO), OpenGL 4.6)",
+      "driPrime": "pci-0000_02_00_0",
+      "angle": "gl",
+      "software": false,
+      "seed": 2024,
+      "minutes": 20,
+      "speed": 1,
+      "quality": 1,
+      "scene": {
+        "time": "noon",
+        "rain": false
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "colony": {
+        "seconds": 1200,
+        "buildings": 30,
+        "units": 16,
+        "trees": 2463
+      },
+      "rows": [
+        {
+          "zoom": 6,
+          "mode": "running",
+          "scale": 2.2,
+          "fps": 58.5,
+          "cpuMean": 5.6,
+          "cpuP95": 12,
+          "drawMs": 5,
+          "stepMs": 0.3,
+          "miniMs": 0,
+          "hudMs": 0.1,
+          "gpuP50": 2.1,
+          "gpuP95": 3.8,
+          "sprites": 539,
+          "graphics": 19,
+          "graphicsBuilds": 18.9,
+          "drawCalls": 38.8,
+          "uploadKB": 140,
+          "texUploads": 0.1,
+          "simulation": {
+            "start": 1200.9833333325698,
+            "pausedBefore": false,
+            "modalBefore": false,
+            "end": 1210.9999999992274,
+            "pausedAfter": false,
+            "modalAfter": false,
+            "speed": 1
+          }
+        }
+      ]
+    },
+    {
+      "source": "output/bench/2026-10-18T12-49-02-488Z/results.json",
+      "gpu": "ANGLE (AMD, AMD Radeon 500 Series (radeonsi polaris12 ACO), OpenGL 4.6)",
+      "driPrime": "pci-0000_02_00_0",
+      "angle": "gl",
+      "software": false,
+      "seed": 2024,
+      "minutes": 20,
+      "speed": 8,
+      "quality": 1,
+      "scene": {
+        "time": "noon",
+        "rain": false
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "colony": {
+        "seconds": 1200,
+        "buildings": 30,
+        "units": 16,
+        "trees": 2463
+      },
+      "rows": [
+        {
+          "zoom": 0,
+          "mode": "running",
+          "scale": 0.55,
+          "fps": 59.4,
+          "cpuMean": 8,
+          "cpuP95": 11.5,
+          "drawMs": 6.7,
+          "stepMs": 1,
+          "miniMs": 0,
+          "hudMs": 0.1,
+          "gpuP50": 3.5,
+          "gpuP95": 5.9,
+          "sprites": 3570,
+          "graphics": 22,
+          "graphicsBuilds": 22.1,
+          "drawCalls": 45.2,
+          "uploadKB": 430,
+          "texUploads": 0.2,
+          "simulation": {
+            "start": 1207.9833333325635,
+            "pausedBefore": false,
+            "modalBefore": false,
+            "end": 1288.116666665824,
+            "pausedAfter": false,
+            "modalAfter": false,
+            "speed": 8
+          }
+        }
+      ]
+    },
+    {
+      "source": "output/bench/2026-10-18T12-49-22-794Z/results.json",
+      "gpu": "ANGLE (AMD, AMD Radeon 500 Series (radeonsi polaris12 ACO), OpenGL 4.6)",
+      "driPrime": "pci-0000_02_00_0",
+      "angle": "gl",
+      "software": false,
+      "seed": 2024,
+      "minutes": 20,
+      "speed": 8,
+      "quality": 1,
+      "scene": {
+        "time": "noon",
+        "rain": false
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "colony": {
+        "seconds": 1200,
+        "buildings": 30,
+        "units": 16,
+        "trees": 2463
+      },
+      "rows": [
+        {
+          "zoom": 1,
+          "mode": "running",
+          "scale": 0.7,
+          "fps": 59.7,
+          "cpuMean": 7.5,
+          "cpuP95": 10.8,
+          "drawMs": 6.3,
+          "stepMs": 0.9,
+          "miniMs": 0,
+          "hudMs": 0.1,
+          "gpuP50": 3.3,
+          "gpuP95": 5.5,
+          "sprites": 2692,
+          "graphics": 22,
+          "graphicsBuilds": 22.1,
+          "drawCalls": 45.2,
+          "uploadKB": 413,
+          "texUploads": 0.2,
+          "simulation": {
+            "start": 1208.1333333325633,
+            "pausedBefore": false,
+            "modalBefore": false,
+            "end": 1288.3833333324903,
+            "pausedAfter": false,
+            "modalAfter": false,
+            "speed": 8
+          }
+        }
+      ]
+    },
+    {
+      "source": "output/bench/2026-10-18T12-49-43-543Z/results.json",
+      "gpu": "ANGLE (AMD, AMD Radeon 500 Series (radeonsi polaris12 ACO), OpenGL 4.6)",
+      "driPrime": "pci-0000_02_00_0",
+      "angle": "gl",
+      "software": false,
+      "seed": 2024,
+      "minutes": 20,
+      "speed": 8,
+      "quality": 1,
+      "scene": {
+        "time": "noon",
+        "rain": false
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "colony": {
+        "seconds": 1200,
+        "buildings": 30,
+        "units": 16,
+        "trees": 2463
+      },
+      "rows": [
+        {
+          "zoom": 2,
+          "mode": "running",
+          "scale": 0.85,
+          "fps": 59.6,
+          "cpuMean": 7,
+          "cpuP95": 10.7,
+          "drawMs": 5.9,
+          "stepMs": 0.8,
+          "miniMs": 0,
+          "hudMs": 0.1,
+          "gpuP50": 3.5,
+          "gpuP95": 3.7,
+          "sprites": 2307,
+          "graphics": 21,
+          "graphicsBuilds": 21.1,
+          "drawCalls": 45.2,
+          "uploadKB": 399,
+          "texUploads": 0.2,
+          "simulation": {
+            "start": 1207.99999999923,
+            "pausedBefore": false,
+            "modalBefore": false,
+            "end": 1288.116666665824,
+            "pausedAfter": false,
+            "modalAfter": false,
+            "speed": 8
+          }
+        }
+      ]
+    },
+    {
+      "source": "output/bench/2026-10-18T12-50-04-505Z/results.json",
+      "gpu": "ANGLE (AMD, AMD Radeon 500 Series (radeonsi polaris12 ACO), OpenGL 4.6)",
+      "driPrime": "pci-0000_02_00_0",
+      "angle": "gl",
+      "software": false,
+      "seed": 2024,
+      "minutes": 20,
+      "speed": 8,
+      "quality": 1,
+      "scene": {
+        "time": "noon",
+        "rain": false
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "colony": {
+        "seconds": 1200,
+        "buildings": 30,
+        "units": 16,
+        "trees": 2463
+      },
+      "rows": [
+        {
+          "zoom": 3,
+          "mode": "running",
+          "scale": 1,
+          "fps": 59.7,
+          "cpuMean": 7.1,
+          "cpuP95": 13.2,
+          "drawMs": 5.9,
+          "stepMs": 0.9,
+          "miniMs": 0,
+          "hudMs": 0.1,
+          "gpuP50": 2.9,
+          "gpuP95": 4.1,
+          "sprites": 1793,
+          "graphics": 21,
+          "graphicsBuilds": 21.1,
+          "drawCalls": 45.2,
+          "uploadKB": 360,
+          "texUploads": 0.2,
+          "simulation": {
+            "start": 1208.1166666658967,
+            "pausedBefore": false,
+            "modalBefore": false,
+            "end": 1288.116666665824,
+            "pausedAfter": false,
+            "modalAfter": false,
+            "speed": 8
+          }
+        }
+      ]
+    },
+    {
+      "source": "output/bench/2026-10-18T12-50-25-669Z/results.json",
+      "gpu": "ANGLE (AMD, AMD Radeon 500 Series (radeonsi polaris12 ACO), OpenGL 4.6)",
+      "driPrime": "pci-0000_02_00_0",
+      "angle": "gl",
+      "software": false,
+      "seed": 2024,
+      "minutes": 20,
+      "speed": 8,
+      "quality": 1,
+      "scene": {
+        "time": "noon",
+        "rain": false
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "colony": {
+        "seconds": 1200,
+        "buildings": 30,
+        "units": 16,
+        "trees": 2463
+      },
+      "rows": [
+        {
+          "zoom": 4,
+          "mode": "running",
+          "scale": 1.3,
+          "fps": 59.9,
+          "cpuMean": 7,
+          "cpuP95": 10.8,
+          "drawMs": 5.9,
+          "stepMs": 0.9,
+          "miniMs": 0,
+          "hudMs": 0.1,
+          "gpuP50": 2.9,
+          "gpuP95": 4.2,
+          "sprites": 1153,
+          "graphics": 21,
+          "graphicsBuilds": 21.1,
+          "drawCalls": 45.2,
+          "uploadKB": 291,
+          "texUploads": 0.2,
+          "simulation": {
+            "start": 1207.99999999923,
+            "pausedBefore": false,
+            "modalBefore": false,
+            "end": 1288.116666665824,
+            "pausedAfter": false,
+            "modalAfter": false,
+            "speed": 8
+          }
+        }
+      ]
+    },
+    {
+      "source": "output/bench/2026-10-18T12-50-46-574Z/results.json",
+      "gpu": "ANGLE (AMD, AMD Radeon 500 Series (radeonsi polaris12 ACO), OpenGL 4.6)",
+      "driPrime": "pci-0000_02_00_0",
+      "angle": "gl",
+      "software": false,
+      "seed": 2024,
+      "minutes": 20,
+      "speed": 8,
+      "quality": 1,
+      "scene": {
+        "time": "noon",
+        "rain": false
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "colony": {
+        "seconds": 1200,
+        "buildings": 30,
+        "units": 16,
+        "trees": 2463
+      },
+      "rows": [
+        {
+          "zoom": 5,
+          "mode": "running",
+          "scale": 1.7,
+          "fps": 59.8,
+          "cpuMean": 6.2,
+          "cpuP95": 8.4,
+          "drawMs": 5.1,
+          "stepMs": 0.8,
+          "miniMs": 0,
+          "hudMs": 0.1,
+          "gpuP50": 2.7,
+          "gpuP95": 5.1,
+          "sprites": 827,
+          "graphics": 20,
+          "graphicsBuilds": 20,
+          "drawCalls": 42.1,
+          "uploadKB": 247,
+          "texUploads": 0.2,
+          "simulation": {
+            "start": 1207.9833333325635,
+            "pausedBefore": false,
+            "modalBefore": false,
+            "end": 1288.116666665824,
+            "pausedAfter": false,
+            "modalAfter": false,
+            "speed": 8
+          }
+        }
+      ]
+    },
+    {
+      "source": "output/bench/2026-10-18T12-51-07-713Z/results.json",
+      "gpu": "ANGLE (AMD, AMD Radeon 500 Series (radeonsi polaris12 ACO), OpenGL 4.6)",
+      "driPrime": "pci-0000_02_00_0",
+      "angle": "gl",
+      "software": false,
+      "seed": 2024,
+      "minutes": 20,
+      "speed": 8,
+      "quality": 1,
+      "scene": {
+        "time": "noon",
+        "rain": false
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "colony": {
+        "seconds": 1200,
+        "buildings": 30,
+        "units": 16,
+        "trees": 2463
+      },
+      "rows": [
+        {
+          "zoom": 6,
+          "mode": "running",
+          "scale": 2.2,
+          "fps": 58.5,
+          "cpuMean": 6.2,
+          "cpuP95": 9.6,
+          "drawMs": 4.7,
+          "stepMs": 1.1,
+          "miniMs": 0,
+          "hudMs": 0.1,
+          "gpuP50": 2.2,
+          "gpuP95": 3.8,
+          "sprites": 536,
+          "graphics": 19,
+          "graphicsBuilds": 18.6,
+          "drawCalls": 38.1,
+          "uploadKB": 215,
+          "texUploads": 0.2,
+          "simulation": {
+            "start": 1207.99999999923,
+            "pausedBefore": false,
+            "modalBefore": false,
+            "end": 1288.116666665824,
+            "pausedAfter": false,
+            "modalAfter": false,
+            "speed": 8
+          }
+        }
+      ]
+    }
+  ],
+  "repeats": [
+    {
+      "source": "output/bench/2026-10-18T12-51-58-990Z/results.json",
+      "windowMs": 30000,
+      "gpu": "ANGLE (AMD, AMD Radeon 500 Series (radeonsi polaris12 ACO), OpenGL 4.6)",
+      "driPrime": "pci-0000_02_00_0",
+      "angle": "gl",
+      "software": false,
+      "seed": 2024,
+      "minutes": 20,
+      "speed": 1,
+      "quality": 1,
+      "scene": {
+        "time": "noon",
+        "rain": false
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "colony": {
+        "seconds": 1200,
+        "buildings": 30,
+        "units": 16,
+        "trees": 2463
+      },
+      "rows": [
+        {
+          "zoom": 6,
+          "mode": "running",
+          "scale": 2.2,
+          "fps": 59.5,
+          "cpuMean": 4.6,
+          "cpuP95": 10.5,
+          "drawMs": 4.2,
+          "stepMs": 0.2,
+          "miniMs": 0,
+          "hudMs": 0.1,
+          "gpuP50": 2.2,
+          "gpuP95": 3.9,
+          "sprites": 543,
+          "graphics": 18,
+          "graphicsBuilds": 18.8,
+          "drawCalls": 38.7,
+          "uploadKB": 137,
+          "texUploads": 0,
+          "simulation": {
+            "start": 1200.9999999992365,
+            "pausedBefore": false,
+            "modalBefore": false,
+            "end": 1230.9999999992092,
+            "pausedAfter": false,
+            "modalAfter": false,
+            "speed": 1
+          }
+        }
+      ]
+    },
+    {
+      "source": "output/bench/2026-10-18T12-52-39-812Z/results.json",
+      "windowMs": 30000,
+      "gpu": "ANGLE (AMD, AMD Radeon 500 Series (radeonsi polaris12 ACO), OpenGL 4.6)",
+      "driPrime": "pci-0000_02_00_0",
+      "angle": "gl",
+      "software": false,
+      "seed": 2024,
+      "minutes": 20,
+      "speed": 8,
+      "quality": 1,
+      "scene": {
+        "time": "noon",
+        "rain": false
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "colony": {
+        "seconds": 1200,
+        "buildings": 30,
+        "units": 16,
+        "trees": 2463
+      },
+      "rows": [
+        {
+          "zoom": 6,
+          "mode": "running",
+          "scale": 2.2,
+          "fps": 59.4,
+          "cpuMean": 6.3,
+          "cpuP95": 10.2,
+          "drawMs": 4.9,
+          "stepMs": 1.1,
+          "miniMs": 0,
+          "hudMs": 0.1,
+          "gpuP50": 2.2,
+          "gpuP95": 3.8,
+          "sprites": 540,
+          "graphics": 19,
+          "graphicsBuilds": 18.5,
+          "drawCalls": 38.1,
+          "uploadKB": 214,
+          "texUploads": 0.2,
+          "simulation": {
+            "start": 1207.9833333325635,
+            "pausedBefore": false,
+            "modalBefore": false,
+            "end": 1448.1166666656784,
+            "pausedAfter": false,
+            "modalAfter": false,
+            "speed": 8
+          }
+        }
+      ]
+    }
+  ],
+  "comparisonWithPreviousIntel": {
+    "note": "Historical runs use Intel UHD 620 and ANGLE gl-egl. AMD runs also change the ANGLE backend to gl; this is not a same-GPU main-versus-integration comparison.",
+    "rows": [
+      {
+        "zoom": 0.55,
+        "intel1xFps": 56.5,
+        "amd1xFps": 59.7,
+        "intel8xFps": 51.2,
+        "amd8xFps": 59.4
+      },
+      {
+        "zoom": 0.7,
+        "intel1xFps": 58,
+        "amd1xFps": 60,
+        "intel8xFps": 53.7,
+        "amd8xFps": 59.7
+      },
+      {
+        "zoom": 0.85,
+        "intel1xFps": 54.5,
+        "amd1xFps": 59.8,
+        "intel8xFps": 56,
+        "amd8xFps": 59.6
+      },
+      {
+        "zoom": 1,
+        "intel1xFps": 59.3,
+        "amd1xFps": 59.8,
+        "intel8xFps": 56.5,
+        "amd8xFps": 59.7
+      },
+      {
+        "zoom": 1.3,
+        "intel1xFps": 60,
+        "amd1xFps": 59.9,
+        "intel8xFps": 58.9,
+        "amd8xFps": 59.9
+      },
+      {
+        "zoom": 1.7,
+        "intel1xFps": 58.9,
+        "amd1xFps": 59.9,
+        "intel8xFps": 59.8,
+        "amd8xFps": 59.8
+      },
+      {
+        "zoom": 2.2,
+        "intel1xFps": 60,
+        "amd1xFps": 58.5,
+        "intel8xFps": 60,
+        "amd8xFps": 58.5
+      }
+    ]
+  }
+}

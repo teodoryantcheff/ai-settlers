@@ -4,11 +4,41 @@ Measured on 2026-10-16 on the reference laptop: Intel Core i7-8550U (4C/8T, 15 W
 
 **Update, 2026-10-17.** The Canvas2D interception layer described below (`pixi-context.ts`) has been removed. Painters now draw straight into a few pooled PixiJS `Graphics` runs per layer, rebuilt each frame. On the same laptop with a 10-minute colony, CPU time per frame fell from 32/27/20 ms to 13/10/5.5 ms (zoom 0.55/1/2.2, running), every zoom reaches the 60 fps cap, and draw calls fell from about 44 to 15.
 
+## AMD OpenGL rerun, 2026-10-18
+
+Reran the integration runtime with `DRI_PRIME=pci-0000_02_00_0` and `--use-angle=gl`. Every measured window reports **ANGLE (AMD, AMD Radeon 500 Series (radeonsi polaris12 ACO), OpenGL 4.6)**, with no software fallback. The benchmark launcher now uses the same ANGLE backend as the browser tests. Runtime code is unchanged from the reviewed implementation; [raw results, bundle hashes and protocol](benchmarks/2026-10-18/native-nature/amd-gl/results.json) preserve all 14 initial windows and both longer repeats.
+
+Conditions: 1920×1080, quality 1, full motion, seed 2024, 20-minute colony, pinned noon/no rain. Each speed/zoom pair starts from a fresh browser and colony, warms for one second and records ten seconds. All windows remain unpaused with no modal, and simulation advances at the requested speed. The previous Intel measurements are historical comparisons; changing both GPU and ANGLE backend does not isolate either change or establish a main-versus-integration gain on AMD.
+
+| Zoom | Previous Intel 1× fps | AMD 1× fps | Previous Intel 8× fps | AMD 8× fps |
+|---|---:|---:|---:|---:|
+| 0.55 | 56.5 | 59.7 | 51.2 | 59.4 |
+| 0.7 | 58 | 60 | 53.7 | 59.7 |
+| 0.85 | 54.5 | 59.8 | 56 | 59.6 |
+| 1 | 59.3 | 59.8 | 56.5 | 59.7 |
+| 1.3 | 60 | 59.9 | 58.9 | 59.9 |
+| 1.7 | 58.9 | 59.9 | 59.8 | 59.8 |
+| 2.2 | 60 | 58.5 | 60 | 58.5 |
+
+| Zoom | AMD 1× CPU p95 | AMD 1× GPU p95 | AMD 8× CPU p95 | AMD 8× GPU p95 |
+|---|---:|---:|---:|---:|
+| 0.55 | 8 ms | 6 ms | 11.5 ms | 5.9 ms |
+| 0.7 | 9.2 ms | 5.8 ms | 10.8 ms | 5.5 ms |
+| 0.85 | 8.3 ms | 4.3 ms | 10.7 ms | 3.7 ms |
+| 1 | 7.3 ms | 4.2 ms | 13.2 ms | 4.1 ms |
+| 1.3 | 10.8 ms | 4.8 ms | 10.8 ms | 4.2 ms |
+| 1.7 | 10.2 ms | 5 ms | 8.4 ms | 5.1 ms |
+| 2.2 | 12 ms | 3.8 ms | 9.6 ms | 3.8 ms |
+
+**AMD puts the game near 60 fps across the zoom range, but these runs do not demonstrate a consistently locked 60 fps at every zoom.** Initial averages span 58.5–60.0 fps at 1× and 58.5–59.9 fps at 8×. The closest zoom (2.2) returned 58.5 fps at both speeds. One predefined 30-second repeat per speed at that zoom produced **59.5 fps at 1× and 59.4 fps at 8×**; both original dips remain in the table and evidence. Repeat CPU p95 was 10.5 / 10.2 ms and GPU p95 3.9 / 3.8 ms (1× / 8×).
+
+GPU p95 stays within the 10 ms target at every zoom (maximum 6.0 ms at 1× and 5.9 ms at 8×). All seven 8× CPU p95 values meet the 15 ms ceiling (maximum 13.2 ms). The tighter 1× CPU p95 ≤10 ms criterion still fails at zooms 1.3, 1.7 and 2.2, with a maximum of 12.0 ms. Most average frame rates are near the cap, while the remaining measured limits are CPU tails or frame pacing rather than the earlier large GPU cost; these counters do not locate every dropped frame. This benchmark covers the pinned daylight scene, not night, rain, territory changes or autosave hitches. No additional runtime optimization or PR is included in this rerun.
+
 ## Native nature retention, 2026-10-18 (#42 / #44)
 
 Implemented on the single `codex/native-nature-integration` branch, starting from fresh `main` at `c0ebf91` (including the normalized building PNGs). Final runtime measurements use reviewed commit `8ce4aa6`; [provenance](benchmarks/2026-10-18/native-nature/provenance.json) records source/bundle hashes and validation. Earlier measurements are retained as [pre-review 1×](benchmarks/2026-10-18/native-nature/retained-pre-review-1x.json) and [pre-review 8×](benchmarks/2026-10-18/native-nature/retained-pre-review-8x.json), rather than selecting the fastest run. The production WebGL renderer retains a view per tree/rock tile. Images and local vector geometry update explicitly, while unchanged views reuse shared textures. Contiguous static spans between immediate building/settler drawings share native GPU batches; moving objects change only the spans they cross. Cached static depth rows merge with the full dynamic depth keys and preserve stable ties. Culling drops obsolete batch ordering identities while retaining owned artwork; removal, world replacement and teardown release owned views, including detached ones. Buildings, settlers and overlays remain immediate.
 
-The first per-owner prototype kept draw calls low but still rebuilt/uploaded the combined scene batch and incurred repeated child-array splices. It did not demonstrate a CPU gain. The adopted path sorts placement once and isolates static batch instructions. Batch isolation increases draw calls. The final controls below show CPU savings but worse far-zoom GPU tails and fps, so the implementation remains experimental and is not recommended for a PR yet.
+The first per-owner prototype kept draw calls low but still rebuilt/uploaded the combined scene batch and incurred repeated child-array splices. It did not demonstrate a CPU gain. The adopted path sorts placement once and isolates static batch instructions. Batch isolation increases draw calls. The final Intel controls below show CPU savings but worse far-zoom GPU tails and fps, so the implementation remains experimental; those results do not support shipping it as a route to stable 60 fps.
 
 ### Hardware measurements
 
@@ -73,7 +103,7 @@ A targeted [8× zoom-1.3 A/B/A repeat](benchmarks/2026-10-18/native-nature/contr
 
 36 before/after actual-game captures cover zooms 0.55, 1.0 and 2.2; day/night; Normal, Visual clarity and Reduced Motion; and both quality 1/0.75. They use the same grown colony, fixed cosmetic clock and cosmetic RNG, and hardware WebGL. [Comparison summaries and hashes](benchmarks/2026-10-18/native-nature/visual-comparison.json) record a maximum channel difference of 6/255 and a worst per-image mean difference below 0.00047/255. The differences are sparse raster rounding; the inspected contact sheet shows no ordering, footprint or anchor shifts. Raw PNGs and the contact sheet remain in `output/native-nature/`.
 
-Real-subsystem tests cover static/dynamic depth keys and stable ties, growth, planting/felling, sway, pause, Reduced Motion, clarity, source replacement, far-zoom thresholds and world replacement. Hardware-browser fixtures verify retained Graphics batches, bounded buffer updates across camera changes, culling/reuse, nested batch cleanup and visible graphics failure recovery. Existing hardware tests cover partial terrain/border uploads, tiled textures, shadows and bounded art caches across all zooms. `npm test`, `npm run format:check` and all 24 affected hardware-browser tests pass. The final `8ce4aa6` functional review reports Standards: 0 documented breaches and 0 remaining smell findings; functional Spec: 0 findings. The shared-selector maintenance concern was fixed and revalidated; the final full routine suite passes again. Performance acceptance has two open criteria: #42's increased draw calls are not justified by the whole-frame fps/GPU results, and #44's far-zoom drawing gain beyond control variation remains unproven. Neither ticket is closed and no PR is opened.
+Real-subsystem tests cover static/dynamic depth keys and stable ties, growth, planting/felling, sway, pause, Reduced Motion, clarity, source replacement, far-zoom thresholds and world replacement. Hardware-browser fixtures verify retained Graphics batches, bounded buffer updates across camera changes, culling/reuse, nested batch cleanup and visible graphics failure recovery. Existing hardware tests cover partial terrain/border uploads, tiled textures, shadows and bounded art caches across all zooms. `npm test`, `npm run format:check` and all 24 affected hardware-browser tests pass. The final `8ce4aa6` functional review reports Standards: 0 documented breaches and 0 remaining smell findings; functional Spec: 0 findings. The shared-selector maintenance concern was fixed and revalidated; the final full routine suite passes again. Performance acceptance has two open criteria: #42's increased draw calls are not justified by the whole-frame fps/GPU results, and #44's far-zoom drawing gain beyond control variation remains unproven. Neither ticket is closed; the integration is being published for review with these performance acceptance gaps explicit.
 
 ### Remaining drawing cost
 
