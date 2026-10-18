@@ -47,7 +47,7 @@ All times below are milliseconds; the paired CPU columns show mean / p95.
 | 1.7 | 14.9 | 60 | 7.9 / 11 | 4.8 / 7.6 |
 | 2.2 | 13.8 | 59.8 | 6.8 / 11.6 | 4.6 / 8.1 |
 
-**The all-zoom target is not met.** In this 1× run CPU p95 still exceeds 10 ms at zooms 0.55–1.0, although GPU p95 stays below 10 ms. GPU medians at zooms 0.55–0.85 still exceed #40's 6 ms criterion. At 8×, CPU p95 exceeds 15 ms at zooms 0.55, 0.7, 0.85 and 1.3; GPU p95 reaches 11 ms at 0.55. The isolated 1.3/8× tail is worse than its baseline and needs an adjacent control before assigning cause. These results establish useful far/default drawing savings, not uniform gains at every zoom, a regression-free 8× result or closure of #35/#40/#47. Autosave and territory-change hitches were not remeasured by this work.
+**The all-zoom target is not met.** In this 1× run CPU p95 still exceeds 10 ms at zooms 0.55–1.0, although GPU p95 stays below 10 ms. GPU medians at zooms 0.55–0.85 still exceed #40's 6 ms criterion. At 8×, CPU p95 exceeds 15 ms at zooms 0.55, 0.7, 0.85 and 1.3; GPU p95 reaches 11 ms at 0.55. The isolated 1.3/8× tail was worse than its baseline; the adjacent repeat below did not reproduce that apparent regression. These results establish useful far/default drawing savings, not uniform gains at every zoom, a regression-free 8× result or closure of #35/#40/#47. Autosave and territory-change hitches were not remeasured by this work.
 
 ### Adjacent A/B/A controls
 
@@ -60,6 +60,8 @@ Main's unchanged built assets were preserved outside the checkout; all implement
 
 Drawing falls about 22% / 16% against the averages of adjacent controls and is below both controls at both zooms. The full 1× run records CPU mean falling from 12.1 to 7.9 ms at far zoom, but the adjacent comparison is the better estimate of the gain under this laptop's shared power budget. The visible sprite counts match. Graphics-build counts rise because immediate work is split into smaller runs; unchanged paused nature emits no image commands or geometry updates. Its independent batches also survive camera transforms without uploading all static sprite vertices, verified by a real GPU buffer-update fixture.
 
+A targeted [8× zoom-1.3 A/B/A repeat](benchmarks/2026-10-18/native-nature/controls-8x-1.3.json) checked that isolated worse tail rather than treating it as a regression. CPU p95 was 11.8 / **11.0** / 12.8 ms (main / retained / main), with drawing 7.4 / **7.0** / 7.6 ms and 60 fps in all three windows. The worse 16.8 ms sample remains in the full table; the controlled repeat met the 15 ms ceiling and does not establish a near-zoom regression.
+
 ### Visual and regression evidence
 
 36 before/after actual-game captures cover zooms 0.55, 1.0 and 2.2; day/night; Normal, Visual clarity and Reduced Motion; and both quality 1/0.75. They use the same grown colony, fixed cosmetic clock and cosmetic RNG, and hardware WebGL. [Comparison summaries and hashes](benchmarks/2026-10-18/native-nature/visual-comparison.json) record a maximum channel difference of 6/255 and a worst per-image mean difference below 0.00047/255. The differences are sparse raster rounding; the inspected contact sheet shows no ordering, footprint or anchor shifts. Raw PNGs and the contact sheet remain in `output/native-nature/`.
@@ -68,7 +70,7 @@ Real-subsystem tests cover static/dynamic depth keys and stable ties, growth, pl
 
 ### Remaining drawing cost
 
-A post-change five-second V8 profile at zooms 0.55/1.0 attributes 37.3% / 47.6% of sampled drawing time to submission (`presentation.end`). Native instruction rebuilding remains 18.4% / 26.7%, and Graphics batch preparation 11.6% / 16.3%; these inclusive shares overlap. Direct building painter stacks account for 6.5% / 16.6%. [Far profile](benchmarks/2026-10-18/native-nature/profile-0.json) and [default profile](benchmarks/2026-10-18/native-nature/profile-3.json) preserve weighted totals and raw-profile hashes. These samples are not source-map attributed, can be blurred by inlining, and include profiler overhead; they do not replace unprofiled frame budgets. Remaining immediate geometry and building drawing warrant controlled probes before choosing #46 or another migration. #45 is still conditional; this 16-unit colony does not establish a large-population settler cost.
+A post-change five-second V8 profile from `463a900` (before the final shared-selector refactor) at zooms 0.55/1.0 attributes 37.3% / 47.6% of sampled drawing time to submission (`presentation.end`). Native instruction rebuilding remains 18.4% / 26.7%, and Graphics batch preparation 11.6% / 16.3%; these inclusive shares overlap. Direct building painter stacks account for 6.5% / 16.6%. [Far profile](benchmarks/2026-10-18/native-nature/profile-0.json) and [default profile](benchmarks/2026-10-18/native-nature/profile-3.json) preserve weighted totals and raw-profile hashes. These samples are not source-map attributed, can be blurred by inlining, and include profiler overhead; they do not replace unprofiled frame budgets. Remaining immediate geometry and building drawing warrant controlled probes before choosing #46 or another migration. #45 is still conditional; this 16-unit colony does not establish a large-population settler cost.
 
 ## Original diagnosis (before the native drawing path)
 

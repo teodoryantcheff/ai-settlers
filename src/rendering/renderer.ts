@@ -908,11 +908,20 @@ export function createRenderer(
       }
     }
   }
-  function drawTree(s: SceneObject, x: number, y: number, tl: Tile, now: number) {
+  function treeArtwork(hash: number, stage: number, now: number) {
+    const sway = renderPrefs().reducedMotion ? 0 : ((now / 2400 + hash * 0.61) | 0) % 2;
+    return game.ART.tree[stage - 1][hash % 3][sway];
+  }
+  function drawTree(
+    s: SceneObject,
+    x: number,
+    y: number,
+    tl: Tile,
+    now: number,
+    prepared?: CanvasImageSource,
+  ) {
     const h = tileHash(game.idx(x, y)),
-      v = h % 3,
-      sw = renderPrefs().reducedMotion ? 0 : ((now / 2400 + h * 0.61) | 0) % 2;
-    const spr = game.ART.tree[tl.tree - 1][v][sw];
+      spr = prepared ?? treeArtwork(h, tl.tree, now);
     const jx = ((h >> 2) % 7) - 3,
       jy = ((h >> 5) % 5) - 2;
     const size = 0.87 + ((h >> 3) % 15) / 100,
@@ -944,16 +953,20 @@ export function createRenderer(
     pebbles[variant] = canvas;
     return canvas;
   }
-  function drawRock(s: SceneObject, x: number, y: number) {
-    const h = tileHash(game.idx(x, y));
+  function rockArtwork(hash: number) {
+    return z < 0.75 ? pebble(hash % 3) : game.ART.rock[hash % 2];
+  }
+  function drawRock(s: SceneObject, x: number, y: number, prepared?: CanvasImageSource) {
+    const h = tileHash(game.idx(x, y)),
+      spr = prepared ?? rockArtwork(h);
     if (z < 0.75) {
       const rx2 = ((h >> 2) % 13) - 6,
         ry2 = ((h >> 5) % 11) - 5;
-      s.image(pebble(h % 3), x * game.TS + 6 + rx2, y * game.TS + 11 + ry2, 11, 7);
+      s.image(spr, x * game.TS + 6 + rx2, y * game.TS + 11 + ry2, 11, 7);
       return;
     }
     s.image(
-      game.ART.rock[h % 2],
+      spr,
       x * game.TS - 1 + ((h >> 4) % 5) - 2,
       y * game.TS + 6.4 + ((h >> 6) % 5) - 2,
       24,
@@ -977,9 +990,11 @@ export function createRenderer(
         clarity: false,
         now,
         paint(scene) {
-          const tile = game.tiles[index];
-          if (tile.tree) drawTree(scene, x, y, tile, this.now);
-          else drawRock(scene, x, y);
+          const tile = game.tiles[index],
+            source = this.source;
+          if (!source) throw new Error('Nature artwork must be selected before preparation');
+          if (tile.tree) drawTree(scene, x, y, tile, this.now, source);
+          else drawRock(scene, x, y, source);
         },
       };
       // Bind once: the callback is retained rather than allocated per frame.
@@ -988,12 +1003,7 @@ export function createRenderer(
     }
     const tree = Boolean(tl.tree),
       clarity = renderPrefs().clarity;
-    const sway = renderPrefs().reducedMotion ? 0 : ((now / 2400 + view.hash * 0.61) | 0) % 2;
-    const source = tree
-      ? game.ART.tree[tl.tree - 1][view.hash % 3][sway]
-      : z < 0.75
-        ? pebble(view.hash % 3)
-        : game.ART.rock[view.hash % 2];
+    const source = tree ? treeArtwork(view.hash, tl.tree, now) : rockArtwork(view.hash);
     const changed =
       view.source !== source || view.tree !== tree || (tree && view.clarity !== clarity);
     view.source = source;

@@ -1,0 +1,167 @@
+[
+  {
+    "variant": "a1",
+    "artifact": "/tmp/settlers-native-baseline/output/bench/2026-10-18T12-17-38-546Z/results.json",
+    "gpu": "ANGLE (Intel, Mesa Intel(R) UHD Graphics 620 (KBL GT2), OpenGL ES 3.2)",
+    "software": false,
+    "seed": 2024,
+    "minutes": 20,
+    "speed": 8,
+    "quality": 1,
+    "scene": {
+      "time": "noon",
+      "rain": false
+    },
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "colony": {
+      "seconds": 1200,
+      "buildings": 30,
+      "units": 16,
+      "trees": 2463
+    },
+    "rows": [
+      {
+        "zoom": 4,
+        "mode": "running",
+        "scale": 1.3,
+        "fps": 60,
+        "cpuMean": 8.7,
+        "cpuP95": 11.8,
+        "drawMs": 7.4,
+        "stepMs": 0.9,
+        "miniMs": 0,
+        "hudMs": 0.1,
+        "gpuP50": 4.8,
+        "gpuP95": 7.5,
+        "sprites": 1153,
+        "graphics": 6,
+        "graphicsBuilds": 6,
+        "drawCalls": 17.6,
+        "uploadKB": 343,
+        "texUploads": 0.2,
+        "simulation": {
+          "start": 1208.1333333325633,
+          "pausedBefore": false,
+          "modalBefore": false,
+          "end": 1288.2499999991571,
+          "pausedAfter": false,
+          "modalAfter": false,
+          "speed": 8
+        }
+      }
+    ]
+  },
+  {
+    "variant": "b",
+    "artifact": "output/bench/2026-10-18T12-17-59-440Z/results.json",
+    "gpu": "ANGLE (Intel, Mesa Intel(R) UHD Graphics 620 (KBL GT2), OpenGL ES 3.2)",
+    "software": false,
+    "seed": 2024,
+    "minutes": 20,
+    "speed": 8,
+    "quality": 1,
+    "scene": {
+      "time": "noon",
+      "rain": false
+    },
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "colony": {
+      "seconds": 1200,
+      "buildings": 30,
+      "units": 16,
+      "trees": 2463
+    },
+    "rows": [
+      {
+        "zoom": 4,
+        "mode": "running",
+        "scale": 1.3,
+        "fps": 60,
+        "cpuMean": 8.3,
+        "cpuP95": 11,
+        "drawMs": 7,
+        "stepMs": 1.1,
+        "miniMs": 0,
+        "hudMs": 0.1,
+        "gpuP50": 4.8,
+        "gpuP95": 7.3,
+        "sprites": 1153,
+        "graphics": 21,
+        "graphicsBuilds": 21.1,
+        "drawCalls": 45.2,
+        "uploadKB": 291,
+        "texUploads": 0.2,
+        "simulation": {
+          "start": 1207.99999999923,
+          "pausedBefore": false,
+          "modalBefore": false,
+          "end": 1288.116666665824,
+          "pausedAfter": false,
+          "modalAfter": false,
+          "speed": 8
+        }
+      }
+    ]
+  },
+  {
+    "variant": "a2",
+    "artifact": "/tmp/settlers-native-baseline/output/bench/2026-10-18T12-18-20-120Z/results.json",
+    "gpu": "ANGLE (Intel, Mesa Intel(R) UHD Graphics 620 (KBL GT2), OpenGL ES 3.2)",
+    "software": false,
+    "seed": 2024,
+    "minutes": 20,
+    "speed": 8,
+    "quality": 1,
+    "scene": {
+      "time": "noon",
+      "rain": false
+    },
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "colony": {
+      "seconds": 1200,
+      "buildings": 30,
+      "units": 16,
+      "trees": 2463
+    },
+    "rows": [
+      {
+        "zoom": 4,
+        "mode": "running",
+        "scale": 1.3,
+        "fps": 60,
+        "cpuMean": 9,
+        "cpuP95": 12.8,
+        "drawMs": 7.6,
+        "stepMs": 1.1,
+        "miniMs": 0,
+        "hudMs": 0.1,
+        "gpuP50": 5.1,
+        "gpuP95": 7.7,
+        "sprites": 1153,
+        "graphics": 6,
+        "graphicsBuilds": 6,
+        "drawCalls": 17.7,
+        "uploadKB": 343,
+        "texUploads": 0.2,
+        "simulation": {
+          "start": 1207.9833333325635,
+          "pausedBefore": false,
+          "modalBefore": false,
+          "end": 1288.116666665824,
+          "pausedAfter": false,
+          "modalAfter": false,
+          "speed": 8
+        }
+      }
+    ]
+  }
+]
