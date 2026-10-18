@@ -173,3 +173,29 @@ test('supplied painted pack uses individual PNGs with the exact original crop pi
       );
   }
 });
+
+const fullResolutionBuildingHashes = {
+  'windmill.png': 'bdebc48728ac8b93ea1b849d95a434940c533d0a0aa28c5ea2b02a44aff0ace6',
+  'bakery.png': 'f7d7af9bf636f01dc5020d49e691bafdbd1a55abdc83aeee0071d68f4c559b3e',
+  'pigfarm.png': '79293dc1e4820991cfb391d12f20ef2369f1f00bdebf373f4bd187042c6cc9c1',
+  'butcher.png': '792da34a932760ab25b57955050532da88b09a1816b039db5107be972ca184ac',
+  'well.png': '64a63fff5724cb49c7bc72b6d7aea0a863e439d50d536b1f5d9d586b79d15908',
+  'brewery.png': 'd82b14a8a5d142e76856c64e06b0bedc286e700dbecdbdc610faea0c4d1bed43',
+  'smelter.png': 'a40c9105d8ae61c381a9e388c9d8a12e85f53c7b65adb6d2764fc3108f6bb30a',
+  'workshop.png': 'eacd4cf3d7c870d789b3a5e273e4bda931b8ffcda8fd5a50918607f11b65d712',
+};
+
+test('every active building PNG stays within the compact artwork budget', async () => {
+  const art = new URL('../assets/art/', import.meta.url);
+  const manifest = JSON.parse(await fs.readFile(new URL('manifest.json', art), 'utf8'));
+  for (const [type, region] of Object.entries(manifest.buildings)) {
+    const bytes = await fs.readFile(new URL(manifest.sheets[region.sheet], art));
+    const image = decodeRGBA(bytes, type);
+    assert.ok(Math.max(image.width, image.height) <= 320, type + ' exceeds 320px');
+    assert.ok(bytes.length <= 200 * 1024, type + ' exceeds 200 KiB');
+  }
+  for (const [file, hash] of Object.entries(fullResolutionBuildingHashes)) {
+    const bytes = await fs.readFile(new URL('source/' + file, art));
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), hash, file);
+  }
+});
