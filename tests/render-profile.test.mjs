@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import {
+  HARDWARE_PROFILE,
   SOFTWARE_PROFILE,
   describeRendering,
   isSoftwareRenderer,
@@ -40,6 +41,19 @@ test('software rendering is selected explicitly and needs no machine configurati
   assert.equal(profile.angle, 'swiftshader');
 });
 
+test('without a selection, commands render on whatever hardware GPU the machine provides', () => {
+  const profile = resolveProfile({ env: noConfig() });
+  assert.equal(profile, HARDWARE_PROFILE);
+  assert.equal(profile.name, 'hardware');
+  assert.equal(profile.mode, 'hardware');
+  assert.equal(profile.angle, 'gl');
+  assert.equal(profile.gpu, null);
+  // It can also be named, and a machine's own default takes precedence over it.
+  assert.equal(resolveProfile({ env: noConfig({ SETTLERS_RENDER_PROFILE: 'hardware' }) }), profile);
+  const config = { default: 'amd', profiles: { amd: AMD } };
+  assert.equal(resolveProfile({ env: withConfig(config) }).name, 'amd');
+});
+
 test('a hardware profile comes from the machine configuration, by name or as its default', () => {
   const config = { default: 'amd', profiles: { amd: AMD, intel: { gpu: 'UHD', angle: 'gl' } } };
   assert.deepEqual(resolveProfile({ env: withConfig(config) }), {
@@ -55,7 +69,6 @@ test('a hardware profile comes from the machine configuration, by name or as its
 
 test('missing or invalid configuration fails before any browser starts', () => {
   for (const [env, message] of [
-    [noConfig(), /No rendering profile selected/],
     [noConfig({ SETTLERS_RENDER_PROFILE: 'amd' }), /Unknown rendering profile "amd"/],
     [withConfig('{ not json', { SETTLERS_RENDER_PROFILE: 'software' }), /not valid JSON/],
     [
@@ -71,6 +84,7 @@ test('missing or invalid configuration fails before any browser starts', () => {
     [withConfig({ profiles: { amd: { ...AMD, env: { HOME: '/root' } } } }), /HOME/],
     [withConfig({ profiles: { amd: { ...AMD, fastest: true } } }), /fastest/],
     [withConfig({ profiles: { software: AMD } }), /software/],
+    [withConfig({ profiles: { hardware: AMD } }), /built-in/],
     [withConfig({ default: 'amd', profiles: {} }), /default "amd"/],
     // Software rendering is never a machine default: it must be named per run.
     [withConfig({ default: 'software', profiles: { amd: AMD } }), /default "software"/],
@@ -78,15 +92,12 @@ test('missing or invalid configuration fails before any browser starts', () => {
     assert.throws(() => resolveProfile({ env }), message, JSON.stringify(env));
 });
 
-test('a performance run refuses the software profile', () => {
-  assert.throws(
-    () =>
-      resolveProfile({
-        env: noConfig({ SETTLERS_RENDER_PROFILE: 'software' }),
-        purpose: 'performance',
-      }),
-    /hardware profile/,
-  );
+test('a performance run needs a configured GPU, refusing software and the generic default', () => {
+  for (const env of [noConfig({ SETTLERS_RENDER_PROFILE: 'software' }), noConfig()])
+    assert.throws(
+      () => resolveProfile({ env, purpose: 'performance' }),
+      /hardware profile that names its GPU/,
+    );
   const env = withConfig({ profiles: { amd: AMD } }, { SETTLERS_RENDER_PROFILE: 'amd' });
   assert.equal(resolveProfile({ env, purpose: 'performance' }).mode, 'hardware');
 });
@@ -135,6 +146,12 @@ test('conflicting backend options or GPU selections are refused', () => {
   assert.throws(() => launchOptions(intel, { env: { DRI_PRIME: '1' } }), /DRI_PRIME/);
 });
 
+test('the generic hardware profile keeps the GPU the shell selects', () => {
+  const launch = launchOptions(HARDWARE_PROFILE, { env: { DRI_PRIME: '1' } });
+  assert.ok(launch.args.includes('--use-angle=gl'));
+  assert.equal(launch.env.DRI_PRIME, '1');
+});
+
 // Renderer names reported by Chromium 156 on the reference workstation.
 const RENDERERS = {
   amdGl: 'ANGLE (AMD, AMD Radeon 500 Series (radeonsi polaris12 ACO), OpenGL 4.6)',
@@ -159,6 +176,19 @@ test('a hardware run accepts only its configured GPU on its configured backend',
   );
   assert.throws(() => verifyRenderer(amd, actual(RENDERERS.amdVulkan)), /backend "gl"/);
   assert.throws(() => verifyRenderer(intelEgl, actual(RENDERERS.intelGl)), /backend "gl-egl"/);
+});
+
+test('the generic hardware profile accepts any hardware GPU on ANGLE OpenGL', () => {
+  for (const renderer of [RENDERERS.amdGl, RENDERERS.intelGl])
+    assert.doesNotThrow(() => verifyRenderer(HARDWARE_PROFILE, actual(renderer)), renderer);
+  assert.throws(() => verifyRenderer(HARDWARE_PROFILE, actual(RENDERERS.intelEgl)), /backend "gl"/);
+  for (const renderer of [RENDERERS.swiftshader, RENDERERS.llvmpipe])
+    assert.throws(
+      () => verifyRenderer(HARDWARE_PROFILE, actual(renderer)),
+      /software fallback/,
+      renderer,
+    );
+  assert.throws(() => verifyRenderer(HARDWARE_PROFILE, actual(null)), /unavailable/);
 });
 
 test('software fallback and unavailable WebGL never satisfy a hardware run', () => {
@@ -218,6 +248,14 @@ test('saved evidence names the configuration, the actual GPU and the source it m
     'Rendering: hardware profile "amd" (ANGLE gl), expected "AMD Radeon 500 Series", ' +
       `actual "${RENDERERS.amdGl}", Chromium 156.0.8078.4 headless shell`,
   );
+  const generic = renderEvidence({
+    ...base,
+    profile: HARDWARE_PROFILE,
+    launch: launchOptions(HARDWARE_PROFILE, { env: { DRI_PRIME: '1' } }),
+  });
+  assert.equal(generic.expectedGpu, null);
+  assert.deepEqual(generic.gpuSelection, { DRI_PRIME: '1' });
+  assert.match(describeRendering(generic), /expected any hardware GPU, actual/);
 });
 
 const repository = path.resolve(import.meta.dirname, '..');

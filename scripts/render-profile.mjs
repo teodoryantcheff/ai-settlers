@@ -1,9 +1,11 @@
 // The rendering-profile contract shared by every Chromium developer command: browser
 // tests, render and territory benchmarks, captures and the production smoke check.
 //
-// A profile names the WebGL configuration a run must get. `software` (SwiftShader) is
-// built in and is only ever used when selected explicitly. Hardware profiles describe
-// one machine, so they live outside the repository, in a JSON file at
+// A profile names the WebGL configuration a run must get. Two are built in: `hardware`,
+// the default, accepts any hardware GPU on ANGLE OpenGL (whichever GPU the environment,
+// such as an exported DRI_PRIME, selects), and `software` (SwiftShader), only ever
+// used when selected explicitly. Profiles that expect one GPU describe one machine, so
+// they live outside the repository, in a JSON file at
 // $SETTLERS_RENDER_PROFILES, or else $XDG_CONFIG_HOME/ai-settlers/render-profiles.json
 // (~/.config by default):
 //
@@ -16,7 +18,8 @@
 //     }
 //   }
 //
-// SETTLERS_RENDER_PROFILE selects a profile by name, overriding the file's default.
+// SETTLERS_RENDER_PROFILE selects a profile by name, overriding the file's default;
+// without either, commands use `hardware`. Benchmarks need a profile that names its GPU.
 // `gpu` must appear in the actual WebGL renderer name; `angle` is the ANGLE backend.
 // Every launch is verified against its profile before any test, capture or sample.
 import { chromium } from '@playwright/test';
@@ -55,9 +58,22 @@ export const SOFTWARE_PROFILE = Object.freeze({
   env: Object.freeze({}),
 });
 
+/**
+ * The built-in default: whatever hardware GPU the environment selects, on ANGLE
+ * OpenGL. It expects no particular GPU (`gpu: null`), so benchmarks refuse it.
+ */
+export const HARDWARE_PROFILE = Object.freeze({
+  name: 'hardware',
+  mode: 'hardware',
+  gpu: null,
+  angle: 'gl',
+  env: Object.freeze({}),
+});
+const BUILT_IN = { hardware: HARDWARE_PROFILE, software: SOFTWARE_PROFILE };
+
 const HELP =
-  'Set SETTLERS_RENDER_PROFILE=software for SwiftShader correctness runs, or name a hardware ' +
-  'profile from the rendering-profile file (README, "Rendering profiles").';
+  'Select hardware (the default), software (SwiftShader) or a profile from the ' +
+  'rendering-profile file with SETTLERS_RENDER_PROFILE (README, "Rendering profiles").';
 
 /** Where this machine's hardware profiles live. */
 export function profilesPath(env = process.env) {
@@ -92,7 +108,7 @@ function readProfiles(file) {
   const profiles = {};
   for (const [name, entry] of Object.entries(config.profiles ?? {})) {
     const where = `profile "${name}"`;
-    if (name === SOFTWARE_PROFILE.name) fail(`"${name}" is the built-in software profile`);
+    if (Object.hasOwn(BUILT_IN, name)) fail(`"${name}" is a built-in profile`);
     if (!isObject(entry)) fail(`${where} must be an object`);
     for (const key of Object.keys(entry))
       if (!['gpu', 'angle', 'env'].includes(key)) fail(`${where} has unknown field "${key}"`);
@@ -115,7 +131,11 @@ function readProfiles(file) {
       env: { ...env },
     };
   }
-  if (config.default !== undefined && !profiles[config.default])
+  if (
+    config.default !== undefined &&
+    config.default !== HARDWARE_PROFILE.name &&
+    !profiles[config.default]
+  )
     fail(
       `default "${config.default}" is not a defined hardware profile; ` +
         'select software rendering per run with SETTLERS_RENDER_PROFILE=software',
@@ -124,22 +144,23 @@ function readProfiles(file) {
 }
 
 /**
- * The selected rendering profile. `purpose: 'performance'` admits only hardware
- * profiles. Throws, naming the problem, on a missing selection or invalid configuration.
+ * The selected rendering profile, `hardware` when nothing is selected. `purpose:
+ * 'performance'` admits only hardware profiles that name their GPU. Throws, naming
+ * the problem, on an unknown selection or invalid configuration.
  */
 export function resolveProfile({ env = process.env, purpose = 'correctness' } = {}) {
   const file = profilesPath(env);
   const config = readProfiles(file);
-  const name = env.SETTLERS_RENDER_PROFILE || config.default;
-  if (!name) throw new Error(`No rendering profile selected. ${HELP}`);
-  const profile = name === SOFTWARE_PROFILE.name ? SOFTWARE_PROFILE : config.profiles[name];
+  const name = env.SETTLERS_RENDER_PROFILE || config.default || HARDWARE_PROFILE.name;
+  const profile = Object.hasOwn(BUILT_IN, name) ? BUILT_IN[name] : config.profiles[name];
   if (!profile) {
-    const known = [SOFTWARE_PROFILE.name, ...Object.keys(config.profiles)].join(', ');
+    const known = [...Object.keys(BUILT_IN), ...Object.keys(config.profiles)].join(', ');
     throw new Error(`Unknown rendering profile "${name}" (known: ${known}; file ${file}). ${HELP}`);
   }
-  if (purpose === 'performance' && profile.mode !== 'hardware')
+  if (purpose === 'performance' && (profile.mode !== 'hardware' || !profile.gpu))
     throw new Error(
-      `Performance runs need a hardware profile; "${profile.name}" is ${profile.mode} rendering. ` +
+      `Performance runs need a hardware profile that names its GPU; "${profile.name}" ` +
+        `${profile.gpu ? `is ${profile.mode} rendering` : 'accepts any GPU'}. ` +
         `Define one in ${file} and select it with SETTLERS_RENDER_PROFILE (README, "Rendering profiles").`,
     );
   return profile;
@@ -164,9 +185,9 @@ export function verifyRenderer(profile, { available, renderer }) {
   }
   if (isSoftwareRenderer(renderer))
     throw new Error(
-      `${label} needs ${profile.gpu}, but Chromium used software fallback "${renderer}".`,
+      `${label} needs ${profile.gpu ?? 'a hardware GPU'}, but Chromium used software fallback "${renderer}".`,
     );
-  if (!renderer.toLowerCase().includes(profile.gpu.toLowerCase()))
+  if (profile.gpu && !renderer.toLowerCase().includes(profile.gpu.toLowerCase()))
     throw new Error(`${label} expected a renderer containing "${profile.gpu}", got "${renderer}".`);
   if (!HARDWARE_BACKENDS[profile.angle].test(renderer))
     throw new Error(`${label} expected ANGLE backend "${profile.angle}", got "${renderer}".`);
@@ -179,8 +200,9 @@ const BACKEND_SWITCHES =
 /**
  * Playwright `chromium.launch` options for a profile. `args` adds capability-specific
  * switches (GPU timer queries, sandboxing), never backend choices. `env` is the
- * inherited environment; a hardware profile's GPU selection is applied on top, and an
- * inherited selection that disagrees with it is refused rather than overridden.
+ * inherited environment; a GPU-specific profile's selection is applied on top, and an
+ * inherited selection that disagrees with it is refused rather than overridden. The
+ * generic `hardware` profile keeps the inherited selection.
  * Commands run Playwright's headless shell unless `fullChromium` asks for the full
  * browser, which the benchmarks have always measured.
  */
@@ -193,7 +215,7 @@ export function launchOptions(
       throw new Error(
         `${arg} conflicts with rendering profile "${profile.name}"; select a profile instead.`,
       );
-  if (profile.mode === 'hardware')
+  if (profile.mode === 'hardware' && profile.gpu)
     for (const key of GPU_SELECTION_ENV)
       if (env[key] !== undefined && env[key] !== profile.env[key])
         throw new Error(
@@ -254,7 +276,7 @@ export function renderEvidence({ profile, renderer, browserVersion, launch }) {
 /** One line for command output. */
 export const describeRendering = (evidence) =>
   `Rendering: ${evidence.mode} profile "${evidence.profile}" (ANGLE ${evidence.backend}), ` +
-  `expected "${evidence.expectedGpu}", actual "${evidence.actualRenderer}", ${evidence.browser}`;
+  `expected ${evidence.expectedGpu ? `"${evidence.expectedGpu}"` : 'any hardware GPU'}, actual "${evidence.actualRenderer}", ${evidence.browser}`;
 
 /**
  * The WebGL 2 renderer a page gets, from the canvas with id `canvasId` or a new one;

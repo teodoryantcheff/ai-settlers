@@ -12,6 +12,8 @@ Measured on 2026-10-16 on the reference laptop: Intel Core i7-8550U (4C/8T, 15 W
 - Software profile: a browser spec, `capture` (all views, with `rendering` in `capture.json`) and the Pages smoke check verified SwiftShader.
 - Refusals before any sample: the software profile for a benchmark; no selected profile; an exported `DRI_PRIME=1` against the `amd` profile; and an `amd` profile on `gl-egl`, where Mesa ignores `DRI_PRIME` and Chromium rendered on **Intel UHD Graphics 620 (OpenGL ES 3.2)**.
 
+With no profile selected, commands use the built-in `hardware` profile: a browser spec verified Intel UHD Graphics 620, or the AMD GPU with `DRI_PRIME` exported, and `bench:render` refused it for naming no GPU.
+
 The ANGLE `vulkan` backend also reaches the AMD GPU here (RADV), but no measurements use it. Matching renderer marks for `d3d11` and `metal` are untested on real hardware.
 
 ## AMD OpenGL rerun, 2026-10-18
