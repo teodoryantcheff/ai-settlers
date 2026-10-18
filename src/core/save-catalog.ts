@@ -2,14 +2,14 @@ import type { ValidatedSave, SaveMetadata } from '../types.ts';
 import type { StoragePort } from './persistence.ts';
 import { saveText } from './save-codec.ts';
 
-export const SAVE_CATALOG_KEY = 'settlers.saves.v1';
-export const AUTOSAVE_KEY = 'settlers.autosave.v1';
+export const SAVE_CATALOG_KEY = 'settlers.saves';
+export const AUTOSAVE_KEY = 'settlers.autosave';
 export const MAX_SAVE_TEXT = 32_000_000;
 const MAX_CATALOG_TEXT = 64_000_000;
 const MAX_CHECKPOINTS = 50;
 /** Largest valid Date value; save times beyond it are corrupt. */
 const MAX_SAVED_AT = 8_640_000_000_000_000;
-/** The autosave envelope adds its version and save time around the save text. */
+/** The autosave envelope adds its save time around the save text. */
 const MAX_AUTOSAVE_TEXT = MAX_SAVE_TEXT + 100;
 export interface CatalogEntry {
   id: string;
@@ -19,7 +19,6 @@ export interface CatalogEntry {
   data: ValidatedSave;
 }
 export interface SaveCatalog {
-  v: 1;
   nextId: number;
   entries: CatalogEntry[];
 }
@@ -61,7 +60,7 @@ export function createSaveCatalog(
     if (!object(input)) throw new Error('Invalid save catalog');
     const value = input;
     if (
-      value.v !== 1 ||
+      Object.hasOwn(value, 'v') ||
       typeof value.nextId !== 'number' ||
       !Number.isInteger(value.nextId) ||
       value.nextId < 1 ||
@@ -97,12 +96,12 @@ export function createSaveCatalog(
         data: checkedSave(text),
       };
     });
-    return { v: 1, nextId: value.nextId, entries };
+    return { nextId: value.nextId, entries };
   }
   function read(): SaveCatalog {
     if (!storage) throw new Error('Browser storage is unavailable');
     const raw = storage.getItem(SAVE_CATALOG_KEY);
-    if (raw === null) return { v: 1, nextId: 1, entries: [] };
+    if (raw === null) return { nextId: 1, entries: [] };
     if (raw.length > MAX_CATALOG_TEXT) throw new Error('Save catalog is too large');
     return validate(JSON.parse(raw));
   }
@@ -116,8 +115,7 @@ export function createSaveCatalog(
     if (
       !value ||
       typeof value !== 'object' ||
-      !('v' in value) ||
-      value.v !== 1 ||
+      Object.hasOwn(value, 'v') ||
       !('savedAt' in value) ||
       typeof value.savedAt !== 'number' ||
       !Number.isSafeInteger(value.savedAt) ||
@@ -138,7 +136,7 @@ export function createSaveCatalog(
   function writeAutosave(text: string, savedAt: number) {
     if (text.length > MAX_SAVE_TEXT) throw new Error('Save code is too large');
     if (!storage) throw new Error('Browser storage is unavailable');
-    storage.setItem(AUTOSAVE_KEY, '{"v":1,"savedAt":' + savedAt + ',"data":' + text + '}');
+    storage.setItem(AUTOSAVE_KEY, '{"savedAt":' + savedAt + ',"data":' + text + '}');
   }
   function hasAutosave() {
     if (!storage) throw new Error('Browser storage is unavailable');

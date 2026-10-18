@@ -79,3 +79,11 @@ _Avoid_: Walking path, when describing which tiles will be paved.
 **Economic notice**:
 A player-facing report that production has started, remained blocked, or recovered, identifying the affected producers and the reason where applicable.
 _Avoid_: Production sound, when referring to the information rather than its optional audible cue; economic history, when referring to a transient report.
+
+**Checkpoint**:
+A named, player-created record of a colony that can be restored later. It remains available until explicitly overwritten or deleted.
+_Avoid_: Autosave, when referring to a checkpoint the player chose to retain.
+
+**Autosave**:
+The colony record automatically replaced during active play, separate from named checkpoints.
+_Avoid_: Checkpoint, when referring to the automatically replaced record.

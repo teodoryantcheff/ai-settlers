@@ -60,7 +60,7 @@ test('only urgent save failure occupies the bar and opens file recovery', async 
   await page.evaluate(() => {
     const original = Storage.prototype.setItem;
     Storage.prototype.setItem = function (key, value) {
-      if (key === 'settlers.autosave.v1') throw new DOMException('Checkpoint storage is full');
+      if (key === 'settlers.autosave') throw new DOMException('Checkpoint storage is full');
       return original.call(this, key, value);
     };
     window.productionArtPreview.game.saveGame(true);
@@ -199,7 +199,7 @@ test('two compact rows retain dense stock, banked objective and essential contro
       g.state.gold = 37;
       const original = Storage.prototype.setItem;
       Storage.prototype.setItem = function (key, value) {
-        if (key === 'settlers.autosave.v1') throw new DOMException('Checkpoint storage is full');
+        if (key === 'settlers.autosave') throw new DOMException('Checkpoint storage is full');
         return original.call(this, key, value);
       };
       g.saveGame(true);

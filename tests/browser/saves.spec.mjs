@@ -51,10 +51,10 @@ test('checkpoint metadata, rename, confirmations, separate autosave and files wo
   await expect(
     page.locator('.save-entry').filter({ has: page.getByText('Autosave', { exact: true }) }),
   ).toBeVisible();
-  const before = await page.evaluate(() => localStorage.getItem('settlers.saves.v1'));
+  const before = await page.evaluate(() => localStorage.getItem('settlers.saves'));
   await renamed.getByRole('button', { name: 'Overwrite', exact: true }).click();
   await expect(page.locator('#save-confirm')).toContainText('Overwrite Timber reserve');
-  expect(await page.evaluate(() => localStorage.getItem('settlers.saves.v1'))).toBe(before);
+  expect(await page.evaluate(() => localStorage.getItem('settlers.saves'))).toBe(before);
   await page.locator('#cancel-save-action').click();
   await renamed.getByRole('button', { name: 'Overwrite', exact: true }).click();
   await page.locator('#confirm-save-action').click();
@@ -98,11 +98,11 @@ test('storage failure preserves valid checkpoints, reports quiet autosave failur
   await openSaves(page);
   await page.locator('#checkpoint-name').fill('Safe checkpoint');
   await page.locator('#create-checkpoint').click();
-  const prior = await page.evaluate(() => localStorage.getItem('settlers.saves.v1'));
+  const prior = await page.evaluate(() => localStorage.getItem('settlers.saves'));
   await page.evaluate(() => {
     const original = Storage.prototype.setItem;
     Storage.prototype.setItem = function (key, value) {
-      if (key === 'settlers.saves.v1' || key === 'settlers.autosave.v1')
+      if (key === 'settlers.saves' || key === 'settlers.autosave')
         throw new DOMException('Browser storage quota exhausted', 'QuotaExceededError');
       return original.call(this, key, value);
     };
@@ -116,7 +116,7 @@ test('storage failure preserves valid checkpoints, reports quiet autosave failur
   );
   await page.locator('#create-checkpoint').click();
   await expect(page.locator('#save-status')).toContainText('quota exhausted');
-  expect(await page.evaluate(() => localStorage.getItem('settlers.saves.v1'))).toBe(prior);
+  expect(await page.evaluate(() => localStorage.getItem('settlers.saves'))).toBe(prior);
   await page.locator('.save-entry').getByRole('button', { name: 'Load', exact: true }).click();
   await expect(page.locator('#save-confirm')).toContainText(
     'Current unsaved progress will be replaced',
@@ -127,7 +127,7 @@ test('storage failure preserves valid checkpoints, reports quiet autosave failur
   await page.locator('#pastecode').click();
   await page.locator('#confirm-save-action').click();
   await expect(page.locator('#save-status')).toContainText('quota exhausted');
-  expect(await page.evaluate(() => localStorage.getItem('settlers.saves.v1'))).toBe(prior);
+  expect(await page.evaluate(() => localStorage.getItem('settlers.saves'))).toBe(prior);
   const downloadPromise = page.waitForEvent('download');
   await page.locator('#export-file').click();
   await downloadPromise;
@@ -143,6 +143,6 @@ test('storage failure preserves valid checkpoints, reports quiet autosave failur
     await expect(page.locator('#pastecode')).toBeFocused();
     expect(await page.evaluate(() => window.scrollY)).toBe(0);
   }
-  expect(await page.evaluate(() => localStorage.getItem('settlers.saves.v1'))).toBe(prior);
+  expect(await page.evaluate(() => localStorage.getItem('settlers.saves'))).toBe(prior);
   expect(await page.evaluate(() => window.productionArtPreview.game.state.time)).toBe(0.25);
 });

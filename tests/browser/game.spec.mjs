@@ -83,10 +83,10 @@ test('save import is transactional and settings persist', async ({ freshPage: pa
   await page.locator('#saveb').click();
   await page.locator('#checkpoint-name').fill('Settings checkpoint');
   await page.locator('#create-checkpoint').click();
-  const saved = await page.evaluate(() => localStorage.getItem('settlers.saves.v1'));
+  const saved = await page.evaluate(() => localStorage.getItem('settlers.saves'));
   await page.locator('#savecode').fill(btoa('{"v":2,"t":[]}'));
   await page.locator('#pastecode').click();
-  expect(await page.evaluate(() => localStorage.getItem('settlers.saves.v1'))).toBe(saved);
+  expect(await page.evaluate(() => localStorage.getItem('settlers.saves'))).toBe(saved);
   await page.locator('[data-close="savedata"]').click();
   await page.locator('#utility summary').click();
   // Keyboard activation avoids waiting for two slow software-GPU animation frames.

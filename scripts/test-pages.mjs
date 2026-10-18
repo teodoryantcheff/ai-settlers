@@ -65,7 +65,7 @@ try {
     .locator('.save-entry')
     .filter({ has: page.getByText('Production smoke checkpoint', { exact: true }) });
   await checkpoint.waitFor({ state: 'visible' });
-  const saved = await page.evaluate(() => localStorage.getItem('settlers.saves.v1'));
+  const saved = await page.evaluate(() => localStorage.getItem('settlers.saves'));
   assert.ok(saved);
   const entry = JSON.parse(saved).entries.find(
     (entry) => entry.name === 'Production smoke checkpoint',
@@ -77,7 +77,7 @@ try {
   await checkpoint.getByRole('button', { name: 'Load', exact: true }).click();
   await page.locator('#confirm-save-action').click();
   await page.locator('#savedata').waitFor({ state: 'hidden' });
-  assert.equal(await page.evaluate(() => localStorage.getItem('settlers.saves.v1')), saved);
+  assert.equal(await page.evaluate(() => localStorage.getItem('settlers.saves')), saved);
   await page.locator('#utility summary').click();
   await page.locator('#saveb').click();
   assert.equal(await page.locator('#colony-name').inputValue(), entry.data.identity.name);

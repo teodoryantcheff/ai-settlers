@@ -53,15 +53,15 @@ test('unknown save shapes fail without replacing a colony or its checkpoints', (
   for (const data of [
     null,
     [],
-    { v: 2, t: null },
-    { v: 2, economy: 2, t: null },
-    { v: 2, economy: 2, seed: 2024, nextId: 1, t: [null, [], [], [], []] },
+    {},
+    { t: null },
+    { seed: 2024, nextId: 1, t: [null, [], [], [], []] },
   ])
     rejectsWithoutAdoption(
       game,
       storage,
       data,
-      /Unsupported save version|Invalid world header|Wrong map dimensions/,
+      /Unsupported save format|Invalid world header|Wrong map dimensions/,
     );
   for (const key of ['b', 'j', 'u', 'st', 'p', 'observations', 'identity', 'attention']) {
     const data = JSON.parse(game.exportSave());
