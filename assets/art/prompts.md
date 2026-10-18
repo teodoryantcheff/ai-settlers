@@ -98,3 +98,24 @@ Asset type: production 2D strategy-game FOLIAGE AND ROCK SPRITE ATLAS. Reference
 ## meadow
 
 Asset type: SEAMLESS TILEABLE GAME TERRAIN MATERIAL. Reference image is STYLE ONLY: closely match its lush beautifully hand-painted meadow under golden-hour light. Make one square entirely filled edge-to-edge with organic meadow grass material seen directly overhead: irregular olive and moss greens, little golden dry-grass strokes, layered fine grass blades, sparse clover, occasional tiny pale white and gold wildflower accents, subtle earthy green shadows between tufts. Rich material craft and variety rather than flat noisy digital green. No buildings, trees, people, roads, large rocks, borders or empty space. No dark vignette, no strong broad directional gradient, no scene shadows, no sun rays, no depth of field. Uniform average brightness across the entire texture; edges must join seamlessly LEFT TO RIGHT and TOP TO BOTTOM with no border or edge discoloration. Fine brush detail, natural irregular low-contrast color patches and balanced open grass. Maintain gameplay readability: no dense high-contrast flower carpet. True hand-painted strategy-game material, refined natural organic texture matching the reference, not a photograph. Opaque background.
+
+## Throwaway graphics prototype — 2026-10-18
+
+Branch `codex/graphics-prototype`, issue #76. No production pack replacement.
+Original generated PNGs are preserved in `prototype/source/`; crop rectangles are
+in `prototype/manifest.json`. Existing `windmill.png` is the edit reference.
+Generated with the built-in image generation tool, transparent backgrounds.
+
+- `prototype/source/windmill-body.png`: remove the entire four-blade rotor and hub
+  from the reference windmill; reconstruct orange tiled roof and pale stone tower;
+  retain south entrance, garden base, barrels, perspective and framing. Output
+  changed resolution, so the prototype explicitly crops and anchors the body.
+- `prototype/source/carrier.png`: eight-frame, four-column/two-row painted medieval
+  carrier sheet; straw hat, blue linen tunic, brown boots; right-facing walk,
+  first row unloaded, second row carrying a wooden crate. Requested contact and
+  passing poses, consistent scale and feet baseline, no scenery or cast shadows.
+  The generated poses repeat and require animation cleanup. This is a style/scale
+  study with four frames per load state, not final eight-direction character art.
+
+Cloud lobes are prepared once in offscreen canvases. Machinery, grass and seeds
+are native Pixi primitives. All motion is driven by an isolated display clock.

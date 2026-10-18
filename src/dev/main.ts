@@ -9,6 +9,7 @@ import { runScenarios } from './scenarios.ts';
 import { createTestReset } from './test-reset.ts';
 import { mountUIPrototype } from './ui-prototype.ts';
 import { preparePrototypeMap } from './ui-prototype-map.ts';
+import { mountGraphicsPrototype } from './graphics-prototype.ts';
 
 if (new URLSearchParams(location.search).has('uiPrototype')) {
   mountUIPrototype();
@@ -21,8 +22,11 @@ if (new URLSearchParams(location.search).has('uiPrototype')) {
     renderer: {} as RendererInternals,
   } satisfies DevInternals;
   bootGame(internals)
-    .then((game) => {
-      if (new URLSearchParams(location.search).has('uiPrototypeMap')) preparePrototypeMap(game);
+    .then(async (game) => {
+      if (new URLSearchParams(location.search).has('graphicsPrototype'))
+        await mountGraphicsPrototype(game, internals);
+      else if (new URLSearchParams(location.search).has('uiPrototypeMap'))
+        preparePrototypeMap(game);
       else runScenarios(game);
       (window as unknown as Record<string, unknown>)['productionArtPreview'] = {
         game,
