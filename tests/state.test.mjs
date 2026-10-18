@@ -116,7 +116,7 @@ test('every production block reason round-trips through exported files and check
   }
 });
 
-test('version-two save continues RNG, timers, cargo and production exactly', () => {
+test('save continues RNG, timers, cargo and production exactly', () => {
   const e = colony();
   const lumber = e.newBuilding('lumberjack', 51, 48);
   lumber.done = true;
@@ -140,13 +140,13 @@ test('malformed load leaves both active colony and saved autosave untouched', ()
   const e = colony();
   e.saveGame(true);
   const before = snapshot(e),
-    saved = e.storage.get('settlers.autosave.v1');
+    saved = e.storage.get('settlers.autosave');
   assert.ok(saved);
   const broken = structuredClone(before);
   broken.t[0].pop();
   assert.throws(() => e.prepareLoad(JSON.stringify(broken)), /dimensions/);
   assert.deepEqual(snapshot(e), before);
-  assert.equal(e.storage.get('settlers.autosave.v1'), saved);
+  assert.equal(e.storage.get('settlers.autosave'), saved);
   const hostile = structuredClone(before);
   hostile.b[0].stock = { bogus: 100 };
   assert.throws(() => e.prepareLoad(JSON.stringify(hostile)), /quantity/);

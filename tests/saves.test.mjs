@@ -120,10 +120,13 @@ test('older, incomplete or invalid saves are rejected before any colony or stora
   const stored = [...storage];
   const fetch = (data) => data.j.find((job) => job.kind === 'fetch');
   const changes = [
-    // Older formats are not migrated.
-    [(data) => (data.v = 1), /Unsupported save version/],
-    [(data) => (data.v = 3), /Unsupported save version/],
-    [(data) => (data.economy = 1), /Unsupported save version/],
+    // Marked historical saves are not adopted, even with otherwise valid data.
+    [(data) => (data.v = 1), /Unsupported save format/],
+    [(data) => (data.v = 2), /Unsupported save format/],
+    [(data) => (data.economy = 2), /Unsupported save format/],
+    [(data) => Object.assign(data, { v: 2, economy: 2 }), /Unsupported save format/],
+    [(data) => (data.v = null), /Unsupported save format/],
+    [(data) => (data.economy = null), /Unsupported save format/],
     [
       (data) => {
         data.b[0].res = data.b[0].reservedStock;

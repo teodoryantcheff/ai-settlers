@@ -323,8 +323,6 @@ export interface GameEvents {
 export type SavedDeposit = ['gold' | 'iron' | 'coal', number, number?] | null;
 export type SavedUnit = Omit<Unit, 'job' | 'dead' | 'moving'> & { ji: number };
 export interface SaveData {
-  v: 2;
-  economy: 2;
   identity: ColonyIdentity;
   observations: EconomicObservations;
   attention: import('./observations/attention.ts').AttentionData;

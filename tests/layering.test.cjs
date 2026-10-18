@@ -89,13 +89,14 @@ function historicalEconomySnapshot(value) {
   }
   return copy;
 }
-// SHA-256 of complete expanded-economy (schema 2) snapshots from the real
-// subsystem graph and seed/command sequence above. The independent observed
+// SHA-256 of complete expanded-economy snapshots from the real
+// subsystem graph and seed/command sequence above. Removing snapshot metadata
+// was checked against the original hashes before updating these. The independent observed
 // run below must match too: event subscriptions cannot change simulation state.
 const baselines = [
-  [2024, false, 'd25a25b2d52e5409b92209bf600460fa232a0f4f1907f1bef0536b798b6d5705'],
-  [42, true, '06fb3b75bf6f56e79993fc0454d8966f59153d7655f972d80b900018f1030b0f'],
-  [2024, true, 'a6fcfab37c782aee6c49ca735a8c5ab0d0e07ff7ef8da41933e9f6293840175b'],
+  [2024, false, 'b68e577e95a7667312133a008a0187e3bef839089862daac58d942ff7324ca0d'],
+  [42, true, '02381e7bd0747d1295dee75daaab9eee7847381ef1030221e6cf59643af08311'],
+  [2024, true, '216c80e961a8de5b4cdc2db7aaf9967ee6c35651df66f4070ae223267f6cd345'],
 ];
 for (const [seed, auto, hash] of baselines)
   test(`headless engine preserves baseline seed ${seed}, autoplay ${auto}`, () => {
@@ -108,7 +109,7 @@ for (const [seed, auto, hash] of baselines)
     });
     try {
       const plain = run(seed, auto);
-      assert.equal(plain.economy, 2);
+      assert.equal(Object.hasOwn(plain, 'economy'), false);
       assert.equal(
         createHash('sha256')
           .update(JSON.stringify(historicalEconomySnapshot(plain)))
@@ -145,7 +146,7 @@ test('headless contracts, upgrades, roads and loads preserve live arrays and ato
   assert.equal(g.anyStorage(), g.buildings[0]);
   assert.deepEqual(JSON.parse(g.exportSave()), JSON.parse(raw));
   const current = g.buildings;
-  assert.throws(() => g.importSave('{"v":2}'));
+  assert.throws(() => g.importSave('{}'));
   assert.equal(g.buildings, current);
   assert.deepEqual(JSON.parse(g.exportSave()), JSON.parse(raw));
   const copy = engine();
@@ -409,12 +410,12 @@ function transferSequence() {
 
 test('transfer, spending and demolition preserve the expanded-economy seed 123 snapshot', () => {
   const plain = transferSequence();
-  assert.equal(plain.economy, 2);
+  assert.equal(Object.hasOwn(plain, 'economy'), false);
   assert.deepEqual(transferSequence(), plain);
   assert.equal(
     createHash('sha256')
       .update(JSON.stringify(historicalEconomySnapshot(plain)))
       .digest('hex'),
-    '50d890f41b14beeb5a93259b1f9a3980811c44596b3046ebb6590d419855f355',
+    '52728cf2c2aa265e18967c7f733f7f01351f6e0c1450a6af3eb07eee6685b426',
   );
 });

@@ -112,8 +112,9 @@ export function validateSave(
     return true;
   };
   const size = width * height;
-  // Only the current format loads; older saves are rejected, not migrated.
-  if (!object(input) || input.v !== 2 || input.economy !== 2) fail('Unsupported save version');
+  // Only the current structure loads; marked historical saves are never adopted.
+  if (!object(input) || Object.hasOwn(input, 'v') || Object.hasOwn(input, 'economy'))
+    fail('Unsupported save format');
   const d = detached ? input : structuredClone(input);
   // Packed sample histories become plain samples before any rule checks them.
   unpackSaveHistories(d, fail);
@@ -597,9 +598,6 @@ export function validateSave(
   );
   d.attention = attention;
   return {
-    ...d,
-    v: 2,
-    economy: 2,
     rng: d.rng,
     seed: d.seed,
     nextId: d.nextId,
@@ -608,7 +606,7 @@ export function validateSave(
     j: checkedJobs,
     u: checkedUnits,
     st: state,
-    // Every pool and timer was checked or defaulted above.
+    // Every pool and timer was checked above.
     p: d.p as SaveData['p'],
     identity,
     observations,

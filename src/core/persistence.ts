@@ -156,8 +156,6 @@ export function createPersistence(
         };
       });
     return {
-      v: 2,
-      economy: 2,
       identity: { name: colonyName },
       observations: structuredClone(game.observationData),
       attention: structuredClone(game.attentionData),
