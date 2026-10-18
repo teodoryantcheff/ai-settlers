@@ -5,7 +5,7 @@ const code = await new Promise((resolve) => build.on('exit', resolve));
 if (code !== 0) process.exit(Number(code) || 1);
 const port = process.env.PROTOTYPE_PORT || '8879';
 console.log(
-  `Graphics prototype: http://127.0.0.1:${port}/tests/game.html?uitest&graphicsPrototype&variant=A`,
+  `Graphics prototype: http://127.0.0.1:${port}/tests/game.html?uitest&graphicsPrototype&round=2&variant=D`,
 );
 const server = spawn('python3', ['-m', 'http.server', port, '--bind', '127.0.0.1'], {
   cwd: root,

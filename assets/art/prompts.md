@@ -119,3 +119,27 @@ Generated with the built-in image generation tool, transparent backgrounds.
 
 Cloud lobes are prepared once in offscreen canvases. Machinery, grass and seeds
 are native Pixi primitives. All motion is driven by an isolated display clock.
+
+### Graphics prototype round two — 2026-10-18
+
+User feedback: reverse windmill rotation; integrate industry activity into the
+painted buildings; improve walking. First round is preserved in
+`src/dev/graphics-prototype-round-one.ts` and commit `1524ca5`.
+
+Built-in image generation, transparent PNG originals retained:
+
+- `prototype/source/windmill-rotor.png`: reference `windmill.png`; extract only
+  four warm painted wooden lattice/ivory canvas sails and central hub. Symmetrical
+  face-on X, square transparent canvas, no tower, scenery or detached shadow.
+- `prototype/source/carrier-rig.png`: reference `prototype/source/carrier.png`;
+  six separate cutout parts in a 3×2 sheet: head/torso without limbs, sleeved upper
+  arm, forearm/hand, trouser thigh, shin/boot and wooden crate. Preserve the
+  straw hat, blue tunic, dark trousers, warm painted texture and right-facing
+  character. Rounded overlapping joints; no labels or background.
+
+All crop rectangles, including separate shin and boot crops for planted soles,
+are in `prototype/manifest.json`. Runtime prepares these once as reusable textures.
+Round two uses counter-clockwise painted sails, source-image-measured furnace,
+chimney and bench anchors, and a distance-driven two-bone leg rig with fixed-ground
+stance and a lifted return step. The round-two cutouts remain prototype artwork;
+no eight-direction production animation has been authored.

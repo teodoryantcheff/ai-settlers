@@ -1,4 +1,4 @@
-/** THROWAWAY: three motion directions on the real map, ?graphicsPrototype&variant=A|B|C.
+/** THROWAWAY: Round two: integrated activity and planted-foot gait, ?graphicsPrototype&variant=D|E|F.
  * Question: which balance of character, industry and atmosphere deserves production art?
  * Display fixture only: no simulation, saves or gameplay commands. */
 import type { GameRuntime } from '../runtime.ts';
@@ -6,35 +6,36 @@ import type { DevInternals } from '../app.ts';
 import { translate, rotate, scale, type SceneLayer } from '../rendering/scene.ts';
 import type { BuildingType } from '../types.ts';
 import { requireCanvas2D } from '../rendering/canvas-context.ts';
+import { paintCarrier, type CarrierParts } from './graphics-prototype-rig.ts';
 import manifest from '../../assets/art/prototype/manifest.json';
 
 const variants = [
   {
-    key: 'A',
-    name: 'Quiet storybook',
-    note: 'Two neighbours, unhurried machinery, light passing shade.',
-    people: 2,
-    pace: 0.65,
+    key: 'D',
+    name: 'Quiet craft',
+    note: 'Painted sails, chimney breath and firelight. Activity stays inside the original artwork.',
+    people: 4,
+    pace: 1,
     wind: 0.35,
     clouds: 2,
   },
   {
-    key: 'B',
-    name: 'Busy workshop',
-    note: 'Six carriers, purposeful machinery, sparks and sawdust.',
-    people: 6,
-    pace: 1.25,
-    wind: 0.45,
-    clouds: 1,
+    key: 'E',
+    name: 'Working machinery',
+    note: 'A moving saw in the existing bench, cut-synchronised sawdust and furnace draught.',
+    people: 4,
+    pace: 1,
+    wind: 0.35,
+    clouds: 2,
   },
   {
-    key: 'C',
-    name: 'Breezy countryside',
-    note: 'Four carriers, sweeping cloud shadows, grass and drifting seeds.',
+    key: 'F',
+    name: 'People at work',
+    note: 'Workers tend the bench and furnace; carriers pause to load and unload, then take shorter steps under load.',
     people: 4,
-    pace: 0.85,
-    wind: 1,
-    clouds: 4,
+    pace: 1,
+    wind: 0.35,
+    clouds: 2,
   },
 ];
 
@@ -47,9 +48,10 @@ export async function mountGraphicsPrototype(game: GameRuntime, internals: DevIn
     await img.decode();
     return img;
   };
-  const [carrier, mill] = await Promise.all([
-    load(manifest.carrier.source),
+  const [mill, rotorImage, rigImage] = await Promise.all([
     load(manifest.windmill.source),
+    load(manifest.rotor.source),
+    load(manifest.rig.source),
   ]);
   const prepared = (source: HTMLImageElement, rect: number[]) => {
     const [x, y, w, h] = rect;
@@ -57,12 +59,16 @@ export async function mountGraphicsPrototype(game: GameRuntime, internals: DevIn
     requireCanvas2D(canvas, game.reportGraphicsFailure).drawImage(source, x, y, w, h, 0, 0, w, h);
     return canvas;
   };
-  const walkers = manifest.carrier.frames.map((rect) => prepared(carrier, rect));
+  const rotor = prepared(rotorImage, manifest.rotor.crop);
+  const parts = Object.fromEntries(
+    Object.entries(manifest.rig.parts).map(([key, rect]) => [key, prepared(rigImage, rect)]),
+  ) as CarrierParts;
   const body = prepared(mill, manifest.windmill.crop);
   let index = Math.max(
     0,
     variants.findIndex((v) => v.key === new URLSearchParams(location.search).get('variant')),
   );
+  let industryTime = 0;
   let time = 0,
     last = performance.now(),
     paused = false,
@@ -133,66 +139,123 @@ export async function mountGraphicsPrototype(game: GameRuntime, internals: DevIn
   // The fixture supplies its own machinery; hide unrelated generic worker glyphs.
   game.buildingWorking = (b) => (buildings.includes(b) ? false : originalWork(b));
   game.villageWorkTime = () => time;
+  // All effect anchors are measured in the original painted images, then fitted
+  // with the same bottom-aligned aspect-preserving rule as the production pack.
+  function anchor(type: 'sawmill' | 'smelter', px: number, py: number) {
+    const img = game.ART.bld[type];
+    if (!img) throw new Error('Missing activity artwork');
+    const [w, h] = type === 'sawmill' ? [312, 262] : [310, 315];
+    const r = Math.min(img.w / w, img.h / h);
+    return { x: img.ox + (img.w - w * r) / 2 + px * r, y: img.oy + img.h - h * r + py * r };
+  }
+  const ember = game.Acan(64, 64),
+    puff = game.Acan(64, 64);
+  for (const [canvas, rgb] of [
+    [ember, '255,148,38'],
+    [puff, '181,170,148'],
+  ] as const) {
+    const ctx = requireCanvas2D(canvas, game.reportGraphicsFailure);
+    const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 31);
+    gradient.addColorStop(0, `rgba(${rgb},0.65)`);
+    gradient.addColorStop(0.45, `rgba(${rgb},0.28)`);
+    gradient.addColorStop(1, `rgba(${rgb},0)`);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 64, 64);
+  }
   const details = game.drawVillageDetails;
   game.drawVillageDetails = (s, b) => {
     details(s, b);
     if (baseline) return;
-    const g = s.g,
-      x = b.x * game.TS,
-      y = b.y * game.TS;
-    const t = working ? time * variants[index].pace : 0;
+    const x = b.x * game.TS,
+      y = b.y * game.TS,
+      t = industryTime;
     if (b.type === 'windmill') {
+      const g = s.g;
       g.save();
       translate(g, x + 12, y - 14);
-      rotate(g, t / 4300);
-      for (let a = 0; a < 4; a++) {
-        rotate(g, Math.PI / 2);
-        g.moveTo(0, 0).lineTo(0, -23).stroke({ color: 0x674027, width: 1.2 });
-        g.poly([1, -7, 7, -7, 7, -23, 1, -23])
-          .fill(0xe4cf9a)
-          .stroke({ color: 0x87552f, width: 0.8 });
-        for (let r = 9; r < 23; r += 3)
-          g.moveTo(1, -r).lineTo(7, -r).stroke({ color: 0xa37e4c, width: 0.5 });
-        g.moveTo(4, -7).lineTo(4, -23).stroke({ color: 0x9a683e, width: 0.5 });
+      // Opposite to round one's clockwise rotor; fixed hub and painted sails.
+      rotate(g, -t / 7500);
+      s.image(rotor, -24, -24, 48, 48);
+      g.restore();
+      return;
+    }
+    if (b.type !== 'sawmill' && b.type !== 'smelter') return;
+    const type = b.type;
+    const fire = anchor('smelter', 142, 208);
+    const bench = anchor('sawmill', 192, 178);
+    const chimney = type === 'smelter' ? anchor(type, 222, 15) : anchor(type, 83, 15);
+    if (working) {
+      // Soft smoke begins at the chimney lip, never at a generic tile position.
+      for (let k = 0; k < 4; k++) {
+        const phase = (t / 3400 + k / 4) % 1;
+        const size = 2 + phase * 5;
+        s.image(
+          puff,
+          x + chimney.x + phase * 2 - size / 2,
+          y + chimney.y - phase * 12 - size / 2,
+          size,
+          size * 1.3,
+          Math.sin(phase * Math.PI) * 0.22,
+        );
       }
-      g.circle(0, 0, 2.3).fill(0x865b35).stroke({ color: 0xd9bb7b, width: 0.7 });
-      g.restore();
-    } else if (b.type === 'sawmill') {
-      const shift = Math.sin(t / 190) * 2;
-      g.roundRect(x + 13 + shift, y + 7, 12, 3.5, 1)
-        .fill(0xa7753d)
-        .stroke({ color: 0x5d432a, width: 0.5 });
-      g.moveTo(x + 17, y + 4)
-        .lineTo(x + 17, y + 13)
-        .stroke({ color: 0xc8c6b5, width: 1.1 });
-      for (let k = 0; k < 5; k++)
-        g.moveTo(x + 17, y + 4 + k * 1.8)
-          .lineTo(x + 18, y + 5 + k * 1.8)
-          .stroke({ color: 0xe4dfc8, width: 0.6 });
-      if (working && !reduced)
-        for (let k = 0; k < 5; k++) {
-          const phase = (t / 700 + k / 5) % 1;
-          g.rect(x + 18 + phase * 7, y + 10 + phase * phase * 6 - k * 0.5, 0.8, 0.7).fill({
-            color: 0xe2c398,
-            alpha: 1 - phase,
+    }
+    if (type === 'smelter') {
+      const flicker = working ? 0.32 + Math.sin(t / 137) * 0.035 + Math.sin(t / 311) * 0.055 : 0.03;
+      s.image(ember, x + fire.x - 3.4, y + fire.y - 2.8, 6.8, 5.6, flicker);
+      if (index > 0 && working) {
+        // Tiny embers rise only inside the mouth, then disappear under its arch.
+        const g = s.g;
+        for (let k = 0; k < 3; k++) {
+          const phase = (t / 1400 + k / 3) % 1;
+          g.circle(x + fire.x + (k - 1) * 0.7, y + fire.y + 0.7 - phase * 2.7, 0.15).fill({
+            color: 0xffd287,
+            alpha: 0.7 * (1 - phase),
           });
         }
-    } else if (b.type === 'smelter') {
-      const pulse = working ? 0.6 + Math.sin(t / 230) * 0.16 : 0.08;
-      g.ellipse(x + 10, y + 4, 3.5, 2.5).fill({ color: 0xffad38, alpha: pulse });
+        s.image(ember, x + fire.x - 3, y + fire.y + 2, 6, 2.5, 0.12 + Math.sin(t / 800) * 0.03);
+      }
+    } else {
+      const g = s.g;
+      if (index === 1) {
+        // Thin saw emerges from the existing shadowed opening into its painted log.
+        const travel = Math.sin(t / 210) * 0.7;
+        g.moveTo(x + bench.x, y + bench.y - 1.8 + travel)
+          .lineTo(x + bench.x, y + bench.y + 1.5 + travel)
+          .stroke({ color: 0xaca998, width: 0.5 });
+        for (let k = 0; k < 4; k++)
+          g.moveTo(x + bench.x, y + bench.y - 1.5 + travel + k * 0.7)
+            .lineTo(x + bench.x + 0.35, y + bench.y - 1.2 + travel + k * 0.7)
+            .stroke({ color: 0xd4ccb2, width: 0.25 });
+      }
+      if (working && !reduced)
+        for (let k = 0; k < (index === 0 ? 2 : 5); k++) {
+          const phase = (t / 840 + k / 5) % 1;
+          if (phase > 0.6) continue;
+          g.rect(x + bench.x + phase * 2.5, y + bench.y + 1 + phase * phase * 3, 0.25, 0.2).fill({
+            color: 0xc5a26c,
+            alpha: (1 - phase) * 0.55,
+          });
+        }
+    }
+    if (index === 2) {
+      const work = type === 'sawmill' ? anchor(type, 233, 260) : anchor(type, 190, 309);
+      const g = s.g;
       g.save();
-      translate(g, x + 23, y + 9);
-      scale(g, 1, working ? 0.75 + Math.sin(t / 420) * 0.2 : 0.65);
-      g.poly([0, 0, 7, -3, 9, 0, 7, 3]).fill(0x754532).stroke({ color: 0xb68b53, width: 0.7 });
+      translate(g, x + work.x, y + work.y);
+      scale(g, 0.57, 0.57);
+      paintCarrier(
+        s,
+        parts,
+        0,
+        0,
+        working ? t / 300 : 0,
+        -1,
+        false,
+        index,
+        true,
+        type === 'sawmill' ? 'saw' : 'poker',
+      );
       g.restore();
-      if (working && !reduced)
-        for (let k = 0; k < 4; k++) {
-          const phase = (t / 1300 + k / 4) % 1;
-          g.circle(x + 10 + Math.sin(k * 9 + phase * 4) * 2, y + 2 - phase * 9, 0.45).fill({
-            color: 0xffd889,
-            alpha: 1 - phase,
-          });
-        }
     }
   };
   // Prepaint cloud lobes once. Every moving frame reuses their GPU textures.
@@ -218,28 +281,32 @@ export async function mountGraphicsPrototype(game: GameRuntime, internals: DevIn
   const layer = pixi.presentation.layer;
   function carriers(s: SceneLayer) {
     const v = variants[index];
+    const distanceAcross = 8 * game.TS;
     for (let n = 0; n < v.people; n++) {
-      const phase = ((time / 22000) * v.pace + n / v.people) % 1;
-      const outbound = phase < 0.5;
-      const progress = outbound ? phase * 2 : (1 - phase) * 2;
-      const x = (cx - 4 + progress * 8) * game.TS,
-        y = (cy + 1.5 + (n % 2) * 0.25) * game.TS;
-      const frame = reduced ? 0 : Math.floor((time / 160) * v.pace + n) % 4;
-      s.image(game.ART.shadowSoft, x - 6, y - 2, 12, 4, 0.6);
-      const g = s.g;
-      g.save();
-      translate(g, x, y);
-      scale(g, outbound ? 1 : -1, 1);
+      // Same route and density for a fair comparison. F adds a loading dwell.
+      const legDuration = 12000;
+      const dwell = index === 2 ? 1200 : 0;
+      const duration = 2 * (legDuration + dwell);
+      const elapsed = (time + (n * duration) / v.people) % duration;
+      const outbound = elapsed < legDuration + dwell;
+      const legTime = outbound ? elapsed : elapsed - legDuration - dwell;
+      const moving = legTime < legDuration;
+      const progress = Math.min(1, legTime / legDuration);
+      const distance = progress * distanceAcross;
+      const x = (cx - 4) * game.TS + (outbound ? distance : distanceAcross - distance);
+      const y = (cy + 1.5 + (outbound ? 0 : 0.35)) * game.TS;
+      s.image(game.ART.shadowSoft, x - 5, y - 1.5, 10, 3, 0.4);
       if (baseline) {
+        const g = s.g;
+        g.save();
+        translate(g, x, y);
+        scale(g, outbound ? 1 : -1, 1);
         const old = game.ART.unitDirections.carrier?.e;
-        if (old) s.image(old.walk[frame * 2], -7.5, -18, 15, 19);
-        const cargo = game.ART.cargo.planks;
-        if (outbound && cargo) s.image(cargo, -2, -13, 10, 7.5);
+        if (old) s.image(old.walk[Math.floor(distance / 3) % 8], -7.5, -18, 15, 19);
+        g.restore();
       } else {
-        const img = walkers[frame + (outbound ? 4 : 0)];
-        s.image(img, ((-img.width / 514) * 22) / 2, -22, (img.width / 514) * 22, 22);
+        paintCarrier(s, parts, x, y, distance, outbound ? 1 : -1, outbound, index, !moving);
       }
-      g.restore();
     }
   }
   pixi.presentation.layer = (name, paint) =>
@@ -265,25 +332,23 @@ export async function mountGraphicsPrototype(game: GameRuntime, internals: DevIn
       if (name === 'foreground-effects' && !baseline) {
         for (let k = 0; k < v.clouds; k++) {
           const x = (cx - 10) * game.TS + (((time / 150) * v.wind + k * 210) % 900);
-          s.image(cloud, x - 45, (cy - 4 + k * 1.4) * game.TS, 220, 100, index === 2 ? 0.7 : 0.25);
+          s.image(cloud, x - 45, (cy - 4 + k * 1.4) * game.TS, 220, 100, 0.22);
         }
-        if (index === 2)
-          for (let n = 0; n < 16; n++) {
-            const x = (cx - 6) * game.TS + ((n * 51 + time / 180) % 600),
-              y = (cy - 2) * game.TS + n * 9 + Math.sin(time / 1800 + n) * 4;
-            s.g.ellipse(x, y, 0.8, 0.4).fill({ color: 0xf7e4ae, alpha: 0.65 });
-          }
       }
     });
   const draw = game.draw;
   game.draw = () => {
     const now = performance.now();
-    if (!paused && !reduced) time += Math.min(50, now - last);
+    if (!paused && !reduced) {
+      const delta = Math.min(50, now - last);
+      time += delta;
+      if (working) industryTime += delta;
+    }
     last = now;
     draw();
   };
   const style = document.createElement('style');
-  style.textContent = `#graphics-prototype{position:fixed;z-index:10000;inset:0;pointer-events:none;font:14px/1.5 system-ui;color:#f5ead2} #graphics-prototype section,#graphics-prototype nav{pointer-events:auto;background:#202921f2;border:1px solid #c6b78566;box-shadow:0 8px 35px #0005;border-radius:14px;padding:18px} #graphics-prototype section{position:absolute;left:20px;top:80px;width:290px} #graphics-prototype h2{font:23px Georgia;margin:5px 0 10px} #graphics-prototype p{margin:8px 0;color:#d2c9ae} #graphics-prototype small{color:#b9ba8b;letter-spacing:1px} #graphics-prototype button{font:inherit;background:#3d4937;color:#fff1cd;border:1px solid #a39c7466;border-radius:7px;padding:7px 10px;cursor:pointer} #graphics-prototype button[aria-pressed=true]{background:#c9ad6e;color:#20291d} #graphics-prototype .row{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0} #graphics-prototype nav{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:15px;white-space:nowrap} #graphics-prototype output{display:block;font:11px/1.6 monospace;white-space:pre-wrap;color:#bdc8b2} #map-modes,#minimap-wrap,#atlas,#inspector{visibility:hidden} @media(max-width:700px){#graphics-prototype section{top:70px;left:8px;width:220px;padding:10px} #graphics-prototype nav{bottom:8px;padding:10px;gap:7px}}`;
+  style.textContent = `#graphics-prototype{position:fixed;z-index:10000;inset:0;pointer-events:none;font:14px/1.5 system-ui;color:#f5ead2} #graphics-prototype section,#graphics-prototype nav{pointer-events:auto;background:#202921f2;border:1px solid #c6b78566;box-shadow:0 8px 35px #0005;border-radius:14px;padding:18px} #graphics-prototype section{position:absolute;left:20px;top:80px;width:290px;max-height:calc(100vh - 180px);overflow:auto} #graphics-prototype h2{font:23px Georgia;margin:5px 0 10px} #graphics-prototype p{margin:8px 0;color:#d2c9ae} #graphics-prototype small{color:#b9ba8b;letter-spacing:1px} #graphics-prototype button{font:inherit;background:#3d4937;color:#fff1cd;border:1px solid #a39c7466;border-radius:7px;padding:7px 10px;cursor:pointer} #graphics-prototype button[aria-pressed=true]{background:#c9ad6e;color:#20291d} #graphics-prototype .row{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0} #graphics-prototype nav{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:15px;white-space:nowrap} #graphics-prototype output{display:block;font:11px/1.6 monospace;white-space:pre-wrap;color:#bdc8b2} #map-modes,#minimap-wrap,#atlas,#inspector{visibility:hidden} @media(max-width:700px){#graphics-prototype section{top:70px;left:8px;width:220px;padding:10px} #graphics-prototype nav{bottom:8px;padding:10px;gap:7px}}`;
   document.head.append(style);
   const ui = document.createElement('div');
   ui.id = 'graphics-prototype';
@@ -293,8 +358,9 @@ export async function mountGraphicsPrototype(game: GameRuntime, internals: DevIn
     game.ART.bld.windmill = baseline ? originalMill : prototypeMill;
     const params = new URLSearchParams(location.search);
     params.set('variant', v.key);
+    params.set('round', '2');
     history.replaceState(null, '', '?' + params);
-    ui.innerHTML = `<section><small>THROWAWAY GRAPHICS STUDY</small><h2>${v.name}</h2><p>${v.note}</p><div class="row"><button data-action="baseline" aria-pressed="${baseline}">Original art</button><button data-action="pause" aria-pressed="${paused}">${paused ? 'Play' : 'Pause'}</button></div><div class="row"><button data-action="working" aria-pressed="${working}">Industry ${working ? 'on' : 'off'}</button><button data-action="reduced" aria-pressed="${reduced}">Reduced motion</button></div><div class="row"><button data-action="village">Village</button><button data-action="normal">Normal zoom</button><button data-action="carrier">Carrier close-up</button></div><p>Compare the same colony. Carriers follow a display loop; the economy is paused. No saves.</p><output>${JSON.stringify({ variant: v.key, carriers: v.people, pace: v.pace, wind: v.wind, clouds: v.clouds, working, paused, reduced, baseline, focus }, null, 2)}</output><p style="font-size:11px">Draft art: side-view walk only; generated poses need cleanup before production.</p></section><nav aria-label="Prototype variants"><button data-action="prev" aria-label="Previous variant">←</button><strong>${v.key} · ${v.name}</strong><button data-action="next" aria-label="Next variant">→</button></nav>`;
+    ui.innerHTML = `<section><small>ROUND TWO · GRAPHICS STUDY</small><h2>${v.name}</h2><p>${v.note}</p><div class="row"><button data-action="baseline" aria-pressed="${baseline}">Original art</button><button data-action="pause" aria-pressed="${paused}">${paused ? 'Play' : 'Pause'}</button></div><div class="row"><button data-action="working" aria-pressed="${working}">Industry ${working ? 'on' : 'off'}</button><button data-action="reduced" aria-pressed="${reduced}">Reduced motion</button></div><div class="row"><button data-action="village">Village</button><button data-action="normal">Normal zoom</button><button data-action="carrier">Carrier close-up</button><button data-action="industry">Industry close-up</button></div><p>Compare the same colony. Carriers follow a display loop; the economy is paused. No saves.</p><details><summary>Comparison state</summary><output>${JSON.stringify({ variant: v.key, carriers: v.people, pace: v.pace, wind: v.wind, clouds: v.clouds, rotation: 'counter-clockwise', gait: 'planted feet', working, paused, reduced, baseline, focus }, null, 2)}</output></details><p style="font-size:11px">Counter-clockwise painted sails. Grounded, jointed walk. Side-view prototype only. <a href="?uitest&graphicsPrototype&round=1&variant=A" style="color:#e9d499">Review round one</a></p></section><nav aria-label="Prototype variants"><button data-action="prev" aria-label="Previous variant">←</button><strong>${v.key} · ${v.name}</strong><button data-action="next" aria-label="Next variant">→</button></nav>`;
     console.info('Graphics prototype', {
       variant: v.key,
       ...v,
@@ -320,6 +386,10 @@ export async function mountGraphicsPrototype(game: GameRuntime, internals: DevIn
     if (action === 'normal') {
       focus = action;
       center(1.7);
+    }
+    if (action === 'industry') {
+      focus = action;
+      center(5, cx + 0.7, cy + 0.1);
     }
     if (action === 'carrier') {
       focus = action;

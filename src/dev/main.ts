@@ -10,6 +10,7 @@ import { createTestReset } from './test-reset.ts';
 import { mountUIPrototype } from './ui-prototype.ts';
 import { preparePrototypeMap } from './ui-prototype-map.ts';
 import { mountGraphicsPrototype } from './graphics-prototype.ts';
+import { mountGraphicsPrototype as mountFirstGraphicsPrototype } from './graphics-prototype-round-one.ts';
 
 if (new URLSearchParams(location.search).has('uiPrototype')) {
   mountUIPrototype();
@@ -23,9 +24,13 @@ if (new URLSearchParams(location.search).has('uiPrototype')) {
   } satisfies DevInternals;
   bootGame(internals)
     .then(async (game) => {
-      if (new URLSearchParams(location.search).has('graphicsPrototype'))
-        await mountGraphicsPrototype(game, internals);
-      else if (new URLSearchParams(location.search).has('uiPrototypeMap'))
+      if (new URLSearchParams(location.search).has('graphicsPrototype')) {
+        const mount =
+          new URLSearchParams(location.search).get('round') === '1'
+            ? mountFirstGraphicsPrototype
+            : mountGraphicsPrototype;
+        await mount(game, internals);
+      } else if (new URLSearchParams(location.search).has('uiPrototypeMap'))
         preparePrototypeMap(game);
       else runScenarios(game);
       (window as unknown as Record<string, unknown>)['productionArtPreview'] = {
