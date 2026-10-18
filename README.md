@@ -61,24 +61,41 @@ Pass exact paths to routine files in `tests/`; repeated selections run once in t
 
 Lint rules live in `.oxlintrc.json`. `no-var` and `prefer-const` apply to source, scripts and tests without exemptions; use `const` for bindings that are never reassigned and `let` for mutable bindings.
 
-Run the slower `npm run check`, browser tests or visual captures only when explicitly requested. The full check adds formatting, the build and browser tests, running alongside the Node tests; it takes about four minutes on a 4-core laptop and retains browser failure artifacts alongside its logs. Browser tests run in three workers on the machine's GPU through ANGLE (`playwright.config.mjs`); Chromium falls back to software WebGL where no GPU is available, which is much slower. Each worker boots one shared page (`tests/browser/helpers/test.mjs`); the development hook `resetForTest()` returns it to the booted colony and interface before every test, and a fingerprint check fails the test if it did not. Tests that need their own pre-boot setup (URL scenarios, real animation frames, audio or WebGL faults, reloads) take the `freshPage` fixture instead.
+Run the slower `npm run check`, browser tests or visual captures only when explicitly requested. The full check adds formatting, the build and browser tests, running alongside the Node tests; it takes about four minutes on a 4-core laptop and retains browser failure artifacts alongside its logs. Browser tests run in three workers under the selected rendering profile (see below); global setup verifies Chromium's actual renderer and prints it before any test runs. Each worker boots one shared page (`tests/browser/helpers/test.mjs`); the development hook `resetForTest()` returns it to the booted colony and interface before every test, and a fingerprint check fails the test if it did not. Tests that need their own pre-boot setup (URL scenarios, real animation frames, audio or WebGL faults, reloads) take the `freshPage` fixture instead.
 
 `npm run coverage` measures V8 coverage of `src/` separately for the Node tests and the browser tests (browser bundles are mapped back through source maps), and fails if any file leaves more lines or branches uncovered in either environment than `tests/coverage-baseline.json` records, beyond 0.5% of the file. Counting uncovered code lets redundant code be deleted without a false alarm while a deleted test still fails. HTML reports are written to `output/coverage/report/{node,browser}/`. After an intended coverage change, run `npm run coverage -- --update` and commit the baseline; `-- --report-only` re-reports the last run's raw data.
 
-Tests and builds run TypeScript 7 checking through `npm run typecheck`, which invokes the TypeScript 7 compiler explicitly. Strict null checks are enabled in the main `tsconfig.json` for all source and compiler contracts. Browser tests require Playwright Chromium (`npx playwright install chromium` once). If port 8765 is occupied by another server, use `PLAYWRIGHT_PORT=8766 npm run test:browser`. Development scenarios are available at `tests/game.html?uitest&buildrules&seed=2024`, `?saveload&seed=123`, and `?devshot&seed=2024`.
+Tests and builds run TypeScript 7 checking through `npm run typecheck`, which invokes the TypeScript 7 compiler explicitly. Strict null checks are enabled in the main `tsconfig.json` for all source and compiler contracts. Browser tests require Playwright Chromium (`npx playwright install chromium` once). If port 8765 is occupied by another server, use `PLAYWRIGHT_PORT=8766 SETTLERS_RENDER_PROFILE=software npm run test:browser`. Development scenarios are available at `tests/game.html?uitest&buildrules&seed=2024`, `?saveload&seed=123`, and `?devshot&seed=2024`.
 
-`npm run bench:render` is opt-in and not part of `npm test`. It measures CPU and GPU frame time at every zoom on this machine's GPU (headless Chromium, real WebGL) and warns if Chromium falls back to software rendering. Add `-- --zooms 3 --profile 3` to narrow it and keep a CPU profile; `scripts/bench-render.mjs` lists every option. Results go to `output/bench/`; see [performance notes](docs/performance-60fps.md). After building, `node scripts/bench-territory.mjs` measures isolated territory-cache frames on hardware WebGL and saves raw samples plus a game screenshot to `output/bench-territory/`.
+### Rendering profiles
 
-On Linux/Mesa with multiple GPUs, set `DRI_PRIME` on the browser process or the command that launches Chromium, rather than on the static server. On this laptop, `pci-0000_02_00_0` selects the AMD Radeon 500 Series; other machines need their own device identifier. Browser tests and the render benchmark use ANGLE OpenGL (`--use-angle=gl`):
+Every Chromium command — browser tests (`npm run test:browser`, `npm run check`, `npm run coverage`), `npm run bench:render`, `scripts/bench-territory.mjs`, `npm run capture` and `npm run test:pages` — launches through one rendering-profile contract (`scripts/render-profile.mjs`). Select a profile with `SETTLERS_RENDER_PROFILE`; there is no tracked default, and a command without a selection stops before starting Chromium.
 
-```sh
-DRI_PRIME=pci-0000_02_00_0 npm run test:browser
-DRI_PRIME=pci-0000_02_00_0 npm run bench:render -- --modes running --speed 1 --ms 10000
+- `software` is built in: SwiftShader WebGL, for CI and machines without a usable GPU. Browser tests, captures and the Pages smoke check accept it; benchmarks refuse it.
+- Hardware profiles describe one machine, so they live outside the repository in `~/.config/ai-settlers/render-profiles.json` (or `$XDG_CONFIG_HOME/ai-settlers/…`, or any file named by `SETTLERS_RENDER_PROFILES`). Each names text the WebGL renderer must contain (`gpu`), the ANGLE backend (`angle`: `gl`, `gl-egl`, `vulkan`, `d3d11` or `metal`) and optional GPU-selection variables (`env`, such as `DRI_PRIME`). An optional `default` selects a profile when `SETTLERS_RENDER_PROFILE` is unset. The reference workstation uses:
+
+```json
+{
+  "default": "amd",
+  "profiles": {
+    "amd": { "gpu": "AMD Radeon 500 Series", "angle": "gl", "env": { "DRI_PRIME": "pci-0000_02_00_0" } },
+    "intel": { "gpu": "UHD Graphics 620", "angle": "gl" }
+  }
+}
 ```
 
-Check the benchmark's printed GPU name before interpreting FPS or GPU timings. AMD and Intel hardware results are distinct configurations, and neither should be confused with software WebGL.
+Find a machine's renderer name in `chrome://gpu` or from a run's printed `Rendering:` line. On Linux/Mesa, put `DRI_PRIME` in the profile rather than the shell; an exported value that disagrees with the selected hardware profile is refused. Intel integrated graphics are hardware acceleration too, but a distinct profile: nothing chooses a GPU automatically.
 
-Browser tests take no screenshots. With the local server running, `npm run capture` exports a curated set of views into `output/captures/`: the release frame and HUD, the minimap, the inspector and Colony, Economy and Logistics panels, the painted production buildings, development overview and detail scenes, `capture.json` renderer diagnostics and a particle animation (`particles.gif`). Capture additionally requires FFmpeg. Headless software-WebGL timings are diagnostics; profile target hardware for performance decisions.
+Each command launches Chromium, reads the unmasked WebGL renderer and stops before testing, capturing or sampling unless it matches the profile: the expected GPU on the expected ANGLE backend, never a software rasterizer, and WebGL available (`software` accepts SwiftShader only). With `gl-egl`, Mesa ignores `DRI_PRIME` and renders on the Intel GPU, which this check catches. Every run prints its profile, backend, expected and actual renderer, and browser version; capture and benchmark results save them with the source commit and dirty state, and benchmarks also keep their Chromium switches and GPU-selection variables. Capability options such as GPU timer queries add to the profile's switches; switches that choose a backend are refused.
+
+```sh
+SETTLERS_RENDER_PROFILE=software npm run test:browser
+SETTLERS_RENDER_PROFILE=amd npm run bench:render -- --modes running --speed 1 --ms 10000
+```
+
+`npm run bench:render` is opt-in and not part of `npm test`. It measures CPU and GPU frame time at every zoom on a hardware profile (full headless Chromium, real WebGL). Add `-- --zooms 3 --profile 3` to narrow it and keep a CPU profile; `scripts/bench-render.mjs` lists every option. Results go to `output/bench/`; see [performance notes](docs/performance-60fps.md). After building, `SETTLERS_RENDER_PROFILE=<hardware profile> node scripts/bench-territory.mjs` measures isolated territory-cache frames and saves raw samples plus a game screenshot to `output/bench-territory/`. Compare results only between runs with the same profile and actual renderer.
+
+Browser tests take no screenshots. With the local server running, `SETTLERS_RENDER_PROFILE=software npm run capture` exports a curated set of views into `output/captures/`: the release frame and HUD, the minimap, the inspector and Colony, Economy and Logistics panels, the painted production buildings, development overview and detail scenes, `capture.json` renderer diagnostics with the rendering configuration, and a particle animation (`particles.gif`). Capture additionally requires FFmpeg. Headless software-WebGL timings are diagnostics; profile target hardware for performance decisions.
 
 ## Deploy
 
@@ -96,7 +113,7 @@ The Direct Upload project is `settlers-tribute`, served at https://settlers-trib
 
 `npm run build:pages` creates a clean, deploy-only `dist/`: entry HTML, a real 404 page, Pages headers, and content-hashed releases containing the minified game and complete artwork/reference/provenance pack. Code and artwork share a release hash, preserving their relative paths and allowing one-year immutable caching; HTML revalidates. Cloudflare handles compression. Never deploy the repository root or manually add unversioned assets to the immutable release paths.
 
-`npm run preview:pages` builds and serves this production package locally through Wrangler. In another terminal, run `npm run test:pages -- http://localhost:8788/` (or pass the deployed URL) to check production WebGL boot, artwork, cache/security headers, missing-file 404s, and save/load. Set `PAGES_SCREENSHOT` to save a screenshot. Run `npm test` and `npm run build:pages` before manually publishing a branch preview. A branch preview can be uploaded with `npx wrangler pages deploy dist --project-name settlers-tribute --branch staging` after building.
+`npm run preview:pages` builds and serves this production package locally through Wrangler. In another terminal, run `SETTLERS_RENDER_PROFILE=software npm run test:pages -- http://localhost:8788/` (or pass the deployed URL) to check production WebGL boot, artwork, cache/security headers, missing-file 404s, and save/load. Set `PAGES_SCREENSHOT` to save a screenshot. Run `npm test` and `npm run build:pages` before manually publishing a branch preview. A branch preview can be uploaded with `npx wrangler pages deploy dist --project-name settlers-tribute --branch staging` after building.
 
 Soft-launch headers disable search indexing (`X-Robots-Tag: noindex`) and embedding, and add basic browser security protections. The site is still public, not access-controlled. Remove `noindex` from `scripts/pages-headers.txt` when ready for discovery. Saves and preferences stay in browser-local storage, separately for each origin; localhost/preview saves do not automatically transfer to production. Serve over HTTP(S); direct `file://` opening and offline caching are unsupported.
 

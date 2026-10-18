@@ -1,8 +1,11 @@
-// Frame-time benchmark on the machine's real GPU (headless Chromium, ANGLE/OpenGL).
+// Frame-time benchmark on a hardware rendering profile (headless Chromium, real WebGL).
 // Grows a deterministic autoplay colony, then measures main-thread and GPU time
 // per frame at each zoom level with the simulation running and paused.
 //
-//   npm run bench:render -- [options]   (builds first)
+//   SETTLERS_RENDER_PROFILE=<hardware profile> npm run bench:render -- [options]
+//
+// Builds first. The profile (scripts/render-profile.mjs) chooses the GPU and ANGLE
+// backend; the run stops before measuring if Chromium renders with anything else.
 //
 // Options (all optional):
 //   --minutes 20       simulated autoplay minutes before measuring
@@ -16,21 +19,27 @@
 //   --profile 0,3      write V8 CPU profiles for these zooms (running mode)
 //   --port 8790        static server port
 // Results: a table on stdout and JSON (plus profiles) under output/bench/.
-import { chromium } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { DRAW_CALLS, benchOptions, summarize } from './bench-render-helpers.mjs';
 import {
-  DRAW_CALLS,
-  benchOptions,
-  isSoftwareRenderer,
-  summarize,
-} from './bench-render-helpers.mjs';
+  launchOptions,
+  resolveProfile,
+  startVerifiedBrowser,
+  verifyRenderer,
+} from './render-profile.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
-let options;
+let options, profile, launch;
 try {
   options = benchOptions(process.argv.slice(2));
+  profile = resolveProfile({ purpose: 'performance' });
+  // Exposes EXT_disjoint_timer_query_webgl2 for GPU frame timing.
+  launch = launchOptions(profile, {
+    args: ['--enable-privileged-webgl-extensions'],
+    fullChromium: true,
+  });
 } catch (error) {
   console.error(error.message);
   process.exit(1);
@@ -130,18 +139,9 @@ try {
     if (serverExited || tries >= 50) throw new Error(`The static server on port ${port} failed.`);
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  browser = await chromium.launch({
-    headless: true,
-    channel: 'chromium',
-    args: [
-      '--headless=new',
-      '--enable-gpu',
-      '--ignore-gpu-blocklist',
-      '--use-angle=gl',
-      // Exposes EXT_disjoint_timer_query_webgl2 for GPU frame timing.
-      '--enable-privileged-webgl-extensions',
-    ],
-  });
+  const started = await startVerifiedBrowser(profile, launch, { performance: true });
+  browser = started.browser;
+  const rendering = started.evidence;
   const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
   // Pin the preferences that change what is drawn, so runs stay comparable.
   await context.addInitScript((quality) => {
@@ -173,16 +173,13 @@ try {
       rain: game.rainAmt(),
     };
   });
-  if (!boot.rendering) throw new Error('WebGL 2 rendering is unavailable in headless Chromium.');
+  // The game's own canvas must render on the verified GPU too.
+  verifyRenderer(profile, { available: boot.rendering, renderer: boot.gpu });
   // Verify the pinned cosmetic state instead of trusting the URL flag.
   if (!boot.pinned || boot.night !== 0 || boot.rain !== 0)
     throw new Error('Cosmetic state is not pinned: expected noon with no rain.');
   const scene = { time: 'noon', rain: false };
   console.log('Scene: noon, no rain (pinned)');
-  const software = isSoftwareRenderer(boot.gpu);
-  const softwareWarning = 'Warning: software rendering; GPU timings are not representative.';
-  console.log('GPU:', boot.gpu);
-  if (software) console.warn(softwareWarning);
   const zooms = options.zooms ?? Array.from({ length: boot.zoomCount }, (_, zoom) => zoom);
   const invalid = [...zooms, ...options.profile].filter((zoom) => zoom >= boot.zoomCount);
   if (invalid.length)
@@ -288,15 +285,13 @@ try {
     }
   console.log();
   console.table(rows);
-  if (software) console.warn(softwareWarning);
   if (rows.some((row) => row.gpuP50 === null))
     console.warn('Warning: GPU timer queries were unavailable; GPU columns are empty.');
   fs.writeFileSync(
     path.join(outDir, 'results.json'),
     JSON.stringify(
       {
-        gpu: boot.gpu,
-        software,
+        rendering,
         seed,
         minutes,
         speed,

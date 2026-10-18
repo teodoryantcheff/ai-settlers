@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import test from 'node:test';
-import { benchOptions, isSoftwareRenderer, summarize } from '../scripts/bench-render-helpers.mjs';
+import { benchOptions, summarize } from '../scripts/bench-render-helpers.mjs';
 
 test('the benchmark measures a 20-minute colony at every zoom by default', () => {
   assert.deepEqual(benchOptions([]), {
@@ -46,20 +46,6 @@ test('option mistakes are rejected before the colony grows', () => {
     [['--port', 'http'], /--port/],
   ])
     assert.throws(() => benchOptions(argv), message, argv.join(' '));
-});
-
-test('software WebGL renderers are told apart from hardware GPUs', () => {
-  for (const name of [
-    'ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)',
-    'ANGLE (Mesa, llvmpipe (LLVM 19.1.1, 256 bits), OpenGL 4.5)',
-    'softpipe',
-    'ANGLE (Microsoft, Microsoft Basic Render Driver Direct3D11 vs_5_0 ps_5_0)',
-  ])
-    assert.equal(isSoftwareRenderer(name), true, name);
-  assert.equal(
-    isSoftwareRenderer('ANGLE (Intel, Mesa Intel(R) UHD Graphics 620 (KBL GT2), OpenGL 4.6)'),
-    false,
-  );
 });
 
 test('a measurement window reports per-frame CPU, GPU and upload costs', () => {

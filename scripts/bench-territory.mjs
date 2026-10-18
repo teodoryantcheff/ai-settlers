@@ -1,12 +1,18 @@
-// Opt-in territory-cache benchmark on the reference hardware GPU.
-// Run npm run build first, then node scripts/bench-territory.mjs.
+// Opt-in territory-cache benchmark on a hardware rendering profile.
+// Run npm run build first, then
+//   SETTLERS_RENDER_PROFILE=<hardware profile> node scripts/bench-territory.mjs
+// The run stops before sampling unless Chromium renders on the profile's GPU and backend.
 // Uses two projections from the real colony rules while preserving building art,
 // so the changed frame isolates border/minimap work from guard animation changes.
-import { chromium } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { isSoftwareRenderer } from './bench-render-helpers.mjs';
+import {
+  launchOptions,
+  resolveProfile,
+  startVerifiedBrowser,
+  verifyRenderer,
+} from './render-profile.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const origin = 'http://127.0.0.1:8795';
@@ -16,6 +22,8 @@ const out = path.join(
   new Date().toISOString().replace(/[:.]/g, '-'),
 );
 if (!fs.existsSync(path.join(root, 'tests/game.html'))) throw new Error('Run npm run build first.');
+const profile = resolveProfile({ purpose: 'performance' });
+const launch = launchOptions(profile, { fullChromium: true });
 const responseFrom = () => fetch(origin, { signal: AbortSignal.timeout(1000) }).catch(() => null);
 if (await responseFrom()) throw new Error('Port 8795 is already in use.');
 const server = spawn('python3', ['-m', 'http.server', '8795', '--bind', '127.0.0.1'], {
@@ -31,11 +39,8 @@ try {
     if (exited || tries >= 50) throw new Error('Benchmark server failed.');
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  browser = await chromium.launch({
-    headless: true,
-    channel: 'chromium',
-    args: ['--headless=new', '--enable-gpu', '--ignore-gpu-blocklist', '--use-angle=gl-egl'],
-  });
+  const started = await startVerifiedBrowser(profile, launch, { performance: true });
+  browser = started.browser;
   const context = await browser.newContext({
     viewport: { width: 1920, height: 1080 },
     deviceScaleFactor: 1,
@@ -65,18 +70,20 @@ try {
     polling: 100,
     timeout: 60000,
   });
-  const gpu = await page.evaluate(() => {
+  const game = await page.evaluate(() => {
     const g = window.productionArtPreview.game;
     const gl = document.getElementById('pixi-view').getContext('webgl2');
-    if (!gl || !g.renderingAvailable) throw new Error('WebGL 2 is unavailable.');
-    const info = gl.getExtension('WEBGL_debug_renderer_info');
+    const info = gl?.getExtension('WEBGL_debug_renderer_info');
     g.closeLayer('start');
     g.state.paused = true;
     g.state.auto = true;
-    return info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+    return {
+      available: !!gl && g.renderingAvailable !== false,
+      renderer: gl && gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER),
+    };
   });
-  if (isSoftwareRenderer(gpu)) throw new Error('Hardware GPU required: ' + gpu);
-  console.log('GPU:', gpu);
+  // The game's own canvas must render on the verified GPU too.
+  verifyRenderer(profile, game);
   for (let minute = 0; minute < 20; minute++)
     await page.evaluate(() => {
       const g = window.productionArtPreview.game;
@@ -147,7 +154,7 @@ try {
     };
   };
   const results = {
-    gpu,
+    rendering: started.evidence,
     seed: 2024,
     viewport: { width: 1920, height: 1080 },
     quality: 1,
