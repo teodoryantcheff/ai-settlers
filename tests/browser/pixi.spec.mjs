@@ -114,9 +114,9 @@ test('repeated native frames reuse installed painted textures without uploads', 
   expect(result.after.textureUpdates).toBe(result.before.textureUpdates);
   expect(result.after.cachedTextures).toBe(result.before.cachedTextures);
   expect(result.after.spriteFrameUpdates).toBe(result.before.spriteFrameUpdates);
-  // Vector work is rebuilt each frame into a handful of pooled Graphics runs.
+  // Immediate buildings/effects use pooled runs; nature keeps native sprites.
   expect(result.after.nativeGraphics).toBe(result.before.nativeGraphics);
-  expect(result.after.nativeGraphics).toBeLessThan(16);
+  expect(result.after.nativeGraphics).toBeLessThan(128);
   expect(result.unchangedUploads).toBe(0);
   expect(result.simulationUnchanged).toBe(true);
   // A dirty tile must refresh the terrain texture — as a full update or a

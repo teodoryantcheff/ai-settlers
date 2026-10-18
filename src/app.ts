@@ -1,14 +1,18 @@
+import type { RendererInternals } from './rendering/renderer.ts';
 import { createEngine } from './simulation/engine.ts';
 import { assemblePresentation } from './application/assembly.ts';
 import type { RendererPresentation } from './rendering/scene.ts';
 import type { GameRuntime } from './runtime.ts';
 import type { PersistenceInternals } from './core/persistence.ts';
+import type { PixiRendererInternals } from './rendering/pixi-renderer.ts';
 import type { HudInternals } from './ui/hud.ts';
 
 /** Test-only hooks the development bundle passes at boot; the release passes none. */
 export interface DevInternals {
   persistence?: PersistenceInternals;
   hud?: HudInternals;
+  pixi?: PixiRendererInternals;
+  renderer?: RendererInternals;
 }
 
 /** Assemble before starting: no module starts a frame loop when imported. */
@@ -29,6 +33,10 @@ export function createGame(
     },
     persistenceInternals: internals?.persistence,
   }) as GameRuntime;
-  assemblePresentation(game, { presentation, hudInternals: internals?.hud });
+  assemblePresentation(game, {
+    presentation,
+    hudInternals: internals?.hud,
+    rendererInternals: internals?.renderer,
+  });
   return game;
 }

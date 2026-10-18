@@ -1,3 +1,5 @@
+import type { RendererInternals } from '../rendering/renderer.ts';
+import type { PixiRendererInternals } from '../rendering/pixi-renderer.ts';
 import { bootGame, reportBootError } from '../bootstrap.ts';
 import type { DevInternals } from '../app.ts';
 import type { PersistenceInternals } from '../core/persistence.ts';
@@ -15,6 +17,8 @@ if (new URLSearchParams(location.search).has('uiPrototype')) {
   const internals = {
     persistence: {} as PersistenceInternals,
     hud: {} as HudInternals,
+    pixi: {} as PixiRendererInternals,
+    renderer: {} as RendererInternals,
   } satisfies DevInternals;
   bootGame(internals)
     .then((game) => {
@@ -22,6 +26,7 @@ if (new URLSearchParams(location.search).has('uiPrototype')) {
       else runScenarios(game);
       (window as unknown as Record<string, unknown>)['productionArtPreview'] = {
         game,
+        internals,
         canvas: document.getElementById('pixi-view'),
         // The offline crop rule, so browser tests can re-check the manifest.
         paintedRegions,

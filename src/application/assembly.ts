@@ -25,6 +25,7 @@ export interface PresentationOptions {
   presentation: RendererPresentation;
   /** Development builds only: test-only HUD hooks (see `src/dev/`). */
   hudInternals?: HudInternals;
+  rendererInternals?: RendererInternals;
 }
 
 /** Production and partial tests use these same factories in this same order. */
@@ -43,7 +44,7 @@ export const PRESENTATION_SUBSYSTEMS = [
     createVillage(game, hooks),
   ),
   presentationSubsystem('renderer', (game, options, hooks?: RendererInternals) =>
-    createRenderer(game, options.presentation, hooks),
+    createRenderer(game, options.presentation, hooks ?? options.rendererInternals),
   ),
   presentationSubsystem('progressionView', (game) => createProgressionView(game)),
   presentationSubsystem('workspace', (game) => createWorkspace(game)),

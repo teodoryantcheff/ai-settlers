@@ -4,6 +4,74 @@ Measured on 2026-10-16 on the reference laptop: Intel Core i7-8550U (4C/8T, 15 W
 
 **Update, 2026-10-17.** The Canvas2D interception layer described below (`pixi-context.ts`) has been removed. Painters now draw straight into a few pooled PixiJS `Graphics` runs per layer, rebuilt each frame. On the same laptop with a 10-minute colony, CPU time per frame fell from 32/27/20 ms to 13/10/5.5 ms (zoom 0.55/1/2.2, running), every zoom reaches the 60 fps cap, and draw calls fell from about 44 to 15.
 
+## Native nature retention, 2026-10-18 (#42 / #44)
+
+Implemented on the single `codex/native-nature-integration` branch, starting from fresh `main` at `c0ebf91` (including the normalized building PNGs). The production WebGL renderer retains a view per tree/rock tile. Images and local vector geometry update explicitly, while unchanged views reuse shared textures. Contiguous static spans between immediate building/settler drawings share native GPU batches; moving objects change only the spans they cross. Cached static depth rows merge with the full dynamic depth keys and preserve stable ties. Culling drops obsolete batch ordering identities while retaining owned artwork; removal, world replacement and teardown release owned views, including detached ones. Buildings, settlers and overlays remain immediate.
+
+The first per-owner prototype kept draw calls low but still rebuilt/uploaded the combined scene batch and incurred repeated child-array splices. It did not demonstrate a CPU gain. The adopted path sorts placement once and isolates static batch instructions. The extra draw calls are a measured tradeoff, not a claim that fewer draw calls alone make a frame faster.
+
+### Hardware measurements
+
+Reference i7-8550U / Intel UHD 620, hardware ANGLE WebGL, 1920×1080, seed 2024, quality 1, full motion, pinned noon/no rain, 20-minute starting colony (30 buildings, 16 units, 2,463 trees). Each window has one second warmup and ten seconds measurement. No tests or captures run concurrently with the timed windows used below. Simulation continues during measurement, so sequential 1× zooms see a slightly older colony. The starting scene and protocol match the baseline. CPU and GPU are separate measurements, not additive frame budgets.
+
+Reproduce the ordinary timings after `npm ci` and `npm run build`:
+
+```sh
+node scripts/bench-render.mjs --minutes 20 --modes running --speed 1 --ms 10000
+for zoom in 0 1 2 3 4 5 6; do
+  node scripts/bench-render.mjs --minutes 20 --modes running --speed 8 --zooms "$zoom" --ms 10000
+done
+```
+
+The final measurement wrapper also records simulation start/end time, pause state and modal state and rejects invalid running windows; it remains locally at `output/native-nature/measure.mjs`. Each 8× window starts from a fresh browser/colony and advances about 80 simulated seconds with no modal or pause. Saved [1× baseline](benchmarks/2026-10-18/native-nature/baseline-1x.json), [retained 1×](benchmarks/2026-10-18/native-nature/retained-1x.json), [8× baseline](benchmarks/2026-10-18/native-nature/baseline-8x.json) and [retained 8×](benchmarks/2026-10-18/native-nature/retained-8x.json) retain the GPU identity, phase means, tails, draw calls and upload counts. The baseline 8× zoom-1.3 window that overlapped a focused test was excluded and replaced by a clean repeat.
+
+All times below are milliseconds; the paired CPU columns show mean / p95.
+
+| Zoom | Main 1× fps | Main CPU | Retained 1× fps | Retained CPU | Retained GPU median / p95 |
+|---|---:|---:|---:|---:|---:|
+| 0.55 | 59 | 12.1 / 17.5 | 59.8 | 7.9 / 11.1 | 6.7 / 9.2 |
+| 0.7 | 59.6 | 11 / 15.3 | 59.6 | 8.3 / 13.1 | 6.3 / 9.1 |
+| 0.85 | 58.6 | 11.8 / 15.7 | 60 | 8.8 / 11.8 | 6.2 / 8.7 |
+| 1 | 59.3 | 9.9 / 13.6 | 60 | 8.3 / 10.5 | 5.4 / 7.3 |
+| 1.3 | 59.8 | 7.7 / 11.4 | 60 | 6.9 / 9.5 | 4.8 / 6.4 |
+| 1.7 | 59.6 | 6.9 / 13.6 | 60 | 5.7 / 7.2 | 4.4 / 6 |
+| 2.2 | 60 | 6 / 11.5 | 59.7 | 5.3 / 7.1 | 4.2 / 5.9 |
+
+| Zoom | Main 8× CPU p95 | Retained 8× fps | Retained CPU mean / p95 | Retained GPU median / p95 |
+|---|---:|---:|---:|---:|
+| 0.55 | 19.2 | 55.9 | 12.4 / 16 | 7.3 / 11 |
+| 0.7 | 20.5 | 57.1 | 11.8 / 16 | 6.9 / 9.8 |
+| 0.85 | 20.6 | 56.5 | 12.2 / 16.8 | 6.8 / 9.6 |
+| 1 | 20.2 | 59.5 | 10.6 / 14.5 | 5.9 / 8.7 |
+| 1.3 | 12.8 | 57.1 | 10.4 / 16.8 | 5.2 / 9.2 |
+| 1.7 | 14.9 | 60 | 7.9 / 11 | 4.8 / 7.6 |
+| 2.2 | 13.8 | 59.8 | 6.8 / 11.6 | 4.6 / 8.1 |
+
+**The all-zoom target is not met.** In this 1× run CPU p95 still exceeds 10 ms at zooms 0.55–1.0, although GPU p95 stays below 10 ms. GPU medians at zooms 0.55–0.85 still exceed #40's 6 ms criterion. At 8×, CPU p95 exceeds 15 ms at zooms 0.55, 0.7, 0.85 and 1.3; GPU p95 reaches 11 ms at 0.55. The isolated 1.3/8× tail is worse than its baseline and needs an adjacent control before assigning cause. These results establish useful far/default drawing savings, not uniform gains at every zoom, a regression-free 8× result or closure of #35/#40/#47. Autosave and territory-change hitches were not remeasured by this work.
+
+### Adjacent A/B/A controls
+
+Main's unchanged built assets were preserved outside the checkout; all implementation stays on one integration branch. A/B/A used fresh 20-minute colonies, zooms 0.55 and 1.0, ten-second running 1× windows, and no concurrent validation. [Saved controls](benchmarks/2026-10-18/native-nature/controls.json) include all counts and original artifact paths.
+
+| Zoom | Main A1 draw / CPU p95 | Retained B draw / CPU p95 | Main A2 draw / CPU p95 | Main → retained draw calls | Main → retained vertex KB/frame |
+|---|---:|---:|---:|---:|---:|
+| 0.55 | 10.7 / 17.1 | 9.2 / 12.9 | 13.0 / 17.9 | 15.7 → 46.5 | 520 → 367 |
+| 1.0 | 8.3 / 12.8 | 7.4 / 11.6 | 9.4 / 12.0 | 17.9 → 46.0 | 375 → 291 |
+
+Drawing falls about 22% / 16% against the averages of adjacent controls and is below both controls at both zooms. The full 1× run records CPU mean falling from 12.1 to 7.9 ms at far zoom, but the adjacent comparison is the better estimate of the gain under this laptop's shared power budget. The visible sprite counts match. Graphics-build counts rise because immediate work is split into smaller runs; unchanged paused nature emits no image commands or geometry updates. Its independent batches also survive camera transforms without uploading all static sprite vertices, verified by a real GPU buffer-update fixture.
+
+### Visual and regression evidence
+
+36 before/after actual-game captures cover zooms 0.55, 1.0 and 2.2; day/night; Normal, Visual clarity and Reduced Motion; and both quality 1/0.75. They use the same grown colony, fixed cosmetic clock and cosmetic RNG, and hardware WebGL. [Comparison summaries and hashes](benchmarks/2026-10-18/native-nature/visual-comparison.json) record a maximum channel difference of 6/255 and a worst per-image mean difference below 0.00047/255. The differences are sparse raster rounding; the inspected contact sheet shows no ordering, footprint or anchor shifts. Raw PNGs and the contact sheet remain in `output/native-nature/`.
+
+Real-subsystem tests cover static/dynamic depth keys and stable ties, growth, planting/felling, sway, pause, Reduced Motion, clarity, source replacement, far-zoom thresholds and world replacement. Hardware-browser fixtures verify retained Graphics batches, bounded buffer updates across camera changes, culling/reuse, nested batch cleanup and visible graphics failure recovery. Existing hardware tests cover partial terrain/border uploads, tiled textures, shadows and bounded art caches across all zooms. `npm test`, `npm run format:check` and all 24 affected hardware-browser tests pass. The integration branch receives the final Standards/Spec review before delivery.
+
+### Remaining drawing cost
+
+A post-change five-second V8 profile at zooms 0.55/1.0 attributes 37.3% / 47.6% of sampled drawing time to submission (`presentation.end`). Native instruction rebuilding remains 18.4% / 26.7%, and Graphics batch preparation 11.6% / 16.3%; these inclusive shares overlap. Direct building painter stacks account for 6.5% / 16.6%. [Far profile](benchmarks/2026-10-18/native-nature/profile-0.json) and [default profile](benchmarks/2026-10-18/native-nature/profile-3.json) preserve weighted totals and raw-profile hashes. These samples are not source-map attributed, can be blurred by inlining, and include profiler overhead; they do not replace unprofiled frame budgets. Remaining immediate geometry and building drawing warrant controlled probes before choosing #46 or another migration. #45 is still conditional; this 16-unit colony does not establish a large-population settler cost.
+
+## Original diagnosis (before the native drawing path)
+
 **Verdict.** The frame is CPU-bound in rendering. The simulation, HUD and minimap together cost about 1 ms per frame at 1× speed. The world renderer re-describes every visible object each frame through intercepted Canvas2D calls, maps them onto a positional pool of PixiJS objects, and makes PixiJS re-batch the whole scene. That work grows with the number of visible objects (∝ 1/zoom²) and roughly doubles while the colony is running. Three cheap fixes halve the cost, but 60 fps at every zoom needs a retained world scene. A prototype of that scene on this machine costs 2–5 ms per frame.
 
 ## Method

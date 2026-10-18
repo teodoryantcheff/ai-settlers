@@ -265,6 +265,7 @@ function recordingPresentation() {
     available: true,
     layers,
     invalidate() {},
+    release() {},
     begin() {},
     layer(name, paint) {
       layers.push({ name, paint });
@@ -294,6 +295,13 @@ function recordingScene(calls = []) {
     calls,
     g,
     texture: (source, frame) => ({ source, frame }),
+    group(_key, paint) {
+      paint(this);
+    },
+    retain(owner, paint) {
+      calls.push({ method: 'retain', args: [owner, Boolean(paint)] });
+      if (paint) paint(this);
+    },
     image(source, x, y, width, height, alpha = 1, frame) {
       calls.push({ method: 'image', args: [source, x, y, width, height], alpha, frame });
     },

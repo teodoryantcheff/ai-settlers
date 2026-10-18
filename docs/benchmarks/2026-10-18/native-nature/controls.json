@@ -1,0 +1,200 @@
+[
+  {
+    "variant": "a1",
+    "artifact": "/tmp/settlers-native-baseline/output/bench/2026-10-18T12-04-52-011Z/results.json",
+    "gpu": "ANGLE (Intel, Mesa Intel(R) UHD Graphics 620 (KBL GT2), OpenGL ES 3.2)",
+    "software": false,
+    "seed": 2024,
+    "minutes": 20,
+    "speed": 1,
+    "quality": 1,
+    "scene": {
+      "time": "noon",
+      "rain": false
+    },
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "colony": {
+      "seconds": 1200,
+      "buildings": 30,
+      "units": 16,
+      "trees": 2463
+    },
+    "rows": [
+      {
+        "zoom": 0,
+        "mode": "running",
+        "scale": 0.55,
+        "fps": 59.7,
+        "cpuMean": 11.3,
+        "cpuP95": 17.1,
+        "drawMs": 10.7,
+        "stepMs": 0.2,
+        "miniMs": 0,
+        "hudMs": 0.1,
+        "gpuP50": 7,
+        "gpuP95": 10.8,
+        "sprites": 3575,
+        "graphics": 7,
+        "graphicsBuilds": 7,
+        "drawCalls": 15.7,
+        "uploadKB": 520,
+        "texUploads": 0.1
+      },
+      {
+        "zoom": 3,
+        "mode": "running",
+        "scale": 1,
+        "fps": 59.9,
+        "cpuMean": 8.8,
+        "cpuP95": 12.8,
+        "drawMs": 8.3,
+        "stepMs": 0.2,
+        "miniMs": 0,
+        "hudMs": 0.1,
+        "gpuP50": 5.6,
+        "gpuP95": 8.1,
+        "sprites": 1802,
+        "graphics": 6,
+        "graphicsBuilds": 6,
+        "drawCalls": 17.9,
+        "uploadKB": 375,
+        "texUploads": 0
+      }
+    ]
+  },
+  {
+    "variant": "b",
+    "artifact": "output/bench/2026-10-18T12-05-24-794Z/results.json",
+    "gpu": "ANGLE (Intel, Mesa Intel(R) UHD Graphics 620 (KBL GT2), OpenGL ES 3.2)",
+    "software": false,
+    "seed": 2024,
+    "minutes": 20,
+    "speed": 1,
+    "quality": 1,
+    "scene": {
+      "time": "noon",
+      "rain": false
+    },
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "colony": {
+      "seconds": 1200,
+      "buildings": 30,
+      "units": 16,
+      "trees": 2463
+    },
+    "rows": [
+      {
+        "zoom": 0,
+        "mode": "running",
+        "scale": 0.55,
+        "fps": 58.1,
+        "cpuMean": 9.8,
+        "cpuP95": 12.9,
+        "drawMs": 9.2,
+        "stepMs": 0.3,
+        "miniMs": 0,
+        "hudMs": 0.1,
+        "gpuP50": 7.1,
+        "gpuP95": 9.1,
+        "sprites": 3575,
+        "graphics": 23,
+        "graphicsBuilds": 22.7,
+        "drawCalls": 46.5,
+        "uploadKB": 367,
+        "texUploads": 0.1
+      },
+      {
+        "zoom": 3,
+        "mode": "running",
+        "scale": 1,
+        "fps": 59.5,
+        "cpuMean": 8,
+        "cpuP95": 11.6,
+        "drawMs": 7.4,
+        "stepMs": 0.2,
+        "miniMs": 0,
+        "hudMs": 0.1,
+        "gpuP50": 5.6,
+        "gpuP95": 8.2,
+        "sprites": 1802,
+        "graphics": 21,
+        "graphicsBuilds": 21.5,
+        "drawCalls": 46,
+        "uploadKB": 291,
+        "texUploads": 0
+      }
+    ]
+  },
+  {
+    "variant": "a2",
+    "artifact": "/tmp/settlers-native-baseline/output/bench/2026-10-18T12-05-57-331Z/results.json",
+    "gpu": "ANGLE (Intel, Mesa Intel(R) UHD Graphics 620 (KBL GT2), OpenGL ES 3.2)",
+    "software": false,
+    "seed": 2024,
+    "minutes": 20,
+    "speed": 1,
+    "quality": 1,
+    "scene": {
+      "time": "noon",
+      "rain": false
+    },
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "colony": {
+      "seconds": 1200,
+      "buildings": 30,
+      "units": 16,
+      "trees": 2463
+    },
+    "rows": [
+      {
+        "zoom": 0,
+        "mode": "running",
+        "scale": 0.55,
+        "fps": 58.3,
+        "cpuMean": 13.6,
+        "cpuP95": 17.9,
+        "drawMs": 13,
+        "stepMs": 0.3,
+        "miniMs": 0,
+        "hudMs": 0.1,
+        "gpuP50": 7.1,
+        "gpuP95": 9.5,
+        "sprites": 3575,
+        "graphics": 7,
+        "graphicsBuilds": 7,
+        "drawCalls": 15.7,
+        "uploadKB": 520,
+        "texUploads": 0.1
+      },
+      {
+        "zoom": 3,
+        "mode": "running",
+        "scale": 1,
+        "fps": 59.8,
+        "cpuMean": 9.9,
+        "cpuP95": 12,
+        "drawMs": 9.4,
+        "stepMs": 0.2,
+        "miniMs": 0,
+        "hudMs": 0.1,
+        "gpuP50": 5.5,
+        "gpuP95": 7.9,
+        "sprites": 1802,
+        "graphics": 6,
+        "graphicsBuilds": 6,
+        "drawCalls": 17.9,
+        "uploadKB": 375,
+        "texUploads": 0
+      }
+    ]
+  }
+]

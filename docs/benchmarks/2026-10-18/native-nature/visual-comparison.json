@@ -1,0 +1,404 @@
+{
+  "method": "Same seeded real 20-minute colony; fixed cosmetic clock and cosmetic RNG; hardware WebGL; 1440x900 CSS viewport. Raw captures under output/native-nature/.",
+  "count": 36,
+  "maximumChannelDifference": 6,
+  "maximumMeanChannelDifference": 0.0004686785550983082,
+  "comparisons": [
+    {
+      "name": "q0.75-clarity-day-z0",
+      "size": [
+        1080,
+        675
+      ],
+      "maxChannelDifference": 2,
+      "meanChannelDifference": 0.00025514403292181074,
+      "beforeSHA256": "de5e31a890fcac32087ebd5d06ac3d718f772ccffca2b13c50e6eb9c37734f2c",
+      "afterSHA256": "e61a97f99ae5bdd6b244c3eca9bfb8c3bf996608e15335148a03c531802fdd69"
+    },
+    {
+      "name": "q0.75-clarity-day-z3",
+      "size": [
+        1080,
+        675
+      ],
+      "maxChannelDifference": 1,
+      "meanChannelDifference": 6.858710562414267e-06,
+      "beforeSHA256": "134334e8c32c6723fe85a8528b8acb8076ce4aeacbe0e910af4a5867953bc6d8",
+      "afterSHA256": "0a9bccb903535042501f5fc3410855328603526a9d736693c513be9340682b5c"
+    },
+    {
+      "name": "q0.75-clarity-day-z6",
+      "size": [
+        1080,
+        675
+      ],
+      "maxChannelDifference": 1,
+      "meanChannelDifference": 2.2862368541380887e-05,
+      "beforeSHA256": "842d1d1f12185d9de4e6d95e13d3c3683767a1b85669bd6b8f24c311ed236622",
+      "afterSHA256": "a720c48e95cae45f85f8a983a9aef5c989f274dc13956fb240bacebab8830c32"
+    },
+    {
+      "name": "q0.75-clarity-night-z0",
+      "size": [
+        1080,
+        675
+      ],
+      "maxChannelDifference": 2,
+      "meanChannelDifference": 0.000242798353909465,
+      "beforeSHA256": "16b4cb31e676939be02dd666a4d91dfc7df67254799a723b3a791b5a190a0e9b",
+      "afterSHA256": "17741c51eb729cd972e9be8231cc1b5b35db4344d9a14179b5369c338ebd29dc"
+    },
+    {
+      "name": "q0.75-clarity-night-z3",
+      "size": [
+        1080,
+        675
+      ],
+      "maxChannelDifference": 1,
+      "meanChannelDifference": 9.144947416552355e-06,
+      "beforeSHA256": "9d9603ba8c1324401aac3a8af2418c94659dc965b0f09bac47c61e8f790b3953",
+      "afterSHA256": "e1c7e1f9e617f94de5fed072eaccab24c049324022b640d05ed0ae4fbcdcd881"
+    },
+    {
+      "name": "q0.75-clarity-night-z6",
+      "size": [
+        1080,
+        675
+      ],
+      "maxChannelDifference": 1,
+      "meanChannelDifference": 2.240512117055327e-05,
+      "beforeSHA256": "82a571aa20802619ca2f8799aff00304690b797234e9e38bef27d8c96a0a1111",
+      "afterSHA256": "b19b924f9ebbe37bdf548ffc05d72aa79cb538e9a61aaf862addaa48ead1f16b"
+    },
+    {
+      "name": "q0.75-normal-day-z0",
+      "size": [
+        1080,
+        675
+      ],
+      "maxChannelDifference": 2,
+      "meanChannelDifference": 0.0002290809327846365,
+      "beforeSHA256": "56882bcd68cb4fa61bda1c1134c2668dbb6d45e75ac79ec613355b866800b145",
+      "afterSHA256": "bba593cf94d7feecc98167757b3f5c08a6d936fb99e022a607fe47904c50c044"
+    },
+    {
+      "name": "q0.75-normal-day-z3",
+      "size": [
+        1080,
+        675
+      ],
+      "maxChannelDifference": 3,
+      "meanChannelDifference": 0.0004686785550983082,
+      "beforeSHA256": "843367216ce03f9a323b6b93d60999fabb3fc6e30bba8838bd32cf97f7ea997f",
+      "afterSHA256": "5bf424d42baf5b0eee9b3775384d548fe8c86204d4b52464a177474de0fe4f1f"
+    },
+    {
+      "name": "q0.75-normal-day-z6",
+      "size": [
+        1080,
+        675
+      ],
+      "maxChannelDifference": 1,
+      "meanChannelDifference": 8.596250571559214e-05,
+      "beforeSHA256": "ecfee8498a14cd3dc1e335451ee732acee337bb71ede969a887b038549b3c575",
+      "afterSHA256": "8c5c728045a6d8eecd729edf88a89622ba95794b7caba8d975f436e74128d932"
+    },
+    {
+      "name": "q0.75-normal-night-z0",
+      "size": [
+        1080,
+        675
+      ],
+      "maxChannelDifference": 2,
+      "meanChannelDifference": 0.0001678097850937357,
+      "beforeSHA256": "266c714ed7d58e7531a30c65061500dad0307c0ad6348b99d4466839e2dc8e07",
+      "afterSHA256": "cbbed0d2fec0661705b9126b840a5abc20ed3ac69e8f984386c866699412261c"
+    },
+    {
+      "name": "q0.75-normal-night-z3",
+      "size": [
+        1080,
+        675
+      ],
+      "maxChannelDifference": 2,
+      "meanChannelDifference": 0.00030224051211705537,
+      "beforeSHA256": "b78beae427f231e22a6c54e3900ad1f7ad506de36a2f2d87af4485c6080a329f",
+      "afterSHA256": "ec27bcfcee2646a28cc39e6dd4960e6228b1c35276198952fe7c17b46815d453"
+    },
+    {
+      "name": "q0.75-normal-night-z6",
+      "size": [
+        1080,
+        675
+      ],
+      "maxChannelDifference": 1,
+      "meanChannelDifference": 7.636031092821215e-05,
+      "beforeSHA256": "ce3d2c62a7771fd18ab20e0ad1fd5c36fb1d46cbcede10b488e46575b42b4da5",
+      "afterSHA256": "6b94f81fa6797cc647cba3fff3bea5cd2f3284ea8f573d3830c384887157bb5a"
+    },
+    {
+      "name": "q0.75-reduced-day-z0",
+      "size": [
+        1080,
+        675
+      ],
+      "maxChannelDifference": 2,
+      "meanChannelDifference": 0.00022542295381801553,
+      "beforeSHA256": "592e31ecc23eba9666693aad016b8e539bc55ed7844615a28b31edf323a609a1",
+      "afterSHA256": "79d642a899a62dd195db9de64138e0ea53ff297a8ff4a2678bce4d66bc0a33ae"
+    },
+    {
+      "name": "q0.75-reduced-day-z3",
+      "size": [
+        1080,
+        675
+      ],
+      "maxChannelDifference": 3,
+      "meanChannelDifference": 0.00043392775491540923,
+      "beforeSHA256": "a78bda160250c17364dd7c4eff4de028b74d124f690007d4595e70dc574d768e",
+      "afterSHA256": "063f19678174dab6f1b9e075e24945666a3833e33269c43c78b935b015320da5"
+    },
+    {
+      "name": "q0.75-reduced-day-z6",
+      "size": [
+        1080,
+        675
+      ],
+      "maxChannelDifference": 1,
+      "meanChannelDifference": 9.510745313214449e-05,
+      "beforeSHA256": "82ef7d8bbf36f19d9fc53e881d70ce1839bd4d66b5d84cd6a4ba823532a86a9e",
+      "afterSHA256": "c41f344a9f07c64a4bbdf544458c4cde787a4b8808e035039edbba7bd10e4ecc"
+    },
+    {
+      "name": "q0.75-reduced-night-z0",
+      "size": [
+        1080,
+        675
+      ],
+      "maxChannelDifference": 1,
+      "meanChannelDifference": 0.00015683584819387288,
+      "beforeSHA256": "ae9ab89b87d6251b36229e86b0361c16cdbd62d8c9abc36cd16579b39dcc01f3",
+      "afterSHA256": "23f7f698849bf964bdfe82865cd5529cc1596c0d46b75b3e6a566e1a25d18787"
+    },
+    {
+      "name": "q0.75-reduced-night-z3",
+      "size": [
+        1080,
+        675
+      ],
+      "maxChannelDifference": 2,
+      "meanChannelDifference": 0.00029858253315043437,
+      "beforeSHA256": "90efaedeafb3a09e2fd8b6cf672977836cf316203461ad244115ca4dc24a5b21",
+      "afterSHA256": "720f842dd15ab8281ca87c38ec5bc5a98f3a2f95b1c4254c2c6930430b44af69"
+    },
+    {
+      "name": "q0.75-reduced-night-z6",
+      "size": [
+        1080,
+        675
+      ],
+      "maxChannelDifference": 1,
+      "meanChannelDifference": 7.178783721993598e-05,
+      "beforeSHA256": "cc41be3e6433d7e9bf6a13881d458e0b70846258984d2078fa030f325aeb8d14",
+      "afterSHA256": "c689edb50b977de1ad67f1c2a4ff728a5de67c298b16a50b83b0f8accfba51bc"
+    },
+    {
+      "name": "q1-clarity-day-z0",
+      "size": [
+        1440,
+        900
+      ],
+      "maxChannelDifference": 2,
+      "meanChannelDifference": 0.0002124485596707819,
+      "beforeSHA256": "4c6c5ec4fa576cc94cee662fece488ca48d869cb649ed942bed3355ff03aa6d1",
+      "afterSHA256": "595e205474169e8fc2ade225104909825e71072245a11cb9f328fb1d2ad82800"
+    },
+    {
+      "name": "q1-clarity-day-z3",
+      "size": [
+        1440,
+        900
+      ],
+      "maxChannelDifference": 2,
+      "meanChannelDifference": 1.2602880658436214e-05,
+      "beforeSHA256": "57a6f115637b0b68158fd8a3733c3b209c2423a583557f0e66fccab8eb11c531",
+      "afterSHA256": "f0e650edf1c9d6606b2d0d284613c80020de9bb95e3407c816492c68ed1c342e"
+    },
+    {
+      "name": "q1-clarity-day-z6",
+      "size": [
+        1440,
+        900
+      ],
+      "maxChannelDifference": 1,
+      "meanChannelDifference": 0.00026414609053497946,
+      "beforeSHA256": "d06b9645a2a978bd89e604054e065fa8373182ed9edaf98e3f80f73eb4db0889",
+      "afterSHA256": "026713359fee279f38e4ab63357c44f85f724c5aa3126f59b0f2379e7fe89d1e"
+    },
+    {
+      "name": "q1-clarity-night-z0",
+      "size": [
+        1440,
+        900
+      ],
+      "maxChannelDifference": 2,
+      "meanChannelDifference": 0.00021064814814814815,
+      "beforeSHA256": "7ca2eb9479f9719f3c3357da3c156f8f1c728310f1046eac6669b3468a988fd7",
+      "afterSHA256": "c040070c2c7781aaa636bf289da06716367c57d87994bfcd9023c074c4e076a4"
+    },
+    {
+      "name": "q1-clarity-night-z3",
+      "size": [
+        1440,
+        900
+      ],
+      "maxChannelDifference": 2,
+      "meanChannelDifference": 1.3374485596707819e-05,
+      "beforeSHA256": "e64bd7d16ec476b841c51fe474434b946287d4f946a6f3c550c4a6bcbb2684ea",
+      "afterSHA256": "492e8dccf2969b94cb865f18f2a1af24f9466993ecf247e36da23cf0b5989836"
+    },
+    {
+      "name": "q1-clarity-night-z6",
+      "size": [
+        1440,
+        900
+      ],
+      "maxChannelDifference": 1,
+      "meanChannelDifference": 0.00026568930041152264,
+      "beforeSHA256": "31991cdf11eae7aba54b888b732686bcb305c0943c2bcf0b58728671f99210bd",
+      "afterSHA256": "062dd6d2a08e8d7646c549a4fd8c433ba07a290391dcaf8206c9e62cac57c6dc"
+    },
+    {
+      "name": "q1-normal-day-z0",
+      "size": [
+        1440,
+        900
+      ],
+      "maxChannelDifference": 6,
+      "meanChannelDifference": 0.00044135802469135805,
+      "beforeSHA256": "9f2b69bd4737a105c670c08d4f288a0548980b5154d5a346114f97d3769bc369",
+      "afterSHA256": "d9937787f8770759b17c4da1e3717443028062bcab5a8709a0bb6f8af8866b0b"
+    },
+    {
+      "name": "q1-normal-day-z3",
+      "size": [
+        1440,
+        900
+      ],
+      "maxChannelDifference": 2,
+      "meanChannelDifference": 1.2088477366255144e-05,
+      "beforeSHA256": "80123f97237126fb861ec3f396ba239aa566fd5a0da76c5cde07008c875511ac",
+      "afterSHA256": "80b92f5469a794882a6b2869e372857b3b01dccb10b2041ab168b95cf7fb5497"
+    },
+    {
+      "name": "q1-normal-day-z6",
+      "size": [
+        1440,
+        900
+      ],
+      "maxChannelDifference": 2,
+      "meanChannelDifference": 8.950617283950617e-05,
+      "beforeSHA256": "9ab5c2ebbcc332d2e569b4d1216788c83494061e6ccd57725e8fe4e612527c30",
+      "afterSHA256": "4ff8f1324543bbc0fa7f68c6a010623867aec81d8792651455e9a2567ef414f9"
+    },
+    {
+      "name": "q1-normal-night-z0",
+      "size": [
+        1440,
+        900
+      ],
+      "maxChannelDifference": 3,
+      "meanChannelDifference": 0.0002777777777777778,
+      "beforeSHA256": "7818365fb39468cec31cd00699572faac847b20f8e0fd1f459f785ee754982d4",
+      "afterSHA256": "c982d39067f80d7b2c3e92a3afc439974f26f3fb5d9387dbcb698362989c0384"
+    },
+    {
+      "name": "q1-normal-night-z3",
+      "size": [
+        1440,
+        900
+      ],
+      "maxChannelDifference": 1,
+      "meanChannelDifference": 8.230452674897118e-06,
+      "beforeSHA256": "96448d1e5a279f2dfb02b616405eea649d33cad3d6c9fd7c8bc9f3dcac560773",
+      "afterSHA256": "b5dcf710fa284bc0f4d8882ff7b3eff1d5692c2e7abe277b855a854206386991"
+    },
+    {
+      "name": "q1-normal-night-z6",
+      "size": [
+        1440,
+        900
+      ],
+      "maxChannelDifference": 1,
+      "meanChannelDifference": 5.555555555555555e-05,
+      "beforeSHA256": "bf53edc91011b744b25303714197f2fc6d13f4efcbc6b1450d17a910789de643",
+      "afterSHA256": "1a9534e4266abf27189c86ca29c5bf4222acd775c4271892d956b98154920da2"
+    },
+    {
+      "name": "q1-reduced-day-z0",
+      "size": [
+        1440,
+        900
+      ],
+      "maxChannelDifference": 6,
+      "meanChannelDifference": 0.00043647119341563785,
+      "beforeSHA256": "b8f545a74c33b7a252298d99650352ab021849e3e0fc50965b4d88dd44488e5b",
+      "afterSHA256": "ba6c6e9b218e37c79cc53cedaba44fdfb737115d602baa31cd4e29ba54d968b2"
+    },
+    {
+      "name": "q1-reduced-day-z3",
+      "size": [
+        1440,
+        900
+      ],
+      "maxChannelDifference": 2,
+      "meanChannelDifference": 1.2602880658436214e-05,
+      "beforeSHA256": "3957b32d28a8c4b650a6aed3d616c741391150fe5dcb1c273c3be5a21b6a94ab",
+      "afterSHA256": "ee5dba83fdbab71fdf894658c3d0b63c377f592fa8a4da1fbc1c959803ad379a"
+    },
+    {
+      "name": "q1-reduced-day-z6",
+      "size": [
+        1440,
+        900
+      ],
+      "maxChannelDifference": 2,
+      "meanChannelDifference": 8.82201646090535e-05,
+      "beforeSHA256": "25cf4cc9187d603bda0ec6897a38d5af2b3c92546be19af082a6f91ff5161720",
+      "afterSHA256": "efbaac2cd7e50b55e10bf10583d3cabfce6fd2e83367cd1fdbdebcfa140fbdd5"
+    },
+    {
+      "name": "q1-reduced-night-z0",
+      "size": [
+        1440,
+        900
+      ],
+      "maxChannelDifference": 4,
+      "meanChannelDifference": 0.0002867798353909465,
+      "beforeSHA256": "5f4f31e77fda3e8e8fb34c7141fb98b5b8dae61217ac1079d3f03e74034d103a",
+      "afterSHA256": "400e67c8198a8376b45cbe0c14ef10d1352b4c5553c61b6383348ffde11f16a7"
+    },
+    {
+      "name": "q1-reduced-night-z3",
+      "size": [
+        1440,
+        900
+      ],
+      "maxChannelDifference": 1,
+      "meanChannelDifference": 8.230452674897118e-06,
+      "beforeSHA256": "4cc79b5f3bba846b717a79e9987617248b390528f3e63ad5ac04e047fcd921a5",
+      "afterSHA256": "b11b9295ff5ab29e58ee6a9a51edf11b85762c96682405c3c3e0fc378e12ebae"
+    },
+    {
+      "name": "q1-reduced-night-z6",
+      "size": [
+        1440,
+        900
+      ],
+      "maxChannelDifference": 1,
+      "meanChannelDifference": 5.581275720164609e-05,
+      "beforeSHA256": "436dfc0df6fb1919d8b642f1adcffb50861e952a5d946a955f4d50615b8d17de",
+      "afterSHA256": "618cb2588c21ce214f763bb3132f93fd2850d88b1bb3e6c360052348fe71d6e3"
+    }
+  ]
+}
