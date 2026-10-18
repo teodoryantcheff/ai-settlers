@@ -1,8 +1,41 @@
-Generated with the built-in image generation tool, using `assets/art/reference/golden-hour-concept.png` as the style reference. The original generated outputs are preserved; atlas cells are selected and trimmed only at game load time. Buildings and foliage retain their generated alpha channels.
+Generated with the built-in image generation tool, using `assets/art/reference/golden-hour-concept.png` as the style reference. Original generated outputs and references are preserved. The active pack uses one PNG per asset with precomputed crops in `manifest.json`; game load copies those crops and fits the cached sprites. Buildings and foliage retain their generated alpha channels.
+
+## lossless extraction (2026-10-18, issue #69)
+
+The three generated sheets moved byte-for-byte to `source/buildings.png`, `source/foliage.png` and `source/mountains.png`. Their generation prompts below and reference relationships above still describe those originals, including unused drawings. All originals, references and this provenance file remain in the complete deployed pack. They are absent from `manifest.sheets` and are not fetched at boot.
+
+The 26 active sprites were extracted from the exact existing manifest `crop` rectangles, preserving every RGBA sample, including transparent RGB and low-alpha padding. There was no art regeneration, resampling, alpha thresholding or color conversion. PNG compression changed for the extracted files; the archived sheets retain their exact original bytes. Original crop coordinates and archived SHA-256 hashes are recorded in `tests/crop-pack.test.mjs` for lossless verification.
+
+| Original | Active extracted PNGs (in original region order) |
+| --- | --- |
+| `source/buildings.png` | `hq.png`, `warehouse.png`, `lumberjack.png`, `forester.png`, `sawmill.png`, `quarry.png`, `fisherman.png`, `farm.png`, `mine_coal.png`, `mine_iron.png`, `mine_gold.png`, `toolsmith.png`, `armory.png`, `guard.png`, `construction-site.png` |
+| `source/foliage.png` | `tree-1.png`, `tree-2.png`, `tree-3.png`, `rock-1.png`, `rock-2.png` |
+| `source/mountains.png` | `mountain-dry-1.png`, `mountain-dry-2.png`, `mountain-dry-3.png`, `mountain-snowy-1.png`, `mountain-snowy-2.png`, `mountain-foothill.png` |
+
+Each extracted region and its `crop` now start at `(0, 0)` with the previous crop's width and height. At this extraction stage, the eight expanded economy building PNGs and complete `meadow.png` material were unchanged, making 35 active images. The building exports were subsequently normalized as described below. Meadow retains its repeating world-space sampling. The existing loader still prepares individual cached sprites atomically, with the same fitting, entrances, roots and gameplay footprints; tree growth and sway are derived as before. After editing active artwork or authored regions, run `npm run crop:art` to refresh manifest crops.
+
+## compact building exports (2026-10-18, user follow-up to #69)
+
+The eight separately generated building PNGs were roughly 1254 × 1254 pixels and 1.1–1.9 MiB each, while the sheet-extracted buildings were roughly 300 pixels across. At the user's request, all 22 active building PNGs now have a longest edge of at most 320 pixels and a size below 200 KiB (approximately the 150 KB class). Existing compact building sprites are unchanged.
+
+The full-resolution generated outputs are preserved byte-for-byte at `source/windmill.png`, `source/bakery.png`, `source/pigfarm.png`, `source/butcher.png`, `source/well.png`, `source/brewery.png`, `source/smelter.png` and `source/workshop.png`. These originals remain shipped with the pack and are excluded from boot requests. Their SHA-256 hashes are checked in `tests/crop-pack.test.mjs`.
+
+The active exports were made with Pillow 12.1.1: crop the archived RGBA original to its previous manifest crop below, scale proportionally to a 320-pixel longest edge, round the other dimension to the nearest integer, resize with `Image.Resampling.LANCZOS`, then save an RGBA PNG with `optimize=True`. This downsampling changes pixels; no artwork was regenerated or palette-quantized. `npm run crop:art` refreshes active crop definitions. Runtime fitting, entrance anchors, gameplay footprints and cached sprite dimensions are unchanged.
+
+| Building | Original crop `(x, y, w, h)` | Active image | PNG bytes |
+| --- | --- | --- | ---: |
+| `windmill` | `(235, 17, 836, 1182)` | 226 × 320 | 136,175 |
+| `bakery` | `(56, 123, 1154, 1013)` | 320 × 281 | 170,664 |
+| `pigfarm` | `(29, 183, 1213, 890)` | 320 × 235 | 137,606 |
+| `butcher` | `(42, 99, 1178, 1060)` | 320 × 288 | 181,605 |
+| `well` | `(235, 144, 807, 961)` | 269 × 320 | 154,267 |
+| `brewery` | `(48, 132, 1179, 957)` | 320 × 260 | 158,002 |
+| `smelter` | `(63, 65, 1135, 1119)` | 320 × 315 | 178,407 |
+| `workshop` | `(86, 169, 1114, 952)` | 320 × 273 | 167,968 |
 
 ## expanded economy buildings
 
-Generated on 2026-10-14 with the built-in image generation tool, one transparent image per building. `buildings.png` is the style reference. Original generated RGBA files are preserved unchanged at `windmill.png`, `bakery.png`, `pigfarm.png`, `butcher.png`, `well.png`, `brewery.png`, `smelter.png`, and `workshop.png`. Manifest regions cover original dimensions; their `crop` rectangles, written by `npm run crop:art`, trim transparent padding, and uniform fitting preserves cached canvas dimensions and single-tile gameplay anchors. The pack validates every building before atomic installation.
+Generated on 2026-10-14 with the built-in image generation tool, one transparent image per building. `source/buildings.png` is the style reference. Original generated RGBA files are preserved unchanged at `source/windmill.png`, `source/bakery.png`, `source/pigfarm.png`, `source/butcher.png`, `source/well.png`, `source/brewery.png`, `source/smelter.png`, and `source/workshop.png`. The corresponding root PNGs are compact runtime exports as described above. Their manifest regions and precomputed crops describe those exports; uniform fitting preserves cached canvas dimensions and single-tile gameplay anchors. The pack validates every building before atomic installation.
 
 Exact generation prompts:
 
@@ -48,7 +81,7 @@ Use case: stylized-concept. Asset type: premium gaming-magazine cover illustrati
 
 ## mountains
 
-Generated with the built-in image generation tool on 2026-10-13. The original transparent output is preserved unchanged in `mountains.png` (1536 × 1024); `manifest.json` defines its six 512 × 512 cells. The chosen original concept references are preserved in `reference/granite-ridges-concept.png` and `reference/grassy-terraces-concept.png`. Top row: three bare granite variants. Bottom row: two snowy summit variants and one low grassy limestone foothill. Snowy art is selected only for the tallest eligible cosmetic peaks; the terrain renderer uses deterministic world-space placement.
+Generated with the built-in image generation tool on 2026-10-13. The original transparent output is preserved unchanged in `source/mountains.png` (1536 × 1024). Its six original 512 × 512 cells supplied the individual mountain PNGs described below. The chosen original concept references are preserved in `reference/granite-ridges-concept.png` and `reference/grassy-terraces-concept.png`. Top row: three bare granite variants. Bottom row: two snowy summit variants and one low grassy limestone foothill. Snowy art is selected only for the tallest eligible cosmetic peaks; the terrain renderer uses deterministic world-space placement.
 
 Exact generation prompt:
 

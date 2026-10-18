@@ -4,7 +4,9 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { deflateSync } from 'node:zlib';
-import { cropPack } from '../scripts/crop-pack.mjs';
+import { paintedRegions } from '../src/rendering/painted-crop.ts';
+import { createHash } from 'node:crypto';
+import { cropPack, decodeRGBA } from '../scripts/crop-pack.mjs';
 
 /** Encode RGBA rows as a PNG, cycling through every scanline filter. */
 function png(width, height, pixel) {
@@ -93,4 +95,107 @@ test('crop-pack fails on unusable art and leaves the manifest untouched', async 
   const before = await fs.readFile(path.join(directory, 'manifest.json'), 'utf8');
   await assert.rejects(cropPack(directory), /rocks\.0: Artwork sprite requires a transparent/);
   assert.equal(await fs.readFile(path.join(directory, 'manifest.json'), 'utf8'), before);
+});
+
+// Original manifest crops before the lossless split in #69. Keep this independent
+// of the active manifest so a shifted or truncated extraction cannot pass.
+const originalCrops = [
+  ['buildings.hq', 'buildings.png', [30, 45, 303, 291]],
+  ['buildings.warehouse', 'buildings.png', [348, 75, 280, 256]],
+  ['buildings.lumberjack', 'buildings.png', [644, 94, 285, 241]],
+  ['buildings.forester', 'buildings.png', [964, 96, 262, 238]],
+  ['buildings.sawmill', 'buildings.png', [26, 367, 312, 262]],
+  ['buildings.quarry', 'buildings.png', [350, 363, 280, 268]],
+  ['buildings.fisherman', 'buildings.png', [652, 362, 267, 268]],
+  ['buildings.farm', 'buildings.png', [937, 387, 304, 252]],
+  ['buildings.mine_coal', 'buildings.png', [23, 675, 295, 250]],
+  ['buildings.mine_iron', 'buildings.png', [337, 677, 293, 249]],
+  ['buildings.mine_gold', 'buildings.png', [637, 681, 296, 239]],
+  ['buildings.toolsmith', 'buildings.png', [948, 664, 282, 273]],
+  ['buildings.armory', 'buildings.png', [34, 948, 290, 264]],
+  ['buildings.guard', 'buildings.png', [354, 949, 237, 269]],
+  ['site', 'buildings.png', [634, 976, 287, 235]],
+  ['trees.0', 'foliage.png', [13, 43, 381, 422]],
+  ['trees.1', 'foliage.png', [397, 66, 377, 392]],
+  ['trees.2', 'foliage.png', [775, 16, 312, 449]],
+  ['rocks.0', 'foliage.png', [27, 808, 342, 243]],
+  ['rocks.1', 'foliage.png', [422, 825, 307, 218]],
+  ['mountains.dry.0', 'mountains.png', [19, 42, 493, 462]],
+  ['mountains.dry.1', 'mountains.png', [530, 80, 494, 428]],
+  ['mountains.dry.2', 'mountains.png', [1024, 112, 498, 397]],
+  ['mountains.snowy.0', 'mountains.png', [12, 512, 500, 469]],
+  ['mountains.snowy.1', 'mountains.png', [512, 513, 512, 466]],
+  ['mountains.foothill', 'mountains.png', [1024, 607, 500, 366]],
+];
+const originalHashes = {
+  'buildings.png': '7d54f7460fa42fd0e59cd8a8580df7d1343fa5f464a7c9126859003c89ed56eb',
+  'foliage.png': 'a9e108c25cab17a4482951b6a9a3b5c8de08fef8957eaa510e8d833ceb292581',
+  'mountains.png': '54be40d596bd2c0e01df5d79fe0e746f0b004ef997759a5d187d0326348d300e',
+};
+
+test('supplied painted pack uses individual PNGs with the exact original crop pixels', async () => {
+  const art = new URL('../assets/art/', import.meta.url);
+  const manifest = JSON.parse(await fs.readFile(new URL('manifest.json', art), 'utf8'));
+  const regions = new Map(paintedRegions(manifest));
+  assert.equal(regions.size, 34);
+  assert.equal(Object.keys(manifest.sheets).length, 35);
+  const files = [...regions.values()].map((region) => manifest.sheets[region.sheet]);
+  files.push(manifest.sheets[manifest.terrain.sheet]);
+  assert.equal(new Set(files).size, 35, 'every active asset has its own source');
+  assert.deepEqual(new Set(files), new Set(Object.values(manifest.sheets)));
+  assert.ok(files.every((file) => file.endsWith('.png') && !file.includes('/')));
+  const originals = new Map();
+  for (const [file, hash] of Object.entries(originalHashes)) {
+    const bytes = await fs.readFile(new URL('source/' + file, art));
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), hash, file);
+    originals.set(file, decodeRGBA(bytes, file));
+    assert.ok(!files.includes(file), file + ' is source-only');
+  }
+  for (const [name, file, [x, y, w, h]] of originalCrops) {
+    const region = regions.get(name);
+    const activeFile = manifest.sheets[region.sheet];
+    const image = decodeRGBA(await fs.readFile(new URL(activeFile, art)), activeFile);
+    assert.deepEqual([image.width, image.height], [w, h], name);
+    assert.deepEqual(
+      region,
+      { sheet: region.sheet, x: 0, y: 0, w, h, crop: { x: 0, y: 0, w, h } },
+      name,
+    );
+    const original = originals.get(file);
+    for (let row = 0; row < h; row++)
+      assert.deepEqual(
+        image.data.subarray(row * w * 4, (row + 1) * w * 4),
+        original.data.subarray(
+          ((y + row) * original.width + x) * 4,
+          ((y + row) * original.width + x + w) * 4,
+        ),
+        name + ' row ' + row,
+      );
+  }
+});
+
+const fullResolutionBuildingHashes = {
+  'windmill.png': 'bdebc48728ac8b93ea1b849d95a434940c533d0a0aa28c5ea2b02a44aff0ace6',
+  'bakery.png': 'f7d7af9bf636f01dc5020d49e691bafdbd1a55abdc83aeee0071d68f4c559b3e',
+  'pigfarm.png': '79293dc1e4820991cfb391d12f20ef2369f1f00bdebf373f4bd187042c6cc9c1',
+  'butcher.png': '792da34a932760ab25b57955050532da88b09a1816b039db5107be972ca184ac',
+  'well.png': '64a63fff5724cb49c7bc72b6d7aea0a863e439d50d536b1f5d9d586b79d15908',
+  'brewery.png': 'd82b14a8a5d142e76856c64e06b0bedc286e700dbecdbdc610faea0c4d1bed43',
+  'smelter.png': 'a40c9105d8ae61c381a9e388c9d8a12e85f53c7b65adb6d2764fc3108f6bb30a',
+  'workshop.png': 'eacd4cf3d7c870d789b3a5e273e4bda931b8ffcda8fd5a50918607f11b65d712',
+};
+
+test('every active building PNG stays within the compact artwork budget', async () => {
+  const art = new URL('../assets/art/', import.meta.url);
+  const manifest = JSON.parse(await fs.readFile(new URL('manifest.json', art), 'utf8'));
+  for (const [type, region] of Object.entries(manifest.buildings)) {
+    const bytes = await fs.readFile(new URL(manifest.sheets[region.sheet], art));
+    const image = decodeRGBA(bytes, type);
+    assert.ok(Math.max(image.width, image.height) <= 320, type + ' exceeds 320px');
+    assert.ok(bytes.length <= 200 * 1024, type + ' exceeds 200 KiB');
+  }
+  for (const [file, hash] of Object.entries(fullResolutionBuildingHashes)) {
+    const bytes = await fs.readFile(new URL('source/' + file, art));
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), hash, file);
+  }
 });

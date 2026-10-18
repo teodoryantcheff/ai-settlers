@@ -1,3 +1,4 @@
+import fs from 'node:fs/promises';
 // Every case boots its own scenario (?devshot, ?economyshot, a failed boot or the
 // release page) or fakes browser APIs before boot, so each takes a fresh page.
 import { test, expect, holdFrames, seedPrefs } from './helpers/test.mjs';
@@ -25,7 +26,7 @@ test('production boots with painted artwork and native Pixi rendering', async ({
   const errors = captureErrors(page);
   const sheets = new Map();
   page.on('response', (response) => {
-    const match = response.url().match(/\/assets\/art\/(buildings|foliage|meadow)\.png$/);
+    const match = new URL(response.url()).pathname.match(/\/assets\/art\/(.+\.png)$/);
     if (match) sheets.set(match[1], response.status());
   });
   await page.goto('/?seed=2024');
@@ -37,7 +38,14 @@ test('production boots with painted artwork and native Pixi rendering', async ({
   await expect(page.locator('#pixi-view')).toBeVisible();
   await expect(page.locator('#view')).toHaveCSS('opacity', '0');
   await expect(page.locator('#painted-art-status')).toHaveCount(0);
-  expect(Object.fromEntries(sheets)).toEqual({ buildings: 200, foliage: 200, meadow: 200 });
+  const manifest = JSON.parse(
+    await fs.readFile(new URL('../../assets/art/manifest.json', import.meta.url), 'utf8'),
+  );
+  const activeFiles = Object.values(manifest.sheets);
+  expect(activeFiles).toHaveLength(35);
+  expect(Object.fromEntries(sheets)).toEqual(
+    Object.fromEntries(activeFiles.map((file) => [file, 200])),
+  );
   await expect
     .poll(() => page.evaluate(() => window.productionRendererStats?.nativeSprites || 0), {
       timeout: 30000,
@@ -428,13 +436,13 @@ test('a failed artwork sheet stops boot with a reload prompt and no colony', asy
 }) => {
   const errors = captureErrors(page);
   await page.addInitScript(() => localStorage.setItem('recovery-sentinel', 'keep'));
-  await page.route('**/assets/art/foliage.png', (route) =>
+  await page.route('**/assets/art/tree-1.png', (route) =>
     route.fulfill({ status: 404, body: 'Artwork unavailable' }),
   );
   await page.goto('/tests/game.html?seed=2024');
   await expect(page.locator('#boot')).toHaveAttribute('role', 'alert');
   await expect(page.locator('#boot-stage')).toContainText('Painted artwork could not load');
-  await expect(page.locator('#boot-stage')).toContainText('foliage.png');
+  await expect(page.locator('#boot-stage')).toContainText('tree-1.png');
   await expect(page.locator('#boot-reload')).toBeVisible();
   await expect(page.locator('#pixi-view')).toHaveCount(0);
   expect(await page.evaluate(() => Boolean(window.productionArtPreview?.game))).toBe(false);

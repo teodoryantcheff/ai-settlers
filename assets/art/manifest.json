@@ -1,10 +1,7 @@
 {
   "version": 1,
   "sheets": {
-    "buildings": "buildings.png",
-    "foliage": "foliage.png",
     "meadow": "meadow.png",
-    "mountains": "mountains.png",
     "windmill": "windmill.png",
     "bakery": "bakery.png",
     "pigfarm": "pigfarm.png",
@@ -12,187 +9,213 @@
     "well": "well.png",
     "brewery": "brewery.png",
     "smelter": "smelter.png",
-    "workshop": "workshop.png"
+    "workshop": "workshop.png",
+    "hq": "hq.png",
+    "warehouse": "warehouse.png",
+    "lumberjack": "lumberjack.png",
+    "forester": "forester.png",
+    "sawmill": "sawmill.png",
+    "quarry": "quarry.png",
+    "fisherman": "fisherman.png",
+    "farm": "farm.png",
+    "mine_coal": "mine_coal.png",
+    "mine_iron": "mine_iron.png",
+    "mine_gold": "mine_gold.png",
+    "toolsmith": "toolsmith.png",
+    "armory": "armory.png",
+    "guard": "guard.png",
+    "construction-site": "construction-site.png",
+    "tree-1": "tree-1.png",
+    "tree-2": "tree-2.png",
+    "tree-3": "tree-3.png",
+    "rock-1": "rock-1.png",
+    "rock-2": "rock-2.png",
+    "mountain-dry-1": "mountain-dry-1.png",
+    "mountain-dry-2": "mountain-dry-2.png",
+    "mountain-dry-3": "mountain-dry-3.png",
+    "mountain-snowy-1": "mountain-snowy-1.png",
+    "mountain-snowy-2": "mountain-snowy-2.png",
+    "mountain-foothill": "mountain-foothill.png"
   },
   "buildings": {
     "hq": {
-      "sheet": "buildings",
-      "x": 30,
-      "y": 45,
+      "sheet": "hq",
+      "x": 0,
+      "y": 0,
       "w": 303,
       "h": 291,
       "crop": {
-        "x": 30,
-        "y": 45,
+        "x": 0,
+        "y": 0,
         "w": 303,
         "h": 291
       }
     },
     "warehouse": {
-      "sheet": "buildings",
-      "x": 348,
-      "y": 75,
+      "sheet": "warehouse",
+      "x": 0,
+      "y": 0,
       "w": 280,
       "h": 256,
       "crop": {
-        "x": 348,
-        "y": 75,
+        "x": 0,
+        "y": 0,
         "w": 280,
         "h": 256
       }
     },
     "lumberjack": {
-      "sheet": "buildings",
-      "x": 644,
-      "y": 94,
+      "sheet": "lumberjack",
+      "x": 0,
+      "y": 0,
       "w": 285,
       "h": 241,
       "crop": {
-        "x": 644,
-        "y": 94,
+        "x": 0,
+        "y": 0,
         "w": 285,
         "h": 241
       }
     },
     "forester": {
-      "sheet": "buildings",
-      "x": 964,
-      "y": 96,
+      "sheet": "forester",
+      "x": 0,
+      "y": 0,
       "w": 262,
       "h": 238,
       "crop": {
-        "x": 964,
-        "y": 96,
+        "x": 0,
+        "y": 0,
         "w": 262,
         "h": 238
       }
     },
     "sawmill": {
-      "sheet": "buildings",
-      "x": 26,
-      "y": 367,
+      "sheet": "sawmill",
+      "x": 0,
+      "y": 0,
       "w": 312,
       "h": 262,
       "crop": {
-        "x": 26,
-        "y": 367,
+        "x": 0,
+        "y": 0,
         "w": 312,
         "h": 262
       }
     },
     "quarry": {
-      "sheet": "buildings",
-      "x": 350,
-      "y": 363,
+      "sheet": "quarry",
+      "x": 0,
+      "y": 0,
       "w": 280,
       "h": 268,
       "crop": {
-        "x": 350,
-        "y": 363,
+        "x": 0,
+        "y": 0,
         "w": 280,
         "h": 268
       }
     },
     "fisherman": {
-      "sheet": "buildings",
-      "x": 652,
-      "y": 362,
+      "sheet": "fisherman",
+      "x": 0,
+      "y": 0,
       "w": 267,
       "h": 268,
       "crop": {
-        "x": 652,
-        "y": 362,
+        "x": 0,
+        "y": 0,
         "w": 267,
         "h": 268
       }
     },
     "farm": {
-      "sheet": "buildings",
-      "x": 937,
-      "y": 387,
+      "sheet": "farm",
+      "x": 0,
+      "y": 0,
       "w": 304,
       "h": 252,
       "crop": {
-        "x": 937,
-        "y": 387,
+        "x": 0,
+        "y": 0,
         "w": 304,
         "h": 252
       }
     },
     "mine_coal": {
-      "sheet": "buildings",
-      "x": 23,
-      "y": 675,
+      "sheet": "mine_coal",
+      "x": 0,
+      "y": 0,
       "w": 295,
       "h": 250,
       "crop": {
-        "x": 23,
-        "y": 675,
+        "x": 0,
+        "y": 0,
         "w": 295,
         "h": 250
       }
     },
     "mine_iron": {
-      "sheet": "buildings",
-      "x": 337,
-      "y": 677,
+      "sheet": "mine_iron",
+      "x": 0,
+      "y": 0,
       "w": 293,
       "h": 249,
       "crop": {
-        "x": 337,
-        "y": 677,
+        "x": 0,
+        "y": 0,
         "w": 293,
         "h": 249
       }
     },
     "mine_gold": {
-      "sheet": "buildings",
-      "x": 637,
-      "y": 681,
+      "sheet": "mine_gold",
+      "x": 0,
+      "y": 0,
       "w": 296,
       "h": 239,
       "crop": {
-        "x": 637,
-        "y": 681,
+        "x": 0,
+        "y": 0,
         "w": 296,
         "h": 239
       }
     },
     "toolsmith": {
-      "sheet": "buildings",
-      "x": 948,
-      "y": 664,
+      "sheet": "toolsmith",
+      "x": 0,
+      "y": 0,
       "w": 282,
       "h": 273,
       "crop": {
-        "x": 948,
-        "y": 664,
+        "x": 0,
+        "y": 0,
         "w": 282,
         "h": 273
       }
     },
     "armory": {
-      "sheet": "buildings",
-      "x": 34,
-      "y": 948,
+      "sheet": "armory",
+      "x": 0,
+      "y": 0,
       "w": 290,
       "h": 264,
       "crop": {
-        "x": 34,
-        "y": 948,
+        "x": 0,
+        "y": 0,
         "w": 290,
         "h": 264
       }
     },
     "guard": {
-      "sheet": "buildings",
-      "x": 354,
-      "y": 949,
+      "sheet": "guard",
+      "x": 0,
+      "y": 0,
       "w": 237,
       "h": 269,
       "crop": {
-        "x": 354,
-        "y": 949,
+        "x": 0,
+        "y": 0,
         "w": 237,
         "h": 269
       }
@@ -201,156 +224,156 @@
       "sheet": "windmill",
       "x": 0,
       "y": 0,
-      "w": 1254,
-      "h": 1254,
+      "w": 226,
+      "h": 320,
       "crop": {
-        "x": 235,
-        "y": 17,
-        "w": 836,
-        "h": 1182
+        "x": 0,
+        "y": 0,
+        "w": 226,
+        "h": 320
       }
     },
     "bakery": {
       "sheet": "bakery",
       "x": 0,
       "y": 0,
-      "w": 1240,
-      "h": 1268,
+      "w": 320,
+      "h": 281,
       "crop": {
-        "x": 56,
-        "y": 123,
-        "w": 1154,
-        "h": 1013
+        "x": 0,
+        "y": 0,
+        "w": 320,
+        "h": 281
       }
     },
     "pigfarm": {
       "sheet": "pigfarm",
       "x": 0,
       "y": 0,
-      "w": 1254,
-      "h": 1254,
+      "w": 320,
+      "h": 235,
       "crop": {
-        "x": 29,
-        "y": 183,
-        "w": 1213,
-        "h": 890
+        "x": 0,
+        "y": 0,
+        "w": 320,
+        "h": 235
       }
     },
     "butcher": {
       "sheet": "butcher",
       "x": 0,
       "y": 0,
-      "w": 1254,
-      "h": 1254,
+      "w": 320,
+      "h": 288,
       "crop": {
-        "x": 42,
-        "y": 99,
-        "w": 1178,
-        "h": 1060
+        "x": 0,
+        "y": 0,
+        "w": 320,
+        "h": 288
       }
     },
     "well": {
       "sheet": "well",
       "x": 0,
       "y": 0,
-      "w": 1254,
-      "h": 1254,
+      "w": 269,
+      "h": 320,
       "crop": {
-        "x": 235,
-        "y": 144,
-        "w": 807,
-        "h": 961
+        "x": 0,
+        "y": 0,
+        "w": 269,
+        "h": 320
       }
     },
     "brewery": {
       "sheet": "brewery",
       "x": 0,
       "y": 0,
-      "w": 1254,
-      "h": 1254,
+      "w": 320,
+      "h": 260,
       "crop": {
-        "x": 48,
-        "y": 132,
-        "w": 1179,
-        "h": 957
+        "x": 0,
+        "y": 0,
+        "w": 320,
+        "h": 260
       }
     },
     "smelter": {
       "sheet": "smelter",
       "x": 0,
       "y": 0,
-      "w": 1254,
-      "h": 1254,
+      "w": 320,
+      "h": 315,
       "crop": {
-        "x": 63,
-        "y": 65,
-        "w": 1135,
-        "h": 1119
+        "x": 0,
+        "y": 0,
+        "w": 320,
+        "h": 315
       }
     },
     "workshop": {
       "sheet": "workshop",
       "x": 0,
       "y": 0,
-      "w": 1254,
-      "h": 1254,
+      "w": 320,
+      "h": 273,
       "crop": {
-        "x": 86,
-        "y": 169,
-        "w": 1114,
-        "h": 952
+        "x": 0,
+        "y": 0,
+        "w": 320,
+        "h": 273
       }
     }
   },
   "site": {
-    "sheet": "buildings",
-    "x": 634,
-    "y": 976,
+    "sheet": "construction-site",
+    "x": 0,
+    "y": 0,
     "w": 287,
     "h": 235,
     "crop": {
-      "x": 634,
-      "y": 976,
+      "x": 0,
+      "y": 0,
       "w": 287,
       "h": 235
     }
   },
   "trees": [
     {
-      "sheet": "foliage",
-      "x": 13,
-      "y": 43,
+      "sheet": "tree-1",
+      "x": 0,
+      "y": 0,
       "w": 381,
       "h": 422,
       "crop": {
-        "x": 13,
-        "y": 43,
+        "x": 0,
+        "y": 0,
         "w": 381,
         "h": 422
       }
     },
     {
-      "sheet": "foliage",
-      "x": 397,
-      "y": 66,
+      "sheet": "tree-2",
+      "x": 0,
+      "y": 0,
       "w": 377,
       "h": 392,
       "crop": {
-        "x": 397,
-        "y": 66,
+        "x": 0,
+        "y": 0,
         "w": 377,
         "h": 392
       }
     },
     {
-      "sheet": "foliage",
-      "x": 775,
-      "y": 16,
+      "sheet": "tree-3",
+      "x": 0,
+      "y": 0,
       "w": 312,
       "h": 449,
       "crop": {
-        "x": 775,
-        "y": 16,
+        "x": 0,
+        "y": 0,
         "w": 312,
         "h": 449
       }
@@ -358,27 +381,27 @@
   ],
   "rocks": [
     {
-      "sheet": "foliage",
-      "x": 27,
-      "y": 808,
+      "sheet": "rock-1",
+      "x": 0,
+      "y": 0,
       "w": 342,
       "h": 243,
       "crop": {
-        "x": 27,
-        "y": 808,
+        "x": 0,
+        "y": 0,
         "w": 342,
         "h": 243
       }
     },
     {
-      "sheet": "foliage",
-      "x": 422,
-      "y": 825,
+      "sheet": "rock-2",
+      "x": 0,
+      "y": 0,
       "w": 307,
       "h": 218,
       "crop": {
-        "x": 422,
-        "y": 825,
+        "x": 0,
+        "y": 0,
         "w": 307,
         "h": 218
       }
@@ -391,40 +414,40 @@
   "mountains": {
     "dry": [
       {
-        "sheet": "mountains",
+        "sheet": "mountain-dry-1",
         "x": 0,
         "y": 0,
-        "w": 512,
-        "h": 512,
+        "w": 493,
+        "h": 462,
         "crop": {
-          "x": 19,
-          "y": 42,
+          "x": 0,
+          "y": 0,
           "w": 493,
           "h": 462
         }
       },
       {
-        "sheet": "mountains",
-        "x": 512,
+        "sheet": "mountain-dry-2",
+        "x": 0,
         "y": 0,
-        "w": 512,
-        "h": 512,
+        "w": 494,
+        "h": 428,
         "crop": {
-          "x": 530,
-          "y": 80,
+          "x": 0,
+          "y": 0,
           "w": 494,
           "h": 428
         }
       },
       {
-        "sheet": "mountains",
-        "x": 1024,
+        "sheet": "mountain-dry-3",
+        "x": 0,
         "y": 0,
-        "w": 512,
-        "h": 512,
+        "w": 498,
+        "h": 397,
         "crop": {
-          "x": 1024,
-          "y": 112,
+          "x": 0,
+          "y": 0,
           "w": 498,
           "h": 397
         }
@@ -432,41 +455,41 @@
     ],
     "snowy": [
       {
-        "sheet": "mountains",
+        "sheet": "mountain-snowy-1",
         "x": 0,
-        "y": 512,
-        "w": 512,
-        "h": 512,
+        "y": 0,
+        "w": 500,
+        "h": 469,
         "crop": {
-          "x": 12,
-          "y": 512,
+          "x": 0,
+          "y": 0,
           "w": 500,
           "h": 469
         }
       },
       {
-        "sheet": "mountains",
-        "x": 512,
-        "y": 512,
+        "sheet": "mountain-snowy-2",
+        "x": 0,
+        "y": 0,
         "w": 512,
-        "h": 512,
+        "h": 466,
         "crop": {
-          "x": 512,
-          "y": 513,
+          "x": 0,
+          "y": 0,
           "w": 512,
           "h": 466
         }
       }
     ],
     "foothill": {
-      "sheet": "mountains",
-      "x": 1024,
-      "y": 512,
-      "w": 512,
-      "h": 512,
+      "sheet": "mountain-foothill",
+      "x": 0,
+      "y": 0,
+      "w": 500,
+      "h": 366,
       "crop": {
-        "x": 1024,
-        "y": 607,
+        "x": 0,
+        "y": 0,
         "w": 500,
         "h": 366
       }
