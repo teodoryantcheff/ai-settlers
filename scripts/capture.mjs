@@ -1,11 +1,13 @@
 import fs from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { chromium } from '@playwright/test';
+import { launchOptions, resolveProfile, startVerifiedBrowser } from './render-profile.mjs';
 
 // Capture the release page and the matching development colony with the same
 // production Pixi art/renderer, plus a curated set of interface views. Browser
 // tests assert behaviour; these images are for people reviewing the look.
+// SETTLERS_RENDER_PROFILE selects the WebGL configuration (scripts/render-profile.mjs);
+// capture.json records it with the actual renderer.
 const output = new URL('../output/captures/', import.meta.url);
 await fs.mkdir(output, { recursive: true });
 const server = 'http://127.0.0.1:8765';
@@ -15,16 +17,11 @@ async function captureView(target, name) {
   views.push(name);
   console.log(name + ' captured');
 }
-const browser = await chromium.launch({
-  headless: true,
-  args: [
-    '--enable-webgl',
-    '--use-gl=angle',
-    '--use-angle=swiftshader',
-    '--enable-unsafe-swiftshader',
-    '--disable-gpu-sandbox',
-  ],
-});
+const profile = resolveProfile();
+const { browser, evidence: rendering } = await startVerifiedBrowser(
+  profile,
+  launchOptions(profile, { args: ['--disable-gpu-sandbox'] }),
+);
 const errors = [];
 try {
   const context = await browser.newContext({
@@ -217,7 +214,7 @@ try {
   if (errors.length) throw new Error(errors.join('; '));
   await fs.writeFile(
     new URL('capture.json', output),
-    JSON.stringify({ views, scenes, animation, errors }, null, 2),
+    JSON.stringify({ rendering, views, scenes, animation, errors }, null, 2),
   );
   await promisify(execFile)('ffmpeg', [
     '-y',

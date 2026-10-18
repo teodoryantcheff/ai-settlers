@@ -1,16 +1,14 @@
 import assert from 'node:assert/strict';
-import { chromium } from '@playwright/test';
+import { launchOptions, resolveProfile, startVerifiedBrowser } from './render-profile.mjs';
 
 // Run against a local Pages preview or a deployed URL, never development scenarios.
+// SETTLERS_RENDER_PROFILE selects the WebGL configuration (scripts/render-profile.mjs).
 const base = process.argv[2] || 'http://127.0.0.1:8788/';
-const browser = await chromium.launch({
-  args: [
-    '--enable-webgl',
-    '--use-angle=swiftshader',
-    '--enable-unsafe-swiftshader',
-    '--disable-accelerated-2d-canvas',
-  ],
-});
+const profile = resolveProfile();
+const { browser, evidence } = await startVerifiedBrowser(
+  profile,
+  launchOptions(profile, { args: ['--disable-accelerated-2d-canvas'] }),
+);
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   page.setDefaultTimeout(60000);
@@ -84,7 +82,10 @@ try {
   await page.locator('#close-saves').click();
   if (process.env.PAGES_SCREENSHOT) await page.screenshot({ path: process.env.PAGES_SCREENSHOT });
   assert.deepEqual(errors, []);
-  console.log(`Pages smoke check passed: ${base} (WebGL, artwork, headers, 404s, save/load).`);
+  console.log(
+    `Pages smoke check passed: ${base} (WebGL, artwork, headers, 404s, save/load) ` +
+      `on ${evidence.mode} profile "${evidence.profile}": ${evidence.actualRenderer}.`,
+  );
 } finally {
   await browser.close();
 }

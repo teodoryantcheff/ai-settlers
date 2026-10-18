@@ -64,10 +64,6 @@ const percentile = (sorted, p) =>
   sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))] ?? 0;
 const round = (value, digits = 1) => Number(value.toFixed(digits));
 
-/** Unmasked WebGL renderer names of CPU rasterizers, whose timings say nothing about the GPU. */
-export const isSoftwareRenderer = (name) =>
-  /swiftshader|llvmpipe|softpipe|basic render/i.test(name);
-
 /** Every WebGL 2 entry point that issues a draw call. */
 export const DRAW_CALLS = [
   'drawElements',
