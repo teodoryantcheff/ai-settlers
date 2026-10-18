@@ -1,0 +1,1073 @@
+{
+  "runtimeSourceCommit": "1f8e057fba857c40d02846f60558bcadfa408f67",
+  "checkoutCommit": "bdc3d92",
+  "profilerIntervalUs": 200,
+  "method": "Each sample is weighted by its V8 timeDelta. Exclusive categories partition samples whose stack contains src/rendering/renderer.ts draw. Inclusive function shares overlap and must not be added. Idle, program and GC samples without that stack are excluded from the draw denominator. V8 attribution and inlining can blur individual painter boundaries.",
+  "command": "SETTLERS_SOURCEMAP=1 npm run build; node scripts/bench-render.mjs --minutes 20 --modes running --speed 1 --zooms 0,3 --profile 0,3 --ms 10000",
+  "bundleSha256": "adeefe012894feb1084709f4dc3de7695e9e18f285e411bf1cc29d379d3788a9",
+  "sourceMapSha256": "a8442deb039183c03698b96ba7c9f078829e25c0cd8542c9e7ceeafb5030505f",
+  "benchmark": {
+    "gpu": "ANGLE (Intel, Mesa Intel(R) UHD Graphics 620 (KBL GT2), OpenGL ES 3.2)",
+    "software": false,
+    "seed": 2024,
+    "minutes": 20,
+    "speed": 1,
+    "quality": 1,
+    "scene": {
+      "time": "noon",
+      "rain": false
+    },
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "colony": {
+      "seconds": 1200,
+      "buildings": 30,
+      "units": 16,
+      "trees": 2463
+    },
+    "rows": [
+      {
+        "zoom": 0,
+        "mode": "running",
+        "scale": 0.55,
+        "fps": 58.6,
+        "cpuMean": 14.1,
+        "cpuP95": 19.8,
+        "drawMs": 13.5,
+        "stepMs": 0.3,
+        "miniMs": 0,
+        "hudMs": 0.1,
+        "gpuP50": 7,
+        "gpuP95": 10.3,
+        "sprites": 3575,
+        "graphics": 7,
+        "graphicsBuilds": 7,
+        "drawCalls": 15.8,
+        "uploadKB": 519,
+        "texUploads": 0.1
+      },
+      {
+        "zoom": 3,
+        "mode": "running",
+        "scale": 1,
+        "fps": 58.7,
+        "cpuMean": 11.4,
+        "cpuP95": 17.6,
+        "drawMs": 10.8,
+        "stepMs": 0.3,
+        "miniMs": 0,
+        "hudMs": 0.1,
+        "gpuP50": 5.4,
+        "gpuP95": 8.7,
+        "sprites": 1803,
+        "graphics": 6,
+        "graphicsBuilds": 6,
+        "drawCalls": 17.9,
+        "uploadKB": 374,
+        "texUploads": 0
+      }
+    ]
+  },
+  "profiles": [
+    {
+      "zoom": 0,
+      "rawProfile": "output/bench/2026-10-18T08-50-38-117Z/zoom0-running.cpuprofile",
+      "rawProfileSha256": "fccb62561256f6ec283cfbd6926199c7ff2879786f078e929e327961d9b9b5b5",
+      "samples": 33630,
+      "totalSampleMs": 10505.15,
+      "drawSampleMs": 7811.81,
+      "exclusiveDrawCategories": [
+        {
+          "name": "Pixi submission",
+          "ms": 3898.188,
+          "percent": 49.901
+        },
+        {
+          "name": "object list / sort / dispatch",
+          "ms": 1482.884,
+          "percent": 18.983
+        },
+        {
+          "name": "trees",
+          "ms": 1244.055,
+          "percent": 15.925
+        },
+        {
+          "name": "other drawing",
+          "ms": 671.035,
+          "percent": 8.59
+        },
+        {
+          "name": "buildings",
+          "ms": 302.495,
+          "percent": 3.872
+        },
+        {
+          "name": "rocks",
+          "ms": 162.144,
+          "percent": 2.076
+        },
+        {
+          "name": "settlers",
+          "ms": 51.009,
+          "percent": 0.653
+        }
+      ],
+      "selfFunctionsPercentOfWallTime": [
+        {
+          "name": ":0 (idle)",
+          "ms": 1075.774,
+          "percent": 10.24
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/utils/buildContextBatches.ts:90 addTextureToGeometryData",
+          "ms": 813.501,
+          "percent": 7.744
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsContext.ts:233 setFillStyle",
+          "ms": 807.984,
+          "percent": 7.691
+        },
+        {
+          "name": ":0 (program)",
+          "ms": 748.037,
+          "percent": 7.121
+        },
+        {
+          "name": "node_modules/pixi.js/src/rendering/batcher/shared/Batcher.ts:485 break",
+          "ms": 644.561,
+          "percent": 6.136
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsContext.ts:278 texture",
+          "ms": 487.841,
+          "percent": 4.644
+        },
+        {
+          "name": "src/rendering/renderer.ts:1029 drawObjects",
+          "ms": 482.194,
+          "percent": 4.59
+        },
+        {
+          "name": "src/rendering/renderer.ts:1075 (anonymous)",
+          "ms": 442.319,
+          "percent": 4.21
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/utils/buildContextBatches.ts:44 buildContextBatches",
+          "ms": 407.448,
+          "percent": 3.879
+        },
+        {
+          "name": ":0 (garbage collector)",
+          "ms": 393.162,
+          "percent": 3.743
+        },
+        {
+          "name": "src/rendering/renderer.ts:902 drawTree",
+          "ms": 317.388,
+          "percent": 3.021
+        },
+        {
+          "name": "node_modules/pixi.js/src/utils/pool/PoolGroup.ts:58 return",
+          "ms": 216.237,
+          "percent": 2.058
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsContextSystem.ts:236 _initContextRenderData",
+          "ms": 207.339,
+          "percent": 1.974
+        },
+        {
+          "name": "src/rendering/renderer.ts:1071 (anonymous)",
+          "ms": 205.056,
+          "percent": 1.952
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/utils/buildContextBatches.ts:172 (anonymous)",
+          "ms": 136.241,
+          "percent": 1.297
+        },
+        {
+          "name": "node_modules/eventemitter3/index.js:166 emit",
+          "ms": 127.509,
+          "percent": 1.214
+        },
+        {
+          "name": "src/rendering/renderer.ts:1295 waterAnim",
+          "ms": 115.358,
+          "percent": 1.098
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsContextSystem.ts:177 getContextRenderData",
+          "ms": 111.025,
+          "percent": 1.057
+        },
+        {
+          "name": ":0 bufferSubData",
+          "ms": 101.279,
+          "percent": 0.964
+        },
+        {
+          "name": "node_modules/eventemitter3/index.js:254 removeListener",
+          "ms": 86.512,
+          "percent": 0.824
+        },
+        {
+          "name": "src/simulation/economy.ts:807 productionConstraint",
+          "ms": 74.334,
+          "percent": 0.708
+        },
+        {
+          "name": "node_modules/pixi.js/src/utils/pool/PoolGroup.ts:71 getPool",
+          "ms": 73.636,
+          "percent": 0.701
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/utils/convertFillInputToFillStyle.ts:156 toFillStyle",
+          "ms": 71.403,
+          "percent": 0.68
+        },
+        {
+          "name": "node_modules/pixi.js/src/utils/pool/Pool.ts:74 return",
+          "ms": 68.835,
+          "percent": 0.655
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/buildCommands/buildCircle.ts:23 build",
+          "ms": 60.922,
+          "percent": 0.58
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsContext.ts:323 fill",
+          "ms": 53.779,
+          "percent": 0.512
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/buildCommands/buildLine.ts:83 round",
+          "ms": 53.176,
+          "percent": 0.506
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/BatchableGraphics.ts:67 get color",
+          "ms": 46.994,
+          "percent": 0.447
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/utils/convertFillInputToFillStyle.ts:203 toStrokeStyle",
+          "ms": 45.238,
+          "percent": 0.431
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/buildCommands/buildCircle.ts:167 triangulate",
+          "ms": 44.743,
+          "percent": 0.426
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/Graphics.ts:295 _callContextMethod",
+          "ms": 44.583,
+          "percent": 0.424
+        },
+        {
+          "name": "src/rendering/pixi-renderer.ts:233 image",
+          "ms": 43.601,
+          "percent": 0.415
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/buildCommands/buildLine.ts:163 buildLine",
+          "ms": 41.657,
+          "percent": 0.397
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/view/ViewContainer.ts:158 onViewUpdate",
+          "ms": 38.231,
+          "percent": 0.364
+        },
+        {
+          "name": "node_modules/eventemitter3/index.js:58 addListener",
+          "ms": 37.321,
+          "percent": 0.355
+        }
+      ],
+      "inclusiveFunctionsPercentOfDrawTime": [
+        {
+          "name": "src/rendering/renderer.ts:2494 draw",
+          "ms": 7811.81,
+          "percent": 100
+        },
+        {
+          "name": ":7 game.<computed>",
+          "ms": 7811.81,
+          "percent": 100
+        },
+        {
+          "name": "src/application/loop.ts:13 frame",
+          "ms": 7811.81,
+          "percent": 100
+        },
+        {
+          "name": ":28 (anonymous)",
+          "ms": 7811.81,
+          "percent": 100
+        },
+        {
+          "name": "src/rendering/pixi-renderer.ts:403 guardGraphics",
+          "ms": 4044.152,
+          "percent": 51.77
+        },
+        {
+          "name": "src/rendering/pixi-renderer.ts:570 end",
+          "ms": 3898.188,
+          "percent": 49.901
+        },
+        {
+          "name": "src/rendering/pixi-renderer.ts:576 (anonymous)",
+          "ms": 3893.88,
+          "percent": 49.846
+        },
+        {
+          "name": "node_modules/pixi.js/src/rendering/renderers/shared/system/AbstractRenderer.ts:345 render",
+          "ms": 3882.271,
+          "percent": 49.697
+        },
+        {
+          "name": "node_modules/pixi.js/src/rendering/renderers/shared/system/SystemRunner.ts:64 emit",
+          "ms": 3871.221,
+          "percent": 49.556
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/container/RenderGroupSystem.ts:44 render",
+          "ms": 3815.594,
+          "percent": 48.844
+        },
+        {
+          "name": "src/rendering/renderer.ts:1029 drawObjects",
+          "ms": 3242.587,
+          "percent": 41.509
+        },
+        {
+          "name": "src/rendering/renderer.ts:1075 (anonymous)",
+          "ms": 2551.446,
+          "percent": 32.661
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/container/RenderGroupSystem.ts:170 _updateRenderGroups",
+          "ms": 2198.59,
+          "percent": 28.144
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/container/RenderGroupSystem.ts:245 _buildInstructions",
+          "ms": 2161.928,
+          "percent": 27.675
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/container/container-mixins/collectRenderablesMixin.ts:99 collectRenderablesWithEffects",
+          "ms": 2154.383,
+          "percent": 27.579
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/container/container-mixins/collectRenderablesMixin.ts:84 collectRenderablesSimple",
+          "ms": 2154.064,
+          "percent": 27.574
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/container/container-mixins/collectRenderablesMixin.ts:58 collectRenderables",
+          "ms": 2153.222,
+          "percent": 27.564
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/view/ViewContainer.ts:202 collectRenderablesSimple",
+          "ms": 2111.76,
+          "percent": 27.033
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsPipe.ts:99 addRenderable",
+          "ms": 2087.597,
+          "percent": 26.724
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsContextSystem.ts:189 updateGpuContext",
+          "ms": 2079.888,
+          "percent": 26.625
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/utils/buildContextBatches.ts:44 buildContextBatches",
+          "ms": 1674.456,
+          "percent": 21.435
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/container/utils/executeInstructions.ts:10 executeInstructions",
+          "ms": 1603.329,
+          "percent": 20.524
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsPipe.ts:137 execute",
+          "ms": 1344.063,
+          "percent": 17.206
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/gl/GlGraphicsAdaptor.ts:65 execute",
+          "ms": 1340.079,
+          "percent": 17.155
+        },
+        {
+          "name": "src/rendering/renderer.ts:902 drawTree",
+          "ms": 1244.055,
+          "percent": 15.925
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsContextSystem.ts:177 getContextRenderData",
+          "ms": 1118.718,
+          "percent": 14.321
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsContextSystem.ts:236 _initContextRenderData",
+          "ms": 1007.679,
+          "percent": 12.899
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsContext.ts:233 setFillStyle",
+          "ms": 832.629,
+          "percent": 10.659
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/utils/buildContextBatches.ts:90 addTextureToGeometryData",
+          "ms": 812.95,
+          "percent": 10.407
+        },
+        {
+          "name": "node_modules/pixi.js/src/rendering/batcher/shared/Batcher.ts:485 break",
+          "ms": 733.746,
+          "percent": 9.393
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsContext.ts:278 texture",
+          "ms": 630.74,
+          "percent": 8.074
+        },
+        {
+          "name": "src/rendering/pixi-renderer.ts:539 layer",
+          "ms": 626.097,
+          "percent": 8.015
+        },
+        {
+          "name": "src/rendering/pixi-renderer.ts:540 (anonymous)",
+          "ms": 621.355,
+          "percent": 7.954
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/utils/buildContextBatches.ts:172 (anonymous)",
+          "ms": 412.903,
+          "percent": 5.286
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsContextSystem.ts:42 reset",
+          "ms": 359.163,
+          "percent": 4.598
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsContextSystem.ts:46 (anonymous)",
+          "ms": 339.731,
+          "percent": 4.349
+        },
+        {
+          "name": "node_modules/pixi.js/src/utils/pool/PoolGroup.ts:58 return",
+          "ms": 339.18,
+          "percent": 4.342
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/Graphics.ts:295 _callContextMethod",
+          "ms": 312.962,
+          "percent": 4.006
+        },
+        {
+          "name": "src/rendering/renderer.ts:718 drawBuilding",
+          "ms": 302.495,
+          "percent": 3.872
+        },
+        {
+          "name": "src/rendering/pixi-renderer.ts:233 image",
+          "ms": 296.155,
+          "percent": 3.791
+        },
+        {
+          "name": "src/rendering/renderer.ts:2572 (anonymous)",
+          "ms": 277.391,
+          "percent": 3.551
+        },
+        {
+          "name": "src/rendering/renderer.ts:2591 (anonymous)",
+          "ms": 273.745,
+          "percent": 3.504
+        },
+        {
+          "name": "src/rendering/renderer.ts:1071 (anonymous)",
+          "ms": 202.085,
+          "percent": 2.587
+        },
+        {
+          "name": "src/rendering/renderer.ts:1295 waterAnim",
+          "ms": 202.061,
+          "percent": 2.587
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsContext.ts:323 fill",
+          "ms": 172.096,
+          "percent": 2.203
+        },
+        {
+          "name": "node_modules/pixi.js/src/filters/FilterPipe.ts:55 execute",
+          "ms": 169.797,
+          "percent": 2.174
+        },
+        {
+          "name": "src/rendering/renderer.ts:938 drawRock",
+          "ms": 162.144,
+          "percent": 2.076
+        },
+        {
+          "name": "node_modules/eventemitter3/index.js:166 emit",
+          "ms": 157.345,
+          "percent": 2.014
+        },
+        {
+          "name": "node_modules/pixi.js/src/rendering/renderers/gpu/shader/BindGroup.ts:114 setResource",
+          "ms": 147.82,
+          "percent": 1.892
+        },
+        {
+          "name": "src/rendering/renderer.ts:1207 fxDraw",
+          "ms": 142.014,
+          "percent": 1.818
+        },
+        {
+          "name": "node_modules/pixi.js/src/rendering/renderers/gl/geometry/GlGeometrySystem.ts:154 bind",
+          "ms": 139.404,
+          "percent": 1.785
+        },
+        {
+          "name": "node_modules/pixi.js/src/rendering/renderers/gl/geometry/GlGeometrySystem.ts:181 updateBuffers",
+          "ms": 123.884,
+          "percent": 1.586
+        },
+        {
+          "name": ":9 proto.<computed>",
+          "ms": 123.259,
+          "percent": 1.578
+        },
+        {
+          "name": "node_modules/pixi.js/src/rendering/renderers/gl/buffer/GlBufferSystem.ts:225 updateBuffer",
+          "ms": 122.642,
+          "percent": 1.57
+        },
+        {
+          "name": "node_modules/pixi.js/src/filters/FilterSystem.ts:352 pop",
+          "ms": 119.299,
+          "percent": 1.527
+        }
+      ]
+    },
+    {
+      "zoom": 3,
+      "rawProfile": "output/bench/2026-10-18T08-50-38-117Z/zoom3-running.cpuprofile",
+      "rawProfileSha256": "8c01c00b6af73df3bac4289d3aedcbb4885ef26b16fc09673f930fe9ff1d8e27",
+      "samples": 33327,
+      "totalSampleMs": 10356.803,
+      "drawSampleMs": 6289.887,
+      "exclusiveDrawCategories": [
+        {
+          "name": "Pixi submission",
+          "ms": 3429.433,
+          "percent": 54.523
+        },
+        {
+          "name": "buildings",
+          "ms": 772.642,
+          "percent": 12.284
+        },
+        {
+          "name": "trees",
+          "ms": 736.95,
+          "percent": 11.716
+        },
+        {
+          "name": "other drawing",
+          "ms": 571.929,
+          "percent": 9.093
+        },
+        {
+          "name": "object list / sort / dispatch",
+          "ms": 537.067,
+          "percent": 8.539
+        },
+        {
+          "name": "rocks",
+          "ms": 182.123,
+          "percent": 2.895
+        },
+        {
+          "name": "settlers",
+          "ms": 59.743,
+          "percent": 0.95
+        }
+      ],
+      "selfFunctionsPercentOfWallTime": [
+        {
+          "name": ":0 (idle)",
+          "ms": 2614.285,
+          "percent": 25.242
+        },
+        {
+          "name": ":0 (program)",
+          "ms": 616.783,
+          "percent": 5.955
+        },
+        {
+          "name": "node_modules/pixi.js/src/rendering/batcher/shared/Batcher.ts:485 break",
+          "ms": 463.001,
+          "percent": 4.471
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/utils/buildContextBatches.ts:44 buildContextBatches",
+          "ms": 447.005,
+          "percent": 4.316
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsContext.ts:233 setFillStyle",
+          "ms": 445.839,
+          "percent": 4.305
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/utils/buildContextBatches.ts:90 addTextureToGeometryData",
+          "ms": 437.06,
+          "percent": 4.22
+        },
+        {
+          "name": ":0 (garbage collector)",
+          "ms": 423.19,
+          "percent": 4.086
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsContext.ts:278 texture",
+          "ms": 278.446,
+          "percent": 2.689
+        },
+        {
+          "name": "node_modules/eventemitter3/index.js:254 removeListener",
+          "ms": 230.337,
+          "percent": 2.224
+        },
+        {
+          "name": "src/rendering/renderer.ts:1029 drawObjects",
+          "ms": 220.436,
+          "percent": 2.128
+        },
+        {
+          "name": "src/rendering/renderer.ts:1075 (anonymous)",
+          "ms": 217.178,
+          "percent": 2.097
+        },
+        {
+          "name": "src/rendering/renderer.ts:902 drawTree",
+          "ms": 179.112,
+          "percent": 1.729
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/utils/buildContextBatches.ts:172 (anonymous)",
+          "ms": 171.935,
+          "percent": 1.66
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsContextSystem.ts:236 _initContextRenderData",
+          "ms": 170.164,
+          "percent": 1.643
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/utils/convertFillInputToFillStyle.ts:203 toStrokeStyle",
+          "ms": 97.393,
+          "percent": 0.94
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/buildCommands/buildCircle.ts:23 build",
+          "ms": 92.679,
+          "percent": 0.895
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/utils/convertFillInputToFillStyle.ts:156 toFillStyle",
+          "ms": 92.437,
+          "percent": 0.893
+        },
+        {
+          "name": "node_modules/pixi.js/src/utils/pool/PoolGroup.ts:58 return",
+          "ms": 88.756,
+          "percent": 0.857
+        },
+        {
+          "name": "src/rendering/renderer.ts:1071 (anonymous)",
+          "ms": 87.199,
+          "percent": 0.842
+        },
+        {
+          "name": "node_modules/eventemitter3/index.js:166 emit",
+          "ms": 80.012,
+          "percent": 0.773
+        },
+        {
+          "name": ":0 bufferSubData",
+          "ms": 79.794,
+          "percent": 0.77
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/buildCommands/buildCircle.ts:167 triangulate",
+          "ms": 72.21,
+          "percent": 0.697
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsContext.ts:323 fill",
+          "ms": 69.796,
+          "percent": 0.674
+        },
+        {
+          "name": "src/rendering/pixi-renderer.ts:233 image",
+          "ms": 62.361,
+          "percent": 0.602
+        },
+        {
+          "name": "src/simulation/economy.ts:807 productionConstraint",
+          "ms": 60.123,
+          "percent": 0.581
+        },
+        {
+          "name": "src/rendering/renderer.ts:1295 waterAnim",
+          "ms": 59.122,
+          "percent": 0.571
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsContextSystem.ts:177 getContextRenderData",
+          "ms": 59.103,
+          "percent": 0.571
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/buildCommands/buildLine.ts:83 round",
+          "ms": 52.788,
+          "percent": 0.51
+        },
+        {
+          "name": "src/rendering/renderer.ts:718 drawBuilding",
+          "ms": 51.299,
+          "percent": 0.495
+        },
+        {
+          "name": "node_modules/pixi.js/src/utils/pool/PoolGroup.ts:71 getPool",
+          "ms": 50.085,
+          "percent": 0.484
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/Graphics.ts:295 _callContextMethod",
+          "ms": 48.853,
+          "percent": 0.472
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsPipe.ts:99 addRenderable",
+          "ms": 47.628,
+          "percent": 0.46
+        },
+        {
+          "name": "node_modules/eventemitter3/index.js:58 addListener",
+          "ms": 46.754,
+          "percent": 0.451
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsContextSystem.ts:189 updateGpuContext",
+          "ms": 45.485,
+          "percent": 0.439
+        },
+        {
+          "name": "node_modules/pixi.js/src/rendering/renderers/gpu/shader/BindGroup.ts:114 setResource",
+          "ms": 44.892,
+          "percent": 0.433
+        }
+      ],
+      "inclusiveFunctionsPercentOfDrawTime": [
+        {
+          "name": "src/rendering/renderer.ts:2494 draw",
+          "ms": 6289.887,
+          "percent": 100
+        },
+        {
+          "name": ":7 game.<computed>",
+          "ms": 6289.887,
+          "percent": 100
+        },
+        {
+          "name": "src/application/loop.ts:13 frame",
+          "ms": 6289.887,
+          "percent": 100
+        },
+        {
+          "name": ":28 (anonymous)",
+          "ms": 6289.887,
+          "percent": 100
+        },
+        {
+          "name": "src/rendering/pixi-renderer.ts:403 guardGraphics",
+          "ms": 3975.334,
+          "percent": 63.202
+        },
+        {
+          "name": "src/rendering/pixi-renderer.ts:570 end",
+          "ms": 3429.433,
+          "percent": 54.523
+        },
+        {
+          "name": "src/rendering/pixi-renderer.ts:576 (anonymous)",
+          "ms": 3423.417,
+          "percent": 54.427
+        },
+        {
+          "name": "node_modules/pixi.js/src/rendering/renderers/shared/system/AbstractRenderer.ts:345 render",
+          "ms": 3412.021,
+          "percent": 54.246
+        },
+        {
+          "name": "node_modules/pixi.js/src/rendering/renderers/shared/system/SystemRunner.ts:64 emit",
+          "ms": 3405.61,
+          "percent": 54.144
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/container/RenderGroupSystem.ts:44 render",
+          "ms": 3343.657,
+          "percent": 53.159
+        },
+        {
+          "name": "src/rendering/renderer.ts:1029 drawObjects",
+          "ms": 2288.525,
+          "percent": 36.384
+        },
+        {
+          "name": "src/rendering/renderer.ts:1075 (anonymous)",
+          "ms": 1978.247,
+          "percent": 31.451
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/container/RenderGroupSystem.ts:170 _updateRenderGroups",
+          "ms": 1854.924,
+          "percent": 29.491
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsContextSystem.ts:189 updateGpuContext",
+          "ms": 1706.798,
+          "percent": 27.136
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/container/RenderGroupSystem.ts:245 _buildInstructions",
+          "ms": 1651.745,
+          "percent": 26.26
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/container/container-mixins/collectRenderablesMixin.ts:99 collectRenderablesWithEffects",
+          "ms": 1641.045,
+          "percent": 26.09
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/container/container-mixins/collectRenderablesMixin.ts:84 collectRenderablesSimple",
+          "ms": 1640.511,
+          "percent": 26.082
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/container/container-mixins/collectRenderablesMixin.ts:58 collectRenderables",
+          "ms": 1639.342,
+          "percent": 26.063
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/view/ViewContainer.ts:202 collectRenderablesSimple",
+          "ms": 1600.666,
+          "percent": 25.448
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsPipe.ts:99 addRenderable",
+          "ms": 1584.066,
+          "percent": 25.184
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/container/utils/executeInstructions.ts:10 executeInstructions",
+          "ms": 1479.972,
+          "percent": 23.529
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/utils/buildContextBatches.ts:44 buildContextBatches",
+          "ms": 1468.797,
+          "percent": 23.352
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsPipe.ts:137 execute",
+          "ms": 1094.639,
+          "percent": 17.403
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/gl/GlGraphicsAdaptor.ts:65 execute",
+          "ms": 1085.598,
+          "percent": 17.259
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsContextSystem.ts:177 getContextRenderData",
+          "ms": 871.438,
+          "percent": 13.855
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsContextSystem.ts:236 _initContextRenderData",
+          "ms": 812.042,
+          "percent": 12.91
+        },
+        {
+          "name": "src/rendering/renderer.ts:718 drawBuilding",
+          "ms": 772.642,
+          "percent": 12.284
+        },
+        {
+          "name": "src/rendering/renderer.ts:902 drawTree",
+          "ms": 736.95,
+          "percent": 11.716
+        },
+        {
+          "name": "src/rendering/pixi-renderer.ts:539 layer",
+          "ms": 535.362,
+          "percent": 8.511
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/utils/buildContextBatches.ts:172 (anonymous)",
+          "ms": 534.361,
+          "percent": 8.496
+        },
+        {
+          "name": "src/rendering/pixi-renderer.ts:540 (anonymous)",
+          "ms": 531.905,
+          "percent": 8.457
+        },
+        {
+          "name": "node_modules/pixi.js/src/rendering/batcher/shared/Batcher.ts:485 break",
+          "ms": 528.054,
+          "percent": 8.395
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsContext.ts:233 setFillStyle",
+          "ms": 464.499,
+          "percent": 7.385
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/utils/buildContextBatches.ts:90 addTextureToGeometryData",
+          "ms": 436.498,
+          "percent": 6.94
+        },
+        {
+          "name": "src/rendering/pixi-renderer.ts:233 image",
+          "ms": 376.42,
+          "percent": 5.985
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsContext.ts:278 texture",
+          "ms": 355.334,
+          "percent": 5.649
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/Graphics.ts:295 _callContextMethod",
+          "ms": 352.5,
+          "percent": 5.604
+        },
+        {
+          "name": "node_modules/pixi.js/src/rendering/renderers/gpu/shader/BindGroup.ts:114 setResource",
+          "ms": 321.983,
+          "percent": 5.119
+        },
+        {
+          "name": "src/rendering/renderer.ts:2591 (anonymous)",
+          "ms": 311.925,
+          "percent": 4.959
+        },
+        {
+          "name": "node_modules/pixi.js/src/filters/FilterPipe.ts:55 execute",
+          "ms": 292.048,
+          "percent": 4.643
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsContext.ts:323 fill",
+          "ms": 264.993,
+          "percent": 4.213
+        },
+        {
+          "name": "node_modules/pixi.js/src/filters/FilterSystem.ts:352 pop",
+          "ms": 255.802,
+          "percent": 4.067
+        },
+        {
+          "name": "node_modules/pixi.js/src/filters/FilterSystem.ts:776 _applyFiltersToTexture",
+          "ms": 252.038,
+          "percent": 4.007
+        },
+        {
+          "name": "src/rendering/renderer.ts:817 drawWorker",
+          "ms": 239.502,
+          "percent": 3.808
+        },
+        {
+          "name": "node_modules/eventemitter3/index.js:254 removeListener",
+          "ms": 230.337,
+          "percent": 3.662
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsContext.ts:384 stroke",
+          "ms": 214.591,
+          "percent": 3.412
+        },
+        {
+          "name": "src/rendering/village.ts:506 drawVillageDetails",
+          "ms": 206.944,
+          "percent": 3.29
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/container/utils/validateRenderables.ts:10 validateRenderables",
+          "ms": 193.969,
+          "percent": 3.084
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsPipe.ts:80 validateRenderable",
+          "ms": 193.147,
+          "percent": 3.071
+        },
+        {
+          "name": "src/rendering/renderer.ts:2572 (anonymous)",
+          "ms": 190.553,
+          "percent": 3.03
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsContextSystem.ts:42 reset",
+          "ms": 183.426,
+          "percent": 2.916
+        },
+        {
+          "name": "src/rendering/renderer.ts:938 drawRock",
+          "ms": 182.123,
+          "percent": 2.895
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/utils/convertFillInputToFillStyle.ts:156 toFillStyle",
+          "ms": 173.452,
+          "percent": 2.758
+        },
+        {
+          "name": "node_modules/pixi.js/src/utils/pool/PoolGroup.ts:58 return",
+          "ms": 169.244,
+          "percent": 2.691
+        },
+        {
+          "name": "node_modules/pixi.js/src/scene/graphics/shared/GraphicsContextSystem.ts:46 (anonymous)",
+          "ms": 168.492,
+          "percent": 2.679
+        }
+      ]
+    }
+  ]
+}
