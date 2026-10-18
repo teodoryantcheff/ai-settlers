@@ -72,6 +72,8 @@ test('missing or invalid configuration fails before any browser starts', () => {
     [withConfig({ profiles: { amd: { ...AMD, fastest: true } } }), /fastest/],
     [withConfig({ profiles: { software: AMD } }), /software/],
     [withConfig({ default: 'amd', profiles: {} }), /default "amd"/],
+    // Software rendering is never a machine default: it must be named per run.
+    [withConfig({ default: 'software', profiles: { amd: AMD } }), /default "software"/],
   ])
     assert.throws(() => resolveProfile({ env }), message, JSON.stringify(env));
 });
@@ -203,15 +205,13 @@ test('saved evidence names the configuration, the actual GPU and the source it m
   assert.equal(evidence.browser, 'Chromium 156.0.8078.4 headless shell');
   assert.match(evidence.commit, /^[0-9a-f]{40}$/);
   assert.equal(typeof evidence.dirty, 'boolean');
-  assert.equal(evidence.launchArgs, undefined);
+  assert.deepEqual(evidence.launchArgs, launch.args);
+  // Only GPU selection is recorded, never the rest of the environment.
+  assert.deepEqual(evidence.gpuSelection, { DRI_PRIME: 'pci-0000_02_00_0' });
+  assert.doesNotMatch(JSON.stringify(evidence), /secret|\/usr\/bin/);
 
   const full = launchOptions(amd, { env: {}, fullChromium: true });
   assert.equal(renderEvidence({ ...base, launch: full }).browser, 'Chromium 156.0.8078.4');
-  const performance = renderEvidence({ ...base, performance: true });
-  assert.deepEqual(performance.launchArgs, launch.args);
-  // Only GPU selection is recorded, never the rest of the environment.
-  assert.deepEqual(performance.gpuSelection, { DRI_PRIME: 'pci-0000_02_00_0' });
-  assert.doesNotMatch(JSON.stringify(performance), /secret|\/usr\/bin/);
 
   assert.equal(
     describeRendering(evidence),
@@ -251,7 +251,16 @@ test('every Chromium command launches through the shared profile contract', () =
   assert.deepEqual(launchers, ['scripts/render-profile.mjs']);
 });
 
-test('browser tests take their launch options and renderer check from the selected profile', async () => {
+test('browser tests take their launch options and renderer check from the selected profile', async (t) => {
+  const saved = {
+    SETTLERS_RENDER_PROFILES: process.env.SETTLERS_RENDER_PROFILES,
+    SETTLERS_RENDER_PROFILE: process.env.SETTLERS_RENDER_PROFILE,
+  };
+  t.after(() => {
+    for (const [key, value] of Object.entries(saved))
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+  });
   process.env.SETTLERS_RENDER_PROFILES = path.join(directory, 'absent.json');
   process.env.SETTLERS_RENDER_PROFILE = 'software';
   const { default: config } = await import('../playwright.config.mjs');

@@ -72,13 +72,17 @@ Tests and builds run TypeScript 7 checking through `npm run typecheck`, which in
 Every Chromium command — browser tests (`npm run test:browser`, `npm run check`, `npm run coverage`), `npm run bench:render`, `scripts/bench-territory.mjs`, `npm run capture` and `npm run test:pages` — launches through one rendering-profile contract (`scripts/render-profile.mjs`). Select a profile with `SETTLERS_RENDER_PROFILE`; there is no tracked default, and a command without a selection stops before starting Chromium.
 
 - `software` is built in: SwiftShader WebGL, for CI and machines without a usable GPU. Browser tests, captures and the Pages smoke check accept it; benchmarks refuse it.
-- Hardware profiles describe one machine, so they live outside the repository in `~/.config/ai-settlers/render-profiles.json` (or `$XDG_CONFIG_HOME/ai-settlers/…`, or any file named by `SETTLERS_RENDER_PROFILES`). Each names text the WebGL renderer must contain (`gpu`), the ANGLE backend (`angle`: `gl`, `gl-egl`, `vulkan`, `d3d11` or `metal`) and optional GPU-selection variables (`env`, such as `DRI_PRIME`). An optional `default` selects a profile when `SETTLERS_RENDER_PROFILE` is unset. The reference workstation uses:
+- Hardware profiles describe one machine, so they live outside the repository in `~/.config/ai-settlers/render-profiles.json` (or `$XDG_CONFIG_HOME/ai-settlers/…`, or any file named by `SETTLERS_RENDER_PROFILES`). Each names text the WebGL renderer must contain (`gpu`), the ANGLE backend (`angle`: `gl`, `gl-egl`, `vulkan`, `d3d11` or `metal`) and optional GPU-selection variables (`env`, such as `DRI_PRIME`). An optional `default` names the hardware profile used when `SETTLERS_RENDER_PROFILE` is unset; software rendering is always selected per run. The reference workstation uses:
 
 ```json
 {
   "default": "amd",
   "profiles": {
-    "amd": { "gpu": "AMD Radeon 500 Series", "angle": "gl", "env": { "DRI_PRIME": "pci-0000_02_00_0" } },
+    "amd": {
+      "gpu": "AMD Radeon 500 Series",
+      "angle": "gl",
+      "env": { "DRI_PRIME": "pci-0000_02_00_0" }
+    },
     "intel": { "gpu": "UHD Graphics 620", "angle": "gl" }
   }
 }
@@ -86,7 +90,7 @@ Every Chromium command — browser tests (`npm run test:browser`, `npm run check
 
 Find a machine's renderer name in `chrome://gpu` or from a run's printed `Rendering:` line. On Linux/Mesa, put `DRI_PRIME` in the profile rather than the shell; an exported value that disagrees with the selected hardware profile is refused. Intel integrated graphics are hardware acceleration too, but a distinct profile: nothing chooses a GPU automatically.
 
-Each command launches Chromium, reads the unmasked WebGL renderer and stops before testing, capturing or sampling unless it matches the profile: the expected GPU on the expected ANGLE backend, never a software rasterizer, and WebGL available (`software` accepts SwiftShader only). With `gl-egl`, Mesa ignores `DRI_PRIME` and renders on the Intel GPU, which this check catches. Every run prints its profile, backend, expected and actual renderer, and browser version; capture and benchmark results save them with the source commit and dirty state, and benchmarks also keep their Chromium switches and GPU-selection variables. Capability options such as GPU timer queries add to the profile's switches; switches that choose a backend are refused.
+Each command stops before testing, capturing or sampling unless Chromium's actual WebGL renderer is the profile's GPU on its ANGLE backend (SwiftShader for `software`); software fallback and unavailable WebGL always fail. Every run prints a `Rendering:` line; capture and benchmark results save it with the source commit, dirty state, Chromium switches and GPU-selection variables. Keep `gpu` specific enough to name one device.
 
 ```sh
 SETTLERS_RENDER_PROFILE=software npm run test:browser

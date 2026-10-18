@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   launchOptions,
+  pageRenderer,
   resolveProfile,
   startVerifiedBrowser,
   verifyRenderer,
@@ -39,8 +40,8 @@ try {
     if (exited || tries >= 50) throw new Error('Benchmark server failed.');
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  const started = await startVerifiedBrowser(profile, launch, { performance: true });
-  browser = started.browser;
+  let rendering;
+  ({ browser, evidence: rendering } = await startVerifiedBrowser(profile, launch));
   const context = await browser.newContext({
     viewport: { width: 1920, height: 1080 },
     deviceScaleFactor: 1,
@@ -70,20 +71,16 @@ try {
     polling: 100,
     timeout: 60000,
   });
-  const game = await page.evaluate(() => {
+  // The game's own canvas must render on the verified GPU too.
+  const canvas = await page.evaluate(pageRenderer, 'pixi-view');
+  const available = await page.evaluate(() => {
     const g = window.productionArtPreview.game;
-    const gl = document.getElementById('pixi-view').getContext('webgl2');
-    const info = gl?.getExtension('WEBGL_debug_renderer_info');
     g.closeLayer('start');
     g.state.paused = true;
     g.state.auto = true;
-    return {
-      available: !!gl && g.renderingAvailable !== false,
-      renderer: gl && gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER),
-    };
+    return g.renderingAvailable !== false;
   });
-  // The game's own canvas must render on the verified GPU too.
-  verifyRenderer(profile, game);
+  verifyRenderer(profile, { ...canvas, available: canvas.available && available });
   for (let minute = 0; minute < 20; minute++)
     await page.evaluate(() => {
       const g = window.productionArtPreview.game;
@@ -154,7 +151,7 @@ try {
     };
   };
   const results = {
-    rendering: started.evidence,
+    rendering,
     seed: 2024,
     viewport: { width: 1920, height: 1080 },
     quality: 1,

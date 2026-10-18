@@ -115,12 +115,11 @@ function readProfiles(file) {
       env: { ...env },
     };
   }
-  if (
-    config.default !== undefined &&
-    config.default !== SOFTWARE_PROFILE.name &&
-    !profiles[config.default]
-  )
-    fail(`default "${config.default}" is not a defined profile`);
+  if (config.default !== undefined && !profiles[config.default])
+    fail(
+      `default "${config.default}" is not a defined hardware profile; ` +
+        'select software rendering per run with SETTLERS_RENDER_PROFILE=software',
+    );
   return { default: config.default, profiles };
 }
 
@@ -230,12 +229,15 @@ function git(args) {
 
 /**
  * What a run rendered with, for saved results: profile, expected and actual GPU,
- * browser and source revision. `performance` adds the launch switches and the GPU
- * selection variables (never the rest of the environment).
+ * browser, source revision, Chromium switches and the GPU selection variables (never
+ * the rest of the environment).
  */
-export function renderEvidence({ profile, renderer, browserVersion, launch, performance = false }) {
+export function renderEvidence({ profile, renderer, browserVersion, launch }) {
   const status = git(['status', '--porcelain']);
-  const evidence = {
+  const gpuSelection = {};
+  for (const key of GPU_SELECTION_ENV)
+    if (launch.env?.[key] !== undefined) gpuSelection[key] = launch.env[key];
+  return {
     mode: profile.mode,
     profile: profile.name,
     backend: profile.angle,
@@ -244,12 +246,9 @@ export function renderEvidence({ profile, renderer, browserVersion, launch, perf
     browser: `Chromium ${browserVersion}${launch.channel === 'chromium' ? '' : ' headless shell'}`,
     commit: git(['rev-parse', 'HEAD']),
     dirty: status === null ? null : status !== '',
+    launchArgs: launch.args,
+    gpuSelection,
   };
-  if (!performance) return evidence;
-  const gpuSelection = {};
-  for (const key of GPU_SELECTION_ENV)
-    if (launch.env?.[key] !== undefined) gpuSelection[key] = launch.env[key];
-  return { ...evidence, launchArgs: launch.args, gpuSelection };
 }
 
 /** One line for command output. */
@@ -257,9 +256,14 @@ export const describeRendering = (evidence) =>
   `Rendering: ${evidence.mode} profile "${evidence.profile}" (ANGLE ${evidence.backend}), ` +
   `expected "${evidence.expectedGpu}", actual "${evidence.actualRenderer}", ${evidence.browser}`;
 
-/** The WebGL 2 renderer a page gets; runs in the page through `page.evaluate`. */
-export function pageRenderer() {
-  const gl = document.createElement('canvas').getContext('webgl2');
+/**
+ * The WebGL 2 renderer a page gets, from the canvas with id `canvasId` or a new one;
+ * runs in the page through `page.evaluate(pageRenderer, canvasId)`.
+ */
+export function pageRenderer(canvasId) {
+  const canvas =
+    (canvasId && document.getElementById(canvasId)) || document.createElement('canvas');
+  const gl = canvas.getContext('webgl2');
   if (!gl) return { available: false, renderer: null };
   const info = gl.getExtension('WEBGL_debug_renderer_info');
   return {
@@ -273,7 +277,7 @@ export function pageRenderer() {
  * renderer against the profile and print the configuration. Closes the browser and
  * throws on any mismatch, so nothing is tested, captured or measured on the wrong GPU.
  */
-export async function startVerifiedBrowser(profile, launch, { performance = false } = {}) {
+export async function startVerifiedBrowser(profile, launch) {
   const browser = await chromium.launch(launch);
   try {
     const page = await browser.newPage();
@@ -285,7 +289,6 @@ export async function startVerifiedBrowser(profile, launch, { performance = fals
       renderer: actual.renderer,
       browserVersion: browser.version(),
       launch,
-      performance,
     });
     console.log(describeRendering(evidence));
     return { browser, evidence };

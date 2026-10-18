@@ -25,6 +25,7 @@ import path from 'node:path';
 import { DRAW_CALLS, benchOptions, summarize } from './bench-render-helpers.mjs';
 import {
   launchOptions,
+  pageRenderer,
   resolveProfile,
   startVerifiedBrowser,
   verifyRenderer,
@@ -139,9 +140,8 @@ try {
     if (serverExited || tries >= 50) throw new Error(`The static server on port ${port} failed.`);
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  const started = await startVerifiedBrowser(profile, launch, { performance: true });
-  browser = started.browser;
-  const rendering = started.evidence;
+  let rendering;
+  ({ browser, evidence: rendering } = await startVerifiedBrowser(profile, launch));
   const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
   // Pin the preferences that change what is drawn, so runs stay comparable.
   await context.addInitScript((quality) => {
@@ -157,24 +157,19 @@ try {
   // night veils and dusk particles never differ between compared runs.
   await page.goto(`${origin}/tests/game.html?seed=${seed}&renderbench`);
   await page.waitForFunction(() => window.productionArtPreview?.game, null, { timeout: 60000 });
+  // The game's own canvas must render on the verified GPU too.
+  const canvas = await page.evaluate(pageRenderer, 'pixi-view');
   const boot = await page.evaluate(() => {
     const game = window.productionArtPreview.game;
-    const gl =
-      document.getElementById('pixi-view')?.getContext('webgl2') ||
-      document.createElement('canvas').getContext('webgl2');
-    const info = gl?.getExtension('WEBGL_debug_renderer_info');
     return {
-      rendering: game.renderingAvailable !== false && !!gl,
-      gpu:
-        gl && (info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)),
+      rendering: game.renderingAvailable !== false,
       zoomCount: game.zooms.length,
       pinned: game.TESTMODE === true,
       night: game.nightAmt(),
       rain: game.rainAmt(),
     };
   });
-  // The game's own canvas must render on the verified GPU too.
-  verifyRenderer(profile, { available: boot.rendering, renderer: boot.gpu });
+  verifyRenderer(profile, { ...canvas, available: canvas.available && boot.rendering });
   // Verify the pinned cosmetic state instead of trusting the URL flag.
   if (!boot.pinned || boot.night !== 0 || boot.rain !== 0)
     throw new Error('Cosmetic state is not pinned: expected noon with no rain.');

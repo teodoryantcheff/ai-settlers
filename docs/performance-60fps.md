@@ -4,6 +4,16 @@ Measured on 2026-10-16 on the reference laptop: Intel Core i7-8550U (4C/8T, 15 W
 
 **Update, 2026-10-17.** The Canvas2D interception layer described below (`pixi-context.ts`) has been removed. Painters now draw straight into a few pooled PixiJS `Graphics` runs per layer, rebuilt each frame. On the same laptop with a 10-minute colony, CPU time per frame fell from 32/27/20 ms to 13/10/5.5 ms (zoom 0.55/1/2.2, running), every zoom reaches the 60 fps cap, and draw calls fell from about 44 to 15.
 
+## Rendering-profile verification, 2026-10-18
+
+[#74](https://github.com/teodoryantcheff/ai-settlers/issues/74) put every Chromium command behind one rendering-profile contract (README, "Rendering profiles"). Checks on the reference laptop, Chromium 156.0.8078.4:
+
+- Hardware profile `amd` (`gpu` "AMD Radeon 500 Series", `angle` gl, `DRI_PRIME=pci-0000_02_00_0`): short `bench:render` and full `bench-territory` runs, a browser spec and the Pages smoke check all verified **ANGLE (AMD, AMD Radeon 500 Series (radeonsi polaris12 ACO), OpenGL 4.6)** before running, and benchmark results saved the profile, switches, `DRI_PRIME`, browser version and commit.
+- Software profile: a browser spec, `capture` (all views, with `rendering` in `capture.json`) and the Pages smoke check verified SwiftShader.
+- Refusals before any sample: the software profile for a benchmark; no selected profile; an exported `DRI_PRIME=1` against the `amd` profile; and an `amd` profile on `gl-egl`, where Mesa ignores `DRI_PRIME` and Chromium rendered on **Intel UHD Graphics 620 (OpenGL ES 3.2)**.
+
+The ANGLE `vulkan` backend also reaches the AMD GPU here (RADV), but no measurements use it. Matching renderer marks for `d3d11` and `metal` are untested on real hardware.
+
 ## AMD OpenGL rerun, 2026-10-18
 
 Reran the integration runtime with `DRI_PRIME=pci-0000_02_00_0` and `--use-angle=gl`. Every measured window reports **ANGLE (AMD, AMD Radeon 500 Series (radeonsi polaris12 ACO), OpenGL 4.6)**, with no software fallback. The benchmark launcher now uses the same ANGLE backend as the browser tests. Runtime code is unchanged from the reviewed implementation; [raw results, bundle hashes and protocol](benchmarks/2026-10-18/native-nature/amd-gl/results.json) preserve all 14 initial windows and both longer repeats.
