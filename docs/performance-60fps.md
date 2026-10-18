@@ -6,9 +6,9 @@ Measured on 2026-10-16 on the reference laptop: Intel Core i7-8550U (4C/8T, 15 W
 
 ## Native nature retention, 2026-10-18 (#42 / #44)
 
-Implemented on the single `codex/native-nature-integration` branch, starting from fresh `main` at `c0ebf91` (including the normalized building PNGs). The production WebGL renderer retains a view per tree/rock tile. Images and local vector geometry update explicitly, while unchanged views reuse shared textures. Contiguous static spans between immediate building/settler drawings share native GPU batches; moving objects change only the spans they cross. Cached static depth rows merge with the full dynamic depth keys and preserve stable ties. Culling drops obsolete batch ordering identities while retaining owned artwork; removal, world replacement and teardown release owned views, including detached ones. Buildings, settlers and overlays remain immediate.
+Implemented on the single `codex/native-nature-integration` branch, starting from fresh `main` at `c0ebf91` (including the normalized building PNGs). Final runtime measurements use reviewed commit `8ce4aa6`; [provenance](benchmarks/2026-10-18/native-nature/provenance.json) records source/bundle hashes and validation. Earlier measurements are retained as [pre-review 1×](benchmarks/2026-10-18/native-nature/retained-pre-review-1x.json) and [pre-review 8×](benchmarks/2026-10-18/native-nature/retained-pre-review-8x.json), rather than selecting the fastest run. The production WebGL renderer retains a view per tree/rock tile. Images and local vector geometry update explicitly, while unchanged views reuse shared textures. Contiguous static spans between immediate building/settler drawings share native GPU batches; moving objects change only the spans they cross. Cached static depth rows merge with the full dynamic depth keys and preserve stable ties. Culling drops obsolete batch ordering identities while retaining owned artwork; removal, world replacement and teardown release owned views, including detached ones. Buildings, settlers and overlays remain immediate.
 
-The first per-owner prototype kept draw calls low but still rebuilt/uploaded the combined scene batch and incurred repeated child-array splices. It did not demonstrate a CPU gain. The adopted path sorts placement once and isolates static batch instructions. The extra draw calls are a measured tradeoff, not a claim that fewer draw calls alone make a frame faster.
+The first per-owner prototype kept draw calls low but still rebuilt/uploaded the combined scene batch and incurred repeated child-array splices. It did not demonstrate a CPU gain. The adopted path sorts placement once and isolates static batch instructions. Batch isolation increases draw calls. The final controls below show CPU savings but worse far-zoom GPU tails and fps, so the implementation remains experimental and is not recommended for a PR yet.
 
 ### Hardware measurements
 
@@ -29,25 +29,25 @@ All times below are milliseconds; the paired CPU columns show mean / p95.
 
 | Zoom | Main 1× fps | Main CPU | Retained 1× fps | Retained CPU | Retained GPU median / p95 |
 |---|---:|---:|---:|---:|---:|
-| 0.55 | 59 | 12.1 / 17.5 | 59.8 | 7.9 / 11.1 | 6.7 / 9.2 |
-| 0.7 | 59.6 | 11 / 15.3 | 59.6 | 8.3 / 13.1 | 6.3 / 9.1 |
-| 0.85 | 58.6 | 11.8 / 15.7 | 60 | 8.8 / 11.8 | 6.2 / 8.7 |
-| 1 | 59.3 | 9.9 / 13.6 | 60 | 8.3 / 10.5 | 5.4 / 7.3 |
-| 1.3 | 59.8 | 7.7 / 11.4 | 60 | 6.9 / 9.5 | 4.8 / 6.4 |
-| 1.7 | 59.6 | 6.9 / 13.6 | 60 | 5.7 / 7.2 | 4.4 / 6 |
-| 2.2 | 60 | 6 / 11.5 | 59.7 | 5.3 / 7.1 | 4.2 / 5.9 |
+| 0.55 | 59 | 12.1 / 17.5 | 56.5 | 9.9 / 12.8 | 7.2 / 9.9 |
+| 0.7 | 59.6 | 11 / 15.3 | 58 | 9.2 / 12.7 | 6.8 / 9.4 |
+| 0.85 | 58.6 | 11.8 / 15.7 | 54.5 | 11 / 17.9 | 6.6 / 10 |
+| 1 | 59.3 | 9.9 / 13.6 | 59.3 | 9.1 / 12.8 | 5.8 / 8.2 |
+| 1.3 | 59.8 | 7.7 / 11.4 | 60 | 7.5 / 10.4 | 5 / 6.8 |
+| 1.7 | 59.6 | 6.9 / 13.6 | 58.9 | 7.2 / 11 | 4.5 / 6.4 |
+| 2.2 | 60 | 6 / 11.5 | 60 | 5.8 / 7.3 | 4.1 / 5.5 |
 
 | Zoom | Main 8× CPU p95 | Retained 8× fps | Retained CPU mean / p95 | Retained GPU median / p95 |
 |---|---:|---:|---:|---:|
-| 0.55 | 19.2 | 55.9 | 12.4 / 16 | 7.3 / 11 |
-| 0.7 | 20.5 | 57.1 | 11.8 / 16 | 6.9 / 9.8 |
-| 0.85 | 20.6 | 56.5 | 12.2 / 16.8 | 6.8 / 9.6 |
-| 1 | 20.2 | 59.5 | 10.6 / 14.5 | 5.9 / 8.7 |
-| 1.3 | 12.8 | 57.1 | 10.4 / 16.8 | 5.2 / 9.2 |
-| 1.7 | 14.9 | 60 | 7.9 / 11 | 4.8 / 7.6 |
-| 2.2 | 13.8 | 59.8 | 6.8 / 11.6 | 4.6 / 8.1 |
+| 0.55 | 19.2 | 51.2 | 13.3 / 20.6 | 7.5 / 11.2 |
+| 0.7 | 20.5 | 53.7 | 12.6 / 18.4 | 7 / 11.1 |
+| 0.85 | 20.6 | 56 | 12.3 / 16.6 | 6.8 / 10 |
+| 1 | 20.2 | 56.5 | 12.1 / 17.9 | 6 / 9.9 |
+| 1.3 | 12.8 | 58.9 | 10.2 / 14.2 | 5.4 / 8.5 |
+| 1.7 | 14.9 | 59.8 | 8.4 / 11.2 | 4.8 / 7.5 |
+| 2.2 | 13.8 | 60 | 7.3 / 10.3 | 4.6 / 7.2 |
 
-**The all-zoom target is not met.** In this 1× run CPU p95 still exceeds 10 ms at zooms 0.55–1.0, although GPU p95 stays below 10 ms. GPU medians at zooms 0.55–0.85 still exceed #40's 6 ms criterion. At 8×, CPU p95 exceeds 15 ms at zooms 0.55, 0.7, 0.85 and 1.3; GPU p95 reaches 11 ms at 0.55. The isolated 1.3/8× tail was worse than its baseline; the adjacent repeat below did not reproduce that apparent regression. These results establish useful far/default drawing savings, not uniform gains at every zoom, a regression-free 8× result or closure of #35/#40/#47. Autosave and territory-change hitches were not remeasured by this work.
+**The all-zoom target is not met.** Final 1× fps ranges from 54.5 to 60, and CPU p95 exceeds 10 ms at six zooms (all except 2.2), peaking at 17.9 ms. Reported GPU p95 is 5.5–10.0 ms, but GPU medians at zooms 0.55–0.85 still exceed #40's 6 ms criterion. At 8×, CPU p95 exceeds 15 ms at zooms 0.55–1.0 and peaks at 20.6 ms; GPU p95 reaches 11.2 ms at 0.55. The final 1.3/8× sample meets the CPU ceiling, as did its adjacent control repeat below. These results establish useful far/default drawing savings, not uniform gains at every zoom, stable 60 fps or closure of #35/#40/#47. Autosave and territory-change hitches were not remeasured by this work.
 
 ### Adjacent A/B/A controls
 
@@ -55,18 +55,25 @@ Main's unchanged built assets were preserved outside the checkout; all implement
 
 | Zoom | Main A1 draw / CPU p95 | Retained B draw / CPU p95 | Main A2 draw / CPU p95 | Main → retained draw calls | Main → retained vertex KB/frame |
 |---|---:|---:|---:|---:|---:|
-| 0.55 | 10.7 / 17.1 | 9.2 / 12.9 | 13.0 / 17.9 | 15.7 → 46.5 | 520 → 367 |
-| 1.0 | 8.3 / 12.8 | 7.4 / 11.6 | 9.4 / 12.0 | 17.9 → 46.0 | 375 → 291 |
+| 0.55 | 12.0 / 17.7 | 11.1 / 17.0 | 14.2 / 22.4 | 15.7 → 46.4 | 520 → 399 |
+| 1.0 | 9.3 / 13.6 | 8.4 / 12.5 | 9.8 / 14.2 | 17.9 → 46.0 | 375 → 293 |
 
-Drawing falls about 22% / 16% against the averages of adjacent controls and is below both controls at both zooms. The full 1× run records CPU mean falling from 12.1 to 7.9 ms at far zoom, but the adjacent comparison is the better estimate of the gain under this laptop's shared power budget. The visible sprite counts match. Graphics-build counts rise because immediate work is split into smaller runs; unchanged paused nature emits no image commands or geometry updates. Its independent batches also survive camera transforms without uploading all static sprite vertices, verified by a real GPU buffer-update fixture.
+| Zoom | Main A1 fps / GPU p95 | Retained B fps / GPU p95 | Main A2 fps / GPU p95 |
+|---|---:|---:|---:|
+| 0.55 | 58.9 / 10.3 | **50.5 / 11.3** | 53.1 / 10.2 |
+| 1.0 | 59.9 / 8.0 | 59.0 / 8.5 | 59.7 / 8.2 |
 
-A targeted [8× zoom-1.3 A/B/A repeat](benchmarks/2026-10-18/native-nature/controls-8x-1.3.json) checked that isolated worse tail rather than treating it as a regression. CPU p95 was 11.8 / **11.0** / 12.8 ms (main / retained / main), with drawing 7.4 / **7.0** / 7.6 ms and 60 fps in all three windows. The worse 16.8 ms sample remains in the full table; the controlled repeat met the 15 ms ceiling and does not establish a near-zoom regression.
+These are matched controls on the final `8ce4aa6` runtime. Drawing falls about 15% / 12% against the averages of adjacent controls and is below both controls at both zooms. The far-zoom reduction against their average is about 2.0 ms, smaller than the 2.2 ms spread between controls, so #44's stronger requirement for a reproducible gain beyond control variation remains unproven. However, **neither zoom shows an fps improvement**, and far-zoom GPU p95 worsens despite lower CPU drawing time. The nearly threefold draw-call increase is not justified as a route to stable 60 fps by these whole-frame results. The CPU reduction alone is not enough to recommend shipping this branch. Earlier [pre-review controls](benchmarks/2026-10-18/native-nature/controls-pre-review.json) are preserved; they measured drawing gains of about 22% / 16%, illustrating the laptop's substantial drift rather than overriding the final result.
+
+The final full 1× run records CPU mean falling from 12.1 to 9.9 ms at far zoom, but the adjacent comparison is the better estimate of the gain under this laptop's shared power budget. Nature artwork remains present; full sprite/upload counts are retained in the raw controls. Graphics-build counts rise because immediate work is split into smaller runs; unchanged paused nature emits no image commands or geometry updates. Its independent batches also survive camera transforms without uploading all static sprite vertices, verified by a real GPU buffer-update fixture. Geometry reuse is functional, while performance acceptance remains open.
+
+A targeted [8× zoom-1.3 A/B/A repeat](benchmarks/2026-10-18/native-nature/controls-8x-1.3.json) checked that isolated worse tail rather than treating it as a regression. CPU p95 was 11.8 / **11.0** / 12.8 ms (main / retained / main), with drawing 7.4 / **7.0** / 7.6 ms and 60 fps in all three windows. The earlier worse 16.8 ms sample remains in the pre-review results; the final full pass measured 14.2 ms. The controlled repeat met the 15 ms ceiling and does not establish a near-zoom regression.
 
 ### Visual and regression evidence
 
 36 before/after actual-game captures cover zooms 0.55, 1.0 and 2.2; day/night; Normal, Visual clarity and Reduced Motion; and both quality 1/0.75. They use the same grown colony, fixed cosmetic clock and cosmetic RNG, and hardware WebGL. [Comparison summaries and hashes](benchmarks/2026-10-18/native-nature/visual-comparison.json) record a maximum channel difference of 6/255 and a worst per-image mean difference below 0.00047/255. The differences are sparse raster rounding; the inspected contact sheet shows no ordering, footprint or anchor shifts. Raw PNGs and the contact sheet remain in `output/native-nature/`.
 
-Real-subsystem tests cover static/dynamic depth keys and stable ties, growth, planting/felling, sway, pause, Reduced Motion, clarity, source replacement, far-zoom thresholds and world replacement. Hardware-browser fixtures verify retained Graphics batches, bounded buffer updates across camera changes, culling/reuse, nested batch cleanup and visible graphics failure recovery. Existing hardware tests cover partial terrain/border uploads, tiled textures, shadows and bounded art caches across all zooms. `npm test`, `npm run format:check` and all 24 affected hardware-browser tests pass. The integration branch receives the final Standards/Spec review before delivery.
+Real-subsystem tests cover static/dynamic depth keys and stable ties, growth, planting/felling, sway, pause, Reduced Motion, clarity, source replacement, far-zoom thresholds and world replacement. Hardware-browser fixtures verify retained Graphics batches, bounded buffer updates across camera changes, culling/reuse, nested batch cleanup and visible graphics failure recovery. Existing hardware tests cover partial terrain/border uploads, tiled textures, shadows and bounded art caches across all zooms. `npm test`, `npm run format:check` and all 24 affected hardware-browser tests pass. The final `8ce4aa6` functional review reports Standards: 0 documented breaches and 0 remaining smell findings; functional Spec: 0 findings. The shared-selector maintenance concern was fixed and revalidated; the final full routine suite passes again. Performance acceptance has two open criteria: #42's increased draw calls are not justified by the whole-frame fps/GPU results, and #44's far-zoom drawing gain beyond control variation remains unproven. Neither ticket is closed and no PR is opened.
 
 ### Remaining drawing cost
 

@@ -1,0 +1,41 @@
+{
+  "baselineCommit": "c0ebf91d2aa51476b455ae627416017bae3719e5",
+  "integrationBaseCommit": "463a9004ce1bdbf5dc79457c1eec9900e7cafc2c",
+  "branch": "codex/native-nature-integration",
+  "files": {
+    "src/rendering/native-object.ts": "33b10b655c29eb2cd8122fb96f645c1fde7b8047e7f626dabab0d7505aff6557",
+    "src/rendering/pixi-renderer.ts": "4449ea88c3768c627788f605f71c7618def857d4dc66addc884d42e54179576b",
+    "src/rendering/renderer.ts": "942a1fb84ea9e2947bb60d4adfb20b0a4d43d8acabef61930814adf64844bd8c",
+    "src/rendering/scene.ts": "f9f60440c088b4b68ae9f744e2a8e7b4f3e0915c4d65d95ef6656c18e776cacc",
+    "game.test.js": "8be855d01c78d5137e70c8c1aa9764c9aa75ce3a99b71eddce2a7e997ec7b56c",
+    "game.min.js": "233602ecc0d61c0df832344170b97e5bbde2d79ffe7d03a8775d37e6d8188688"
+  },
+  "runtimeCommit": "8ce4aa64aa808db6038f83b7e01b588110a98c7c",
+  "windowMs": 10000,
+  "warmupMs": 1000,
+  "validation": {
+    "routine": "output/validation/2026-10-18T12-21-58-451Z-rekYMI",
+    "hardwareBrowserTests": 24,
+    "postReviewNativeTests": 4,
+    "visualComparisons": 36,
+    "formatCheck": "passed",
+    "hardwareBrowserScope": "24 affected fixtures on retained implementation; four native fixtures repeated after the shared-selector refactor."
+  },
+  "review": {
+    "fixedPoint": "c0ebf91d2aa51476b455ae627416017bae3719e5",
+    "reviewedCommit": "8ce4aa64aa808db6038f83b7e01b588110a98c7c",
+    "standards": {
+      "documentedBreaches": 0,
+      "remainingSmells": 0
+    },
+    "spec": {
+      "functionalFindings": 0,
+      "openPerformanceAcceptanceCriteria": [
+        "#42: increased draw calls not justified by whole-frame fps/GPU results",
+        "#44: far-zoom gain beyond control variation remains unproven"
+      ]
+    },
+    "resolved": "Shared artwork selection now drives both invalidation and native painting."
+  },
+  "performanceAcceptance": "Unmet. Final controls reduce CPU drawing work but do not improve fps; far-zoom GPU p95 is worse with approximately three times as many draw calls. Hold PR."
+}
