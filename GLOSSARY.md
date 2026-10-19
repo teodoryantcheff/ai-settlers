@@ -16,6 +16,18 @@ _Avoid_: Goods in transit, before collection; adding reservations to stored stoc
 Stored stock remaining after reservations are subtracted.
 _Avoid_: Stored stock, when describing goods not already promised for collection.
 
+**Reclaimable stock**:
+Reserved stock held for warehouse transfers that no carrier has collected yet. Construction and explicit spending may cancel those transfers to use it; producer fetches never do.
+_Avoid_: Available stock; reserved stock in general, which also includes construction and ingredient fetches.
+
+**Spendable stock**:
+Available stock plus reclaimable stock: what construction and explicit spending can draw on.
+_Avoid_: Available stock, when transfer holdings are included.
+
+**Treasury**:
+Banked gold: stored gold plus gold carried between storehouses. Gold delivered from producers, contract rewards and refunds increase it; spending reduces it. Gold still held at a producer is not banked.
+_Avoid_: Stored gold, when gold carried between storehouses is included; delivered gold, which counts only producer deliveries over the colony's lifetime.
+
 **Goods in transit**:
 Goods physically carried between locations after collection and before delivery.
 _Avoid_: Reserved stock; all assigned deliveries, including those not yet collected.

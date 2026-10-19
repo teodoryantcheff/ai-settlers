@@ -1,5 +1,6 @@
 import type { ObservationSubsystem } from '../simulation/observations.ts';
 import type { EconomySubsystem } from '../simulation/economy.ts';
+import type { StockLedgerSubsystem } from '../simulation/stock-ledger.ts';
 import type { SimulationStateSubsystem } from '../simulation/state.ts';
 import type { EventsSubsystem } from '../core/events.ts';
 import type { Building, BuildingType, Good, Inventory } from '../types.ts';
@@ -81,7 +82,7 @@ export function createProgression(
     const materials = Object.entries(cost).map(([name, required]) => {
       const good = name as Good;
       const accounting = game.resourceAccounting(good);
-      const spendable = game.availGood(good);
+      const spendable = game.spendableStock(good);
       return {
         good,
         required,
@@ -102,23 +103,7 @@ export function createProgression(
     purpose: 'contractSpent' | 'upgradeSpent' = 'contractSpent',
   ) {
     if (!game.requestStock(cost)) return false;
-    for (const good in cost) {
-      let remaining = cost[good as Good] || 0;
-      for (const store of game.storages()) {
-        const take = Math.min(
-          remaining,
-          Math.max(0, (store.stock[good as Good] || 0) - (store.reservedStock[good as Good] || 0)),
-        );
-        store.stock[good as Good] = (store.stock[good as Good] || 0) - take;
-        remaining -= take;
-        game.recordEconomicFlow(purpose, good as Good, take);
-        if (!remaining) break;
-      }
-    }
-    if (cost.gold) {
-      game.state.gold = Math.max(0, game.state.gold - cost.gold);
-      game.state.spentGold += cost.gold;
-    }
+    game.withdrawStock(cost, purpose);
     return true;
   }
   function claimContract(index: number) {
@@ -130,12 +115,8 @@ export function createProgression(
     }
     const store = game.anyStorage();
     if (!store) return;
-    for (const g in c.reward) {
-      const amount = c.reward[g as Good] || 0;
-      store.stock[g as Good] = (store.stock[g as Good] || 0) + amount;
-      if (g === 'gold') game.state.gold += amount;
-      game.recordEconomicFlow('contractReward', g as Good, amount);
-    }
+    for (const g in c.reward)
+      game.storeGoods(store, g as Good, c.reward[g as Good] || 0, 'external', 'contractReward');
     game.state.contracts.push(index);
     game.emitGameEvent('contractFulfilled', { index, name: c.name, x: store.x, y: store.y });
   }
@@ -238,7 +219,8 @@ export interface ProgressionInternals {
 
 export interface ProgressionDependencies
   extends
-    Pick<EconomySubsystem, 'anyStorage' | 'requestStock' | 'storages' | 'totalGood' | 'availGood'>,
+    Pick<EconomySubsystem, 'anyStorage' | 'requestStock'>,
+    Pick<StockLedgerSubsystem, 'spendableStock' | 'storeGoods' | 'withdrawStock'>,
     Pick<SimulationStateSubsystem, 'buildings' | 'state'>,
-    Pick<ObservationSubsystem, 'recordEconomicFlow' | 'resourceAccounting'>,
+    Pick<ObservationSubsystem, 'resourceAccounting'>,
     Pick<EventsSubsystem, 'emitGameEvent'> {}

@@ -92,7 +92,7 @@ test('remote stored goods cannot make an isolated construction site affordable',
   remote.done = true;
   remote.stock = { planks: 99 };
   g.buildings.push(remote);
-  assert.equal(g.availGood('planks'), 101);
+  assert.equal(g.spendableStock('planks'), 101);
   const evidence = g.buildingAffordability('farm', { x: 51, y: 48 });
   assert.equal(evidence.affordable, false);
   assert.equal(evidence.materials.find((row) => row.good === 'planks').available, 2);

@@ -9,6 +9,7 @@ import type { SimulationStateSubsystem } from './state.ts';
 import type { WorldSubsystem } from '../core/world.ts';
 import type { AdvisorSubsystem } from '../gameplay/advisor.ts';
 import type { EconomySubsystem } from './economy.ts';
+import type { StockLedgerSubsystem } from './stock-ledger.ts';
 import type { RoadsSubsystem } from './roads.ts';
 import type { NavigationSubsystem } from './navigation.ts';
 import type { MapSubsystem } from './map.ts';
@@ -32,7 +33,7 @@ export function createAutoplay(
   }
   function afford(bt: BuildingType) {
     const c = game.BSPEC[bt].cost || {};
-    for (const g in c) if (game.availGood(g as Good) < (c[g as Good] || 0)) return false;
+    for (const g in c) if (game.spendableStock(g as Good) < (c[g as Good] || 0)) return false;
     return true;
   }
   function randTile(): [number, number] {
@@ -614,7 +615,6 @@ export interface AutoplayDependencies
     Pick<
       EconomySubsystem,
       | 'anyStorage'
-      | 'availGood'
       | 'buildingAt'
       | 'buildingStatus'
       | 'canPlace'
@@ -623,6 +623,7 @@ export interface AutoplayDependencies
       | 'nearestStoragePos'
       | 'placeBuilding'
     >,
+    Pick<StockLedgerSubsystem, 'spendableStock'>,
     Pick<RoadsSubsystem, 'commitRoad'>,
     Pick<NavigationSubsystem, 'findPath' | 'connectedLand'>,
     Pick<MapSubsystem, 'owned'> {}

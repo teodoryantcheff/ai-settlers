@@ -16,6 +16,7 @@ import type { AutoplaySubsystem } from './simulation/autoplay.ts';
 import type { ObservationSubsystem } from './simulation/observations.ts';
 import type { TransportSubsystem } from './simulation/transport.ts';
 import type { EconomySubsystem } from './simulation/economy.ts';
+import type { StockLedgerSubsystem } from './simulation/stock-ledger.ts';
 import type { MapSubsystem } from './simulation/map.ts';
 import type { NavigationSubsystem } from './simulation/navigation.ts';
 import type { SimulationStateSubsystem } from './simulation/state.ts';
@@ -53,6 +54,7 @@ export type GameRuntime = ReferenceViewSubsystem &
   SimulationStateSubsystem &
   PersistenceSubsystem &
   ObservationSubsystem &
+  StockLedgerSubsystem &
   EconomySubsystem &
   TransportSubsystem &
   AttentionSubsystem &

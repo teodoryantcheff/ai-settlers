@@ -3,6 +3,7 @@ import { ingredientAlternatives, ingredientShortages } from './production-rules.
 import type { SimulationStateSubsystem } from '../simulation/state.ts';
 import type { WorldSubsystem } from '../core/world.ts';
 import type { EconomySubsystem } from '../simulation/economy.ts';
+import type { StockLedgerSubsystem } from '../simulation/stock-ledger.ts';
 import type { ProgressionSubsystem } from './progression.ts';
 import type { NavigationSubsystem } from '../simulation/navigation.ts';
 import type { MapSubsystem } from '../simulation/map.ts';
@@ -67,8 +68,8 @@ export function createAdvisor(game: AdvisorDependencies): AdvisorSubsystem {
     const foundations = enoughTimber && foodCount && have('quarry');
     const needMetal =
       foundations &&
-      (game.totalGood('tools') < Math.max(10, game.stockTargetTotal('tools')) ||
-        game.totalGood('weapons') < Math.max(3, game.stockTargetTotal('weapons')));
+      (game.storedStock('tools') < Math.max(10, game.stockTargetTotal('tools')) ||
+        game.storedStock('weapons') < Math.max(3, game.stockTargetTotal('weapons')));
     let breadTarget = coast
       ? foundations || have('bakery') || have('windmill')
         ? 1
@@ -282,7 +283,7 @@ export function createAdvisor(game: AdvisorDependencies): AdvisorSubsystem {
     }
     const alternatives = ingredientAlternatives(game.BSPEC[bottleneck.type], missing);
     let ready = alternatives.reduce(function (sum, good) {
-      return sum + game.totalGood(good);
+      return sum + game.storedStock(good);
     }, 0);
     for (const source of game.buildings) {
       const output = game.BSPEC[source.type].out;
@@ -317,7 +318,8 @@ export interface AdvisorDependencies
   extends
     Pick<SimulationStateSubsystem, 'BSPEC' | 'buildings' | 'units'>,
     Pick<WorldSubsystem, 'DX' | 'DY' | 'GOAL' | 'W' | 'inB' | 'passI' | 'tiles'>,
-    Pick<EconomySubsystem, 'canPlace' | 'nearestStoragePos' | 'stockTargetTotal' | 'totalGood'>,
+    Pick<EconomySubsystem, 'canPlace' | 'nearestStoragePos' | 'stockTargetTotal'>,
+    Pick<StockLedgerSubsystem, 'storedStock'>,
     Pick<ProgressionSubsystem, 'currentLesson' | 'pendingOutpost'>,
     Pick<MapSubsystem, 'owned'>,
     Pick<NavigationSubsystem, 'connectedLand'> {}

@@ -431,7 +431,7 @@ test('new construction reclaims pending warehouse transfers before rejecting sto
   target.targets.planks = 8;
   for (let i = 0; i < 4; i++) e.ensureJobs();
   assert.equal(source.reservedStock.planks, 8);
-  assert.equal(e.totalGood('planks'), 8);
+  assert.equal(e.storedStock('planks'), 8);
   assert.equal(e.canPlace('lumberjack', 5, 9)[0], true);
   assert.equal(e.placeBuilding('lumberjack', 5, 9), true);
   const site = e.buildingAt(5, 9);
@@ -467,7 +467,7 @@ test('higher-priority stock requests preserve fetch reservations and collected t
   );
   assert.equal(source.reservedStock.gold, 0);
   assert.equal(source.reservedStock.logs, 3);
-  assert.equal(e.availGood('logs'), 2);
+  assert.equal(e.spendableStock('logs'), 2);
   assert.equal(e.requestStock({ logs: 3 }), false);
   checkReservations(e);
 });

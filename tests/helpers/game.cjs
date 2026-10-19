@@ -29,6 +29,7 @@ function createGame(options = {}) {
   if (names.has('economy'))
     for (const name of [
       'observations',
+      'ledger',
       'transport',
       'attention',
       'progression',
