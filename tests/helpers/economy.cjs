@@ -77,7 +77,7 @@ function autoplay(seed) {
 function snapshot(e) {
   const mix = {};
   for (const b of e.buildings) mix[b.type] = (mix[b.type] || 0) + 1;
-  const stocks = Object.fromEntries(Object.keys(e.GOODS).map((g) => [g, e.totalGood(g)]));
+  const stocks = Object.fromEntries(Object.keys(e.GOODS).map((g) => [g, e.storedStock(g)]));
   const stalled = e.buildings
     .filter((b) => !b.done)
     .map((b) => ({ type: b.type, got: b.got, needs: b.needs }));
@@ -177,7 +177,7 @@ function checkEconomy(e) {
     if (tile.deposit) assert.ok(tile.deposit.amt >= 0, 'deposits cannot go negative');
   const carriedBankedGold = e.units.filter((u) => u.carry === 'gold' && u.carryTransfer).length;
   assert.equal(
-    e.totalGood('gold') + carriedBankedGold,
+    e.storedStock('gold') + carriedBankedGold,
     e.state.gold,
     'treasury includes previously banked gold moving between warehouses',
   );

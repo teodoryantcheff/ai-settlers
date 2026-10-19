@@ -8,6 +8,7 @@ import {
 } from '../gameplay/colony-rules.ts';
 import { deliveryStage } from './delivery-stage.ts';
 import type { ObservationSubsystem } from './observations.ts';
+import type { StockLedgerSubsystem } from './stock-ledger.ts';
 import {
   edibleGoods,
   eligibleIngredients,
@@ -161,8 +162,7 @@ export function createEconomy(
       if (options.available) {
         const good = options.available;
         const free =
-          ((store.stock[good] ?? 0) | 0) -
-          ((store.reservedStock[good] ?? 0) | 0) -
+          game.availableAt(store, good) -
           (options.retainTarget ? ((store.targets || {})[good] ?? 0) | 0 : 0);
         if (free <= 0) continue;
       }
@@ -180,12 +180,6 @@ export function createEconomy(
   function nearestStoragePos(x: number, y: number): Building | null {
     return nearestStorage({ x, y }, { connected: true });
   }
-  function totalGood(g: Good) {
-    let s = 0;
-    const ss = storages();
-    for (let i = 0; i < ss.length; i++) s += (ss[i].stock[g] ?? 0) | 0;
-    return s;
-  }
   function liveMines() {
     let n = 0;
     for (let i = 0; i < game.buildings.length; i++) {
@@ -201,11 +195,11 @@ export function createEconomy(
     return target;
   }
   function foodSaturated(good: Good) {
-    return totalGood(good) >= Math.max(6 + 2 * liveMines(), stockTargetTotal(good));
+    return game.storedStock(good) >= Math.max(6 + 2 * liveMines(), stockTargetTotal(good));
   }
   function intermediateSaturated(good: Good) {
     const reserve = intermediateReserves[good] || 0;
-    return reserve > 0 && totalGood(good) >= Math.max(reserve, stockTargetTotal(good));
+    return reserve > 0 && game.storedStock(good) >= Math.max(reserve, stockTargetTotal(good));
   }
   function hasLocalWater(b: Pick<Building, 'x' | 'y'>) {
     return hasWellCoverage(game, b, 'active');
@@ -363,37 +357,6 @@ export function createEconomy(
       connected: !!ref,
     });
   }
-  function availableGood(
-    g: Good,
-    ref: Pick<Building, 'x' | 'y'> | undefined,
-    includeTransfers: boolean,
-  ) {
-    let s = 0;
-    const ss = storages();
-    for (let i = 0; i < ss.length; i++) {
-      const store = ss[i];
-      if (ref && !game.connectedLand(ref.x, ref.y, store.x, store.y)) continue;
-      let free = ((store.stock[g] ?? 0) | 0) - ((store.reservedStock[g] ?? 0) | 0);
-      if (includeTransfers)
-        for (let j = 0; j < game.jobs.length; j++) {
-          const job = game.jobs[j];
-          if (
-            job.kind === 'transfer' &&
-            job.sourceId === store.id &&
-            job.good === g &&
-            !collectedJob(job)
-          )
-            free++;
-        }
-      s += Math.max(0, Math.min((store.stock[g] ?? 0) | 0, free));
-    }
-    return s;
-  }
-  function availGood(g: Good, ref?: Pick<Building, 'x' | 'y'>) {
-    // Uncollected warehouse transfers are optional positioning, so their stock is
-    // still available to construction and explicit spending. Fetches stay reserved.
-    return availableGood(g, ref, true);
-  }
   function buildingAffordability(
     type: BuildingType,
     ref?: Pick<Building, 'x' | 'y'>,
@@ -401,8 +364,8 @@ export function createEconomy(
     const cost = game.BSPEC[type].cost || {};
     const materials = Object.entries(cost).map(([name, required]) => {
       const good = name as Good;
-      const free = availableGood(good, ref, false);
-      const available = availableGood(good, ref, true);
+      const free = game.availableStock(good, ref);
+      const available = game.spendableStock(good, ref);
       const optionalTransfers = Math.max(0, available - free);
       return {
         good,
@@ -424,8 +387,8 @@ export function createEconomy(
     // not disturb existing logistics merely because one material was available.
     for (const g in cost) {
       const required = cost[g as Good] ?? 0;
-      if (availGood(g as Good, ref) < required) return false;
-      shortage[g as Good] = Math.max(0, required - availableGood(g as Good, ref, false));
+      if (game.spendableStock(g as Good, ref) < required) return false;
+      shortage[g as Good] = Math.max(0, required - game.availableStock(g as Good, ref));
     }
     cancelJobs(function (job) {
       if (job.kind !== 'transfer' || !job.good || !shortage[job.good] || collectedJob(job))
@@ -457,7 +420,7 @@ export function createEconomy(
       }
     if ((j.kind === 'fetch' || j.kind === 'transfer') && j.good && (!assigned || !assigned.carry)) {
       const s = byId(j.sourceId);
-      if (s) s.reservedStock[j.good] = Math.max(0, ((s.reservedStock[j.good] ?? 0) | 0) - 1);
+      if (s) game.releaseReservation(s, j.good);
     }
     if (j.kind === 'soldier') {
       game.soldierPool++;
@@ -633,7 +596,7 @@ export function createEconomy(
       needs = copyObj(sp.cost || {});
     for (const g in needs) {
       const good = g as Good,
-        available = availGood(good, { x, y }),
+        available = game.spendableStock(good, { x, y }),
         required = needs[good] ?? 0;
       if (available < required) {
         const r: PlacementRefusal = { code: 'stock', good, required, available };
@@ -756,27 +719,21 @@ export function createEconomy(
     if (equipmentStore)
       for (const name in quote.equipment) {
         const good = name as Good;
-        const amount = quote.equipment[good] ?? 0;
-        equipmentStore.stock[good] = ((equipmentStore.stock[good] ?? 0) | 0) + amount;
-        game.recordEconomicFlow('salvage', good, amount);
+        game.storeGoods(equipmentStore, good, quote.equipment[good] ?? 0, 'external', 'salvage');
       }
     const sp = game.BSPEC[b.type];
     const receiver = quote.receiver ? byId(quote.receiver.id) : null;
     if (receiver) {
       for (const name in quote.refund) {
         const good = name as Good;
-        const amount = quote.refund[good] ?? 0;
-        receiver.stock[good] = ((receiver.stock[good] ?? 0) | 0) + amount;
-        game.recordEconomicFlow('refund', good, amount);
+        game.storeGoods(receiver, good, quote.refund[good] ?? 0, 'external', 'refund');
       }
       for (const name in quote.salvage) {
         const good = name as Good;
         const amount = quote.salvage[good] ?? 0;
-        receiver.stock[good] = ((receiver.stock[good] ?? 0) | 0) + amount;
-        game.recordEconomicFlow('salvage', good, amount);
+        // A storehouse's goods were already stored stock; a producer's are delivered.
+        game.storeGoods(receiver, good, amount, sp.store ? 'storage' : 'producer', 'salvage');
         if (good === 'gold' && !sp.store) {
-          game.state.gold += amount;
-          game.state.goldDelivered = (game.state.goldDelivered || 0) + amount;
           gameEvent('goodsDelivered', {
             building: receiver,
             good,
@@ -814,18 +771,19 @@ export function createEconomy(
     else if (sp.out && intermediateSaturated(sp.out)) reason = 'demand';
     else if (
       sp.out === 'beer' &&
-      totalGood('beer') >= Math.max(productionReserves.beer, stockTargetTotal('beer'))
+      game.storedStock('beer') >= Math.max(productionReserves.beer, stockTargetTotal('beer'))
     )
       reason = 'demand';
     else if (
       (b.type === 'toolsmith' || b.type === 'workshop') &&
-      (totalGood('tools') >= Math.max(productionReserves.tools, stockTargetTotal('tools')) ||
-        (b.type === 'workshop' && totalGood('planks') < productionReserves.planks))
+      (game.storedStock('tools') >= Math.max(productionReserves.tools, stockTargetTotal('tools')) ||
+        (b.type === 'workshop' && game.storedStock('planks') < productionReserves.planks))
     )
       reason = 'reserve';
     else if (
       b.type === 'armory' &&
-      totalGood('weapons') >= Math.max(productionReserves.weapons, stockTargetTotal('weapons'))
+      game.storedStock('weapons') >=
+        Math.max(productionReserves.weapons, stockTargetTotal('weapons'))
     )
       reason = 'reserve';
     else if (sp.water && !hasLocalWater(b)) reason = 'water';
@@ -1146,8 +1104,7 @@ export function createEconomy(
         sourceKey = pending.sourceId + '/' + pending.good;
       if (exportBudget[sourceKey] === undefined)
         exportBudget[sourceKey] = source
-          ? ((source.stock[pending.good] ?? 0) | 0) -
-            ((source.reservedStock[pending.good] ?? 0) | 0) -
+          ? game.availableAt(source, pending.good) -
             (((source.targets || {})[pending.good] ?? 0) | 0)
           : 0;
       // Existing transfer reservations are eligible for reconsideration. Fetch
@@ -1201,7 +1158,7 @@ export function createEconomy(
             euclidean: true,
           });
           if (!source) break;
-          source.reservedStock[g as Good] = ((source.reservedStock[g as Good] ?? 0) | 0) + 1;
+          game.reserveStock(source, g as Good);
           game.jobs.push({
             kind: 'transfer',
             good: g as Good,
@@ -1261,7 +1218,7 @@ export function createEconomy(
               if (requestStock(request, b)) s = pickStorageFor(g, b);
             }
             if (!s) break;
-            s.reservedStock[g] = ((s.reservedStock[g] ?? 0) | 0) + 1;
+            game.reserveStock(s, g);
             game.jobs.push({
               kind: 'fetch',
               good: g as Good,
@@ -1292,7 +1249,7 @@ export function createEconomy(
           for (let c3 = 0; c3 < toC; c3++) {
             const s3 = pickStorageFor(g, b);
             if (!s3) break;
-            s3.reservedStock[g] = ((s3.reservedStock[g] ?? 0) | 0) + 1;
+            game.reserveStock(s3, g);
             game.jobs.push({
               kind: 'fetch',
               good: g as Good,
@@ -1351,9 +1308,7 @@ export function createEconomy(
         const old = s;
         const nb = nearestStorage(old || { x: 0, y: 0 }, { available: j.good });
         if (!nb || j.kind === 'transfer') return null;
-        if (old && old !== nb)
-          old.reservedStock[j.good] = Math.max(0, ((old.reservedStock[j.good] ?? 0) | 0) - 1);
-        nb.reservedStock[j.good] = ((nb.reservedStock[j.good] ?? 0) | 0) + 1;
+        game.moveReservation(old, nb, j.good);
         j.sourceId = nb.id;
       }
       const s2 = byId(j.sourceId);
@@ -1554,11 +1509,7 @@ export function createEconomy(
       if (ji2 >= 0) game.jobs.splice(ji2, 1);
       if ((u.job.kind === 'fetch' || u.job.kind === 'transfer') && u.job.good && !u.carry) {
         const source = byId(u.job.sourceId);
-        if (source)
-          source.reservedStock[u.job.good] = Math.max(
-            0,
-            ((source.reservedStock[u.job.good] ?? 0) | 0) - 1,
-          );
+        if (source) game.releaseReservation(source, u.job.good);
       }
       u.job = null;
     }
@@ -1625,14 +1576,12 @@ export function createEconomy(
     if (!s || !s.done || !game.BSPEC[s.type].store || !game.connectedLand(u.x, u.y, s.x, s.y))
       s = nearestStoragePos(u.x, u.y);
     if (s) {
-      s.stock[g] = ((s.stock[g] ?? 0) | 0) + 1;
       const transfer = !!u.carryTransfer || u.job?.kind === 'transfer';
+      game.storeGoods(s, g, 1, transfer ? 'storage' : 'producer');
       recordDelivery(s, g, transfer);
       if (u.carryWarehouseTransfer) game.recordEconomicFlow('transferred', g, 1);
       recordOutputDelivery(u, g);
       if (g === 'gold' && !transfer) {
-        game.state.gold++;
-        game.state.goldDelivered = (game.state.goldDelivered || 0) + 1;
         gameEvent('goldBanked', { building: s });
         if (game.state.goldDelivered === 1) gameEvent('firstGold', { building: s });
       }
@@ -1654,14 +1603,10 @@ export function createEconomy(
             resetCarrier(u, 'assignment');
             return;
           }
-          const old = byId(j.sourceId);
-          if (old && old !== s)
-            old.reservedStock[j.good] = Math.max(0, ((old.reservedStock[j.good] ?? 0) | 0) - 1);
-          s.reservedStock[j.good] = ((s.reservedStock[j.good] ?? 0) | 0) + 1;
+          game.moveReservation(byId(j.sourceId), s, j.good);
           j.sourceId = s.id;
         }
-        s.stock[j.good] = (s.stock[j.good] ?? 0) - 1;
-        s.reservedStock[j.good] = Math.max(0, ((s.reservedStock[j.good] ?? 0) | 0) - 1);
+        game.collectReserved(s, j.good);
         u.carry = j.good;
         u.carryTransfer = true;
         u.carryWarehouseTransfer = j.kind === 'transfer';
@@ -1708,7 +1653,8 @@ export function createEconomy(
         if (u.dropIsSite && j && (j.kind === 'fetch' || j.kind === 'transfer')) {
           const site = byId(j.to);
           if (site) {
-            if (site.done) site.stock[good] = ((site.stock[good] ?? 0) | 0) + 1;
+            if (site.done && game.BSPEC[site.type].store) game.storeGoods(site, good, 1, 'storage');
+            else if (site.done) site.stock[good] = ((site.stock[good] ?? 0) | 0) + 1;
             else {
               site.got[good] = ((site.got[good] ?? 0) | 0) + 1;
               game.recordEconomicFlow('constructionSpent', good, 1);
@@ -1998,7 +1944,7 @@ export function createEconomy(
           lines.push({ t: 'Deposit exhausted! Build a replacement mine elsewhere', w: true });
           return { lines: lines, bad: true };
         }
-        if (b.type === 'workshop' && totalGood('planks') < productionReserves.planks)
+        if (b.type === 'workshop' && game.storedStock('planks') < productionReserves.planks)
           lines.push({
             t: 'Paused \u2014 keeping a planks reserve for construction sites',
             w: false,
@@ -2012,7 +1958,7 @@ export function createEconomy(
           });
         if (
           sp.out === 'beer' &&
-          totalGood('beer') >= Math.max(productionReserves.beer, stockTargetTotal('beer'))
+          game.storedStock('beer') >= Math.max(productionReserves.beer, stockTargetTotal('beer'))
         )
           lines.push({ t: 'Beer reserves are plentiful — production paused', w: false });
         if (sp.water && !hasLocalWater(b))
@@ -2029,18 +1975,10 @@ export function createEconomy(
           }
           const incoming =
             stages.queued + stages.assigned + stages.carrying + (stages.unknown || 0);
-          const available = alternatives.reduce(
-            (n, good) =>
-              n +
-              Math.max(
-                0,
-                storages().reduce(
-                  (n, store) => n + (store.stock[good] || 0) - (store.reservedStock[good] || 0),
-                  0,
-                ),
-              ),
-            0,
-          );
+          // Producer fetches draw on connected available stock; transfer holdings are reported apart.
+          const available = alternatives.reduce((n, good) => n + game.availableStock(good, b), 0),
+            reclaimable = alternatives.reduce((n, good) => n + game.reclaimableStock(good, b), 0),
+            held = reclaimable ? ' (' + reclaimable + ' more held for warehouse transfers)' : '';
           lines.push({
             t:
               (shortage.have === 0 && !incoming ? 'STARVED: no ' : 'Waiting for ') +
@@ -2056,8 +1994,10 @@ export function createEconomy(
                 : available > 0
                   ? ' — ' +
                     available +
-                    ' free in colony storage; delivery scheduling or route still required'
-                  : ' — no free colony supply'),
+                    ' free in connected storage' +
+                    held +
+                    '; delivery scheduling or route still required'
+                  : ' — no free connected supply' + held),
             w: !incoming,
           });
         }
@@ -2102,14 +2042,13 @@ export function createEconomy(
     byId,
     buildingAt,
     storages,
+    collectedJob,
     anyStorage,
     nearestStoragePos,
-    totalGood,
     stockTargetTotal,
     carrierCap,
     newBuilding,
     siteReady,
-    availGood,
     requestStock,
     canPlace,
     placementChecks,
@@ -2179,14 +2118,14 @@ export interface EconomySubsystem {
   byId: (id: number | null | undefined) => Building | null;
   buildingAt: (x: number, y: number) => Building | null;
   storages: () => Building[];
+  /** Whether a carrier has picked up this job's cargo. */
+  collectedJob: (job: Job) => boolean;
   anyStorage: () => Building | null;
   nearestStoragePos: (x: number, y: number) => Building | null;
-  totalGood: (g: Good) => number;
   stockTargetTotal: (g: Good) => number;
   carrierCap: () => number;
   newBuilding: (type: BuildingType, x: number, y: number) => Building;
   siteReady: (b: Building) => boolean;
-  availGood: (g: Good, ref?: Pick<Building, 'x' | 'y'>) => number;
   requestStock: (cost: Inventory, ref?: Pick<Building, 'x' | 'y'>) => boolean;
   hasLocalWater: (b: Pick<Building, 'x' | 'y'>) => boolean;
   buildingAffordability: (
@@ -2257,6 +2196,19 @@ export interface EconomyDependencies
     Pick<AutoplaySubsystem, 'autoTick'>,
     Pick<NavigationSubsystem, 'connectedLand' | 'findPath' | 'moveCost'>,
     Pick<ObservationSubsystem, 'recordEconomicFlow' | 'sampleEconomy' | 'recordCargoArrival'>,
+    Pick<
+      StockLedgerSubsystem,
+      | 'availableAt'
+      | 'availableStock'
+      | 'reclaimableStock'
+      | 'spendableStock'
+      | 'storedStock'
+      | 'reserveStock'
+      | 'releaseReservation'
+      | 'moveReservation'
+      | 'collectReserved'
+      | 'storeGoods'
+    >,
     Pick<EventsSubsystem, 'emitGameEvent'>,
     Pick<ProgressionSubsystem, 'gameTick'>,
     Pick<MapSubsystem, 'owned' | 'recomputeTerritory' | 'projectTerritory'> {}

@@ -169,7 +169,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     }
     document.querySelectorAll<HTMLElement>('#goods [data-good]').forEach((node) => {
       const good = node.dataset.good as Good;
-      const count = game.totalGood(good);
+      const count = game.storedStock(good);
       const popup = resourceHelp.get(good);
       const explanation =
         game.GOODS[good].name +

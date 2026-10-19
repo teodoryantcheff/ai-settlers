@@ -28,8 +28,8 @@ test('empty economy lookups stay nullable and caches follow a loaded world with 
   assert.deepEqual(game.storages(), []);
   assert.equal(game.anyStorage(), null);
   assert.equal(game.nearestStoragePos(48, 48), null);
-  assert.equal(game.totalGood('logs'), 0);
-  assert.equal(game.availGood('logs'), 0);
+  assert.equal(game.storedStock('logs'), 0);
+  assert.equal(game.spendableStock('logs'), 0);
 
   game.initializeColony();
   const original = game.anyStorage();

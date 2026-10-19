@@ -14,7 +14,7 @@ async function paint(page) {
         return ['logs', 'planks', 'tools'].every(
           (good) =>
             document.querySelector(`#goods [data-good="${good}"] b`)?.textContent ===
-            String(game.totalGood(good)),
+            String(game.storedStock(good)),
         );
       }),
     )

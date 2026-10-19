@@ -3,6 +3,7 @@ import type { Building, BuildingType, Good, ProductionBlockReason } from '../typ
 import type { SimulationStateSubsystem } from '../simulation/state.ts';
 import type { EventsSubsystem } from '../core/events.ts';
 import type { EconomySubsystem } from '../simulation/economy.ts';
+import type { StockLedgerSubsystem } from '../simulation/stock-ledger.ts';
 import type { TransportSubsystem } from '../simulation/transport.ts';
 import { ingredientAlternatives, ingredientShortages } from '../gameplay/production-rules.ts';
 import {
@@ -305,7 +306,20 @@ export function createAttention(game: AttentionDependencies): AttentionSubsystem
               (stage) => [stage, deliveries.filter((row) => row.stage === stage).length] as const,
             )
             .filter(([, count]) => count);
-          const available = alternatives.reduce((sum, good) => sum + game.availGood(good, b), 0);
+          // Producer fetches draw on available stock only; transfer holdings are reported apart.
+          const available = alternatives.reduce(
+              (sum, good) => sum + game.availableStock(good, b),
+              0,
+            ),
+            reclaimable = alternatives.reduce(
+              (sum, good) => sum + game.reclaimableStock(good, b),
+              0,
+            ),
+            held = reclaimable
+              ? ' ' +
+                reclaimable +
+                ' more reachable units are held for warehouse transfers, which producer fetches do not reclaim.'
+              : '';
           const label = alternatives.map((good) => game.GOODS[good].name).join(' or ');
           evidence.push(
             label +
@@ -336,13 +350,16 @@ export function createAttention(game: AttentionDependencies): AttentionSubsystem
             evidence.push(
               'No reachable available stored ' +
                 label +
-                '. This is missing accessible supply, not proof that no producer exists.',
+                '.' +
+                held +
+                ' This is missing accessible supply, not proof that no producer exists.',
             );
           } else {
             hasDelayed = true;
             evidence.push(
               available +
-                ' reachable available stored units; no delivery request is currently recorded. Scheduling/route cause is unavailable.',
+                ' reachable available stored units; no delivery request is currently recorded. Scheduling/route cause is unavailable.' +
+                held,
             );
           }
           for (const other of game.buildings) {
@@ -431,5 +448,6 @@ export interface AttentionDependencies
   extends
     Pick<SimulationStateSubsystem, 'state' | 'buildings' | 'BSPEC' | 'GOODS'>,
     Pick<EventsSubsystem, 'gameEvents'>,
-    Pick<EconomySubsystem, 'byId' | 'availGood' | 'hasLocalWater'>,
+    Pick<EconomySubsystem, 'byId' | 'hasLocalWater'>,
+    Pick<StockLedgerSubsystem, 'availableStock' | 'reclaimableStock'>,
     Pick<TransportSubsystem, 'currentTransport'> {}

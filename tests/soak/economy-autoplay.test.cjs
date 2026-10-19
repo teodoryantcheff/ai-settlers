@@ -21,11 +21,11 @@ function investmentChoices(e) {
   }
   e.anyStorage().targets = targets;
   for (let contract = 0; contract < e.contracts.length; contract++) {
-    if (Object.entries(e.contracts[contract].cost).every(([g, n]) => e.availGood(g) >= n))
+    if (Object.entries(e.contracts[contract].cost).every(([g, n]) => e.spendableStock(g) >= n))
       e.claimContract(contract);
   }
   for (const kind of ['haul', 'production'])
-    if (e.availGood('gold') >= 15 * ((e.state.upgrades[kind] || 0) + 1)) e.buyUpgrade(kind);
+    if (e.spendableStock('gold') >= 15 * ((e.state.upgrades[kind] || 0) + 1)) e.buyUpgrade(kind);
 }
 
 function registerEconomyTest(seed, invest = false) {

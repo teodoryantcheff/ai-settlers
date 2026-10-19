@@ -265,9 +265,9 @@ test('Colony explains and spends reclaimable optional warehouse promises exactly
     await page.evaluate(() => {
       const g = window.productionArtPreview.game;
       return {
-        planks: g.totalGood('planks'),
+        planks: g.storedStock('planks'),
         gold: g.state.gold,
-        tools: g.totalGood('tools'),
+        tools: g.storedStock('tools'),
         transfers: g.jobs.filter((j) => j.kind === 'transfer' && j.good === 'planks').length,
       };
     }),

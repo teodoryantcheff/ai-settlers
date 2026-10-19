@@ -234,3 +234,40 @@ test('local well support is not missing transported food, and no-op roads do not
   advance(game, 1);
   assert.ok(game.activityHistory().events.some((event) => event.kind === 'issue-resolved'));
 });
+test('inspector and attention report the same available stock and transfer holdings for a starved producer', () => {
+  const { game, hq, producer } = colony();
+  const warehouse = game.newBuilding('warehouse', 60, 48);
+  Object.assign(warehouse, { done: true, constructionProgress: 1 });
+  game.buildings.push(warehouse);
+  advance(game, 15);
+  assert.equal(game.activeAttention()[0].reason, 'inputs');
+  hq.stock.logs = 3;
+  for (let i = 0; i < 3; i++) {
+    game.jobs.push({
+      kind: 'transfer',
+      good: 'logs',
+      sourceId: hq.id,
+      to: warehouse.id,
+      status: 'pending',
+    });
+    game.reserveStock(hq, 'logs');
+  }
+  const evidence = () => game.activeAttention()[0].evidence.join(' ');
+  const inspector = () =>
+    game
+      .buildingStatus(producer)
+      .lines.map((line) => line.t)
+      .join(' ');
+  assert.match(
+    evidence(),
+    /No reachable available stored logs\. 3 more reachable units are held for warehouse transfers/i,
+  );
+  assert.match(inspector(), /no free connected supply \(3 more held for warehouse transfers\)/);
+
+  hq.stock.logs = 5;
+  assert.match(
+    evidence(),
+    /^.*2 reachable available stored units.*3 more reachable units are held/,
+  );
+  assert.match(inspector(), /2 free in connected storage \(3 more held for warehouse transfers\)/);
+});

@@ -12,6 +12,7 @@ import { createSimulationState, type SimulationStateSubsystem } from './state.ts
 import { createMap, type MapInternals, type MapSubsystem } from './map.ts';
 import { createNavigation, type NavigationSubsystem } from './navigation.ts';
 import { createObservations, type ObservationSubsystem } from './observations.ts';
+import { createStockLedger, type StockLedgerSubsystem } from './stock-ledger.ts';
 import { createEconomy, type EconomyInternals, type EconomySubsystem } from './economy.ts';
 import { createTransport, type TransportSubsystem } from './transport.ts';
 import { createAutoplay, type AutoplayInternals, type AutoplaySubsystem } from './autoplay.ts';
@@ -31,6 +32,7 @@ export type SimulationEngine = WorldSubsystem &
   MapSubsystem &
   NavigationSubsystem &
   ObservationSubsystem &
+  StockLedgerSubsystem &
   EconomySubsystem &
   TransportSubsystem &
   AttentionSubsystem &
@@ -58,6 +60,7 @@ export const DOMAIN_SUBSYSTEMS = [
   domainSubsystem('map', (game, _options, hooks?: MapInternals) => createMap(game, hooks)),
   domainSubsystem('navigation', (game) => createNavigation(game)),
   domainSubsystem('observations', (game) => createObservations(game)),
+  domainSubsystem('stockLedger', (game) => createStockLedger(game)),
   domainSubsystem('economy', (game, _options, hooks?: EconomyInternals) =>
     createEconomy(game, hooks),
   ),

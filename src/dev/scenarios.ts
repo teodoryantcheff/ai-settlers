@@ -530,7 +530,7 @@ export function runScenarios(game: GameRuntime) {
         j: game.jobs.length,
         sp: game.serfPool,
         so: game.soldierPool,
-        pl: game.totalGood('planks'),
+        pl: game.storedStock('planks'),
       };
       let th = 0;
       for (let i2 = 0; i2 < game.tiles.length; i2++) {
