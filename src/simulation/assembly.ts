@@ -60,7 +60,7 @@ export const DOMAIN_SUBSYSTEMS = [
   domainSubsystem('map', (game, _options, hooks?: MapInternals) => createMap(game, hooks)),
   domainSubsystem('navigation', (game) => createNavigation(game)),
   domainSubsystem('observations', (game) => createObservations(game)),
-  domainSubsystem('ledger', (game) => createStockLedger(game)),
+  domainSubsystem('stockLedger', (game) => createStockLedger(game)),
   domainSubsystem('economy', (game, _options, hooks?: EconomyInternals) =>
     createEconomy(game, hooks),
   ),

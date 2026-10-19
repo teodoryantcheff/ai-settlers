@@ -1,6 +1,6 @@
 import type { ObservationSubsystem } from '../simulation/observations.ts';
 import type { EconomySubsystem } from '../simulation/economy.ts';
-import type { StockLedgerSubsystem } from '../simulation/stock-ledger.ts';
+import type { SpendPurpose, StockLedgerSubsystem } from '../simulation/stock-ledger.ts';
 import type { SimulationStateSubsystem } from '../simulation/state.ts';
 import type { EventsSubsystem } from '../core/events.ts';
 import type { Building, BuildingType, Good, Inventory } from '../types.ts';
@@ -98,10 +98,7 @@ export function createProgression(
     });
     return { affordable: materials.every((material) => material.missing === 0), materials };
   }
-  function spendStock(
-    cost: Inventory,
-    purpose: 'contractSpent' | 'upgradeSpent' = 'contractSpent',
-  ) {
+  function spendStock(cost: Inventory, purpose: SpendPurpose = 'contractSpent') {
     if (!game.requestStock(cost)) return false;
     game.withdrawStock(cost, purpose);
     return true;

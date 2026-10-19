@@ -1653,7 +1653,8 @@ export function createEconomy(
         if (u.dropIsSite && j && (j.kind === 'fetch' || j.kind === 'transfer')) {
           const site = byId(j.to);
           if (site) {
-            if (site.done) site.stock[good] = ((site.stock[good] ?? 0) | 0) + 1;
+            if (site.done && game.BSPEC[site.type].store) game.storeGoods(site, good, 1, 'storage');
+            else if (site.done) site.stock[good] = ((site.stock[good] ?? 0) | 0) + 1;
             else {
               site.got[good] = ((site.got[good] ?? 0) | 0) + 1;
               game.recordEconomicFlow('constructionSpent', good, 1);
@@ -2041,6 +2042,7 @@ export function createEconomy(
     byId,
     buildingAt,
     storages,
+    collectedJob,
     anyStorage,
     nearestStoragePos,
     stockTargetTotal,
@@ -2116,6 +2118,8 @@ export interface EconomySubsystem {
   byId: (id: number | null | undefined) => Building | null;
   buildingAt: (x: number, y: number) => Building | null;
   storages: () => Building[];
+  /** Whether a carrier has picked up this job's cargo. */
+  collectedJob: (job: Job) => boolean;
   anyStorage: () => Building | null;
   nearestStoragePos: (x: number, y: number) => Building | null;
   stockTargetTotal: (g: Good) => number;

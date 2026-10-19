@@ -15,6 +15,9 @@ type Place = Pick<Building, 'x' | 'y'>;
  */
 export type StockSource = 'storage' | 'producer' | 'external';
 
+/** Explicit spending recorded as an economic flow. */
+export type SpendPurpose = Extract<EconomicFlow, 'contractSpent' | 'upgradeSpent'>;
+
 /**
  * Colony stock ledger: the single owner of storage quantities. Stored stock is
  * what a completed storehouse holds; reserved stock is the part of it promised
@@ -47,15 +50,13 @@ export function createStockLedger(game: StockLedgerDependencies): StockLedgerSub
   function uncollectedTransfers(store: Building, good: Good) {
     let n = 0;
     for (const job of game.jobs)
-      if (job.kind === 'transfer' && job.sourceId === store.id && job.good === good) {
-        let collected = false;
-        for (const unit of game.units)
-          if (unit.job === job && unit.carry) {
-            collected = true;
-            break;
-          }
-        if (!collected) n++;
-      }
+      if (
+        job.kind === 'transfer' &&
+        job.sourceId === store.id &&
+        job.good === good &&
+        !game.collectedJob(job)
+      )
+        n++;
     return n;
   }
   function spendableAt(store: Building, good: Good) {
@@ -107,7 +108,7 @@ export function createStockLedger(game: StockLedgerDependencies): StockLedgerSub
     game.state.gold += amount;
     if (source === 'producer') game.state.goldDelivered = (game.state.goldDelivered || 0) + amount;
   }
-  function withdrawStock(cost: Inventory, purpose: 'contractSpent' | 'upgradeSpent') {
+  function withdrawStock(cost: Inventory, purpose: SpendPurpose) {
     for (const name in cost) {
       const good = name as Good;
       let remaining = cost[good] ?? 0;
@@ -177,12 +178,12 @@ export interface StockLedgerSubsystem {
    * Spend available stock, storehouse by storehouse, debiting the treasury for
    * gold. Callers first secure the cost (see `requestStock`); reservations stay.
    */
-  withdrawStock: (cost: Inventory, purpose: 'contractSpent' | 'upgradeSpent') => void;
+  withdrawStock: (cost: Inventory, purpose: SpendPurpose) => void;
 }
 
 export interface StockLedgerDependencies
   extends
-    Pick<SimulationStateSubsystem, 'jobs' | 'units' | 'state'>,
+    Pick<SimulationStateSubsystem, 'jobs' | 'state'>,
     Pick<NavigationSubsystem, 'connectedLand'>,
     Pick<ObservationSubsystem, 'recordEconomicFlow'>,
-    Pick<EconomySubsystem, 'storages'> {}
+    Pick<EconomySubsystem, 'storages' | 'collectedJob'> {}
