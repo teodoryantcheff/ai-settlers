@@ -22,25 +22,25 @@ async function settings(page) {
 }
 
 // Reloads with remembered settings, then replaces Storage.prototype.setItem.
-test('FPS is optional and settings honestly report persistence failures', async ({
+test('FPS shows by default, can be hidden, and settings honestly report persistence failures', async ({
   freshPage: page,
 }) => {
   await bootStandard(page);
-  await expect(page.locator('#fps')).toBeHidden();
+  await expect(page.locator('#fps')).toBeVisible();
   await settings(page);
-  await page.getByRole('checkbox', { name: 'Show FPS counter' }).check();
+  await page.getByRole('checkbox', { name: 'Show FPS counter' }).uncheck();
   await expect(page.locator('#settings-status')).toContainText('Settings remembered');
   expect(
     await page.evaluate(() => JSON.parse(localStorage.getItem('settlers.prefs')).showFps),
-  ).toBe(true);
+  ).toBe(false);
   await page.keyboard.press('Escape');
-  await expect(page.locator('#fps')).toBeVisible();
+  await expect(page.locator('#fps')).toBeHidden();
   await page.reload();
   await expect(page.locator('#boot')).toHaveCount(0, { timeout: 30000 });
-  await expect(page.locator('#fps')).toBeVisible();
+  await expect(page.locator('#fps')).toBeHidden();
   await page.locator('#startb').click();
   await settings(page);
-  await expect(page.getByRole('checkbox', { name: 'Show FPS counter' })).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: 'Show FPS counter' })).not.toBeChecked();
   await page.evaluate(() => {
     const original = Storage.prototype.setItem;
     Storage.prototype.setItem = function (key, value) {
@@ -48,10 +48,10 @@ test('FPS is optional and settings honestly report persistence failures', async 
       return original.call(this, key, value);
     };
   });
-  await page.getByRole('checkbox', { name: 'Show FPS counter' }).uncheck();
+  await page.getByRole('checkbox', { name: 'Show FPS counter' }).check();
   await expect(page.locator('#settings-status')).toContainText('could not be remembered');
   await page.keyboard.press('Escape');
-  await expect(page.locator('#fps')).toBeHidden();
+  await expect(page.locator('#fps')).toBeVisible();
 });
 
 test('only urgent save failure occupies the bar and opens file recovery', async ({ page }) => {

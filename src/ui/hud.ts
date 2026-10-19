@@ -680,7 +680,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
         (!Object.hasOwn(p, 'reducedMotion') &&
           window.matchMedia('(prefers-reduced-motion: reduce)').matches);
       game.presentationPrefs.atlasExpanded = p.atlasExpanded === true;
-      game.presentationPrefs.showFps = p.showFps === true;
+      game.presentationPrefs.showFps = p.showFps !== false;
       game.presentationPrefs.minimapVisible = p.minimapVisible !== false;
       game.presentationPrefs.weather = p.weather !== false;
       game.presentationPrefs.clarity = p.clarity === true;

@@ -48,7 +48,7 @@ export function createInteraction(game: GameRuntime): InteractionSubsystem {
     ttStr: string | null = null;
 
   const presentationPrefs: PresentationPreferences = {
-    showFps: false,
+    showFps: true,
     atlasExpanded: false,
     minimapVisible: true,
     reducedMotion: false,
