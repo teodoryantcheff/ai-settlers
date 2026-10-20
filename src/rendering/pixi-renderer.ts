@@ -512,7 +512,7 @@ export async function createPixiRenderer(internals?: PixiRendererInternals) {
     ih: number,
   ) {
     const textureSource = part.texture.source;
-    if ((textureSource as any).resource !== source || textureSource.mipLevelCount > 1) return false;
+    if (textureSource.resource !== source || textureSource.mipLevelCount > 1) return false;
     if (!scratchUploadCanvas || !scratchUploadCtx) {
       scratchUploadCanvas = document.createElement('canvas');
       scratchUploadCtx = requireCanvas2D(scratchUploadCanvas, loseGpu, {
@@ -527,8 +527,7 @@ export async function createPixiRenderer(internals?: PixiRendererInternals) {
     if (scratch.height !== h) scratch.height = h;
     g.clearRect(0, 0, w, h);
     g.drawImage(source, ix, iy, iw, ih, 0, 0, w, h);
-    const textures = renderer.texture as any;
-    if (typeof textures?.getGlSource !== 'function') return false;
+    const textures = renderer.texture;
     // getGlSource initialises the GPU texture (performing the initial full
     // upload) on first use, so prior content is valid before texSubImage2D.
     const glTexture = textures.getGlSource(textureSource);
@@ -536,9 +535,10 @@ export async function createPixiRenderer(internals?: PixiRendererInternals) {
     if (glTexture.target !== gl.TEXTURE_2D) return false;
     textures.bindSource(textureSource, 0);
     // Match onSourceUpdate's unpack state and keep Pixi's private cache truthful.
+    // Bracket access to the private member stays type-checked across Pixi upgrades.
     const premultiply = textureSource.alphaMode === 'premultiply-alpha-on-upload';
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, premultiply);
-    textures._premultiplyAlpha = premultiply;
+    textures['_premultiplyAlpha'] = premultiply;
     const resolution = textureSource.resolution;
     gl.texSubImage2D(
       glTexture.target,
