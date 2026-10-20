@@ -75,8 +75,6 @@ export function createLoop(game: GameRuntime, internals?: LoopInternals): LoopSu
     if (game.ART.grainURL) grain.style.backgroundImage = 'url(' + game.ART.grainURL + ')';
     game.loadPrefs();
     game.resize();
-    requireElement('musicb').classList.toggle('off', !game.musicOn);
-    requireElement('mute').style.opacity = game.muted ? '0.4' : '1';
     game.buildPalette();
     game.updateHint();
     requireElement('boot').remove();

@@ -199,13 +199,13 @@ export function createSessionView(game: GameRuntime): SessionSubsystem {
     game.setAdvisorVisible((event.target as HTMLInputElement).checked);
   requireElement('mutepref', HTMLInputElement).onchange = (event) => {
     game.setMuted((event.target as HTMLInputElement).checked);
-    requireElement('mute').style.opacity = game.muted ? '0.4' : '1';
+    game.syncAudioButtons();
     game.persistPreferences();
   };
   requireElement('musicpref', HTMLInputElement).onchange = (event) => {
     game.initAudio();
     game.setMusicVol((event.target as HTMLInputElement).checked);
-    requireElement('musicb').classList.toggle('off', !game.musicOn);
+    game.syncAudioButtons();
     game.persistPreferences();
   };
   observePresentation(game, 'worldLoaded', () => {

@@ -17,7 +17,7 @@ test('analysis preserves selection and map context while canceling placement', (
   const { game } = createGame({
     seed: 2024,
     modules: [...DEFAULT_MODULES, 'workspace'],
-    stubs: { keys: {}, cam: { x: 800, y: 900 }, vw: 800, vh: 600, z: 1, clampCam() {} },
+    stubs: { cam: { x: 800, y: 900 }, vw: 800, vh: 600, z: 1, clampCam() {} },
   });
   const building = game.newBuilding('farm', 50, 50);
   game.buildings.push(building);
@@ -44,7 +44,7 @@ test('nested blocking layers preserve the original player pause state', () => {
   const { game } = createGame({
     seed: 2024,
     modules: [...DEFAULT_MODULES, 'workspace'],
-    stubs: { keys: {}, SND: { demolish() {} } },
+    stubs: { SND: { demolish() {} } },
   });
   game.state.paused = false;
   game.openLayer('mix');
@@ -73,7 +73,7 @@ test('a directly hidden utility can be reopened and a removed contributor retain
   const { game } = createGame({
     seed: 2024,
     modules: [...DEFAULT_MODULES, 'workspace'],
-    stubs: { keys: {}, SND: { demolish() {} } },
+    stubs: { SND: { demolish() {} } },
   });
   game.openLayer('mix');
   dom.node('mix').classList.add('hidden');
@@ -107,7 +107,7 @@ test('closing a nested utility skips a disabled invoker and focuses the visible 
   const { game } = createGame({
     seed: 2024,
     modules: [...DEFAULT_MODULES, 'workspace'],
-    stubs: { keys: {} },
+    stubs: {},
   });
   const invoker = dom.node('settings-help');
   invoker.isConnected = true;
@@ -127,10 +127,15 @@ test('every report opening clears placement, road anchors, stale previews and he
   const dom = fakeDom(),
     win = fakeWindow();
   installGlobals({ document: dom.document, window: win.window });
+  let released = 0;
   const { game: g } = createGame({
     seed: 2024,
     modules: [...DEFAULT_MODULES, 'workspace'],
-    stubs: { keys: {} },
+    stubs: {
+      releaseKeys() {
+        released++;
+      },
+    },
   });
   g.switchWorkspace('economy');
   g.setMode('road');
@@ -139,7 +144,7 @@ test('every report opening clears placement, road anchors, stale previews and he
   g.hoverIn = true;
   g.mouseSeen = true;
   g.ttStr = 'old placement';
-  g.keys.l = g.keys.r = g.keys.u = g.keys.d = true;
+  released = 0;
   g.switchWorkspace('logistics');
   assert.equal(g.mode, null);
   assert.equal(g.anchor, null);
@@ -147,5 +152,5 @@ test('every report opening clears placement, road anchors, stale previews and he
   assert.equal(g.hoverIn, false);
   assert.equal(g.mouseSeen, false);
   assert.equal(g.ttStr, null);
-  assert.deepEqual(g.keys, { l: false, r: false, u: false, d: false });
+  assert.equal(released, 1, 'held map movement is released');
 });

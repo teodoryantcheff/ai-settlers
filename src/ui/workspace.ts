@@ -30,9 +30,9 @@ export type WorkspaceDependencies = ReportWindowsDependencies &
     | 'clampCam'
     | 'gameEvents'
     | 'gameplayHUD'
-    | 'keys'
     | 'persistPreferences'
     | 'presentationPrefs'
+    | 'releaseKeys'
     | 'renderingAvailable'
     | 'selInfo'
     | 'selected'
@@ -99,7 +99,7 @@ export function createWorkspace(game: WorkspaceDependencies): WorkspaceSubsystem
       game.hoverIn = game.mouseSeen = false;
       game.ttStr = null;
       requireElement('tt').style.display = 'none';
-      game.keys.l = game.keys.r = game.keys.u = game.keys.d = false;
+      game.releaseKeys();
       game.cancelMapGestures();
     }
     reportWindows.hide(workspace);
@@ -231,7 +231,7 @@ export function createWorkspace(game: WorkspaceDependencies): WorkspaceSubsystem
     if (blocking) element.setAttribute('aria-modal', 'true');
     element.tabIndex = -1;
     element.style.zIndex = String(30 + layers.length);
-    game.keys.l = game.keys.r = game.keys.u = game.keys.d = false;
+    game.releaseKeys();
     (focusable(element)[0] || element).focus({ preventScroll: true });
     updateLayerBackdrop();
   }

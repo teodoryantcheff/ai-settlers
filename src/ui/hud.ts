@@ -701,11 +701,57 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
       );
     }
     applyPresentationPrefs();
+    syncAudioButtons();
   }
+  function preferenceToggle(
+    id: string,
+    field: 'showFps' | 'reducedMotion' | 'weather' | 'clarity',
+    changed?: () => void,
+  ): PreferenceControl {
+    const control = requireElement(id, HTMLInputElement);
+    return {
+      control,
+      sync() {
+        control.checked = game.presentationPrefs[field];
+      },
+      commit() {
+        game.presentationPrefs[field] = control.checked;
+        return true;
+      },
+      changed,
+    };
+  }
+  const qualityPref = requireElement('qualitypref', HTMLSelectElement);
+  const preferenceControls: PreferenceControl[] = [
+    preferenceToggle('fpspref', 'showFps', () => game.resize()),
+    preferenceToggle('motionpref', 'reducedMotion'),
+    preferenceToggle('weatherpref', 'weather'),
+    preferenceToggle('claritypref', 'clarity'),
+    {
+      control: qualityPref,
+      sync() {
+        qualityPref.value = String(game.presentationPrefs.quality);
+      },
+      commit() {
+        const quality = Number(qualityPref.value);
+        if (quality !== 1 && quality !== 0.75) return false;
+        game.presentationPrefs.quality = quality;
+        return true;
+      },
+      changed: () => game.resize(),
+    },
+  ];
+  for (const { control, commit, changed } of preferenceControls)
+    control.onchange = () => {
+      if (!commit()) return;
+      applyPresentationPrefs();
+      changed?.();
+      savePrefs();
+    };
   function applyPresentationPrefs() {
     game.setAtlasExpanded(game.presentationPrefs.atlasExpanded, false);
     requireElement('fps').hidden = !game.presentationPrefs.showFps;
-    requireElement('fpspref', HTMLInputElement).checked = game.presentationPrefs.showFps;
+    for (const preference of preferenceControls) preference.sync();
     const atlasArt = requireElement('atlas-art', HTMLCanvasElement);
     if (game.drawSpriteIcon) {
       const context = requireCanvas2D(atlasArt, game.reportGraphicsFailure);
@@ -714,10 +760,6 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     }
     document.body.classList.toggle('reduced-motion', game.presentationPrefs.reducedMotion);
     document.body.classList.toggle('clarity-view', game.presentationPrefs.clarity);
-    requireElement('motionpref', HTMLInputElement).checked = game.presentationPrefs.reducedMotion;
-    requireElement('weatherpref', HTMLInputElement).checked = game.presentationPrefs.weather;
-    requireElement('claritypref', HTMLInputElement).checked = game.presentationPrefs.clarity;
-    requireElement('qualitypref', HTMLSelectElement).value = String(game.presentationPrefs.quality);
     mapControls.update();
     mapControls.paint();
   }
@@ -844,7 +886,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     if (k === 'ArrowDown' || k === 's' || k === 'S') game.keys.d = false;
   });
   window.addEventListener('blur', function () {
-    game.keys.l = game.keys.r = game.keys.u = game.keys.d = false;
+    game.releaseKeys();
     cancelMapGestures();
   });
   function keyPan(dt: number) {
@@ -855,16 +897,20 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     if (game.keys.d) game.cam.y += sp;
     game.clampCam();
   }
+  /** Show the audio state on the bar's mute and music buttons. */
+  function syncAudioButtons() {
+    requireElement('mute').style.opacity = game.muted ? '0.4' : '1';
+    requireElement('musicb').classList.toggle('off', !game.musicOn);
+  }
   function toggleMute() {
     game.setMuted(!game.muted);
-    requireElement('mute').style.opacity = game.muted ? '0.4' : '1';
+    syncAudioButtons();
     savePrefs();
     game.SND.ui();
   }
   function toggleMusic() {
     game.setMusicVol(!game.musicOn);
-    requireElement('musicb').classList.toggle('off', !game.musicOn);
-    requireElement('mute').style.opacity = game.muted ? '0.4' : '1';
+    syncAudioButtons();
     savePrefs();
     if (!game.muted && game.musicOn) game.SND.ui();
   }
@@ -977,37 +1023,6 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     game.setAmbVol(+ambienceVolume.value / 100);
     volLbl('ambvolv', +ambienceVolume.value / 100);
     savePrefsSoon();
-  };
-  const motionPref = requireElement('motionpref', HTMLInputElement);
-  motionPref.onchange = function () {
-    game.presentationPrefs.reducedMotion = motionPref.checked;
-    applyPresentationPrefs();
-    savePrefs();
-  };
-  const fpsPref = requireElement('fpspref', HTMLInputElement);
-  fpsPref.onchange = function () {
-    game.presentationPrefs.showFps = fpsPref.checked;
-    requireElement('fps').hidden = !fpsPref.checked;
-    game.resize();
-    savePrefs();
-  };
-  const weatherPref = requireElement('weatherpref', HTMLInputElement);
-  weatherPref.onchange = function () {
-    game.presentationPrefs.weather = weatherPref.checked;
-    savePrefs();
-  };
-  const qualityPref = requireElement('qualitypref', HTMLSelectElement);
-  qualityPref.onchange = function () {
-    if (+qualityPref.value !== 1 && +qualityPref.value !== 0.75) return;
-    game.presentationPrefs.quality = +qualityPref.value as 1 | 0.75;
-    game.resize();
-    savePrefs();
-  };
-  const clarityPref = requireElement('claritypref', HTMLInputElement);
-  clarityPref.onchange = function () {
-    game.presentationPrefs.clarity = clarityPref.checked;
-    applyPresentationPrefs();
-    savePrefs();
   };
   requireElement('economybody').onclick = function (e) {
     const btn = (e.target as HTMLInputElement).closest('button');
@@ -1243,6 +1258,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     resetFps,
     updateFps,
     loadPrefs,
+    syncAudioButtons,
     persistPreferences: savePrefs,
     toggleAutoplay: toggleAuto,
     buildPalette,
@@ -1256,6 +1272,16 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
         syncHover(game.hovX, game.hovY, false);
     },
   };
+}
+
+/** A settings control that shows one presentation preference and applies its changes. */
+interface PreferenceControl {
+  control: HTMLInputElement | HTMLSelectElement;
+  sync: () => void;
+  /** Store the control's value; false rejects a value the preference cannot take. */
+  commit: () => boolean;
+  /** An effect beyond `applyPresentationPrefs`, run after a committed change. */
+  changed?: () => void;
 }
 
 export interface PreferencesHealth {
@@ -1287,6 +1313,7 @@ export interface HudSubsystem {
   resetFps: () => void;
   updateFps: (ts: number) => void;
   loadPrefs: () => void;
+  syncAudioButtons: () => void;
   persistPreferences: () => boolean;
   buildPalette: () => void;
   updateHint: () => void;

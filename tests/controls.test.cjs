@@ -108,6 +108,9 @@ function controls() {
       gameEvents: { on: () => {} },
       state: { paused: false, speed: 1, auto: false },
       keys: { l: false, r: false, u: false, d: false },
+      releaseKeys() {
+        Object.assign(this.keys, { l: false, r: false, u: false, d: false });
+      },
       cam: { x: 500, y: 500 },
       z: 1,
       zi: 0,
@@ -228,6 +231,40 @@ test('movement keys pan while held and stop on keyup or window blur', () => {
   assert.equal(game.cam.x, 570, 'losing focus must release all movement keys');
   assert.equal(game.pan, null);
   assert.equal(game.miniDown, false);
+});
+
+test('settings controls store, apply and remember presentation preferences', () => {
+  const { game, calls, node } = controls();
+  const saves = calls.save;
+  const fps = node('fpspref');
+  fps.checked = false;
+  fps.onchange();
+  assert.equal(game.presentationPrefs.showFps, false);
+  assert.equal(node('fps').hidden, true);
+  const quality = node('qualitypref');
+  quality.value = '0.5';
+  quality.onchange();
+  assert.equal(game.presentationPrefs.quality, 1, 'an unsupported quality is ignored');
+  quality.value = '0.75';
+  quality.onchange();
+  const clarity = node('claritypref');
+  clarity.checked = true;
+  clarity.onchange();
+  assert.equal(document.body.classList.contains('clarity-view'), true);
+  assert.equal(calls.save - saves, 3, 'each accepted change is remembered');
+  const saved = JSON.parse(localStorage.getItem('settlers.prefs'));
+  assert.deepEqual(
+    { showFps: saved.showFps, quality: saved.quality, clarity: saved.clarity },
+    { showFps: false, quality: 0.75, clarity: true },
+  );
+  fps.checked = true;
+  quality.value = '1';
+  saved.muted = true;
+  localStorage.setItem('settlers.prefs', JSON.stringify(saved));
+  game.loadPrefs();
+  assert.equal(fps.checked, false, 'loading shows the remembered preference');
+  assert.equal(quality.value, '0.75');
+  assert.equal(node('mute').style.opacity, '0.4', 'loading shows the remembered mute');
 });
 
 test('typing in editable controls does not start autoplay, change speed, mute, or pan', () => {

@@ -517,6 +517,10 @@ export function createRenderer(
     clampCam();
   }
   const keys = { l: false, r: false, u: false, d: false };
+  /** Stop held camera panning, e.g. when focus or the workspace leaves the map. */
+  function releaseKeys() {
+    keys.l = keys.r = keys.u = keys.d = false;
+  }
 
   // ---------- objects ----------
   function bldImg(b: Building): Sprite {
@@ -2733,6 +2737,7 @@ export function createRenderer(
     get keys() {
       return keys;
     },
+    releaseKeys,
     bldImg,
     drawSpriteIcon,
     get FX() {
@@ -2785,6 +2790,7 @@ export interface RendererSubsystem {
   zoomAt: (nzi: number, ax?: number, ay?: number) => void;
   miniClick: (e: MouseEvent) => void;
   readonly keys: { l: boolean; r: boolean; u: boolean; d: boolean };
+  releaseKeys: () => void;
   bldImg: (b: Building) => Sprite;
   drawSpriteIcon: (
     g: CanvasRenderingContext2D,

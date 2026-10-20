@@ -1,7 +1,7 @@
 import type { PersistenceInternals } from '../core/persistence.ts';
 import type { HudInternals } from '../ui/hud.ts';
 import type { GameRuntime } from '../runtime.ts';
-import { PAGE_ELEMENT_IDS, requireElement } from '../ui/dom.ts';
+import { PAGE_ELEMENT_IDS } from '../ui/dom.ts';
 
 /** What a shared browser-test page must return to between tests. */
 export interface TestFingerprint {
@@ -146,9 +146,7 @@ export function createTestReset(
     localStorage.clear();
     for (const [key, value] of base.storage) localStorage.setItem(key, value);
     game.loadPrefs();
-    requireElement('mute').style.opacity = game.muted ? '0.4' : '1';
-    requireElement('musicb').classList.toggle('off', !game.musicOn);
-    game.keys.l = game.keys.r = game.keys.u = game.keys.d = false;
+    game.releaseKeys();
     game.resize();
     game.zi = base.camera.zi;
     game.z = game.zooms[base.camera.zi];
