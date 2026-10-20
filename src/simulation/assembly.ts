@@ -9,7 +9,7 @@ import {
   type StoragePort,
 } from '../core/persistence.ts';
 import { createSimulationState, type SimulationStateSubsystem } from './state.ts';
-import { createMap, type MapInternals, type MapSubsystem } from './map.ts';
+import { createMap, type MapSubsystem } from './map.ts';
 import { createNavigation, type NavigationSubsystem } from './navigation.ts';
 import { createObservations, type ObservationSubsystem } from './observations.ts';
 import { createStockLedger, type StockLedgerSubsystem } from './stock-ledger.ts';
@@ -59,7 +59,7 @@ export const DOMAIN_SUBSYSTEMS = [
   ),
   domainSubsystem('events', () => createEvents()),
   domainSubsystem('state', () => createSimulationState()),
-  domainSubsystem('map', (game, _options, hooks?: MapInternals) => createMap(game, hooks)),
+  domainSubsystem('map', (game) => createMap(game)),
   domainSubsystem('navigation', (game) => createNavigation(game)),
   domainSubsystem('observations', (game) => createObservations(game)),
   domainSubsystem('stockLedger', (game) => createStockLedger(game)),

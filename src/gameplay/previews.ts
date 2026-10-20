@@ -5,7 +5,7 @@ import type {
   PlacementChecks,
   BuildingAffordability,
 } from '../simulation/economy.ts';
-import type { MapSubsystem } from '../simulation/map.ts';
+import type { GuardPreviewSegment, MapSubsystem } from '../simulation/map.ts';
 import type { NavigationSubsystem } from '../simulation/navigation.ts';
 import type { RoadsSubsystem } from '../simulation/roads.ts';
 import type { SimulationStateSubsystem } from '../simulation/state.ts';
@@ -32,6 +32,16 @@ export interface PlacementPreview {
   /** Player-facing resource and delivery estimate. */
   summary: string;
 }
+/** Guard-post border feedback for one site. */
+export interface GuardPostPreview {
+  key: string;
+  x: number;
+  y: number;
+  /** Tile indexes the post would newly claim. */
+  fill: number[];
+  /** New border edges in world pixels. */
+  segs: GuardPreviewSegment[];
+}
 /** Road plan feedback for one pair of endpoints. */
 export interface RoadPreview {
   key: string;
@@ -51,14 +61,15 @@ export interface RoadPreview {
 }
 
 /**
- * Read-only placement and road predictions shared by the map, catalog and HUD.
+ * Read-only placement, road and guard-post predictions shared by the map, catalog and HUD.
  * Each query reuses its last answer while the world and relevant stock are
  * unchanged; it consumes no RNG and never advances or mutates the colony.
  */
 export function createPreviews(game: PreviewsDependencies): PreviewsSubsystem {
   let revision = 0,
     placementCache: PlacementPreview | null = null,
-    roadCache: RoadPreview | null = null;
+    roadCache: RoadPreview | null = null,
+    guardCache: GuardPostPreview | null = null;
   // Tile, territory and world replacement all change routes, reach and storage choice.
   const changed = () => revision++;
   game.gameEvents.on('tileChanged', changed);
@@ -232,7 +243,14 @@ export function createPreviews(game: PreviewsDependencies): PreviewsSubsystem {
     });
   }
 
-  return { previewPlacement, previewRoad };
+  function previewGuardPost(site: TilePoint): GuardPostPreview {
+    const key = site.x + ':' + site.y + ':' + worldKey();
+    if (guardCache && guardCache.key === key) return guardCache;
+    const { fill, segs } = game.guardPostClaim(site.x, site.y);
+    return (guardCache = { key, x: site.x, y: site.y, fill, segs });
+  }
+
+  return { previewPlacement, previewRoad, previewGuardPost };
 }
 
 export interface PreviewsSubsystem {
@@ -240,6 +258,8 @@ export interface PreviewsSubsystem {
   previewPlacement: (type: BuildingType, site: TilePoint) => PlacementPreview;
   /** The road plan between two endpoints with its walk-time benefit. */
   previewRoad: (anchor: TilePoint, end: TilePoint) => RoadPreview;
+  /** The border a manned guard post at `site` would add. */
+  previewGuardPost: (site: TilePoint) => GuardPostPreview;
 }
 
 export interface PreviewsDependencies
@@ -259,6 +279,6 @@ export interface PreviewsDependencies
       | 'storages'
     >,
     Pick<EventsSubsystem, 'gameEvents'>,
-    Pick<MapSubsystem, 'owned'>,
+    Pick<MapSubsystem, 'guardPostClaim' | 'owned'>,
     Pick<NavigationSubsystem, 'findPath' | 'moveCost'>,
     Pick<RoadsSubsystem, 'planRoad'> {}

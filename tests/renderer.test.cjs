@@ -351,16 +351,27 @@ test('pause and Reduced Motion keep eight-direction settlers in their resting po
 
 test('the map previews only the active tool at the hovered site', () => {
   const e = renderer();
-  assert.equal(e.getPlacementPreview(), e.previewPlacement('sawmill', e.ghost));
+  assert.equal(e.placementPreview(), e.previewPlacement('sawmill', e.ghost));
   e.ghost.in = false;
-  assert.equal(e.getPlacementPreview(), null);
+  assert.equal(e.placementPreview(), null);
   e.mode = { type: 'road' };
   e.anchor = { x: 50, y: 50 };
   e.ht = { x: 54, y: 50 };
   e.hoverIn = false;
-  assert.equal(e.getRoadPreview(), null, 'no road preview while the pointer is off the map');
+  assert.equal(e.roadPreview(), null, 'no road preview while the pointer is off the map');
   e.hoverIn = true;
-  assert.equal(e.getRoadPreview(), e.previewRoad(e.anchor, e.ht));
+  assert.equal(e.roadPreview(), e.previewRoad(e.anchor, e.ht));
+  assert.equal(e.guardPreview(), null, 'only the guard tool previews a border');
+  e.mode = { type: 'build', bt: 'guard' };
+  e.ghost = { x: 56, y: 48, ok: true, reason: null, in: true };
+  const guard = e.guardPreview();
+  assert.ok(guard);
+  assert.deepEqual([guard.x, guard.y], [56, 48]);
+  assert.equal(e.guardPreview(), guard, 'an unchanged world reuses the border');
+  e.recomputeTerritory();
+  assert.notEqual(e.guardPreview(), guard, 'a territory change recomputes the border');
+  e.ghost.ok = false;
+  assert.equal(e.guardPreview(), null, 'an invalid site previews no border');
 });
 
 test('Reduced Motion keeps minimap attention markers steady', () => {

@@ -380,7 +380,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     // recomputeTerritory so the ghost never goes stale when the border moves
     if (game.mode && game.mode.type === 'build' && game.hoverIn) {
       game.ghost = { x: game.ht.x, y: game.ht.y, ok: true, reason: null, in: true };
-      const preview = game.placementPreview?.();
+      const preview = game.placementPreview();
       const spatial = preview
         ? ([preview.checks.ok, preview.checks.reason] as ReturnType<typeof game.canPlace>)
         : game.canPlace(game.mode.bt, game.ht.x, game.ht.y);

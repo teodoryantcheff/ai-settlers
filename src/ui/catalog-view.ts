@@ -223,8 +223,8 @@ export function createCatalogView(
   }
   function updatePlacement() {
     if (game.mode?.type === 'demolish') return;
-    const placement = game.placementPreview?.();
-    const road = game.roadPreview?.();
+    const placement = game.placementPreview();
+    const road = game.roadPreview();
     if (!placement && !road) {
       feedback.clear();
       return;

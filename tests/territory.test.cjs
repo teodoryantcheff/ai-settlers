@@ -62,7 +62,7 @@ test('hypothetical guard claims can be added, removed or unmanned without changi
 });
 
 test('the guard preview matches completed manned placement around water and ridges', () => {
-  const { game, internals } = createGame({ seed: 42, headless: true });
+  const { game } = createGame({ seed: 42, headless: true });
   game.initializeColony();
   game.tiles = Array.from({ length: game.W * game.H }, () => ({
     t: game.GRASS,
@@ -76,9 +76,9 @@ test('the guard preview matches completed manned placement around water and ridg
   game.recomputeTerritory();
   const before = game.owned.slice();
   const rng = game.SR.getState();
-  game.computeGuardPreview(63, 48);
-  const preview = internals.map.gpOwned.slice();
-  const newlyClaimed = [...game.gpFill];
+  const claim = game.guardPostClaim(63, 48);
+  const preview = claim.owned;
+  const newlyClaimed = claim.fill;
   assert.ok(newlyClaimed.length > 0);
   assert.equal(preview[game.idx(63, 55)], 1, 'the full radius reaches open ground');
   assert.equal(preview[game.idx(66, 48)], 0, 'nearby land beyond the barrier needs a longer route');

@@ -9,6 +9,7 @@ import type {
 } from '../types.ts';
 import { observePresentation } from './domain-feedback.ts';
 import type { GameRuntime } from '../runtime.ts';
+import type { GuardPostPreview, PlacementPreview, RoadPreview } from '../gameplay/previews.ts';
 export function createInteraction(game: GameRuntime): InteractionSubsystem {
   const ORDER = [
     'lumberjack',
@@ -57,6 +58,27 @@ export function createInteraction(game: GameRuntime): InteractionSubsystem {
     quality: 1,
     overlay: 'none',
   };
+  // The active tool's preview at the hovered site; the domain caches each answer.
+  function placementPreview(): PlacementPreview | null {
+    if (!mode || mode.type !== 'build' || !ghost || !ghost.in) return null;
+    return game.previewPlacement(mode.bt, ghost);
+  }
+  function roadPreview(): RoadPreview | null {
+    if (
+      !mode ||
+      mode.type !== 'road' ||
+      !anchor ||
+      !game.hoverIn ||
+      !game.inB(game.ht.x, game.ht.y)
+    )
+      return null;
+    return game.previewRoad(anchor, game.ht);
+  }
+  function guardPreview(): GuardPostPreview | null {
+    if (!mode || mode.type !== 'build' || mode.bt !== 'guard' || !ghost || !ghost.in || !ghost.ok)
+      return null;
+    return game.previewGuardPost(ghost);
+  }
   function refreshTool() {
     game.refreshToolView?.();
   }
@@ -137,6 +159,9 @@ export function createInteraction(game: GameRuntime): InteractionSubsystem {
     setMode,
     cancelMode,
     dismissInspector,
+    placementPreview,
+    roadPreview,
+    guardPreview,
     get ORDER() {
       return ORDER;
     },
@@ -220,6 +245,12 @@ export interface InteractionSubsystem {
   demolitionInput: (target: Building | null, shift?: boolean) => DemolitionAction;
   roadInput: (tile: TilePoint, shift?: boolean) => void;
   dismissInspector: () => void;
+  /** The build tool's placement preview at the hovered site, if any. */
+  placementPreview: () => PlacementPreview | null;
+  /** The road tool's plan from its anchor to the hovered tile, if any. */
+  roadPreview: () => RoadPreview | null;
+  /** The new border of a valid guard-post placement at the hovered site, if any. */
+  guardPreview: () => GuardPostPreview | null;
   readonly ORDER: string[];
   readonly presentationPrefs: PresentationPreferences;
   selected: Building | null;

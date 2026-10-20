@@ -248,9 +248,9 @@ test('seed42 coastal expansion fixture retains useful claims and advances the mi
   const next = e.spotOnCorridor(corridor, ['gold']);
   assert.ok(next, 'a useful outpost exists beside the coastal route');
   assert.equal(e.isFaceTile(next[0], next[1], ['gold']), false, 'leave mine faces free');
-  e.computeGuardPreview(next[0], next[1]);
+  const claimed = e.guardPostClaim(next[0], next[1]).owned;
   const after = corridor.reduce(
-    (furthest, i, q) => (e.gpOwned[i] ? Math.max(furthest, q) : furthest),
+    (furthest, i, q) => (claimed[i] ? Math.max(furthest, q) : furthest),
     -1,
   );
   assert.ok(after > before, 'the manned flood reaches new route tiles');

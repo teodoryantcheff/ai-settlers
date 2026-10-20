@@ -4,7 +4,7 @@ import type { WorldSubsystem } from '../core/world.ts';
 import type { EventsSubsystem } from '../core/events.ts';
 import type { NavigationSubsystem } from './navigation.ts';
 
-export function createMap(game: MapDependencies, internals?: MapInternals): MapSubsystem {
+export function createMap(game: MapDependencies): MapSubsystem {
   function genMap() {
     game.landRegionTiles = null;
     let att,
@@ -328,56 +328,40 @@ export function createMap(game: MapDependencies, internals?: MapInternals): MapS
   }
   function recomputeTerritory() {
     owned.set(projectTerritory());
-    gpDirty = true;
     game.emitGameEvent('territoryChanged', {});
   }
-  // ---- guard-post territory preview (read-only projection; never mutates `owned`) ----
-  // Project a hypothetical manned guard so the ghost shows the eventual border,
+  // ---- guard-post territory claim (read-only projection; never mutates `owned`) ----
+  // Project a hypothetical manned guard so previews show the eventual border,
   // including detours around water and ridges, without changing the live colony.
-  const gpOwned = new Uint8Array(game.W * game.H),
-    gpSegs: GuardPreviewSegment[] = [],
-    gpFill: number[] = [];
-  let gpDirty = true,
-    gpX = -1,
-    gpY = -1;
-  function computeGuardPreview(x: number, y: number) {
-    gpOwned.set(
-      projectColonyTerritory(game, [
-        ...game.buildings,
-        { type: 'guard', x, y, done: true, manned: true },
-      ]),
-    );
-    gpSegs.length = 0;
-    gpFill.length = 0;
-    for (let i = 0; i < game.W * game.H; i++) if (gpOwned[i] && !owned[i]) gpFill.push(i); // newly claimed tiles
+  function guardPostClaim(x: number, y: number): GuardPostClaim {
+    const claimed = projectColonyTerritory(game, [
+      ...game.buildings,
+      { type: 'guard', x, y, done: true, manned: true },
+    ]);
+    const fill: number[] = [],
+      segs: GuardPreviewSegment[] = [];
+    for (let i = 0; i < game.W * game.H; i++) if (claimed[i] && !owned[i]) fill.push(i); // newly claimed tiles
     for (let y2 = 0; y2 < game.H; y2++)
       for (let x2 = 0; x2 < game.W; x2++) {
         // border edges not already in the live border
         const i2 = game.idx(x2, y2);
-        if (!gpOwned[i2]) continue;
+        if (!claimed[i2]) continue;
         const px = x2 * game.TS,
           py = y2 * game.TS;
         for (let d2 = 0; d2 < 4; d2++) {
           const nx2 = x2 + game.DX[d2],
             ny2 = y2 + game.DY[d2],
-            outN = !game.inB(nx2, ny2) || !gpOwned[game.idx(nx2, ny2)];
+            outN = !game.inB(nx2, ny2) || !claimed[game.idx(nx2, ny2)];
           if (!outN) continue;
           if (owned[i2] && (!game.inB(nx2, ny2) || !owned[game.idx(nx2, ny2)])) continue; // existing live edge
-          if (d2 === 0) gpSegs.push([px + game.TS, py, px + game.TS, py + game.TS]);
-          else if (d2 === 1) gpSegs.push([px, py, px, py + game.TS]);
-          else if (d2 === 2) gpSegs.push([px, py + game.TS, px + game.TS, py + game.TS]);
-          else gpSegs.push([px, py, px + game.TS, py]);
+          if (d2 === 0) segs.push([px + game.TS, py, px + game.TS, py + game.TS]);
+          else if (d2 === 1) segs.push([px, py, px, py + game.TS]);
+          else if (d2 === 2) segs.push([px, py + game.TS, px + game.TS, py + game.TS]);
+          else segs.push([px, py, px + game.TS, py]);
         }
       }
-    gpX = x;
-    gpY = y;
-    gpDirty = false;
+    return { owned: claimed, fill, segs };
   }
-  // Test-only view of closure internals; never merged into the runtime.
-  if (internals)
-    Object.defineProperties(internals, {
-      gpOwned: { get: () => gpOwned, enumerable: true },
-    });
 
   // Live bindings preserve replacement of arrays and mutable subsystem state.
   return {
@@ -387,46 +371,30 @@ export function createMap(game: MapDependencies, internals?: MapInternals): MapS
     },
     recomputeTerritory,
     projectTerritory,
-    get gpSegs() {
-      return gpSegs;
-    },
-    get gpFill() {
-      return gpFill;
-    },
-    get gpDirty() {
-      return gpDirty;
-    },
-    get gpX() {
-      return gpX;
-    },
-    get gpY() {
-      return gpY;
-    },
-    computeGuardPreview,
+    guardPostClaim,
   };
 }
 
 /** Border edge segment in world pixels: [x1, y1, x2, y2]. */
 export type GuardPreviewSegment = [number, number, number, number];
 
+/** The territory a manned guard post at one site would hold. */
+export interface GuardPostClaim {
+  /** Projected ownership including the hypothetical post. */
+  owned: Uint8Array;
+  /** Tile indexes newly claimed by the post. */
+  fill: number[];
+  /** Border edge segments of the claim not already on the live border, in world pixels. */
+  segs: GuardPreviewSegment[];
+}
+
 export interface MapSubsystem {
   genMap: () => void;
   readonly owned: Uint8Array<ArrayBuffer>;
   recomputeTerritory: () => void;
   projectTerritory: (excludedId?: number) => Uint8Array;
-  /** Border edge segments of the previewed territory in world pixels: [x1, y1, x2, y2]. */
-  readonly gpSegs: GuardPreviewSegment[];
-  /** Tile indexes newly claimed by the previewed guard post. */
-  readonly gpFill: number[];
-  readonly gpDirty: boolean;
-  readonly gpX: number;
-  readonly gpY: number;
-  computeGuardPreview: (x: number, y: number) => void;
-}
-
-/** Test-only view of closure internals; never merged into the runtime. */
-export interface MapInternals {
-  readonly gpOwned: Uint8Array<ArrayBuffer>;
+  /** Read-only projection of a manned guard post at (x, y); consumes no RNG. */
+  guardPostClaim: (x: number, y: number) => GuardPostClaim;
 }
 
 export interface MapDependencies

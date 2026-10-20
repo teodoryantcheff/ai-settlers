@@ -13,7 +13,6 @@ import type {
   Unit,
 } from '../types.ts';
 import { observePresentation } from '../ui/domain-feedback.ts';
-import type { PlacementPreview, RoadPreview } from '../gameplay/previews.ts';
 import { workArea, workTiles } from '../gameplay/work-area.ts';
 import type { GameRuntime } from '../runtime.ts';
 import { requireCanvas2D } from './canvas-context.ts';
@@ -1537,21 +1536,6 @@ export function createRenderer(
   // ---------- logistics and placement feedback ----------
   let _logisticsCaption = '';
   let workloadSummary: { busy: number; carriers: number; waiting: number } | null = null;
-  function getPlacementPreview() {
-    if (!game.mode || game.mode.type !== 'build' || !game.ghost || !game.ghost.in) return null;
-    return game.previewPlacement(game.mode.bt, game.ghost);
-  }
-  function getRoadPreview() {
-    if (
-      !game.mode ||
-      game.mode.type !== 'road' ||
-      !game.anchor ||
-      !hoverIn ||
-      !game.inB(ht.x, ht.y)
-    )
-      return null;
-    return game.previewRoad(game.anchor, ht);
-  }
   const LABEL_FONT = '600 11px system-ui,sans-serif';
   function worldLabel(s: SceneLayer, x: number, y: number, label: string, color: string) {
     while (label.length > 8 && s.measureText(label, LABEL_FONT) > vw - 32)
@@ -1885,7 +1869,7 @@ export function createRenderer(
       }
       _logisticsCaption = 'Production status · ' + stalled + ' buildings waiting or paused';
     }
-    const placement = getPlacementPreview();
+    const placement = game.placementPreview();
     if (placement) {
       if (placement.resources.length)
         reachDraw(
@@ -1917,7 +1901,7 @@ export function createRenderer(
         placement.canBuild ? '#d3efd0' : '#ffd0b4',
       );
     }
-    const road = getRoadPreview();
+    const road = game.roadPreview();
     if (road) {
       if (road.path && game.anchor)
         traceRoute(s, game.anchor.x + 0.5, game.anchor.y + 0.5, road.path, 0, '#e6d49d', true);
@@ -2138,33 +2122,25 @@ export function createRenderer(
 
   // ---------- guard-post placement preview (the *actual* new border, not the naive radius) ----------
   function guardPreview(s: SceneLayer, now: number) {
+    const preview = game.guardPreview();
+    if (!preview) return;
     now = motionTime(now);
-    if (
-      !game.mode ||
-      game.mode.type !== 'build' ||
-      game.mode.bt !== 'guard' ||
-      !game.ghost ||
-      !game.ghost.in ||
-      !game.ghost.ok
-    )
-      return;
-    if (game.gpDirty || game.gpX !== game.ghost.x || game.gpY !== game.ghost.y)
-      game.computeGuardPreview(game.ghost.x, game.ghost.y);
+    const { fill, segs } = preview;
     const g = s.g;
-    for (let i = 0; i < game.gpFill.length; i++) {
-      const fi = game.gpFill[i];
+    for (let i = 0; i < fill.length; i++) {
+      const fi = fill[i];
       g.rect((fi % game.W) * game.TS, ((fi / game.W) | 0) * game.TS, game.TS, game.TS);
     }
-    if (game.gpFill.length) g.fill({ color: 0xffd23f, alpha: 0.07 });
+    if (fill.length) g.fill({ color: 0xffd23f, alpha: 0.07 });
     // One dash pattern continues along every border segment.
     const pu = 0.5 + 0.5 * Math.sin(now / 240);
     let offset = -now / 40;
-    for (let i = 0; i < game.gpSegs.length; i++) {
-      const s2 = game.gpSegs[i];
+    for (let i = 0; i < segs.length; i++) {
+      const s2 = segs[i];
       dashed(g, s2, 7, 5, offset);
       offset += Math.hypot(s2[2] - s2[0], s2[3] - s2[1]);
     }
-    if (game.gpSegs.length) g.stroke({ color: 0xffe282, alpha: 0.5 + 0.35 * pu, width: 2 });
+    if (segs.length) g.stroke({ color: 0xffe282, alpha: 0.5 + 0.35 * pu, width: 2 });
   }
   function cloudsShadowDraw(s: SceneLayer, now: number) {
     // drifting ground shadows under the sky blobs (sun NW -> SE offset)
@@ -2599,8 +2575,6 @@ export function createRenderer(
       drawUnit,
       meadowParticles,
       fxDraw,
-      getPlacementPreview,
-      getRoadPreview,
       clarityBuildings,
       glowsDraw,
       FXL,
@@ -2744,8 +2718,6 @@ export function createRenderer(
     set mouseSeen(value: typeof mouseSeen) {
       mouseSeen = value;
     },
-    placementPreview: getPlacementPreview,
-    roadPreview: getRoadPreview,
     resize,
     clampCam,
     screenToWorld,
@@ -2805,9 +2777,6 @@ export interface RendererSubsystem {
   ht: { x: number; y: number };
   hoverIn: boolean;
   mouseSeen: boolean;
-  /** Cached current-world queries consumed by the production placement UI. */
-  placementPreview: () => PlacementPreview | null;
-  roadPreview: () => RoadPreview | null;
   resize: () => void;
   clampCam: () => void;
   screenToWorld: (mx: number, my: number) => TilePoint;
@@ -2864,8 +2833,6 @@ export interface RendererInternals {
   drawUnit: (s: SceneLayer, u: Unit, now: number) => void;
   meadowParticles: (s: SceneLayer, now: number) => void;
   fxDraw: (s: SceneLayer, now: number) => void;
-  getPlacementPreview: () => PlacementPreview | null;
-  getRoadPreview: () => RoadPreview | null;
   clarityBuildings: (s: SceneLayer) => void;
   glowsDraw: (s: SceneLayer) => void;
   readonly FXL: FXEffect[];
