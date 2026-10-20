@@ -49,7 +49,7 @@ Advisor guidance recommends expansion when wanted deposits cannot be reached and
 
 `src/simulation/map.ts` owns the authoritative mask and the shared `isRevealed` policy; `src/gameplay/discovery.ts` defines work-aware reveal reach. Saves require the exploration choice and the exact binary mask, including historical discoveries with no surviving source. Imports validate dimensions, binary values, unrestricted full coverage, revealed construction/road sites and completed-building coverage before replacing live state. No migration or missing-field default is supplied.
 
-The production WebGL presentation uses cached fog artwork with an opaque muted interior and a soft edge extending onto revealed land. It refreshes on discovery/world replacement, reuses GPU resources on unchanged frames, and keeps settlers above unexplored land visible and inspectable. Discovery also invalidates affected terrain, shadow, minimap and preview caches. Fog is static at qualities 1 and 0.75 and respects Reduced Motion without advancing simulation or consuming its RNG.
+The production WebGL presentation uses cached fog artwork with an opaque muted interior and a soft edge extending onto revealed land. It uses the mutable canvas texture cache, refreshes on discovery/world replacement, reuses GPU resources on unchanged frames, and keeps settlers above unexplored land visible and inspectable. Discovery also invalidates affected terrain, shadow, minimap and preview caches. Fog is static at qualities 1 and 0.75 and respects Reduced Motion without advancing simulation or consuming its RNG.
 
 ## Buildings and production
 

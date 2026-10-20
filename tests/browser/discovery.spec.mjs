@@ -2,6 +2,70 @@ import { test, expect, frame, holdFrames, load, seedPrefs } from './helpers/test
 
 test.setTimeout(60000);
 
+test('outpost completion and manning clear the already uploaded fog', async ({ page }) => {
+  const result = await page.evaluate(() => {
+    const g = window.productionArtPreview.game;
+    performance.now = () => 5000;
+    g.resetColony(42, 'Expansion', true);
+    g.state.paused = true;
+    g.z = 1;
+    g.cam.x = 53 * g.TS;
+    g.cam.y = 43 * g.TS;
+    const canvas = document.getElementById('pixi-view');
+    const gl = canvas.getContext('webgl2');
+    const pixel = (x, y) => {
+      const data = new Uint8Array(4);
+      const scale = canvas.width / g.vw;
+      gl.readPixels(
+        Math.floor(((x + 0.5) * g.TS - g.cam.x) * scale),
+        canvas.height - 1 - Math.floor(((y + 0.5) * g.TS - g.cam.y) * scale),
+        1,
+        1,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        data,
+      );
+      return Array.from(data);
+    };
+    g.draw();
+    const before = [pixel(64, 48), pixel(68, 48), pixel(75, 48), pixel(65, 48)];
+    const b = g.newBuilding('guard', 59, 48);
+    Object.assign(b, { done: true, constructionProgress: 1 });
+    g.buildings.push(b);
+    g.recomputeTerritory();
+    g.draw();
+    const completed = pixel(64, 48);
+    b.manned = true;
+    g.recomputeTerritory();
+    g.draw();
+    const manned = pixel(68, 48);
+    const owned = pixel(65, 48);
+    const unknown = pixel(75, 48);
+    const uploads = window.productionRendererStats.textureUpdates;
+    g.draw();
+    return {
+      before,
+      completed,
+      manned,
+      owned,
+      claimed: g.owned[g.idx(65, 48)],
+      unknown,
+      known: [g.isRevealed(g.idx(64, 48)), g.isRevealed(g.idx(68, 48))],
+      stable: pixel(68, 48),
+      uploads,
+      unchangedUploads: window.productionRendererStats.textureUpdates,
+    };
+  });
+  expect(result.known).toEqual([true, true]);
+  expect(result.completed).not.toEqual(result.before[0]);
+  expect(result.manned).not.toEqual(result.before[1]);
+  expect(result.claimed).toBe(1);
+  expect(result.owned).not.toEqual(result.before[3]);
+  expect(result.unknown).toEqual(result.before[2]);
+  expect(result.stable).toEqual(result.manned);
+  expect(result.unchangedUploads).toBe(result.uploads);
+});
+
 test('exploration choice starts off, stays with the colony, and conceals terrain on the real WebGL map', async ({
   freshPage: page,
 }) => {

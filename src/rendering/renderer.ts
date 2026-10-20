@@ -2450,7 +2450,6 @@ export function createRenderer(
   // onto revealed land, so soft edges never expose unknown terrain.
   const fogCanvas = game.Acan(game.W * game.TS, game.H * game.TS);
   const fogContext = requireCanvas2D(fogCanvas, reportGraphicsFailure);
-  const fogOwner = {};
   let fogDirty = true;
   function drawFog(s: SceneLayer, now: number) {
     if (!game.state.explorationFog) return;
@@ -2474,12 +2473,13 @@ export function createRenderer(
       presentation.invalidate(fogCanvas);
       fogDirty = false;
     }
-    s.retain(
-      fogOwner,
-      changed
-        ? (view) => view.image(fogCanvas, 0, 0, fogCanvas.width, fogCanvas.height)
-        : undefined,
-    );
+    // Mutable canvases use the same cache that invalidate() refreshes. Retained
+    // artwork images are uploaded once and would keep the original fog forever.
+    const sx = Math.max(0, cam.x),
+      sy = Math.max(0, cam.y),
+      sw = Math.min(fogCanvas.width - sx, cam.x + vw / z - sx),
+      sh = Math.min(fogCanvas.height - sy, cam.y + vh / z - sy);
+    if (sw > 0 && sh > 0) s.blit(fogCanvas, sx, sy, sw, sh, sx, sy, sw, sh);
     // Settlers preserve their usual sorting on known land; those crossing fog
     // sit above the opaque veil and never change discovery.
     const walkers = game.units.filter(
