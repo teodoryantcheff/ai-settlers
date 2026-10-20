@@ -163,13 +163,13 @@ test('road plans render and refresh through real terrain events while paused', a
       rng: game.SR.getState(),
     });
     game.draw();
-    const preview = game._roadCache;
+    const preview = game.roadPreview();
     game.draw();
     const stats = window.productionRendererStats;
     return {
       endpoints,
       preview,
-      reused: game._roadCache === preview,
+      reused: game.roadPreview() === preview,
       unchanged:
         colony ===
         JSON.stringify({
@@ -198,7 +198,7 @@ test('road plans render and refresh through real terrain events while paused', a
     const stats = window.productionRendererStats;
     return {
       committed,
-      preview: game._roadCache,
+      preview: game.roadPreview(),
       roadsBuilt: game.state.roadsBuilt,
       time: game.state.time,
       rng: game.SR.getState(),

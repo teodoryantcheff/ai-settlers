@@ -1,12 +1,10 @@
 import { FillGradient } from 'pixi.js';
 import type { Graphics } from 'pixi.js';
-import type { PlacementChecks, BuildingAffordability } from '../simulation/economy.ts';
 import type {
   Building,
   BuildingSpec,
   BuildingType,
   Good,
-  Inventory,
   PresentationPreferences,
   ProductionBlockReason,
   Sprite,
@@ -15,8 +13,8 @@ import type {
   Unit,
 } from '../types.ts';
 import { observePresentation } from '../ui/domain-feedback.ts';
+import type { PlacementPreview, RoadPreview } from '../gameplay/previews.ts';
 import { workArea, workTiles } from '../gameplay/work-area.ts';
-import { walkSeconds } from '../simulation/travel.ts';
 import type { GameRuntime } from '../runtime.ts';
 import { requireCanvas2D } from './canvas-context.ts';
 import { createShadowCache } from './shadow-cache.ts';
@@ -53,34 +51,6 @@ export interface FXEffect {
   c?: string;
   r?: number;
   n?: number;
-}
-/** Cached live placement feedback for the hovered tile (getPlacementPreview). */
-export interface PlacementPreview {
-  key: string;
-  x: number;
-  y: number;
-  resources: number[];
-  checks: PlacementChecks;
-  spending: BuildingAffordability;
-  canBuild: boolean;
-  operatingSupport: { ok: boolean; reason: string } | null;
-  path: number[] | null;
-  storage: Building | null;
-  haulSeconds: number | null;
-  summary: string;
-}
-/** Cached road-drawing feedback for the anchor/hover pair (getRoadPreview). */
-export interface RoadPreview {
-  key: string;
-  ok: boolean;
-  reason: string;
-  cost: Inventory;
-  path: number[] | null;
-  paved: Record<number, boolean>;
-  count: number;
-  beforeSeconds: number;
-  afterSeconds: number;
-  summary: string;
 }
 /** In-flight eased zoom tween around a fixed screen/world anchor. */
 export interface ZoomAnim {
@@ -1565,143 +1535,12 @@ export function createRenderer(
       });
   }
   // ---------- logistics and placement feedback ----------
-  /**
-   * @typedef {Object} PlacementPreview
-   * @property {string} key
-   * @property {number} x
-   * @property {number} y
-   * @property {number[]} resources Tile indices within the producer's work area.
-   * @property {number[]|null} path Current preferred route from storage.
-   * @property {Object|null} storage Closest completed storage building.
-   * @property {number|null} haulSeconds Estimated one-way travel time.
-   * @property {string} summary Player-facing resource and delivery estimate.
-   * @typedef {Object} RoadPreview
-   * @property {string} key
-   * @property {number[]|null} path Current preferred route between the endpoints.
-   * @property {Object<number,boolean>} paved Clear owned tiles that become roads.
-   * @property {number} count Number of new road tiles.
-   * @property {number} beforeSeconds Travel time along the preview route today.
-   * @property {number} afterSeconds Travel time along that route after paving.
-   * @property {string} summary Player-facing benefit and count.
-   */
-  let _placementCache: PlacementPreview | null = null,
-    _roadCache: RoadPreview | null = null,
-    _logisticsCaption = '';
+  let _logisticsCaption = '';
   let workloadSummary: { busy: number; carriers: number; waiting: number } | null = null;
-  function logisticsWorldKey() {
-    let key = terrainRevision + ':' + (game.state.upgrades ? game.state.upgrades.haul || 0 : 0);
-    // Completion and manning alter storage choice and territory without changing
-    // the building count. These states also need to refresh a paused preview.
-    for (let i = 0; i < game.buildings.length; i++) {
-      const b = game.buildings[i];
-      key +=
-        ':' +
-        b.id +
-        ',' +
-        b.x +
-        ',' +
-        b.y +
-        ',' +
-        (b.done ? 1 : 0) +
-        ',' +
-        (b.manned ? 1 : 0) +
-        ',' +
-        (b.disabled ? 1 : 0);
-    }
-    return key;
-  }
-  function placementStockKey(type: BuildingType) {
-    const goods = Object.keys(game.BSPEC[type].cost || {}) as Good[];
-    let key = '';
-    for (const store of game.storages())
-      for (const good of goods)
-        key +=
-          ':' +
-          store.id +
-          ',' +
-          good +
-          ',' +
-          (store.stock[good] || 0) +
-          ',' +
-          (store.reservedStock[good] || 0);
-    for (const job of game.jobs)
-      if (job.kind === 'transfer' && job.good && goods.includes(job.good))
-        key += ':' + job.sourceId + ',' + job.to + ',' + job.good + ',' + job.status;
-    for (const unit of game.units)
-      if (unit.job?.kind === 'transfer' && unit.carry) key += ':cargo' + unit.id + ',' + unit.carry;
-    return key;
-  }
-  /** @returns {PlacementPreview|null} */
   function getPlacementPreview() {
     if (!game.mode || game.mode.type !== 'build' || !game.ghost || !game.ghost.in) return null;
-    const key =
-      game.mode.bt +
-      ':' +
-      game.ghost.x +
-      ':' +
-      game.ghost.y +
-      ':' +
-      logisticsWorldKey() +
-      ':' +
-      placementStockKey(game.mode.bt) +
-      ':' +
-      Math.floor(game.state.time / 2);
-    if (_placementCache && _placementCache.key === key) return _placementCache;
-    const checks = game.placementChecks(game.mode.bt, game.ghost.x, game.ghost.y);
-    const spending = game.buildingAffordability(game.mode.bt, game.ghost);
-    const sp = game.BSPEC[game.mode.bt],
-      resources = workTiles(game, game.mode.bt, game.ghost),
-      storage = game.nearestStoragePos(game.ghost.x, game.ghost.y);
-    const path =
-      storage && game.passI(game.idx(game.ghost.x, game.ghost.y))
-        ? game.findPath(storage.x, storage.y, game.ghost.x, game.ghost.y)
-        : null;
-    const haul =
-      path && storage
-        ? walkSeconds(game, path, storage.x, storage.y, game.state.upgrades?.haul)
-        : null;
-    let supply = '';
-    if (sp.prod === 'gather') supply = resources.length + ' mature trees';
-    else if (sp.prod === 'rock') supply = resources.length + ' rock tiles';
-    else if (sp.resKind) {
-      let amount = 0;
-      for (let i = 0; i < resources.length; i++)
-        amount += game.tiles[resources[i]].deposit?.amt ?? 0;
-      supply = amount + ' ' + game.GOODS[sp.resKind].name.toLowerCase() + ' in reach';
-    } else if (sp.prod === 'fish')
-      supply = resources.length ? 'Shore in reach' : 'No shore in reach';
-    else if (sp.prod === 'plant') supply = resources.length + ' clear nursery tiles';
-    const summary =
-      (supply ? supply + ' · ' : '') +
-      (haul === null || !storage
-        ? 'No storage route'
-        : 'Estimated one-way walk: ~' +
-          haul.toFixed(1) +
-          's to ' +
-          game.BSPEC[storage.type].name.toLowerCase());
-    return (_placementCache = {
-      key: key,
-      x: game.ghost.x,
-      y: game.ghost.y,
-      resources: resources,
-      checks,
-      spending,
-      canBuild: checks.ok && spending.affordable,
-      operatingSupport: sp.water
-        ? {
-            ok: game.hasLocalWater(game.ghost),
-            reason: game.hasLocalWater(game.ghost)
-              ? 'Working connected Well within 6 tiles'
-              : 'No working connected Well within 6 tiles. Construction is allowed; production will wait.',
-          }
-        : null,
-      path: path,
-      storage: storage,
-      haulSeconds: haul,
-      summary: summary,
-    });
+    return game.previewPlacement(game.mode.bt, game.ghost);
   }
-  /** @returns {RoadPreview|null} */
   function getRoadPreview() {
     if (
       !game.mode ||
@@ -1711,64 +1550,7 @@ export function createRenderer(
       !game.inB(ht.x, ht.y)
     )
       return null;
-    const key =
-      game.anchor.x +
-      ':' +
-      game.anchor.y +
-      ':' +
-      ht.x +
-      ':' +
-      ht.y +
-      ':' +
-      logisticsWorldKey() +
-      ':' +
-      Math.floor(NOW / 600);
-    if (_roadCache && _roadCache.key === key) return _roadCache;
-    const plan = game.planRoad(game.anchor, ht);
-    if (plan.ok === false)
-      return (_roadCache = {
-        key: key,
-        ok: false,
-        reason:
-          plan.reason === 'blocked-start'
-            ? 'Road must start on clear ground inside your territory'
-            : 'No walking route connects these endpoints',
-        cost: {},
-        path: null,
-        paved: {},
-        count: 0,
-        beforeSeconds: 0,
-        afterSeconds: 0,
-        summary:
-          plan.reason === 'blocked-start'
-            ? 'Road must start on clear ground inside your territory'
-            : 'No route here',
-      });
-    const { path, paved: pave, count } = plan;
-    const haul = game.state.upgrades?.haul,
-      before = walkSeconds(game, path, game.anchor.x, game.anchor.y, haul),
-      after = walkSeconds(game, path, game.anchor.x, game.anchor.y, haul, pave);
-    const pct = before > 0 ? Math.round(((before - after) / before) * 100) : 0;
-    return (_roadCache = {
-      key: key,
-      ok: true,
-      reason: '',
-      cost: {},
-      path: path,
-      paved: pave,
-      count: count,
-      beforeSeconds: before,
-      afterSeconds: after,
-      summary:
-        count +
-        ' new tiles · 0 goods · estimated walk ~' +
-        before.toFixed(1) +
-        's → ' +
-        after.toFixed(1) +
-        's (' +
-        pct +
-        '% faster along this route)',
-    });
+    return game.previewRoad(game.anchor, ht);
   }
   const LABEL_FONT = '600 11px system-ui,sans-serif';
   function worldLabel(s: SceneLayer, x: number, y: number, label: string, color: string) {
@@ -2444,8 +2226,6 @@ export function createRenderer(
     borderDirty = true;
     for (let i = 0; i < game.owned.length; i++)
       if (game.owned[i] !== borderOwned[i]) miniTiles.add(i);
-    _placementCache = null;
-    _roadCache = null;
   });
   // A committed load clears every transient presentation cache through this one
   // sanctioned method; loaders never poke renderer internals field by field.
@@ -2459,8 +2239,6 @@ export function createRenderer(
     _seen = {};
     _warmup = false;
     macroCan = null;
-    _placementCache = null;
-    _roadCache = null;
     unitPoses = {};
     workPulses = {};
     borderReady = false;
@@ -2987,18 +2765,6 @@ export function createRenderer(
     get FX() {
       return FX;
     },
-    get _placementCache() {
-      return _placementCache;
-    },
-    set _placementCache(value: typeof _placementCache) {
-      _placementCache = value;
-    },
-    get _roadCache() {
-      return _roadCache;
-    },
-    set _roadCache(value: typeof _roadCache) {
-      _roadCache = value;
-    },
     initSky,
     nightAmt,
     rainAmt,
@@ -3085,8 +2851,6 @@ export interface RendererSubsystem {
     dust: (x: number, y: number) => void;
     pop: (x: number, y: number) => void;
   };
-  _placementCache: PlacementPreview | null;
-  _roadCache: RoadPreview | null;
   initSky: () => void;
   nightAmt: () => number;
   rainAmt: () => number;

@@ -349,82 +349,18 @@ test('pause and Reduced Motion keep eight-direction settlers in their resting po
   }
 });
 
-test('placement estimates refresh for paused haul upgrades and terrain edits', () => {
+test('the map previews only the active tool at the hovered site', () => {
   const e = renderer();
-  const initial = e.getPlacementPreview();
-  e.state.upgrades.haul = 1;
-  const upgraded = e.getPlacementPreview();
-  assert.ok(upgraded.haulSeconds < initial.haulSeconds);
-  for (let x = 49; x <= 52; x++) {
-    const i = e.idx(x, 48);
-    e.tiles[i].road = true;
-    e.drawTile(e.context, i);
-  }
-  const paved = e.getPlacementPreview();
-  assert.ok(paved.haulSeconds < upgraded.haulSeconds);
-  assert.equal(e.state.time, 0);
-});
-
-test('placement estimates use a newly completed nearer warehouse without adding a building', () => {
-  const e = renderer();
-  const store = e.newBuilding('warehouse', 51, 48);
-  e.buildings.push(store);
-  const initial = e.getPlacementPreview();
-  store.done = true;
-  const completed = e.getPlacementPreview();
-  assert.equal(completed.storage.id, store.id);
-  assert.ok(completed.haulSeconds < initial.haulSeconds);
-});
-
-test('a paused resource preview drops trees cleared for another construction site', () => {
-  const e = renderer();
-  e.mode.bt = 'lumberjack';
-  const tree = e.idx(54, 48);
-  e.tiles[tree].tree = 4;
-  assert.equal(e.getPlacementPreview().resources.includes(tree), true);
-  e.tiles[tree].tree = 0;
-  e.drawTile(e.context, tree);
-  assert.equal(e.getPlacementPreview().resources.includes(tree), false);
-});
-
-test('road estimates update immediately when tiles are paved within the same frame bucket', () => {
-  const e = renderer();
+  assert.equal(e.getPlacementPreview(), e.previewPlacement('sawmill', e.ghost));
+  e.ghost.in = false;
+  assert.equal(e.getPlacementPreview(), null);
   e.mode = { type: 'road' };
   e.anchor = { x: 50, y: 50 };
   e.ht = { x: 54, y: 50 };
+  e.hoverIn = false;
+  assert.equal(e.getRoadPreview(), null, 'no road preview while the pointer is off the map');
   e.hoverIn = true;
-  const before = e.getRoadPreview();
-  assert.equal(before.count, 5);
-  assert.equal(e.getRoadPreview(), before, 'unchanged frames reuse the cached preview');
-  for (const i of [e.idx(50, 50), ...before.path]) {
-    e.tiles[i].road = true;
-    e.drawTile(e.context, i);
-  }
-  const after = e.getRoadPreview();
-  assert.equal(after.count, 0);
-  assert.ok(after.beforeSeconds < before.beforeSeconds);
-});
-
-test('road previews display rejection labels without a route or travel estimates', () => {
-  const e = renderer();
-  e.mode = { type: 'road' };
-  e.anchor = { x: 48, y: 48 }; // Headquarters blocks the start.
-  e.ht = { x: 54, y: 50 };
-  e.hoverIn = true;
-  const blocked = e.getRoadPreview();
-  assert.match(blocked.summary, /start on clear ground inside your territory/);
-  const endpoint = e.idx(e.ht.x, e.ht.y);
-  e.tiles[endpoint].t = e.WATER;
-  e.drawTile(e.context, endpoint);
-  const unreachable = e.getRoadPreview();
-  assert.equal(unreachable.summary, 'No route here');
-  for (const preview of [blocked, unreachable]) {
-    assert.equal(preview.path, null);
-    assert.equal(preview.count, 0);
-    assert.deepEqual(preview.paved, {});
-    assert.equal(preview.beforeSeconds, 0);
-    assert.equal(preview.afterSeconds, 0);
-  }
+  assert.equal(e.getRoadPreview(), e.previewRoad(e.anchor, e.ht));
 });
 
 test('Reduced Motion keeps minimap attention markers steady', () => {
@@ -623,19 +559,6 @@ test('a producer blocked by colony reserves is drawn idle before its next simula
   );
   assert.equal(e.exportSave(), before, 'drawing idle cannot advance the colony');
   assert.equal(e.SR.getState(), rng);
-});
-
-test('a paused placement preview refreshes affordability immediately while unchanged frames reuse it', () => {
-  const e = renderer();
-  e.anyStorage().stock = { planks: 3, stone: 1, tools: 1 };
-  const before = e.getPlacementPreview();
-  assert.equal(before.canBuild, true);
-  assert.equal(e.getPlacementPreview(), before);
-  e.anyStorage().stock.planks = 2;
-  const after = e.getPlacementPreview();
-  assert.equal(after.checks.ok, true, 'the terrain remains suitable');
-  assert.equal(after.canBuild, false, 'spending becomes unavailable without aging simulation time');
-  assert.equal(after.spending.materials.find((row) => row.good === 'planks').available, 2);
 });
 
 test('night glow lights domestic windows but leaves mines and open yards dark', () => {

@@ -29,6 +29,7 @@ import type { HudSubsystem } from './ui/hud.ts';
 import type { EventsSubsystem } from './core/events.ts';
 import type { AdvisorSubsystem } from './gameplay/advisor.ts';
 import type { RoadsSubsystem } from './simulation/roads.ts';
+import type { PreviewsSubsystem } from './gameplay/previews.ts';
 import type { EngineSubsystem } from './simulation/engine.ts';
 import type { InteractionSubsystem } from './ui/interaction.ts';
 import type { MessagesSubsystem } from './ui/messages.ts';
@@ -42,6 +43,7 @@ export type GameRuntime = ReferenceViewSubsystem &
   EventsSubsystem &
   AdvisorSubsystem &
   RoadsSubsystem &
+  PreviewsSubsystem &
   EngineSubsystem &
   InteractionSubsystem &
   MessagesSubsystem &

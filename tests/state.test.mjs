@@ -64,8 +64,6 @@ function colony(seed = 2024) {
       _warmup: false,
       _prevWon: false,
       macroCan: null,
-      _placementCache: null,
-      _roadCache: null,
       unitPoses: {},
       workPulses: {},
     },

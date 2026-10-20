@@ -23,6 +23,7 @@ import {
   type ProgressionSubsystem,
 } from '../gameplay/progression.ts';
 import { createAdvisor, type AdvisorSubsystem } from '../gameplay/advisor.ts';
+import { createPreviews, type PreviewsSubsystem } from '../gameplay/previews.ts';
 
 import { createEngineStartup, type EngineSubsystem } from './startup.ts';
 
@@ -38,6 +39,7 @@ export type SimulationEngine = WorldSubsystem &
   AttentionSubsystem &
   AutoplaySubsystem &
   RoadsSubsystem &
+  PreviewsSubsystem &
   ProgressionSubsystem &
   AdvisorSubsystem &
   PersistenceSubsystem &
@@ -71,6 +73,7 @@ export const DOMAIN_SUBSYSTEMS = [
   ),
   domainSubsystem('advisor', (game) => createAdvisor(game)),
   domainSubsystem('roads', (game) => createRoads(game)),
+  domainSubsystem('previews', (game) => createPreviews(game)),
   domainSubsystem('autoplay', (game, _options, hooks?: AutoplayInternals) =>
     createAutoplay(game, hooks),
   ),
