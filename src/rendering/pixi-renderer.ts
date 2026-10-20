@@ -535,7 +535,7 @@ export async function createPixiRenderer(internals?: PixiRendererInternals) {
     if (glTexture.target !== gl.TEXTURE_2D) return false;
     textures.bindSource(textureSource, 0);
     // Match onSourceUpdate's unpack state and keep Pixi's private cache truthful.
-    // Bracket access to the private member stays type-checked across Pixi upgrades.
+    // Bracket access to the private member fails type-check if a Pixi upgrade removes it.
     const premultiply = textureSource.alphaMode === 'premultiply-alpha-on-upload';
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, premultiply);
     textures['_premultiplyAlpha'] = premultiply;

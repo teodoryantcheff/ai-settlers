@@ -8,7 +8,10 @@ export function goodsIn(inventory: Readonly<Partial<Record<Good, unknown>>>): Go
   return Object.keys(inventory) as Good[];
 }
 
-/** An inventory's goods with their amounts, in the same order as `goodsIn`. */
+/**
+ * An inventory's goods with their amounts, in the same order as `goodsIn`.
+ * Inventories hold a number for every good they name, never `undefined`.
+ */
 export function inventoryEntries(inventory: Readonly<Inventory>): [Good, number][] {
   return Object.entries(inventory) as [Good, number][];
 }

@@ -121,7 +121,7 @@ export function runScenarios(game: GameRuntime) {
         const sampleSpec = game.BSPEC[sample.type];
         if (sampleSpec.out) sample.stock[sampleSpec.out] = 6;
         if (sampleSpec.in)
-          for (const ingredient of goodsIn(sampleSpec.in ?? {})) sample.stock[ingredient] = 4;
+          for (const ingredient of goodsIn(sampleSpec.in)) sample.stock[ingredient] = 4;
       }
       const stageMatch = location.search.match(/[?&]stage=(0|1|2|3)(?:&|$)/);
       if (nb2 && stageMatch) nb2.constructionProgress = [0.1, 0.4, 0.7, 0.93][+stageMatch[1]];
