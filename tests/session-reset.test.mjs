@@ -14,8 +14,13 @@ function colony(seed) {
 test('new colony resets the real graph to a reproducible fresh world with live bindings', () => {
   const game = colony(2024),
     expected = colony(42);
+  const other = colony(7),
+    otherBefore = other.exportSave();
   const state = game.state,
-    oldBuildings = game.buildings;
+    oldBuildings = game.buildings,
+    oldTiles = game.tiles,
+    oldUnits = game.units,
+    oldRng = game.SR;
   game.placeBuilding('farm', 51, 48);
   for (let i = 0; i < 60; i++) game.step(0.25);
   game.state.auto = true;
@@ -24,6 +29,9 @@ test('new colony resets the real graph to a reproducible fresh world with live b
   game.resetColony(42);
   assert.equal(game.state, state);
   assert.notEqual(game.buildings, oldBuildings);
+  assert.notEqual(game.tiles, oldTiles);
+  assert.notEqual(game.units, oldUnits);
+  assert.notEqual(game.SR, oldRng);
   assert.equal(game.byId(game.anyStorage().id), game.buildings[0]);
   assert.deepEqual(JSON.parse(game.exportSave()), JSON.parse(expected.exportSave()));
   for (let i = 0; i < 120; i++) {
@@ -31,6 +39,7 @@ test('new colony resets the real graph to a reproducible fresh world with live b
     expected.step(1 / 60);
   }
   assert.deepEqual(JSON.parse(game.exportSave()), JSON.parse(expected.exportSave()));
+  assert.equal(other.exportSave(), otherBefore, 'reset and stepping cannot alter another graph');
   const before = game.exportSave();
   assert.throws(() => game.resetColony(NaN), /seed/i);
   assert.equal(game.exportSave(), before);

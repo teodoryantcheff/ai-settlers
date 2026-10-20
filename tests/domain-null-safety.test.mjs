@@ -48,6 +48,23 @@ test('false delivery destinations cannot masquerade as an absent building', () =
   rejectsWithoutAdoption(game, storage, data, /Missing drop destination/);
 });
 
+test('unknown whole-save shapes fail without replacing a colony or its checkpoints', () => {
+  const { game, storage } = colony();
+  for (const data of [
+    null,
+    [],
+    {},
+    { t: null },
+    { seed: 2024, nextId: 1, t: [null, [], [], [], []] },
+  ])
+    rejectsWithoutAdoption(
+      game,
+      storage,
+      data,
+      /Unsupported save format|Invalid world header|Wrong map dimensions/,
+    );
+});
+
 test('missing routes, completed lessons and absent outposts have explicit empty results', () => {
   const { game } = colony();
   assert.equal(game.findPath(-1, -1, 48, 48), null);

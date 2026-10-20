@@ -155,7 +155,17 @@ test('missing live carriers leave assignment evidence unavailable instead of inv
   const g = colony();
   const b = g.newBuilding('sawmill', 51, 48);
   Object.assign(b, { done: true, constructionProgress: 1 });
-  g.buildings.push(b);
+  const other = g.newBuilding('sawmill', 54, 48);
+  Object.assign(other, { done: true, constructionProgress: 1 });
+  g.buildings.push(b, other);
+  // A pending delivery elsewhere must still read as queued.
+  g.jobs.push({
+    kind: 'fetch',
+    good: 'logs',
+    to: other.id,
+    sourceId: g.anyStorage().id,
+    status: 'pending',
+  });
   g.jobs.push({
     kind: 'fetch',
     good: 'logs',
@@ -166,8 +176,15 @@ test('missing live carriers leave assignment evidence unavailable instead of inv
   // The transport report is read-only: it leaves the assignment record and
   // the rest of the colony unchanged.
   const before = JSON.stringify(g.snapshotGame());
-  const unknown = g.currentTransport().rows.find((row) => row.stage === 'unknown');
+  const { rows } = g.currentTransport();
+  const unknown = rows.find((row) => row.stage === 'unknown');
   assert.ok(unknown, 'assignment without a live carrier is unavailable, not queued');
+  assert.equal(rows.filter((row) => row.stage === 'unknown').length, 1);
+  assert.equal(
+    rows.filter((row) => row.stage === 'queued').length,
+    1,
+    'pending jobs stay queued beside the unavailable assignment',
+  );
   assert.equal(unknown.carrierId, null);
   assert.equal(unknown.route, null);
   assert.equal(g.jobs.at(-1).status, 'assigned', 'report leaves the assignment record unchanged');
