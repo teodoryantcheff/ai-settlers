@@ -15,6 +15,8 @@ import type {
   Unit,
 } from '../types.ts';
 import { observePresentation } from '../ui/domain-feedback.ts';
+import { workArea, workTiles } from '../gameplay/work-area.ts';
+import { walkSeconds } from '../simulation/travel.ts';
 import type { GameRuntime } from '../runtime.ts';
 import { requireCanvas2D } from './canvas-context.ts';
 import { createShadowCache } from './shadow-cache.ts';
@@ -1608,83 +1610,6 @@ export function createRenderer(
     }
     return key;
   }
-  function pathSeconds(path: number[], sx: number, sy: number, paved?: Record<number, boolean>) {
-    let seconds = 0,
-      px = sx,
-      py = sy;
-    for (let i = 0; i < path.length; i++) {
-      const n = path[i],
-        x = n % game.W,
-        y = (n / game.W) | 0;
-      let speed =
-        typeof game.speedOn === 'function'
-          ? game.speedOn({ x: px + 0.5, y: py + 0.5 }, n)
-          : 2.7 / game.moveCost(n);
-      // The preview only paves the exact clear, owned tiles commitRoad will accept.
-      if (paved && paved[n]) speed *= game.moveCost(n) / 0.3;
-      seconds += Math.hypot(x - px, y - py) / Math.max(0.1, speed);
-      px = x;
-      py = y;
-    }
-    return seconds;
-  }
-  function resourceWorkArea(type: BuildingType, x: number, y: number) {
-    const sp = game.BSPEC[type];
-    let r = sp.resKind ? 1 : sp.prod === 'fish' ? 2 : sp.rad || 0;
-    if (sp.prod === 'plant') {
-      let closest: Building | null = null,
-        dist = Infinity;
-      for (let i = 0; i < game.buildings.length; i++) {
-        const b = game.buildings[i];
-        if (!b.done || b.type !== 'lumberjack') continue;
-        const d = Math.abs(b.x - x) + Math.abs(b.y - y);
-        if (d < dist) {
-          dist = d;
-          closest = b;
-        }
-      }
-      if (closest) {
-        x = closest.x;
-        y = closest.y;
-        r = 5;
-      }
-    }
-    return { x: x, y: y, r: r };
-  }
-  function resourceTilesAt(type: BuildingType, x: number, y: number) {
-    const sp = game.BSPEC[type],
-      area = resourceWorkArea(type, x, y),
-      found = [],
-      r = area.r;
-    x = area.x;
-    y = area.y;
-    for (let yy = y - r; yy <= y + r; yy++)
-      for (let xx = x - r; xx <= x + r; xx++) {
-        if (!game.inB(xx, yy)) continue;
-        const dx = xx - x,
-          dy = yy - y;
-        if (!sp.resKind && sp.prod !== 'fish' && dx * dx + dy * dy > r * r) continue;
-        const i = game.idx(xx, yy),
-          tl = game.tiles[i];
-        let hit = false;
-        if (sp.prod === 'gather') hit = tl.tree >= 3;
-        else if (sp.prod === 'rock') hit = !!tl.rock;
-        else if (sp.prod === 'fish')
-          hit = tl.t === game.WATER && Math.max(Math.abs(dx), Math.abs(dy)) <= 2;
-        else if (sp.resKind)
-          hit = !!tl.deposit && tl.deposit.kind === sp.resKind && tl.deposit.amt > 0;
-        else if (sp.prod === 'plant')
-          hit =
-            tl.t === game.GRASS &&
-            !tl.tree &&
-            !tl.rock &&
-            !tl.road &&
-            !!game.owned[i] &&
-            !game.buildingAt(xx, yy);
-        if (hit) found.push(i);
-      }
-    return found;
-  }
   function placementStockKey(type: BuildingType) {
     const goods = Object.keys(game.BSPEC[type].cost || {}) as Good[];
     let key = '';
@@ -1725,13 +1650,16 @@ export function createRenderer(
     const checks = game.placementChecks(game.mode.bt, game.ghost.x, game.ghost.y);
     const spending = game.buildingAffordability(game.mode.bt, game.ghost);
     const sp = game.BSPEC[game.mode.bt],
-      resources = resourceTilesAt(game.mode.bt, game.ghost.x, game.ghost.y),
+      resources = workTiles(game, game.mode.bt, game.ghost),
       storage = game.nearestStoragePos(game.ghost.x, game.ghost.y);
     const path =
       storage && game.passI(game.idx(game.ghost.x, game.ghost.y))
         ? game.findPath(storage.x, storage.y, game.ghost.x, game.ghost.y)
         : null;
-    const haul = path && storage ? pathSeconds(path, storage.x, storage.y) : null;
+    const haul =
+      path && storage
+        ? walkSeconds(game, path, storage.x, storage.y, game.state.upgrades?.haul)
+        : null;
     let supply = '';
     if (sp.prod === 'gather') supply = resources.length + ' mature trees';
     else if (sp.prod === 'rock') supply = resources.length + ' rock tiles';
@@ -1817,8 +1745,9 @@ export function createRenderer(
             : 'No route here',
       });
     const { path, paved: pave, count } = plan;
-    const before = pathSeconds(path, game.anchor.x, game.anchor.y),
-      after = pathSeconds(path, game.anchor.x, game.anchor.y, pave);
+    const haul = game.state.upgrades?.haul,
+      before = walkSeconds(game, path, game.anchor.x, game.anchor.y, haul),
+      after = walkSeconds(game, path, game.anchor.x, game.anchor.y, haul, pave);
     const pct = before > 0 ? Math.round(((before - after) / before) * 100) : 0;
     return (_roadCache = {
       key: key,
@@ -1893,13 +1822,14 @@ export function createRenderer(
   function reachDraw(s: SceneLayer, type: BuildingType, x: number, y: number, resources: number[]) {
     const g = s.g,
       sp = game.BSPEC[type],
-      area = resourceWorkArea(type, x, y),
+      // Other producers show their building radius.
+      area = workArea(game, type, { x, y }) ?? { x, y, r: sp.rad || 0, shape: 'disc' },
       r = area.r * game.TS,
       fill = { color: 0x89cfb1, alpha: 0.04 },
       edge = { color: 0xb3e6c5, alpha: 0.72, width: 1 / z };
     x = area.x;
     y = area.y;
-    if (sp.resKind || sp.prod === 'fish')
+    if (area.shape !== 'disc')
       g.roundRect(
         (x - area.r) * game.TS,
         (y - area.r) * game.TS,
@@ -2146,7 +2076,7 @@ export function createRenderer(
           spec = game.BSPEC[rb.type];
         if (spec.store || spec.guard || !spec.rad || !visibleAt(rb.x, rb.y)) continue;
         if (++count > 18) break;
-        reachDraw(s, rb.type, rb.x, rb.y, resourceTilesAt(rb.type, rb.x, rb.y));
+        reachDraw(s, rb.type, rb.x, rb.y, workTiles(game, rb.type, rb));
       }
       _logisticsCaption = game.selected
         ? 'Resource reach · pale tiles can supply the selected building'

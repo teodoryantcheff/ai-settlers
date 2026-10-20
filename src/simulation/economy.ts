@@ -17,7 +17,15 @@ import {
   productionTiming,
   foodVarietyBonus,
 } from '../gameplay/production-rules.ts';
+import {
+  findWork,
+  nearestLumberjack,
+  scanArea,
+  workTiles,
+  type WorkAreaWorld,
+} from '../gameplay/work-area.ts';
 import type { SimulationStateSubsystem } from './state.ts';
+import { carrierSpeed } from './travel.ts';
 import type { WorldSubsystem } from '../core/world.ts';
 import type { AutoplaySubsystem } from './autoplay.ts';
 import type { NavigationSubsystem } from './navigation.ts';
@@ -813,9 +821,8 @@ export function createEconomy(
     // Resource checks are pure. These timers continue towards another attempt, unlike suspension.
     if (
       !reason &&
-      ((sp.prod === 'gather' && findTree(b, sp.rad) === undefined) ||
-        (sp.prod === 'rock' && findRock(b, sp.rad) === undefined) ||
-        (sp.prod === 'fish' && !hasWaterNear(b)))
+      (sp.prod === 'gather' || sp.prod === 'rock' || sp.prod === 'fish') &&
+      findWork(workWorld, b.type, b) === undefined
     )
       reason = 'resources';
     const output = sp.prod === 'gather' ? 2 : 1;
@@ -869,7 +876,7 @@ export function createEconomy(
     if (b.timer > 0) return;
     switch (sp.prod) {
       case 'gather': {
-        const tr = findTree(b, sp.rad);
+        const tr = findWork(workWorld, b.type, b);
         if (tr !== undefined) {
           game.tiles[tr].tree = 0;
           gameEvent('tileChanged', { index: tr });
@@ -883,27 +890,12 @@ export function createEconomy(
         break;
       }
       case 'plant': {
-        // replant around the nearest done lumberjack: every planted tree must be inside its rad-6
-        // chop zone (plant rad 5 around the LJ, gate on the LJ's own supply). Planting around the
-        // forester itself can fill the un-choppable crescent of its circle, close the gate and
-        // starve the pair (seen on ?autoplay&seed=2024).
-        let lb4: Building | null = null,
-          bd4 = 1e9;
-        for (let i6 = 0; i6 < game.buildings.length; i6++) {
-          const lb5 = game.buildings[i6];
-          if (lb5.done && lb5.type === 'lumberjack') {
-            const dd4 = Math.abs(lb5.x - b.x) + Math.abs(lb5.y - b.y);
-            if (dd4 < bd4) {
-              bd4 = dd4;
-              lb4 = lb5;
-            }
-          }
-        }
-        const tgt6 = lb4 || b,
-          gt6 = lb4 ? 20 : 25,
-          pr6 = lb4 ? 5 : sp.rad;
-        if (countTrees(tgt6, lb4 ? 6 : 7) < gt6) {
-          const p = randPlantSpot(tgt6, pr6);
+        // Replant inside the nearest lumberjack's chop zone and gate on that lumberjack's own
+        // supply. Planting around the forester itself can fill the un-choppable crescent of
+        // its circle, close the gate and starve the pair (seen on ?autoplay&seed=2024).
+        const lumberjack = nearestLumberjack(game, b);
+        if (countTrees(lumberjack || b, lumberjack ? 6 : 7) < (lumberjack ? 20 : 25)) {
+          const p = findWork(workWorld, b.type, b, () => game.SR() < 0.12);
           if (p !== undefined) {
             game.tiles[p].tree = 3;
             gameEvent('tileChanged', { index: p });
@@ -913,7 +905,7 @@ export function createEconomy(
         break;
       }
       case 'rock': {
-        const rk = findRock(b, sp.rad);
+        const rk = findWork(workWorld, b.type, b);
         const t2 = rk === undefined ? undefined : game.tiles[rk],
           rock = t2?.rock;
         if (rk !== undefined && t2 && rock) {
@@ -937,7 +929,7 @@ export function createEconomy(
         break;
       }
       case 'fish': {
-        if (!hasWaterNear(b)) {
+        if (findWork(workWorld, b.type, b) === undefined) {
           b.timer = 4;
           b.blockedReason = 'resources';
           break;
@@ -987,25 +979,36 @@ export function createEconomy(
       }
     }
   }
+  // Live bindings: imports replace the tile and building arrays.
+  const workWorld: WorkAreaWorld = {
+    get tiles() {
+      return game.tiles;
+    },
+    get owned() {
+      return game.owned;
+    },
+    get buildings() {
+      return game.buildings;
+    },
+    get BSPEC() {
+      return game.BSPEC;
+    },
+    DX: game.DX,
+    DY: game.DY,
+    GRASS: game.GRASS,
+    WATER: game.WATER,
+    MTN: game.MTN,
+    inB: (x, y) => game.inB(x, y),
+    idx: (x, y) => game.idx(x, y),
+    buildingAt,
+  };
   function forRadius<T>(
-    b: Building,
+    b: Pick<Building, 'x' | 'y'>,
     r: number | undefined,
     f: (i: number, x: number, y: number) => T | undefined,
   ) {
     if (r === undefined) return undefined;
-    for (let y = b.y - r; y <= b.y + r; y++)
-      for (let x = b.x - r; x <= b.x + r; x++) {
-        if (!game.inB(x, y)) continue;
-        if ((b.x - x) * (b.x - x) + (b.y - y) * (b.y - y) > r * r) continue;
-        const r2 = f(game.idx(x, y), x, y);
-        if (r2 !== undefined) return r2;
-      }
-    return undefined;
-  }
-  function findTree(b: Building, r: number | undefined) {
-    return forRadius(b, r, function (i) {
-      return game.tiles[i].tree >= 3 ? i : undefined;
-    });
+    return scanArea(game, { x: b.x, y: b.y, r, shape: 'disc' }, f);
   }
   function countTrees(b: Building, r: number) {
     let n = 0;
@@ -1014,50 +1017,15 @@ export function createEconomy(
     });
     return n;
   }
-  function findRock(b: Building, r: number | undefined) {
-    return forRadius(b, r, function (i) {
-      return game.tiles[i].rock ? i : undefined;
-    });
-  }
-  function randPlantSpot(b: Building, r: number | undefined) {
-    return forRadius(b, r, function (i, x, y) {
-      const tl = game.tiles[i];
-      return tl.t === game.GRASS &&
-        !tl.tree &&
-        !tl.rock &&
-        !tl.road &&
-        !buildingAt(x, y) &&
-        game.owned[i] &&
-        game.SR() < 0.12
-        ? i
-        : undefined;
-    });
-  }
-  function hasWaterNear(b: Building) {
-    for (let y = b.y - 2; y <= b.y + 2; y++)
-      for (let x = b.x - 2; x <= b.x + 2; x++)
-        if (game.inB(x, y) && game.tiles[game.idx(x, y)].t === game.WATER) return true;
-    return false;
-  }
   function mineDeposit(b: Building) {
-    for (let d = 0; d < 8; d++) {
-      const x = b.x + game.DX[d],
-        y = b.y + game.DY[d];
-      if (!game.inB(x, y)) continue;
-      const t = game.tiles[game.idx(x, y)];
-      if (
-        t.t === game.MTN &&
-        t.deposit &&
-        t.deposit.kind === game.BSPEC[b.type].resKind &&
-        t.deposit.amt > 0
-      ) {
-        t.deposit.amt--;
-        gameEvent('tileChanged', { index: game.idx(x, y) });
-        return true;
-      }
-    }
-    return false;
+    const i = findWork(workWorld, b.type, b),
+      deposit = i === undefined ? null : game.tiles[i].deposit;
+    if (i === undefined || !deposit) return false;
+    deposit.amt--;
+    gameEvent('tileChanged', { index: i });
+    return true;
   }
+
   function incomingStock(g: Good, bid: number) {
     let n = 0;
     for (let i = 0; i < game.jobs.length; i++)
@@ -1479,8 +1447,7 @@ export function createEconomy(
             Math.min(game.H - 1, Math.max(0, Math.floor(u.y))),
           )
         : destination;
-    const haul = game.state.upgrades ? Math.min(3, game.state.upgrades.haul || 0) : 0;
-    return (2.7 / game.moveCost(i)) * (1 + 0.12 * haul);
+    return carrierSpeed(game.moveCost(i), game.state.upgrades?.haul);
   }
   /** Preserve the narrower state transitions used by retries and cancelled pickups. */
   function resetCarrier(
@@ -1881,10 +1848,7 @@ export function createEconomy(
     }
     switch (sp.prod) {
       case 'gather': {
-        let trees = 0;
-        forRadius(b, sp.rad, function (i) {
-          if (game.tiles[i].tree >= 3) trees++;
-        });
+        const trees = workTiles(workWorld, b.type, b).length;
         if (trees === 0) lines.push({ t: 'NO TREES in range! Build a Forester nearby', w: true });
         else
           lines.push({
@@ -1899,10 +1863,7 @@ export function createEconomy(
         lines.push({ t: 'Planting saplings for the future', w: false });
         break;
       case 'rock': {
-        let rocks = 0;
-        forRadius(b, sp.rad, function (i) {
-          if (game.tiles[i].rock) rocks++;
-        });
+        const rocks = workTiles(workWorld, b.type, b).length;
         if (rocks === 0)
           lines.push({ t: 'NO ROCKS left in range! Rebuild the quarry elsewhere', w: true });
         else

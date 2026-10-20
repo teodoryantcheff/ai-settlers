@@ -1,5 +1,6 @@
 import type { WorldSubsystem } from '../core/world.ts';
 import type { Tile } from '../types.ts';
+import { ROAD_COST } from './travel.ts';
 
 export function createNavigation(game: NavigationDependencies): NavigationSubsystem {
   const NAVG = new Float32Array(game.W * game.H),
@@ -47,7 +48,7 @@ export function createNavigation(game: NavigationDependencies): NavigationSubsys
   }
   function moveCost(n: number) {
     const tl = game.tiles[n];
-    if (tl.road) return 0.3;
+    if (tl.road) return ROAD_COST;
     if (tl.tree) return 1.6;
     if (tl.t === game.SAND) return 1.15;
     return 1;
@@ -59,7 +60,8 @@ export function createNavigation(game: NavigationDependencies): NavigationSubsys
       by = (b / game.W) | 0,
       dx = Math.abs(ax - bx),
       dy = Math.abs(ay - by);
-    return 0.3 * (Math.max(dx, dy) + (Math.SQRT2 - 1) * Math.min(dx, dy));
+    // Admissible: no tile is cheaper than a road.
+    return ROAD_COST * (Math.max(dx, dy) + (Math.SQRT2 - 1) * Math.min(dx, dy));
   }
   const heapI: number[] = [],
     heapF: number[] = [];
@@ -176,7 +178,7 @@ export function createNavigation(game: NavigationDependencies): NavigationSubsys
 export interface NavigationSubsystem {
   landRegionTiles: Tile[] | null;
   connectedLand: (ax: number, ay: number, bx: number, by: number) => boolean;
-  moveCost: (n: number) => 1 | 0.3 | 1.6 | 1.15;
+  moveCost: (n: number) => 1 | typeof ROAD_COST | 1.6 | 1.15;
   /** Tile indexes from the first step after the start to the target, or null when unreachable. */
   findPath: (sx: number, sy: number, tx: number, ty: number) => number[] | null;
 }
