@@ -2,8 +2,8 @@
   "src/app.ts": {
     "node": {
       "lines": {
-        "uncovered": 20,
-        "total": 22
+        "uncovered": 24,
+        "total": 26
       },
       "branches": {
         "uncovered": 4,
@@ -13,7 +13,7 @@
     "browser": {
       "lines": {
         "uncovered": 3,
-        "total": 30
+        "total": 38
       },
       "branches": {
         "uncovered": 3,
@@ -28,18 +28,18 @@
         "total": 66
       },
       "branches": {
-        "uncovered": 2,
-        "total": 7
+        "uncovered": 4,
+        "total": 9
       }
     },
     "browser": {
       "lines": {
         "uncovered": 1,
-        "total": 71
+        "total": 72
       },
       "branches": {
         "uncovered": 5,
-        "total": 11
+        "total": 13
       }
     }
   },
@@ -78,11 +78,11 @@
     },
     "browser": {
       "lines": {
-        "uncovered": 122,
+        "uncovered": 81,
         "total": 231
       },
       "branches": {
-        "uncovered": 41,
+        "uncovered": 38,
         "total": 73
       }
     }
@@ -210,11 +210,11 @@
     },
     "browser": {
       "lines": {
-        "uncovered": 176,
+        "uncovered": 77,
         "total": 541
       },
       "branches": {
-        "uncovered": 88,
+        "uncovered": 57,
         "total": 195
       }
     }
@@ -232,11 +232,11 @@
     },
     "browser": {
       "lines": {
-        "uncovered": 77,
+        "uncovered": 68,
         "total": 391
       },
       "branches": {
-        "uncovered": 45,
+        "uncovered": 44,
         "total": 99
       }
     }
@@ -310,18 +310,18 @@
   "src/core/persistence.ts": {
     "node": {
       "lines": {
-        "uncovered": 47,
-        "total": 432
+        "uncovered": 43,
+        "total": 438
       },
       "branches": {
-        "uncovered": 28,
+        "uncovered": 23,
         "total": 123
       }
     },
     "browser": {
       "lines": {
-        "uncovered": 70,
-        "total": 507
+        "uncovered": 69,
+        "total": 514
       },
       "branches": {
         "uncovered": 81,
@@ -333,21 +333,21 @@
     "node": {
       "lines": {
         "uncovered": 14,
-        "total": 135
+        "total": 134
       },
       "branches": {
         "uncovered": 14,
-        "total": 74
+        "total": 73
       }
     },
     "browser": {
       "lines": {
         "uncovered": 22,
-        "total": 149
+        "total": 147
       },
       "branches": {
-        "uncovered": 52,
-        "total": 122
+        "uncovered": 51,
+        "total": 120
       }
     }
   },
@@ -377,7 +377,7 @@
     "node": {
       "lines": {
         "uncovered": 29,
-        "total": 571
+        "total": 569
       },
       "branches": {
         "uncovered": 30,
@@ -387,7 +387,7 @@
     "browser": {
       "lines": {
         "uncovered": 74,
-        "total": 595
+        "total": 593
       },
       "branches": {
         "uncovered": 275,
@@ -420,18 +420,18 @@
   "src/gameplay/advisor.ts": {
     "node": {
       "lines": {
-        "uncovered": 9,
+        "uncovered": 10,
         "total": 279
       },
       "branches": {
-        "uncovered": 9,
+        "uncovered": 10,
         "total": 215
       }
     },
     "browser": {
       "lines": {
         "uncovered": 61,
-        "total": 314
+        "total": 316
       },
       "branches": {
         "uncovered": 118,
@@ -461,6 +461,28 @@
       }
     }
   },
+  "src/gameplay/previews.ts": {
+    "node": {
+      "lines": {
+        "uncovered": 14,
+        "total": 173
+      },
+      "branches": {
+        "uncovered": 21,
+        "total": 76
+      }
+    },
+    "browser": {
+      "lines": {
+        "uncovered": 32,
+        "total": 235
+      },
+      "branches": {
+        "uncovered": 64,
+        "total": 111
+      }
+    }
+  },
   "src/gameplay/production-rules.ts": {
     "node": {
       "lines": {
@@ -486,21 +508,43 @@
   "src/gameplay/progression.ts": {
     "node": {
       "lines": {
-        "uncovered": 6,
-        "total": 184
+        "uncovered": 3,
+        "total": 161
       },
       "branches": {
-        "uncovered": 7,
-        "total": 56
+        "uncovered": 3,
+        "total": 40
       }
     },
     "browser": {
       "lines": {
-        "uncovered": 19,
-        "total": 230
+        "uncovered": 16,
+        "total": 209
       },
       "branches": {
-        "uncovered": 37,
+        "uncovered": 25,
+        "total": 63
+      }
+    }
+  },
+  "src/gameplay/work-area.ts": {
+    "node": {
+      "lines": {
+        "uncovered": 4,
+        "total": 126
+      },
+      "branches": {
+        "uncovered": 5,
+        "total": 58
+      }
+    },
+    "browser": {
+      "lines": {
+        "uncovered": 13,
+        "total": 150
+      },
+      "branches": {
+        "uncovered": 36,
         "total": 86
       }
     }
@@ -530,22 +574,22 @@
   "src/observations/attention.ts": {
     "node": {
       "lines": {
-        "uncovered": 17,
-        "total": 369
+        "uncovered": 10,
+        "total": 384
       },
       "branches": {
-        "uncovered": 11,
-        "total": 119
+        "uncovered": 10,
+        "total": 121
       }
     },
     "browser": {
       "lines": {
-        "uncovered": 63,
-        "total": 429
+        "uncovered": 68,
+        "total": 446
       },
       "branches": {
-        "uncovered": 100,
-        "total": 200
+        "uncovered": 101,
+        "total": 202
       }
     }
   },
@@ -640,11 +684,11 @@
   "src/rendering/landscape.ts": {
     "node": {
       "lines": {
-        "uncovered": 87,
+        "uncovered": 152,
         "total": 663
       },
       "branches": {
-        "uncovered": 71,
+        "uncovered": 110,
         "total": 279
       }
     },
@@ -659,25 +703,47 @@
       }
     }
   },
-  "src/rendering/painted-assets.ts": {
+  "src/rendering/native-object.ts": {
     "node": {
       "lines": {
-        "uncovered": 215,
-        "total": 252
+        "uncovered": 68,
+        "total": 69
       },
       "branches": {
-        "uncovered": 71,
-        "total": 74
+        "uncovered": 20,
+        "total": 20
       }
     },
     "browser": {
       "lines": {
-        "uncovered": 22,
-        "total": 271
+        "uncovered": 7,
+        "total": 71
       },
       "branches": {
-        "uncovered": 29,
-        "total": 106
+        "uncovered": 9,
+        "total": 32
+      }
+    }
+  },
+  "src/rendering/painted-assets.ts": {
+    "node": {
+      "lines": {
+        "uncovered": 195,
+        "total": 232
+      },
+      "branches": {
+        "uncovered": 68,
+        "total": 71
+      }
+    },
+    "browser": {
+      "lines": {
+        "uncovered": 20,
+        "total": 249
+      },
+      "branches": {
+        "uncovered": 25,
+        "total": 97
       }
     }
   },
@@ -728,22 +794,22 @@
   "src/rendering/pixi-renderer.ts": {
     "node": {
       "lines": {
-        "uncovered": 523,
-        "total": 537
+        "uncovered": 595,
+        "total": 610
       },
       "branches": {
-        "uncovered": 168,
-        "total": 168
+        "uncovered": 191,
+        "total": 191
       }
     },
     "browser": {
       "lines": {
-        "uncovered": 31,
-        "total": 575
+        "uncovered": 34,
+        "total": 655
       },
       "branches": {
-        "uncovered": 53,
-        "total": 270
+        "uncovered": 61,
+        "total": 308
       }
     }
   },
@@ -772,22 +838,22 @@
   "src/rendering/renderer.ts": {
     "node": {
       "lines": {
-        "uncovered": 1317,
-        "total": 2772
+        "uncovered": 1229,
+        "total": 2620
       },
       "branches": {
-        "uncovered": 567,
-        "total": 1078
+        "uncovered": 512,
+        "total": 1002
       }
     },
     "browser": {
       "lines": {
-        "uncovered": 422,
-        "total": 2952
+        "uncovered": 326,
+        "total": 2783
       },
       "branches": {
-        "uncovered": 564,
-        "total": 1628
+        "uncovered": 468,
+        "total": 1509
       }
     }
   },
@@ -805,7 +871,7 @@
     "browser": {
       "lines": {
         "uncovered": 1,
-        "total": 123
+        "total": 128
       },
       "branches": {
         "uncovered": 11,
@@ -848,11 +914,11 @@
     },
     "browser": {
       "lines": {
-        "uncovered": 64,
+        "uncovered": 25,
         "total": 716
       },
       "branches": {
-        "uncovered": 111,
+        "uncovered": 81,
         "total": 378
       }
     }
@@ -882,22 +948,22 @@
   "src/simulation/assembly.ts": {
     "node": {
       "lines": {
-        "uncovered": 0,
-        "total": 58
+        "uncovered": 6,
+        "total": 62
       },
       "branches": {
-        "uncovered": 0,
-        "total": 2
+        "uncovered": 1,
+        "total": 4
       }
     },
     "browser": {
       "lines": {
         "uncovered": 1,
-        "total": 83
+        "total": 90
       },
       "branches": {
         "uncovered": 1,
-        "total": 2
+        "total": 4
       }
     }
   },
@@ -915,7 +981,7 @@
     "browser": {
       "lines": {
         "uncovered": 424,
-        "total": 579
+        "total": 580
       },
       "branches": {
         "uncovered": 530,
@@ -948,22 +1014,22 @@
   "src/simulation/economy.ts": {
     "node": {
       "lines": {
-        "uncovered": 189,
-        "total": 2046
+        "uncovered": 169,
+        "total": 1943
       },
       "branches": {
-        "uncovered": 165,
-        "total": 1297
+        "uncovered": 145,
+        "total": 1189
       }
     },
     "browser": {
       "lines": {
-        "uncovered": 398,
-        "total": 2239
+        "uncovered": 365,
+        "total": 2150
       },
       "branches": {
-        "uncovered": 875,
-        "total": 1892
+        "uncovered": 805,
+        "total": 1753
       }
     }
   },
@@ -1015,7 +1081,7 @@
     "node": {
       "lines": {
         "uncovered": 5,
-        "total": 168
+        "total": 169
       },
       "branches": {
         "uncovered": 2,
@@ -1025,7 +1091,7 @@
     "browser": {
       "lines": {
         "uncovered": 8,
-        "total": 180
+        "total": 181
       },
       "branches": {
         "uncovered": 45,
@@ -1121,6 +1187,28 @@
       }
     }
   },
+  "src/simulation/stock-ledger.ts": {
+    "node": {
+      "lines": {
+        "uncovered": 2,
+        "total": 116
+      },
+      "branches": {
+        "uncovered": 3,
+        "total": 38
+      }
+    },
+    "browser": {
+      "lines": {
+        "uncovered": 6,
+        "total": 149
+      },
+      "branches": {
+        "uncovered": 30,
+        "total": 62
+      }
+    }
+  },
   "src/simulation/transport.ts": {
     "node": {
       "lines": {
@@ -1140,6 +1228,28 @@
       "branches": {
         "uncovered": 13,
         "total": 51
+      }
+    }
+  },
+  "src/simulation/travel.ts": {
+    "node": {
+      "lines": {
+        "uncovered": 0,
+        "total": 31
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 6
+      }
+    },
+    "browser": {
+      "lines": {
+        "uncovered": 0,
+        "total": 35
+      },
+      "branches": {
+        "uncovered": 0,
+        "total": 6
       }
     }
   },
@@ -1234,11 +1344,11 @@
   "src/ui/domain-feedback.ts": {
     "node": {
       "lines": {
-        "uncovered": 19,
+        "uncovered": 34,
         "total": 148
       },
       "branches": {
-        "uncovered": 9,
+        "uncovered": 19,
         "total": 35
       }
     },
@@ -1310,11 +1420,11 @@
     },
     "browser": {
       "lines": {
-        "uncovered": 12,
+        "uncovered": 11,
         "total": 285
       },
       "branches": {
-        "uncovered": 54,
+        "uncovered": 51,
         "total": 184
       }
     }
@@ -1322,21 +1432,21 @@
   "src/ui/hud.ts": {
     "node": {
       "lines": {
-        "uncovered": 629,
-        "total": 1226
+        "uncovered": 633,
+        "total": 1229
       },
       "branches": {
-        "uncovered": 299,
+        "uncovered": 300,
         "total": 596
       }
     },
     "browser": {
       "lines": {
-        "uncovered": 163,
-        "total": 1284
+        "uncovered": 147,
+        "total": 1288
       },
       "branches": {
-        "uncovered": 293,
+        "uncovered": 291,
         "total": 934
       }
     }
@@ -1359,7 +1469,7 @@
       },
       "branches": {
         "uncovered": 177,
-        "total": 474
+        "total": 476
       }
     }
   },
@@ -1398,11 +1508,11 @@
     },
     "browser": {
       "lines": {
-        "uncovered": 2,
+        "uncovered": 1,
         "total": 52
       },
       "branches": {
-        "uncovered": 16,
+        "uncovered": 15,
         "total": 51
       }
     }
@@ -1508,11 +1618,11 @@
     },
     "browser": {
       "lines": {
-        "uncovered": 5,
+        "uncovered": 4,
         "total": 57
       },
       "branches": {
-        "uncovered": 14,
+        "uncovered": 13,
         "total": 34
       }
     }
@@ -1706,11 +1816,11 @@
     },
     "browser": {
       "lines": {
-        "uncovered": 19,
+        "uncovered": 17,
         "total": 170
       },
       "branches": {
-        "uncovered": 36,
+        "uncovered": 35,
         "total": 98
       }
     }
@@ -1754,7 +1864,7 @@
         "total": 370
       },
       "branches": {
-        "uncovered": 105,
+        "uncovered": 104,
         "total": 261
       }
     }

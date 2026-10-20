@@ -163,6 +163,15 @@ test('missing live carriers leave assignment evidence unavailable instead of inv
     sourceId: g.anyStorage().id,
     status: 'assigned',
   });
+  // The transport report is read-only: it leaves the assignment record and
+  // the rest of the colony unchanged.
+  const before = JSON.stringify(g.snapshotGame());
+  const unknown = g.currentTransport().rows.find((row) => row.stage === 'unknown');
+  assert.ok(unknown, 'assignment without a live carrier is unavailable, not queued');
+  assert.equal(unknown.carrierId, null);
+  assert.equal(unknown.route, null);
+  assert.equal(g.jobs.at(-1).status, 'assigned', 'report leaves the assignment record unchanged');
+  assert.equal(JSON.stringify(g.snapshotGame()), before);
   assert.deepEqual(g.incomingDeliveryStages('logs', b.id), {
     queued: 0,
     assigned: 0,

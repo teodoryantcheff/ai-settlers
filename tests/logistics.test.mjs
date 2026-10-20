@@ -127,19 +127,3 @@ test('queued jobs, assigned pickup, physical cargo and recovered cargo remain di
   for (let i = 0; i < 20; i++) game.currentTransport();
   assert.equal(game.exportSave(), before);
 });
-
-test('assignment records without a live carrier have unavailable evidence, not queued status', () => {
-  const { game, hq } = colony();
-  game.ensureJobs();
-  game.spawnCarrier(hq);
-  game.startJob(game.units[0], game.jobs[0]);
-  game.units = [];
-  const before = JSON.stringify(game.snapshotGame());
-  const report = game.currentTransport();
-  assert.equal(report.rows[0].stage, 'unknown');
-  assert.equal(report.rows[0].carrierId, null);
-  assert.equal(report.rows[0].route, null);
-  assert.equal(report.rows.filter((row) => row.stage === 'queued').length, game.jobs.length - 1);
-  assert.equal(game.jobs[0].status, 'assigned', 'report leaves the assignment record unchanged');
-  assert.equal(JSON.stringify(game.snapshotGame()), before);
-});

@@ -57,7 +57,7 @@ npm test -- --file tests/validation.test.mjs --file tests/typecheck.test.mjs
 
 Pass exact paths to routine files in `tests/`; repeated selections run once in the suite's usual order. Missing files, globs, helper files, browser tests and soak tests are rejected before validation starts. Run plain `npm test` once at the end, before committing, to cover the full routine suite.
 
-`npm test` excludes the economy soak suite in `tests/soak/`, whose full autoplay playthroughs take several minutes. Run `npm run test:soak` after changing simulation, economy, logistics, autoplay or progression balance; it retains logs the same way. `ECONOMY_SEED=<n>`, `ECONOMY_SEEDS=<a,b>`, `ECONOMY_PROFILE=invest` and `ECONOMY_SECONDS=<limit>` narrow or extend a run. CI runs it in a parallel job; `npm run check` and `npm run deploy` do not.
+`npm test` excludes the soak suite in `tests/soak/`, whose full autoplay playthroughs — economy balance runs and the determinism-baseline hash matrix — take several minutes. The routine suite keeps one autoplay hash spot-check in `tests/layering.test.cjs`. Run `npm run test:soak` after changing simulation, economy, logistics, autoplay or progression balance; it retains logs the same way. `ECONOMY_SEED=<n>`, `ECONOMY_SEEDS=<a,b>`, `ECONOMY_PROFILE=invest` and `ECONOMY_SECONDS=<limit>` narrow or extend a run. CI runs it in a parallel job; `npm run check` and `npm run deploy` do not.
 
 Lint rules live in `.oxlintrc.json`. `no-var` and `prefer-const` apply to source, scripts and tests without exemptions; use `const` for bindings that are never reassigned and `let` for mutable bindings.
 

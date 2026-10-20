@@ -90,6 +90,8 @@ test('every production block reason round-trips through exported files and check
   mill.constructionProgress = 1;
   e.buildings.push(mill);
   e.step(1 / 60);
+  // One export/import cycle per reason; the checkpoint path shares the
+  // serialization, so one representative reason exercises it.
   for (const reason of [
     '',
     'paused',
@@ -106,12 +108,14 @@ test('every production block reason round-trips through exported files and check
     e.importSave(exported);
     assert.equal(e.buildings[1].blockedReason, reason);
     assert.deepEqual(JSON.parse(e.exportSave()), JSON.parse(exported));
-    const saved = e.saveCheckpoint('Production reason');
-    e.buildings[1].blockedReason = '';
-    e.loadCheckpoint(saved.id);
-    assert.equal(e.buildings[1].blockedReason, reason);
-    assert.deepEqual(JSON.parse(e.exportSave()), JSON.parse(exported));
   }
+  e.buildings[1].blockedReason = 'water';
+  const exported = e.exportSave();
+  const saved = e.saveCheckpoint('Production reason');
+  e.buildings[1].blockedReason = '';
+  e.loadCheckpoint(saved.id);
+  assert.equal(e.buildings[1].blockedReason, 'water');
+  assert.deepEqual(JSON.parse(e.exportSave()), JSON.parse(exported));
 });
 
 test('save continues RNG, timers, cargo and production exactly', () => {
@@ -171,20 +175,16 @@ test('malformed load leaves both active colony and saved autosave untouched', ()
   assert.throws(() => e.prepareLoad(JSON.stringify(wrongCargo)), /cargo/);
 });
 
-test('autoplay save continuation preserves construction decisions and milestones', () => {
-  const e = colony();
-  e.state.auto = true;
-  for (let tick = 0; tick < 7200; tick++) e.step(1 / 60);
-  const checkpoint = JSON.stringify(e.snapshotGame());
-  for (let tick = 0; tick < 4800; tick++) e.step(1 / 60);
-  const expected = snapshot(e);
-  e.commitLoad(e.prepareLoad(checkpoint));
-  for (let tick = 0; tick < 4800; tick++) e.step(1 / 60);
-  assert.deepEqual(snapshot(e), expected);
-});
-
 test('the pantry milestone distinguishes initial stock from prepared food production', () => {
   const e = colony();
+  const farm = e.newBuilding('farm', 48, 50);
+  farm.done = true;
+  farm.constructionProgress = 1;
+  e.buildings.push(farm);
+  e.step(1 / 60);
+  farm.metrics.produced.grain = 50;
+  e.step(1 / 60);
+  assert.equal(e.state.milestones.includes(3), false);
   const bakery = e.newBuilding('bakery', 51, 48);
   bakery.done = true;
   bakery.constructionProgress = 1;

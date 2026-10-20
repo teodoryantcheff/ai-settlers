@@ -1,126 +1,33 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createHash } = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
-const { createEngine } = require('../src/simulation/engine.ts');
-const { createPersistence } = require('../src/core/persistence.ts');
 const { createMessages } = require('../src/ui/messages.ts');
 const { createInteraction } = require('../src/ui/interaction.ts');
 const { attachSubsystem } = require('../src/core/attach.ts');
 const { bindDomainFeedback, observePresentation } = require('../src/ui/domain-feedback.ts');
-const { fakeStorage, installGlobals } = require('./helpers/game.cjs');
-function engine(seed = 2024) {
-  const storage = fakeStorage().localStorage;
-  const g = createEngine({ seed, storage });
-  g.initializeColony();
-  return g;
-}
-function snapshot(g) {
-  const hooks = {};
-  createPersistence(g, hooks);
-  return JSON.parse(JSON.stringify(hooks.snapshotGame()));
-}
-function run(seed, auto, record = false) {
-  const g = engine(seed);
-  const events = [];
-  if (record)
-    for (const name of [
-      'tileChanged',
-      'territoryChanged',
-      'buildingPlaced',
-      'buildingCompleted',
-      'buildingDemolished',
-      'roadBuilt',
-      'goodsProduced',
-      'goodsDelivered',
-      'outpostManned',
-      'milestoneReached',
-    ])
-      g.gameEvents.on(name, (e) => events.push(e));
-  g.state.auto = auto;
-  if (!auto) {
-    g.placeBuilding('lumberjack', 51, 48);
-    g.placeBuilding('sawmill', 48, 51);
-    g.commitRoad({ x: 49, y: 48 }, { x: 50, y: 51 });
-  }
-  for (let i = 0; i < 18000; i++) {
-    if (i === 9000 && !auto) g.demolish(g.buildings.find((b) => b.type === 'lumberjack'));
-    g.step(1 / 60, i >= 3000 && i < 4200);
-  }
-  if (record) assert.ok(events.length > 0);
-  return snapshot(g);
-}
-function historicalEconomySnapshot(value) {
-  const copy = structuredClone(value);
-  // Keep the original byte hashes: only field names changed, not simulation.
-  const historicalFields = {
-    reservedStock: 'res',
-    constructionProgress: 'prog',
-    manned: 'man',
-    foodBlockedNoticeSent: 'nofood',
-    rocksExhaustedNoticeSent: 'norock',
-  };
-  copy.b = copy.b.map((building) =>
-    Object.fromEntries(
-      Object.entries(building).map(([key, value]) => [historicalFields[key] || key, value]),
-    ),
-  );
-  copy.j = copy.j.map((job) => ({
-    kind: job.kind,
-    good: job.good || null,
-    to: job.to || 0,
-    s: job.kind === 'fetch' || job.kind === 'transfer' ? job.sourceId : 0,
-    from: job.kind === 'deliver' || job.kind === 'transfer' ? job.sourceId : 0,
-    state: job.status === 'pending' ? 'p' : 't',
-  }));
-  delete copy.identity;
-  delete copy.observations;
-  delete copy.attention;
-  for (const unit of copy.u) {
-    delete unit.carryProducer;
-    delete unit.carryWarehouseTransfer;
-  }
-  for (const building of copy.b) {
-    const metrics = building.metrics;
-    metrics.recent = metrics.recent
-      .filter((sample) => sample.elapsed >= metrics.elapsed - 120 - 1e-9)
-      .slice(-61);
-  }
-  return copy;
-}
-// SHA-256 of complete expanded-economy snapshots from the real
-// subsystem graph and seed/command sequence above. Removing snapshot metadata
-// was checked against the original hashes before updating these. The independent observed
-// run below must match too: event subscriptions cannot change simulation state.
-const baselines = [
-  [2024, false, 'b68e577e95a7667312133a008a0187e3bef839089862daac58d942ff7324ca0d'],
-  [42, true, '02381e7bd0747d1295dee75daaab9eee7847381ef1030221e6cf59643af08311'],
-  [2024, true, '216c80e961a8de5b4cdc2db7aaf9967ee6c35651df66f4070ae223267f6cd345'],
-];
-for (const [seed, auto, hash] of baselines)
-  test(`headless engine preserves baseline seed ${seed}, autoplay ${auto}`, () => {
-    const restore = installGlobals({
-      performance: undefined,
-      location: undefined,
-      localStorage: undefined,
-      document: undefined,
-      window: undefined,
-    });
-    try {
-      const plain = run(seed, auto);
-      assert.equal(Object.hasOwn(plain, 'economy'), false);
-      assert.equal(
-        createHash('sha256')
-          .update(JSON.stringify(historicalEconomySnapshot(plain)))
-          .digest('hex'),
-        hash,
-      );
-      assert.deepEqual(run(seed, auto, true), plain);
-    } finally {
-      restore();
-    }
+const { installGlobals } = require('./helpers/game.cjs');
+const { BASELINES, baselineHash, engine, run, snapshot } = require('./helpers/baselines.cjs');
+// The routine suite hashes one autoplay baseline; the full seed and manual
+// matrix lives in tests/soak/baseline-hashes.test.cjs.
+const ROUTINE_BASELINE = BASELINES.find(([seed, auto]) => seed === 2024 && auto === true);
+test(`headless engine preserves baseline seed ${ROUTINE_BASELINE[0]}, autoplay ${ROUTINE_BASELINE[1]}`, () => {
+  const restore = installGlobals({
+    performance: undefined,
+    location: undefined,
+    localStorage: undefined,
+    document: undefined,
+    window: undefined,
   });
+  try {
+    const plain = run(ROUTINE_BASELINE[0], ROUTINE_BASELINE[1]);
+    assert.equal(Object.hasOwn(plain, 'economy'), false);
+    assert.equal(baselineHash(plain), ROUTINE_BASELINE[2]);
+    assert.deepEqual(run(ROUTINE_BASELINE[0], ROUTINE_BASELINE[1], true), plain);
+  } finally {
+    restore();
+  }
+});
 test('headless contracts, upgrades, roads and loads preserve live arrays and atomic storage', () => {
   const g = engine();
   assert.ok(!('SND' in g) && !('FX' in g) && !('mode' in g) && !('msg' in g));
@@ -413,9 +320,7 @@ test('transfer, spending and demolition preserve the expanded-economy seed 123 s
   assert.equal(Object.hasOwn(plain, 'economy'), false);
   assert.deepEqual(transferSequence(), plain);
   assert.equal(
-    createHash('sha256')
-      .update(JSON.stringify(historicalEconomySnapshot(plain)))
-      .digest('hex'),
+    baselineHash(plain),
     '52728cf2c2aa265e18967c7f733f7f01351f6e0c1450a6af3eb07eee6685b426',
   );
 });

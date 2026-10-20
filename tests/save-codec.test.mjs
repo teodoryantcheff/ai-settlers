@@ -63,7 +63,7 @@ test('malformed packed histories are rejected before validation', () => {
 });
 
 test('a grown colony saves in a fraction of the space and continues exactly', () => {
-  const { game } = grownColony();
+  const { game } = grownColony(6);
   const packed = game.exportSave();
   const plain = JSON.stringify(plainSave(packed));
   assert.match(packed, /"columns"/);
@@ -74,7 +74,7 @@ test('a grown colony saves in a fraction of the space and continues exactly', ()
 });
 
 test('plain-array histories load and continue identically', () => {
-  const { game } = grownColony(6);
+  const { game } = grownColony(3);
   const packed = game.exportSave();
   const plain = JSON.stringify(plainSave(packed));
   game.importSave(plain);

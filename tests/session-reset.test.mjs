@@ -38,12 +38,14 @@ test('new colony resets the real graph to a reproducible fresh world with live b
 
 test('new colony identity is validated before replacing live state and visible at committed event', () => {
   const game = colony(2024);
-  let nameAtReplacement;
-  game.gameEvents.on('worldLoaded', () => {
+  let nameAtReplacement, reasonAtReplacement;
+  game.gameEvents.on('worldLoaded', ({ reason }) => {
     nameAtReplacement = game.colonyName;
+    reasonAtReplacement = reason;
   });
   game.resetColony(42, 'Oakbridge');
   assert.equal(nameAtReplacement, 'Oakbridge');
+  assert.equal(reasonAtReplacement, 'new');
   const before = game.exportSave();
   assert.throws(() => game.resetColony(123, 'x'.repeat(81)), /name/i);
   assert.equal(game.exportSave(), before);

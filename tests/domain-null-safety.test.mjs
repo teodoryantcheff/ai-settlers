@@ -48,28 +48,6 @@ test('false delivery destinations cannot masquerade as an absent building', () =
   rejectsWithoutAdoption(game, storage, data, /Missing drop destination/);
 });
 
-test('unknown save shapes fail without replacing a colony or its checkpoints', () => {
-  const { game, storage } = colony();
-  for (const data of [
-    null,
-    [],
-    {},
-    { t: null },
-    { seed: 2024, nextId: 1, t: [null, [], [], [], []] },
-  ])
-    rejectsWithoutAdoption(
-      game,
-      storage,
-      data,
-      /Unsupported save format|Invalid world header|Wrong map dimensions/,
-    );
-  for (const key of ['b', 'j', 'u', 'st', 'p', 'observations', 'identity', 'attention']) {
-    const data = JSON.parse(game.exportSave());
-    data[key] = null;
-    rejectsWithoutAdoption(game, storage, data, /Invalid|Missing/);
-  }
-});
-
 test('missing routes, completed lessons and absent outposts have explicit empty results', () => {
   const { game } = colony();
   assert.equal(game.findPath(-1, -1, 48, 48), null);

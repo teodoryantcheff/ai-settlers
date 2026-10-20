@@ -7,20 +7,6 @@ function colony() {
   game.initializeColony();
   return game;
 }
-test('pantry milestone requires prepared food production rather than initial stock or grain', () => {
-  const g = colony();
-  const farm = g.newBuilding('farm', 48, 50);
-  g.buildings.push(farm);
-  farm.done = true;
-  farm.metrics.produced.grain = 50;
-  g.gameTick();
-  assert.ok(!g.state.milestones.includes(3));
-  const bakery = g.newBuilding('bakery', 50, 50);
-  g.buildings.push(bakery);
-  bakery.metrics.produced.bread = 3;
-  g.gameTick();
-  assert.ok(g.state.milestones.includes(3));
-});
 test('advisor completes inland bread and metal prerequisites', () => {
   const g = colony();
   for (const type of ['lumberjack', 'sawmill', 'quarry', 'farm', 'mine_iron', 'mine_coal']) {

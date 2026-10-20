@@ -344,7 +344,6 @@ module.exports = {
   fakeDom,
   fakeWindow,
   fakeStorage,
-  recordingPresentation,
   recordingScene,
   DEFAULT_MODULES,
 };
