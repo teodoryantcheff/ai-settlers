@@ -116,8 +116,8 @@ export function createCatalogView(
     element: HTMLButtonElement;
   }> = [];
   const helpCleanup: Array<() => void> = [];
-  const search = requireElement<HTMLInputElement>('catalog-search');
-  const chain = requireElement<HTMLSelectElement>('catalog-chain');
+  const search = requireElement('catalog-search', HTMLInputElement);
+  const chain = requireElement('catalog-chain', HTMLSelectElement);
   function filter() {
     help.dismiss();
     const query = (search.value || '').trim().toLowerCase();

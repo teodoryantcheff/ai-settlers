@@ -10,10 +10,10 @@ export function createSaveView(game: GameRuntime): SaveViewSubsystem {
   const status = requireElement('save-status');
   const health = requireElement('save-health');
   const recovery = requireElement('save-recovery');
-  const colonyName = requireElement('colony-name') as HTMLInputElement;
-  const checkpointName = requireElement('checkpoint-name') as HTMLInputElement;
-  const renameName = requireElement('rename-checkpoint') as HTMLInputElement;
-  const code = requireElement('savecode') as HTMLTextAreaElement;
+  const colonyName = requireElement('colony-name', HTMLInputElement);
+  const checkpointName = requireElement('checkpoint-name', HTMLInputElement);
+  const renameName = requireElement('rename-checkpoint', HTMLInputElement);
+  const code = requireElement('savecode', HTMLTextAreaElement);
   let pending: (() => void) | null = null;
 
   function showStatus(message: string, failed = false) {
@@ -204,7 +204,7 @@ export function createSaveView(game: GameRuntime): SaveViewSubsystem {
     game.closeLayer('save-confirm');
     refreshSaveManager();
     game.openLayer('savedata', { blocking: true });
-    const utility = requireElement('utility') as HTMLDetailsElement;
+    const utility = requireElement('utility', HTMLDetailsElement);
     utility.open = false;
   }
   function closeSaveManager() {

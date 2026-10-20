@@ -12,6 +12,7 @@ import type {
   TilePoint,
   Unit,
 } from '../types.ts';
+import { requireElement } from '../ui/dom.ts';
 import { observePresentation } from '../ui/domain-feedback.ts';
 import { workArea, workTiles } from '../gameplay/work-area.ts';
 import type { GameRuntime } from '../runtime.ts';
@@ -417,8 +418,8 @@ export function createRenderer(
   }
 
   // ---------- camera ----------
-  const view = document.getElementById('view') as HTMLCanvasElement;
-  const mini = document.getElementById('mini') as HTMLCanvasElement,
+  const view = requireElement('view', HTMLCanvasElement);
+  const mini = requireElement('mini', HTMLCanvasElement),
     mctx = requireCanvas2D(mini, reportGraphicsFailure);
   let dpr = window.devicePixelRatio || 1,
     z = 1;

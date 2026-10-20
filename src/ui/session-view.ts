@@ -7,10 +7,10 @@ import type { SaveMetadata } from '../types.ts';
 /** One session boundary: layers suspend time; replacing a colony is deliberate. */
 export function createSessionView(game: GameRuntime): SessionSubsystem {
   const status = requireElement('welcome-status');
-  const continueButton = requireElement('continueb') as HTMLButtonElement;
+  const continueButton = requireElement('continueb', HTMLButtonElement);
   const form = requireElement('new-colony-form');
-  const nameInput = requireElement('new-colony-name') as HTMLInputElement;
-  const seedInput = requireElement('new-colony-seed') as HTMLInputElement;
+  const nameInput = requireElement('new-colony-name', HTMLInputElement);
+  const seedInput = requireElement('new-colony-seed', HTMLInputElement);
   let liveColony = game.started;
   let saved: SaveMetadata[] = [];
   let pendingNew: (() => void) | null = null;
@@ -139,20 +139,20 @@ export function createSessionView(game: GameRuntime): SessionSubsystem {
     element.setAttribute('role', game.preferencesHealth.status === 'failed' ? 'alert' : 'status');
   }
   function closeUtility() {
-    const utility = requireElement('utility') as HTMLDetailsElement;
+    const utility = requireElement('utility', HTMLDetailsElement);
     utility.open = false;
   }
   function openSettings() {
-    (requireElement('speedpref') as HTMLSelectElement).value = String(game.state.speed);
-    (requireElement('advisorpref') as HTMLInputElement).checked = game.advisorVisible;
-    (requireElement('mutepref') as HTMLInputElement).checked = game.muted;
-    (requireElement('musicpref') as HTMLInputElement).checked = game.musicOn;
+    requireElement('speedpref', HTMLSelectElement).value = String(game.state.speed);
+    requireElement('advisorpref', HTMLInputElement).checked = game.advisorVisible;
+    requireElement('mutepref', HTMLInputElement).checked = game.muted;
+    requireElement('musicpref', HTMLInputElement).checked = game.musicOn;
     for (const [id, value] of [
       ['musvol', game.musVol],
       ['sfxvol', game.sfxVol],
       ['ambvol', game.ambVol],
     ] as const) {
-      (requireElement(id) as HTMLInputElement).value = String(Math.round(value * 100));
+      requireElement(id, HTMLInputElement).value = String(Math.round(value * 100));
       requireElement(id + 'v').textContent = Math.round(value * 100) + '%';
     }
     settingsStatus();
@@ -188,21 +188,21 @@ export function createSessionView(game: GameRuntime): SessionSubsystem {
     game.closeLayer('session-confirm');
   };
   requireElement('protect-current-colony').onclick = () => game.openSaveManager();
-  (requireElement('speedpref') as HTMLSelectElement).onchange = (event) => {
+  requireElement('speedpref', HTMLSelectElement).onchange = (event) => {
     const value = Number((event.target as HTMLSelectElement).value);
     if ([1, 2, 4, 8].includes(value)) {
       game.state.speed = value as 1 | 2 | 4 | 8;
       game.persistPreferences();
     }
   };
-  (requireElement('advisorpref') as HTMLInputElement).onchange = (event) =>
+  requireElement('advisorpref', HTMLInputElement).onchange = (event) =>
     game.setAdvisorVisible((event.target as HTMLInputElement).checked);
-  (requireElement('mutepref') as HTMLInputElement).onchange = (event) => {
+  requireElement('mutepref', HTMLInputElement).onchange = (event) => {
     game.setMuted((event.target as HTMLInputElement).checked);
     requireElement('mute').style.opacity = game.muted ? '0.4' : '1';
     game.persistPreferences();
   };
-  (requireElement('musicpref') as HTMLInputElement).onchange = (event) => {
+  requireElement('musicpref', HTMLInputElement).onchange = (event) => {
     game.initAudio();
     game.setMusicVol((event.target as HTMLInputElement).checked);
     requireElement('musicb').classList.toggle('off', !game.musicOn);

@@ -689,7 +689,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
         game.presentationPrefs.overlay = p.overlay;
       if (p.adv === false) {
         advOn = false;
-        (requireElement('colony-guidance') as HTMLDetailsElement).open = false;
+        requireElement('colony-guidance', HTMLDetailsElement).open = false;
         requireElement('advb').className = '';
       }
     } catch (e) {
@@ -705,8 +705,8 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
   function applyPresentationPrefs() {
     game.setAtlasExpanded(game.presentationPrefs.atlasExpanded, false);
     requireElement('fps').hidden = !game.presentationPrefs.showFps;
-    (requireElement('fpspref') as HTMLInputElement).checked = game.presentationPrefs.showFps;
-    const atlasArt = requireElement<HTMLCanvasElement>('atlas-art');
+    requireElement('fpspref', HTMLInputElement).checked = game.presentationPrefs.showFps;
+    const atlasArt = requireElement('atlas-art', HTMLCanvasElement);
     if (game.drawSpriteIcon) {
       const context = requireCanvas2D(atlasArt, game.reportGraphicsFailure);
       context.clearRect(0, 0, atlasArt.width, atlasArt.height);
@@ -714,13 +714,10 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     }
     document.body.classList.toggle('reduced-motion', game.presentationPrefs.reducedMotion);
     document.body.classList.toggle('clarity-view', game.presentationPrefs.clarity);
-    (requireElement('motionpref') as HTMLInputElement).checked =
-      game.presentationPrefs.reducedMotion;
-    (requireElement('weatherpref') as HTMLInputElement).checked = game.presentationPrefs.weather;
-    (requireElement('claritypref') as HTMLInputElement).checked = game.presentationPrefs.clarity;
-    (requireElement('qualitypref') as HTMLSelectElement).value = String(
-      game.presentationPrefs.quality,
-    );
+    requireElement('motionpref', HTMLInputElement).checked = game.presentationPrefs.reducedMotion;
+    requireElement('weatherpref', HTMLInputElement).checked = game.presentationPrefs.weather;
+    requireElement('claritypref', HTMLInputElement).checked = game.presentationPrefs.clarity;
+    requireElement('qualitypref', HTMLSelectElement).value = String(game.presentationPrefs.quality);
     mapControls.update();
     mapControls.paint();
   }
@@ -796,7 +793,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
           setPaletteExpanded(false);
           requireElement('paletteb').focus();
         } else if (!e.repeat) cancelMode();
-        (requireElement('utility') as HTMLDetailsElement).open = false;
+        requireElement('utility', HTMLDetailsElement).open = false;
       }
       e.preventDefault();
       return;
@@ -880,7 +877,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
   }
   function setAdvisorVisible(visible: boolean) {
     advOn = visible;
-    (requireElement('colony-guidance') as HTMLDetailsElement).open = advOn;
+    requireElement('colony-guidance', HTMLDetailsElement).open = advOn;
     requireElement('advb').className = advOn ? 'on' : '';
     savePrefs();
   }
@@ -896,7 +893,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     }
     if (!advOn && guidance.contains(document.activeElement))
       requireElement('colony-guidance-summary').focus({ preventScroll: true });
-    (requireElement('utility') as HTMLDetailsElement).open = false;
+    requireElement('utility', HTMLDetailsElement).open = false;
   }
   function toggleAdvisorDetails() {
     const compact = requireElement('adv').classList.toggle('compact');
@@ -926,7 +923,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     }
     if (requireElement(id).classList.contains('hidden')) game.openLayer(id);
     else game.closeLayer(id);
-    (requireElement('utility') as HTMLDetailsElement).open = false;
+    requireElement('utility', HTMLDetailsElement).open = false;
     if (id === 'mix') {
       game.initAudio();
       for (const data of [
@@ -934,7 +931,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
         ['sfxvol', game.sfxVol],
         ['ambvol', game.ambVol],
       ] as [string, number][]) {
-        (requireElement(data[0]) as HTMLInputElement).value = String(Math.round(data[1] * 100));
+        requireElement(data[0], HTMLInputElement).value = String(Math.round(data[1] * 100));
         volLbl(data[0] + 'v', data[1]);
       }
     }
@@ -963,50 +960,50 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
   function volLbl(id: string, v: number) {
     requireElement(id).textContent = Math.round(v * 100) + '%';
   }
-  const musicVolume = requireElement('musvol') as HTMLInputElement;
+  const musicVolume = requireElement('musvol', HTMLInputElement);
   musicVolume.oninput = function () {
     game.setMusVol(+musicVolume.value / 100);
     volLbl('musvolv', +musicVolume.value / 100);
     savePrefsSoon();
   };
-  const sfxVolume = requireElement('sfxvol') as HTMLInputElement;
+  const sfxVolume = requireElement('sfxvol', HTMLInputElement);
   sfxVolume.oninput = function () {
     game.setSfxVol(+sfxVolume.value / 100);
     volLbl('sfxvolv', +sfxVolume.value / 100);
     savePrefsSoon();
   };
-  const ambienceVolume = requireElement('ambvol') as HTMLInputElement;
+  const ambienceVolume = requireElement('ambvol', HTMLInputElement);
   ambienceVolume.oninput = function () {
     game.setAmbVol(+ambienceVolume.value / 100);
     volLbl('ambvolv', +ambienceVolume.value / 100);
     savePrefsSoon();
   };
-  const motionPref = requireElement('motionpref') as HTMLInputElement;
+  const motionPref = requireElement('motionpref', HTMLInputElement);
   motionPref.onchange = function () {
     game.presentationPrefs.reducedMotion = motionPref.checked;
     applyPresentationPrefs();
     savePrefs();
   };
-  const fpsPref = requireElement('fpspref') as HTMLInputElement;
+  const fpsPref = requireElement('fpspref', HTMLInputElement);
   fpsPref.onchange = function () {
     game.presentationPrefs.showFps = fpsPref.checked;
     requireElement('fps').hidden = !fpsPref.checked;
     game.resize();
     savePrefs();
   };
-  const weatherPref = requireElement('weatherpref') as HTMLInputElement;
+  const weatherPref = requireElement('weatherpref', HTMLInputElement);
   weatherPref.onchange = function () {
     game.presentationPrefs.weather = weatherPref.checked;
     savePrefs();
   };
-  const qualityPref = requireElement('qualitypref') as HTMLSelectElement;
+  const qualityPref = requireElement('qualitypref', HTMLSelectElement);
   qualityPref.onchange = function () {
     if (+qualityPref.value !== 1 && +qualityPref.value !== 0.75) return;
     game.presentationPrefs.quality = +qualityPref.value as 1 | 0.75;
     game.resize();
     savePrefs();
   };
-  const clarityPref = requireElement('claritypref') as HTMLInputElement;
+  const clarityPref = requireElement('claritypref', HTMLInputElement);
   clarityPref.onchange = function () {
     game.presentationPrefs.clarity = clarityPref.checked;
     applyPresentationPrefs();
@@ -1021,7 +1018,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     game.gameplayHUD();
   };
   requireElement('colony-guidance').addEventListener('toggle', () => {
-    const open = (requireElement('colony-guidance') as HTMLDetailsElement).open;
+    const open = requireElement('colony-guidance', HTMLDetailsElement).open;
     if (open !== advOn) setAdvisorVisible(open);
   });
   requireElement('advb').className = 'on';
@@ -1088,7 +1085,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
   };
   function setPaletteExpanded(expanded: boolean) {
     transientHelp.dismiss();
-    (requireElement('palette') as HTMLDetailsElement).classList.toggle('compact', !expanded);
+    requireElement('palette').classList.toggle('compact', !expanded);
     requireElement('paletteitems').classList.toggle('hidden', !expanded);
     requireElement('catalog-controls').classList.toggle('hidden', !expanded);
     const button = requireElement('paletteb');

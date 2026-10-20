@@ -1,18 +1,36 @@
 /** Required page structure is a boot contract; missing controls must name themselves. */
-export function requireElement<T extends HTMLElement = HTMLElement>(
+export function requireElement(id: string, scope?: ParentNode): HTMLElement;
+/** As above, and the element must be the kind its caller uses. */
+export function requireElement<T extends HTMLElement>(
   id: string,
+  kind: abstract new () => T,
   scope?: ParentNode,
-): T {
-  const element = scope
-    ? [...scope.querySelectorAll<HTMLElement>('[id]')].find((node) => node.id === id)
+): T;
+export function requireElement(
+  id: string,
+  kindOrScope?: (abstract new () => HTMLElement) | ParentNode,
+  scope?: ParentNode,
+): HTMLElement {
+  const kind = typeof kindOrScope === 'function' ? kindOrScope : undefined;
+  const root = typeof kindOrScope === 'function' ? scope : kindOrScope;
+  const element = root
+    ? [...root.querySelectorAll<HTMLElement>('[id]')].find((node) => node.id === id)
     : document.getElementById(id);
   if (!element) throw new MissingElementError(id);
-  return element as T;
+  if (kind && !(element instanceof kind)) throw new WrongElementError(id, kind.name);
+  return element;
 }
 export class MissingElementError extends Error {
-  constructor(id: string) {
-    super('Missing required page element #' + id);
+  constructor(id: string, message = 'Missing required page element #' + id) {
+    super(message);
     this.name = 'MissingElementError';
+  }
+}
+/** A present element of another kind breaks the same boot contract as a missing one. */
+export class WrongElementError extends MissingElementError {
+  constructor(id: string, kind: string) {
+    super(id, 'Page element #' + id + ' is not ' + (/^[AEIOU]/.test(kind) ? 'an ' : 'a ') + kind);
+    this.name = 'WrongElementError';
   }
 }
 

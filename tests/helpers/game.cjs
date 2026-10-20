@@ -12,6 +12,26 @@ const MODULES = Object.fromEntries(SUBSYSTEMS.map(({ name, create }) => [name, c
 
 const DEFAULT_MODULES = DOMAIN_SUBSYSTEMS.map(({ name }) => name);
 
+// Element doubles are untyped, so checked page lookups (`requireElement(id, kind)`)
+// accept any double. A test can install a strict kind with `installGlobals`.
+for (const kind of [
+  'HTMLElement',
+  'HTMLButtonElement',
+  'HTMLCanvasElement',
+  'HTMLDetailsElement',
+  'HTMLInputElement',
+  'HTMLSelectElement',
+  'HTMLTextAreaElement',
+])
+  if (!(kind in globalThis))
+    globalThis[kind] = {
+      [kind]: class {
+        static [Symbol.hasInstance](value) {
+          return typeof value === 'object' && value !== null;
+        }
+      },
+    }[kind];
+
 // Presentation modules notify each other directly and production composes every
 // one, so runtime calls are unguarded. A partial graph gets a no-op for each
 // notification whose providing module it leaves out; a composed provider wins.

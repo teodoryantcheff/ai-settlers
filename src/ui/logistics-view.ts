@@ -150,8 +150,8 @@ export function createLogisticsView(game: GameRuntime): LogisticsViewSubsystem {
   function updateLogisticsView() {
     if (game.workspace !== 'logistics') return;
     const snapshot = game.currentTransport();
-    const stage = requireElement<HTMLSelectElement>('logistics-stage').value;
-    const query = requireElement<HTMLInputElement>('logistics-query').value.trim().toLowerCase();
+    const stage = requireElement('logistics-stage', HTMLSelectElement).value;
+    const query = requireElement('logistics-query', HTMLInputElement).value.trim().toLowerCase();
     const filtered = snapshot.rows.filter(
       (row) =>
         (stage === 'all' || row.stage === stage) &&

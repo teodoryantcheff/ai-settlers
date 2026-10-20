@@ -734,7 +734,7 @@ export function mountUIPrototype() {
         syncMap();
       }
     } else if (action === 'save-checkpoint') {
-      const name = requireElement<HTMLInputElement>('checkpoint-name', root).value.trim();
+      const name = requireElement('checkpoint-name', HTMLInputElement, root).value.trim();
       if (name) {
         saves.push({ name: name.slice(0, 60), type: 'Checkpoint', time: clock(), gold: 84 });
         toast('Checkpoint added to the in-memory preview.');
@@ -781,7 +781,7 @@ export function mountUIPrototype() {
         `${value} selected. This study previews selection; placement and economy changes belong to implementation.`,
       );
     } else if (action === 'new-colony') {
-      const name = requireElement<HTMLInputElement>('colony-name', root).value.trim() || 'Eastmere';
+      const name = requireElement('colony-name', HTMLInputElement, root).value.trim() || 'Eastmere';
       saves.unshift({ name: name.slice(0, 60), type: 'Preview', time: '00:00', gold: 0 });
       view = 'workspace';
       dialog = '';
@@ -790,7 +790,7 @@ export function mountUIPrototype() {
         'Setup preview complete. The map and economic figures remain the shared comparison fixture.',
       );
     } else if (action === 'import') {
-      const code = requireElement<HTMLTextAreaElement>('import-code', root).value.trim();
+      const code = requireElement('import-code', HTMLTextAreaElement, root).value.trim();
       toast(
         code
           ? 'Import flow preview complete. No colony was replaced.'

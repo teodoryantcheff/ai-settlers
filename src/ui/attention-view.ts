@@ -96,8 +96,8 @@ export function createAttentionView(game: GameRuntime): AttentionViewSubsystem {
         ? '<article class="attention-card urgent"><h2>Urgent · Graphics unavailable</h2><p>The renderer failed and the colony is paused. Follow the visible graphics recovery panel to reload. Stored checkpoints remain available.</p><button data-attention-save>Open saves and export recovery</button></article>'
         : '',
     ].filter(Boolean);
-    const query = (requireElement<HTMLInputElement>('attention-query').value || '').toLowerCase(),
-      severity = requireElement<HTMLSelectElement>('attention-severity').value;
+    const query = (requireElement('attention-query', HTMLInputElement).value || '').toLowerCase(),
+      severity = requireElement('attention-severity', HTMLSelectElement).value;
     const filtered = issues.filter(
       (issue) =>
         severity !== 'urgent' &&
@@ -137,9 +137,9 @@ export function createAttentionView(game: GameRuntime): AttentionViewSubsystem {
     );
     replace(host, 'attention-detail', detail(issues));
     const journal = game.activityHistory(),
-      filter = requireElement<HTMLInputElement>('activity-query').value.toLowerCase(),
-      priority = requireElement<HTMLSelectElement>('activity-severity').value,
-      window = requireElement<HTMLSelectElement>('activity-window').value;
+      filter = requireElement('activity-query', HTMLInputElement).value.toLowerCase(),
+      priority = requireElement('activity-severity', HTMLSelectElement).value,
+      window = requireElement('activity-window', HTMLSelectElement).value;
     const from =
       window === 'all'
         ? journal.started

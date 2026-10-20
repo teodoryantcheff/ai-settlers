@@ -146,7 +146,7 @@ export function createInspectorView(game: InspectorViewDependencies, feedback: P
       return;
     const b = game.byId(confirmationId);
     const content = requireElement('demolition-evidence');
-    const confirm = requireElement('demolition-confirm') as HTMLButtonElement;
+    const confirm = requireElement('demolition-confirm', HTMLButtonElement);
     if (!b) {
       content.textContent = 'This building no longer exists.';
       confirm.disabled = true;
@@ -291,7 +291,7 @@ export function createInspectorView(game: InspectorViewDependencies, feedback: P
     const el = requireElement('info');
     const b = game.selected;
     requireElement('inspectordock').hidden = !b && !game.selInfo && !game.removedContributor;
-    const illustration = requireElement<HTMLCanvasElement>('inspector-art');
+    const illustration = requireElement('inspector-art', HTMLCanvasElement);
     const type = b?.type || game.removedContributor?.type;
     illustration.hidden = !type;
     if (type && type !== illustratedType && game.drawSpriteIcon) {

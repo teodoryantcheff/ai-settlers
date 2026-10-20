@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { bootGame, reportBootError } = require('../src/bootstrap.ts');
-const { PAGE_ELEMENT_IDS } = require('../src/ui/dom.ts');
+const { MissingElementError, PAGE_ELEMENT_IDS, requireElement } = require('../src/ui/dom.ts');
 const {
   createGame,
   DEFAULT_MODULES,
@@ -62,6 +62,34 @@ test('a missing interface element stops assembly and the boot alert names its id
   assert.equal(dom.node('boot').dataset.stage, 'failed');
   assert.equal(dom.node('boot-progress').hidden, true);
   assert.equal(dom.node('boot-error-controls').hidden, false);
+});
+
+test('a page element of the wrong kind stops assembly and the boot alert names its id and kind', (t) => {
+  class Input {}
+  const dom = fakeDom();
+  dom.node('boot-error-controls').querySelector = () => fakeElement();
+  t.after(
+    installGlobals({
+      document: dom.document,
+      HTMLInputElement: Input,
+      console: { ...console, error() {} },
+    }),
+  );
+  const input = Object.assign(new Input(), { id: 'fpspref' });
+  const lookup = dom.document.getElementById;
+  dom.document.getElementById = (id) => (id === 'fpspref' ? input : lookup(id));
+  assert.equal(requireElement('fpspref', Input), input);
+  assert.throws(
+    () => requireElement('musicpref', Input),
+    (error) => {
+      assert.ok(error instanceof MissingElementError, 'boot treats it as page structure');
+      assert.match(error.message, /#musicpref is not an? Input/);
+      reportBootError(error);
+      return true;
+    },
+  );
+  assert.match(dom.node('boot-stage').textContent, /#musicpref is not an? Input/);
+  assert.equal(dom.node('boot').dataset.stage, 'failed');
 });
 
 for (const missing of [

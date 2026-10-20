@@ -17,8 +17,8 @@ interface Article {
 
 /** Search and contextual copy read the same specs and recipe rules as simulation. */
 export function createReferenceView(game: GameRuntime): ReferenceViewSubsystem {
-  const search = requireElement('reference-search') as HTMLInputElement;
-  const topic = requireElement('reference-topic') as HTMLSelectElement;
+  const search = requireElement('reference-search', HTMLInputElement);
+  const topic = requireElement('reference-topic', HTMLSelectElement);
   const results = requireElement('reference-results');
   let articles: Article[] = [];
   function buildingArticle(type: BuildingType): Article {

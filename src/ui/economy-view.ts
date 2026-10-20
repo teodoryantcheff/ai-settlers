@@ -210,8 +210,8 @@ export function createEconomyView(game: GameRuntime): EconomyViewSubsystem {
       ? `Observed ${number(measured.elapsed)} simulation seconds (${number(measured.from)}–${number(measured.to)}). ${window === 'lifetime' ? 'Lifetime means recorded coverage; older unrecorded history is unavailable.' : 'Two-second samples; partial windows show only actual coverage.'}`
       : 'History unavailable — gathering observations. Current stock remains available; missing measurements are not zero.';
     if (coverage.textContent !== text) coverage.textContent = text;
-    const query = requireElement<HTMLInputElement>('economy-query').value.trim().toLowerCase();
-    const chain = requireElement<HTMLSelectElement>('economy-chain').value;
+    const query = requireElement('economy-query', HTMLInputElement).value.trim().toLowerCase();
+    const chain = requireElement('economy-chain', HTMLSelectElement).value;
     const filtered = goods.filter((good) => {
       const group = RESOURCE_GROUPS.find((entry) => entry.goods.includes(good));
       return (
