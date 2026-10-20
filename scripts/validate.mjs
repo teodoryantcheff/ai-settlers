@@ -20,9 +20,9 @@ const nodeConcurrency = Math.max(1, Math.min(4, os.availableParallelism() - 2));
  * The validation plan. Steps without `after` start together; a step waits for the
  * steps it names and is skipped when one of them fails. Node tests run in one
  * `node --test` invocation, one process per file. `nodeOnly` is routine validation
- * and omits format, build and browsers; `soakOnly` runs just the slow soak suite in
+ * and omits build and browsers; `soakOnly` runs just the slow soak suite in
  * `tests/soak/`, which the full check does not include. `files` narrows routine Node
- * tests while preserving the repository-wide lint and typecheck steps.
+ * tests while preserving the repository-wide format, lint and typecheck steps.
  */
 export async function validationSteps(
   directory,
@@ -61,19 +61,15 @@ export async function validationSteps(
   }
   const routine = files.length ? tests.filter((name) => selected.has(name)) : tests;
   return [
-    ...(!nodeOnly
-      ? [
-          node('format', [
-            'node_modules/prettier/bin/prettier.cjs',
-            '--check',
-            'src',
-            'scripts',
-            'tests',
-            'index.html',
-            'tsconfig.json',
-          ]),
-        ]
-      : []),
+    node('format', [
+      'node_modules/prettier/bin/prettier.cjs',
+      '--check',
+      'src',
+      'scripts',
+      'tests',
+      'index.html',
+      'tsconfig.json',
+    ]),
     node('lint', [
       'node_modules/oxlint/bin/oxlint',
       '--deny-warnings',

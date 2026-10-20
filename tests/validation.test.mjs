@@ -167,7 +167,7 @@ test('the full plan runs every routine Node test file and browsers after the bui
   assert.ok(!plan.some((entry) => entry.args.some((arg) => arg.includes('soak'))));
   assert.deepEqual(
     (await validationSteps(root, { nodeOnly: true })).map((entry) => entry.name),
-    ['lint', 'typecheck', 'node-tests'],
+    ['format', 'lint', 'typecheck', 'node-tests'],
   );
   const [soak] = await validationSteps(root, { soakOnly: true });
   assert.ok(soak.args.includes(path.join('tests', 'soak', 'economy-autoplay.test.cjs')));
@@ -182,7 +182,7 @@ test('pull-request CI validates on the supported Node and never publishes', asyn
   assert.doesNotMatch(workflow, /secrets[.:]|deploy|wrangler|build:pages|CLOUDFLARE/i);
 });
 
-test('focused validation keeps lint and types and selects exact routine files once', async () => {
+test('focused validation keeps format, lint and types and selects exact routine files once', async () => {
   const root = path.resolve(import.meta.dirname, '..');
   const plan = await validationSteps(root, {
     nodeOnly: true,
@@ -194,7 +194,7 @@ test('focused validation keeps lint and types and selects exact routine files on
   });
   assert.deepEqual(
     plan.map((entry) => entry.name),
-    ['lint', 'typecheck', 'node-tests'],
+    ['format', 'lint', 'typecheck', 'node-tests'],
   );
   assert.deepEqual(plan.at(-1).args.slice(-2), [
     path.join('tests', 'typecheck.test.mjs'),

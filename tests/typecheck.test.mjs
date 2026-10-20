@@ -60,3 +60,20 @@ test('the main typecheck rejects null errors, retains diagnostics and accepts gu
   );
   await run();
 });
+
+test('the main TypeScript configuration keeps the whole strict family on', async () => {
+  const { compilerOptions } = JSON.parse(await fs.readFile(path.join(root, 'tsconfig.json')));
+  assert.equal(compilerOptions.strict, true);
+  const strictFamily = [
+    'alwaysStrict',
+    'noImplicitAny',
+    'noImplicitThis',
+    'strictBindCallApply',
+    'strictBuiltinIteratorReturn',
+    'strictFunctionTypes',
+    'strictNullChecks',
+    'strictPropertyInitialization',
+    'useUnknownInCatchVariables',
+  ];
+  for (const flag of strictFamily) assert.notEqual(compilerOptions[flag], false, flag);
+});

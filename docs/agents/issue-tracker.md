@@ -10,9 +10,17 @@ Issues, implementation tickets and new work specs live in [teodoryantcheff/ai-se
 - **Make an issue a sub-issue of a parent**: `gh issue create --parent <parent> ...`, or `gh issue edit <parent> --add-sub-issue <child>` afterwards (`gh` 2.94+). Older `gh`: `gh api --method POST repos/<owner>/<repo>/issues/<parent>/sub_issues -F sub_issue_id=<child-db-id>` (database id, as in **Blocking** below). Without sub-issues, put `Part of #<parent>` at the top of the child body.
 - **Comment on an issue**: `gh issue comment <number> --body "..."`
 - **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
-- **Close**: `gh issue close <number> --comment "..."`
+- **Close**: `gh issue close <number> --comment "..."`, after the checks in **Closing an issue** below.
 
-Inside this checkout, `gh` infers the repository from `origin`; outside it, pass `--repo teodoryantcheff/ai-settlers`. Claim implementation work with `gh issue edit <number> --add-assignee @me`. Record acceptance evidence before closing; use `Closes #<number>` in a pull request when resolution depends on merging it.
+Inside this checkout, `gh` infers the repository from `origin`; outside it, pass `--repo teodoryantcheff/ai-settlers`. Claim implementation work with `gh issue edit <number> --add-assignee @me`. Use `Closes #<number>` in a pull request when resolution depends on merging it.
+
+## Closing an issue
+
+These checks come first whether you close the issue directly or a merged pull request that says `Closes #<number>` closes it:
+
+- **Evidence**: record acceptance evidence in the closing comment or the pull request.
+- **Acceptance boxes**: tick each box the work meets in the issue body. Read the body with `gh issue view <number> --json body --jq .body`, change `- [ ]` to `- [x]`, and write it back with `gh issue edit <number> --body-file <path>`. Give the reason for every box left unticked.
+- **Follow-ups**: file each follow-up you name while closing as its own issue, and link it from the closing comment.
 
 ## Pull requests as a triage surface
 
