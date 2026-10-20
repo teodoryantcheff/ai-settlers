@@ -2603,8 +2603,23 @@ export function createRenderer(
       getRoadPreview,
       clarityBuildings,
       glowsDraw,
+      FXL,
     });
     Object.defineProperties(internals, {
+      macroCan: {
+        get: () => macroCan,
+        set: (value) => {
+          macroCan = value;
+        },
+        enumerable: true,
+      },
+      unitPoses: {
+        get: () => unitPoses,
+        set: (value) => {
+          unitPoses = value;
+        },
+        enumerable: true,
+      },
       terrainRevision: {
         get: () => terrainRevision,
         set: (value) => {
@@ -2657,9 +2672,6 @@ export function createRenderer(
     set borderDirty(value: typeof borderDirty) {
       borderDirty = value;
     },
-    get FXL() {
-      return FXL;
-    },
     get NOW() {
       return NOW;
     },
@@ -2672,12 +2684,6 @@ export function createRenderer(
     },
     tileHash,
     drawTile,
-    get macroCan() {
-      return macroCan;
-    },
-    set macroCan(value: typeof macroCan) {
-      macroCan = value;
-    },
     get view() {
       return view;
     },
@@ -2756,36 +2762,12 @@ export function createRenderer(
     },
     bldImg,
     drawSpriteIcon,
-    get unitPoses() {
-      return unitPoses;
-    },
-    set unitPoses(value: typeof unitPoses) {
-      unitPoses = value;
-    },
     get FX() {
       return FX;
     },
     initSky,
     nightAmt,
     rainAmt,
-    get _seen() {
-      return _seen;
-    },
-    set _seen(value: typeof _seen) {
-      _seen = value;
-    },
-    get _warmup() {
-      return _warmup;
-    },
-    set _warmup(value: typeof _warmup) {
-      _warmup = value;
-    },
-    get workPulses() {
-      return workPulses;
-    },
-    set workPulses(value: typeof workPulses) {
-      workPulses = value;
-    },
     resetPresentation,
     drawMini,
     draw,
@@ -2798,7 +2780,6 @@ export interface RendererSubsystem {
   readonly renderingAvailable: boolean;
   readonly sctx: CanvasRenderingContext2D;
   borderDirty: boolean;
-  readonly FXL: FXEffect[];
   NOW: number;
   renderPrefs: () => PresentationPreferences;
   readonly renderStats: {
@@ -2812,7 +2793,6 @@ export interface RendererSubsystem {
   };
   tileHash: (i: number) => number;
   drawTile: (g: CanvasRenderingContext2D, i: number) => void;
-  macroCan: HTMLCanvasElement | null;
   readonly view: HTMLCanvasElement;
   readonly mini: HTMLCanvasElement;
   z: number;
@@ -2843,7 +2823,6 @@ export interface RendererSubsystem {
     cy: number,
     size: number,
   ) => void;
-  unitPoses: Record<string, UnitPose>;
   readonly FX: {
     coin: (x: number, y: number) => void;
     ring: (x: number, y: number, c: string, r: number) => void;
@@ -2854,9 +2833,6 @@ export interface RendererSubsystem {
   initSky: () => void;
   nightAmt: () => number;
   rainAmt: () => number;
-  _seen: Record<string, SeenBuilding>;
-  _warmup: boolean;
-  workPulses: Record<string, WorkPulse>;
   resetPresentation: () => void;
   drawMini: () => void;
   draw: () => void;
@@ -2892,6 +2868,9 @@ export interface RendererInternals {
   getRoadPreview: () => RoadPreview | null;
   clarityBuildings: (s: SceneLayer) => void;
   glowsDraw: (s: SceneLayer) => void;
+  readonly FXL: FXEffect[];
+  macroCan: HTMLCanvasElement | null;
+  unitPoses: Record<string, UnitPose>;
   terrainRevision: number;
   miniDirty: boolean;
   atmosphereCount: number;

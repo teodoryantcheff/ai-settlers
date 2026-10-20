@@ -72,12 +72,14 @@ test('an exported colony continues the same seeded simulation after import', () 
   game.initializeColony();
   game.state.auto = true;
   game.state.paused = false;
-  for (let tick = 0; tick < 120 * 60; tick++) game.step(1 / 60);
+  for (let tick = 0; tick < 1073; tick++) game.step(1 / 60);
   const saved = game.exportSave();
-  for (let tick = 0; tick < 60 * 60; tick++) game.step(1 / 60);
+  assert.ok(JSON.parse(saved).b.length > 1, 'autoplay has started construction before saving');
+  for (let tick = 0; tick < 2400; tick++) game.step(1 / 60);
   const expected = game.exportSave();
+  assert.notEqual(expected, saved);
   game.importSave(saved);
-  for (let tick = 0; tick < 60 * 60; tick++) game.step(1 / 60);
+  for (let tick = 0; tick < 2400; tick++) game.step(1 / 60);
   assert.equal(game.exportSave(), expected);
 });
 

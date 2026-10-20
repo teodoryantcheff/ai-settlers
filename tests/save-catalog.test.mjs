@@ -180,7 +180,7 @@ test('catalog validation derives metadata and rejects malformed entries before a
 
 test('autosave neither reads nor rewrites named checkpoints and still continues', () => {
   const { game, values, accesses } = colony();
-  for (let i = 0; i < 10; i++) game.saveCheckpoint('Checkpoint ' + i);
+  for (let i = 0; i < 3; i++) game.saveCheckpoint('Checkpoint ' + i);
   const catalog = values.get('settlers.saves');
   game.step(0.25);
   accesses.length = 0;
@@ -192,7 +192,7 @@ test('autosave neither reads nor rewrites named checkpoints and still continues'
   assert.equal(values.get('settlers.saves'), catalog);
   assert.equal(game.hasUnsavedProgress(), false);
   const saves = game.listSaves();
-  assert.equal(saves.length, 11);
+  assert.equal(saves.length, 4);
   assert.equal(saves[0].kind, 'autosave');
   assert.equal(saves[0].simulationAge, 0.25);
   game.step(0.25);

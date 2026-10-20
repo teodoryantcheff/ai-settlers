@@ -44,7 +44,6 @@ function colony(seed = 2024) {
         gone: noop,
         man: noop,
       },
-      FXL: [],
       FX: { ring: noop, coin: noop, pop: noop },
       drawTile: noop,
       sctx: {},
@@ -60,12 +59,7 @@ function colony(seed = 2024) {
       lastGoodsHTML: null,
       lastInfoHTML: null,
       lastSpeedBtn: null,
-      _seen: {},
-      _warmup: false,
       _prevWon: false,
-      macroCan: null,
-      unitPoses: {},
-      workPulses: {},
     },
   });
   // Match the release bootstrap: a headquarters and eight carriers.
