@@ -81,6 +81,7 @@ test('feedback has one owner, survives audio failure, clears relevant selection,
     pop: () => calls.push('pop'),
   };
   g.updateInfo = () => calls.push('inspector');
+  g.clearRemovedContributor = g.showRemovedContributor = () => {};
   assert.equal(Object.getOwnPropertyDescriptor(g, 'msgs').set, undefined);
   let dispose = bindDomainFeedback(g);
   g.canPlace('farm', 0, 0);

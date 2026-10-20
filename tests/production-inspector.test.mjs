@@ -38,6 +38,8 @@ function inspectorHarness() {
       GOODS: { logs: { name: 'Logs' }, planks: { name: 'Planks' } },
       state: { upgrades: {} },
       bStatus: () => ({ lines: [] }),
+      productionProgress: () => null,
+      demolitionQuote: () => null,
       productionWindow: (m, window) => {
         calls.push({ m, window });
         return {

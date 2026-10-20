@@ -12,7 +12,54 @@ import { buildingPurposes as buildingHelp } from './catalog-view.ts';
 import { observePresentation } from './domain-feedback.ts';
 
 /** Owns inspector evidence, mounted controls, refresh and native interaction retention. */
-export function createInspectorView(game: GameRuntime, feedback: PlacementFeedback) {
+/** The runtime members the inspector reads. */
+export type InspectorViewDependencies = Pick<
+  GameRuntime,
+  | 'blockingLayerOpen'
+  | 'BSPEC'
+  | 'bStatus'
+  | 'buildings'
+  | 'buildingStatus'
+  | 'byId'
+  | 'clearRemovedContributor'
+  | 'closeLayer'
+  | 'demoArm'
+  | 'demolish'
+  | 'demolitionInput'
+  | 'demolitionQuote'
+  | 'dismissInspector'
+  | 'drawSpriteIcon'
+  | 'economicWindow'
+  | 'emitGameEvent'
+  | 'gameEvents'
+  | 'GOODS'
+  | 'hasLocalWater'
+  | 'hoverIn'
+  | 'ht'
+  | 'idx'
+  | 'incomingDeliveryStages'
+  | 'mode'
+  | 'msg'
+  | 'MTN'
+  | 'openLayer'
+  | 'owned'
+  | 'productionProgress'
+  | 'productionWindow'
+  | 'removedContributor'
+  | 'reportGraphicsFailure'
+  | 'resourceAccounting'
+  | 'selected'
+  | 'selInfo'
+  | 'setBuildingPriority'
+  | 'setStockTarget'
+  | 'state'
+  | 'tiles'
+  | 'updateInfo'
+  | 'updateReferenceContext'
+  | 'WATER'
+>;
+
+export function createInspectorView(game: InspectorViewDependencies, feedback: PlacementFeedback) {
   let productionRateWindow: ProductionRateWindow = 30;
   let inspectorKey = '';
   let illustratedType = '';
@@ -37,11 +84,11 @@ export function createInspectorView(game: GameRuntime, feedback: PlacementFeedba
         : '',
     )}</p>`;
   }
-  function live(b: Building, work = game.productionProgress?.(b)) {
+  function live(b: Building, work = game.productionProgress(b)) {
     const sp = game.BSPEC[b.type],
       status = game.buildingStatus ? game.buildingStatus(b) : game.bStatus(b);
     const simulationHeld =
-      game.state.paused || game.blockingLayerOpen?.() || document.visibilityState === 'hidden';
+      game.state.paused || game.blockingLayerOpen() || document.visibilityState === 'hidden';
     let html = markup`<h2>${sp.name} <small>#${b.id} · ${b.x}, ${b.y}</small></h2><div class="inspector-status" role="status">${trusted(
       work
         ? markup`<p class="${work.reason && work.reason !== 'paused' && work.reason !== 'demand' && work.reason !== 'reserve' ? 'inspector-warning' : 'inspector-evidence'}">${work.explanation}</p>`
@@ -82,7 +129,7 @@ export function createInspectorView(game: GameRuntime, feedback: PlacementFeedba
           html += markup`<h3>Known incoming work</h3><p>${trusted(inbound.join('<br>'))}</p><p class="muted">Queued work has no carrier. Assigned work has not been picked up. Carrying means the goods have been collected. Arrival times are not guaranteed.</p>`;
       }
       if (sp.water)
-        html += markup`<p>Local water: ${game.hasLocalWater?.(b) ? 'working connected well within 6 tiles' : 'no working connected well within 6 tiles'}. Water is local coverage, not transported stock.</p>`;
+        html += markup`<p>Local water: ${game.hasLocalWater(b) ? 'working connected well within 6 tiles' : 'no working connected well within 6 tiles'}. Water is local coverage, not transported stock.</p>`;
       if (b.type === 'guard')
         html += markup`<p>${b.manned ? 'Manned' : 'Unmanned'} outpost · current claim radius ${territoryClaimRadius(sp, b.manned)} tiles, restricted by traversable land.</p>`;
     }
@@ -240,7 +287,7 @@ export function createInspectorView(game: GameRuntime, feedback: PlacementFeedba
     return true;
   }
   function updateInfo() {
-    game.updateReferenceContext?.();
+    game.updateReferenceContext();
     const el = requireElement('info');
     const b = game.selected;
     requireElement('inspectordock').hidden = !b && !game.selInfo && !game.removedContributor;
@@ -273,7 +320,7 @@ export function createInspectorView(game: GameRuntime, feedback: PlacementFeedba
       return;
     }
     el.style.display = 'block';
-    game.clearRemovedContributor?.();
+    game.clearRemovedContributor();
     let h = '';
     let liveHTML = '',
       quote: DemolitionQuote | undefined,
@@ -282,9 +329,9 @@ export function createInspectorView(game: GameRuntime, feedback: PlacementFeedba
       productionHTML = '';
     if (b) {
       const sp = game.BSPEC[b.type];
-      const work = game.productionProgress?.(b);
+      const work = game.productionProgress(b);
       liveHTML = live(b, work);
-      quote = game.demolitionQuote?.(b);
+      quote = game.demolitionQuote(b);
       quoteHTML = quote ? shortcut(b, quote) : '';
       h = markup`<div data-inspector-live>${trusted(liveHTML)}</div><div data-inspector-controls>`;
       const referenceStart = h.length;
@@ -400,7 +447,7 @@ export function createInspectorView(game: GameRuntime, feedback: PlacementFeedba
       updateInfo();
     }
   });
-  function updateDzBtn(quote = game.selected && game.demolitionQuote?.(game.selected)) {
+  function updateDzBtn(quote = game.selected && game.demolitionQuote(game.selected)) {
     // the panel raze button arms like map clicks: confirm before razing
     const dz = requireElement('dz'),
       armed = game.demoArm && game.selected && game.demoArm === game.selected;

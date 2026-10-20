@@ -4,7 +4,7 @@ import type { EventsSubsystem } from '../core/events.ts';
 
 /** Domain exceptions still propagate. Only passive presentation observers are isolated. */
 export function observePresentation<K extends keyof GameEvents>(
-  source: EventsSubsystem,
+  source: Pick<EventsSubsystem, 'gameEvents'>,
   name: K,
   listener: (event: GameEvents[K]) => void,
   report: (error: unknown) => void = (error) =>

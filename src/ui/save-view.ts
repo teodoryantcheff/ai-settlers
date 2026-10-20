@@ -39,7 +39,7 @@ export function createSaveView(game: GameRuntime): SaveViewSubsystem {
       game.saveHealth.message + '. Open saves to export current progress.',
     );
     recovery.title = game.saveHealth.message;
-    if (wasHidden !== game.saveHealth.ok && game.vw > 0) game.resize?.();
+    if (wasHidden !== game.saveHealth.ok && game.vw > 0) game.resize();
     health.textContent =
       game.saveHealth.message +
       (game.saveHealth.ok

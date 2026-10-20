@@ -1,7 +1,11 @@
 import { requireElement } from './dom.ts';
 import type { GameRuntime } from '../runtime.ts';
 import type { BuildingType, TilePoint } from '../types.ts';
-import { createReportWindows, type ReportName } from './report-windows.ts';
+import {
+  createReportWindows,
+  type ReportName,
+  type ReportWindowsDependencies,
+} from './report-windows.ts';
 import { observePresentation } from './domain-feedback.ts';
 
 export type WorkspaceName = 'map' | 'economy' | 'logistics' | 'colony' | 'attention' | 'activity';
@@ -15,7 +19,37 @@ export interface LayerOptions {
 }
 
 /** Presentation navigation owns no simulation quantities or random draws. */
-export function createWorkspace(game: GameRuntime): WorkspaceSubsystem {
+/** The runtime members the workspace reads, including those its report windows need. */
+export type WorkspaceDependencies = ReportWindowsDependencies &
+  Pick<
+    GameRuntime,
+    | 'TS'
+    | 'byId'
+    | 'cam'
+    | 'cancelMapGestures'
+    | 'clampCam'
+    | 'gameEvents'
+    | 'gameplayHUD'
+    | 'keys'
+    | 'persistPreferences'
+    | 'presentationPrefs'
+    | 'renderingAvailable'
+    | 'selInfo'
+    | 'selected'
+    | 'setMode'
+    | 'state'
+    | 'updateAttentionView'
+    | 'updateEconomyView'
+    | 'updateInfo'
+    | 'updateLogisticsView'
+    | 'vh'
+    | 'view'
+    | 'vw'
+    | 'z'
+    | 'zoomAnim'
+  >;
+
+export function createWorkspace(game: WorkspaceDependencies): WorkspaceSubsystem {
   let workspace: WorkspaceName = 'map';
   const reportWindows = createReportWindows(game, () => {
     switchWorkspace('map');
@@ -43,7 +77,7 @@ export function createWorkspace(game: GameRuntime): WorkspaceSubsystem {
     toggle.title = expanded ? 'Collapse Colony Atlas' : 'Expand Colony Atlas';
     document.body.classList.toggle('atlas-expanded', expanded);
     reportWindows.constrain();
-    if (persist) game.persistPreferences?.();
+    if (persist) game.persistPreferences();
   }
   function focusWorkspaceNavigation() {
     const nav = requireElement('workspace-nav');
@@ -66,7 +100,7 @@ export function createWorkspace(game: GameRuntime): WorkspaceSubsystem {
       game.ttStr = null;
       requireElement('tt').style.display = 'none';
       game.keys.l = game.keys.r = game.keys.u = game.keys.d = false;
-      game.cancelMapGestures?.();
+      game.cancelMapGestures();
     }
     reportWindows.hide(workspace);
     workspace = next;
@@ -79,11 +113,11 @@ export function createWorkspace(game: GameRuntime): WorkspaceSubsystem {
       requireElement('workspace-' + name).hidden = name !== next;
     }
     requireElement('economy').classList.toggle('hidden', next !== 'colony');
-    game.updateInfo?.();
-    game.gameplayHUD?.();
-    game.updateEconomyView?.();
-    game.updateLogisticsView?.();
-    game.updateAttentionView?.();
+    game.updateInfo();
+    game.gameplayHUD();
+    game.updateEconomyView();
+    game.updateLogisticsView();
+    game.updateAttentionView();
     reportWindows.show(next);
   }
 
@@ -93,7 +127,7 @@ export function createWorkspace(game: GameRuntime): WorkspaceSubsystem {
     removedContributor = null;
     game.selected = building;
     game.selInfo = null;
-    game.updateInfo?.();
+    game.updateInfo();
     return true;
   }
   function unobscuredMapCenter() {
@@ -150,7 +184,7 @@ export function createWorkspace(game: GameRuntime): WorkspaceSubsystem {
     game.selected = null;
     game.selInfo = null;
     removedContributor = { ...former };
-    game.updateInfo?.();
+    game.updateInfo();
   }
   function clearRemovedContributor() {
     removedContributor = null;

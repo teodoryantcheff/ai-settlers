@@ -19,7 +19,7 @@ export function createProgressionView(game: GameRuntime): ProgressionViewSubsyst
   function journeyAction() {
     const lesson = game.currentLesson();
     if (!lesson) return;
-    game.switchWorkspace?.('map');
+    game.switchWorkspace('map');
     const outpost = lesson.step.building === 'guard' && game.pendingOutpost();
     if (outpost) {
       game.inspectBuilding(outpost, 'journey');
@@ -200,7 +200,7 @@ export function createProgressionView(game: GameRuntime): ProgressionViewSubsyst
   function showVictory() {
     if (!game.state.won) return;
     renderVictory();
-    game.openLayer?.('win', { blocking: true });
+    game.openLayer('win', { blocking: true });
   }
   requireElement('colony-autoplay').addEventListener('click', () => {
     game.toggleAutoplay();
@@ -210,7 +210,7 @@ export function createProgressionView(game: GameRuntime): ProgressionViewSubsyst
   requireElement('colony-map').addEventListener('click', () => game.switchWorkspace('map'));
   requireElement('wingo').onclick = () => {
     if (game.continueColony) game.continueColony();
-    else game.closeLayer?.('win');
+    else game.closeLayer('win');
   };
   requireElement('winhome').addEventListener('click', () => game.returnHome());
   observePresentation(game, 'victory', showVictory);

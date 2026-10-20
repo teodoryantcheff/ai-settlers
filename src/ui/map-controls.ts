@@ -31,7 +31,7 @@ export function createMapControls(game: GameRuntime, stopMinimapDrag: () => void
     if (!overlays.includes(overlay)) return;
     game.presentationPrefs.overlay = overlay;
     update();
-    game.persistPreferences?.();
+    game.persistPreferences();
   }
   function paint() {
     for (const button of buttons) {
@@ -68,7 +68,7 @@ export function createMapControls(game: GameRuntime, stopMinimapDrag: () => void
     stopMinimapDrag();
     game.presentationPrefs.minimapVisible = game.presentationPrefs.minimapVisible === false;
     update();
-    game.persistPreferences?.();
+    game.persistPreferences();
   });
   return { update, paint, setMapOverlay };
 }

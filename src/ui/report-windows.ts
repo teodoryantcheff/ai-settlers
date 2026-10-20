@@ -21,7 +21,13 @@ interface ReportWindow {
 }
 
 /** Session-only report presentation; report views retain their mounted evidence and controls. */
-export function createReportWindows(game: GameRuntime, close: () => void) {
+/** The runtime members report windows read. */
+export type ReportWindowsDependencies = Pick<
+  GameRuntime,
+  'ghost' | 'hoverIn' | 'mouseSeen' | 'ttStr'
+>;
+
+export function createReportWindows(game: ReportWindowsDependencies, close: () => void) {
   const reports = new Map<ReportName, ReportWindow>();
   function bounds() {
     const nav = requireElement('workspace-nav');

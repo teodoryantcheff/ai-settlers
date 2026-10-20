@@ -10,7 +10,7 @@ import type {
 import { observePresentation } from './domain-feedback.ts';
 import type { GameRuntime } from '../runtime.ts';
 import type { GuardPostPreview, PlacementPreview, RoadPreview } from '../gameplay/previews.ts';
-export function createInteraction(game: GameRuntime): InteractionSubsystem {
+export function createInteraction(game: InteractionDependencies): InteractionSubsystem {
   const ORDER = [
     'lumberjack',
     'forester',
@@ -80,7 +80,7 @@ export function createInteraction(game: GameRuntime): InteractionSubsystem {
     return game.previewGuardPost(ghost);
   }
   function refreshTool() {
-    game.refreshToolView?.();
+    game.refreshToolView();
   }
   function setMode(mtype: InteractionModeType | null, bt?: BuildingType | null) {
     mode = mtype ? ({ type: mtype, bt: bt || null } as InteractionMode) : null;
@@ -92,14 +92,14 @@ export function createInteraction(game: GameRuntime): InteractionSubsystem {
   function dismissInspector() {
     selected = null;
     selInfo = null;
-    game.clearRemovedContributor?.();
-    game.updateInfo?.();
+    game.clearRemovedContributor();
+    game.updateInfo();
   }
   function cancelMode() {
     // Reset every world reference before asking presentation to refresh.
     selected = null;
     setMode(null);
-    game.updateInfo?.();
+    game.updateInfo();
   }
   function roadInput(tile: TilePoint, shift = false) {
     if (!anchor) anchor = { x: tile.x, y: tile.y };
@@ -135,19 +135,19 @@ export function createInteraction(game: GameRuntime): InteractionSubsystem {
   function selectMapTarget(building: Building | null, tile: TilePoint) {
     selected = building;
     selInfo = building ? null : { x: tile.x, y: tile.y };
-    game.updateInfo?.();
+    game.updateInfo();
   }
   function inspectBuilding(building: Building | null, source: InspectionSource) {
     if (source === 'journey') setMode(null);
     selected = building;
     if (source !== 'advisor') selInfo = null;
-    if (source !== 'advisor' || building) game.updateInfo?.();
+    if (source !== 'advisor' || building) game.updateInfo();
   }
   observePresentation(game, 'worldLoaded', cancelMode);
   observePresentation(game, 'buildingDemolished', (event) => {
     if (selected?.id === event.id) {
       dismissInspector();
-      game.showRemovedContributor?.(event);
+      game.showRemovedContributor(event);
     }
   });
   return {
@@ -234,6 +234,24 @@ export function createInteraction(game: GameRuntime): InteractionSubsystem {
     },
   };
 }
+/** The runtime members interaction reads; it owns every other piece of its state. */
+export type InteractionDependencies = Pick<
+  GameRuntime,
+  | 'clearRemovedContributor'
+  | 'commitRoad'
+  | 'demolish'
+  | 'gameEvents'
+  | 'hoverIn'
+  | 'ht'
+  | 'inB'
+  | 'previewGuardPost'
+  | 'previewPlacement'
+  | 'previewRoad'
+  | 'refreshToolView'
+  | 'requestDemolitionConfirmation'
+  | 'showRemovedContributor'
+  | 'updateInfo'
+>;
 export type InspectionSource = 'advisor' | 'flagged' | 'journey';
 export type DemolitionAction = 'missing' | 'armed' | 'confirmed';
 export interface InteractionSubsystem {

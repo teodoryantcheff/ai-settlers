@@ -12,6 +12,34 @@ const MODULES = Object.fromEntries(SUBSYSTEMS.map(({ name, create }) => [name, c
 
 const DEFAULT_MODULES = DOMAIN_SUBSYSTEMS.map(({ name }) => name);
 
+// Presentation modules notify each other directly and production composes every
+// one, so runtime calls are unguarded. A partial graph gets a no-op for each
+// notification whose providing module it leaves out; a composed provider wins.
+const PRESENTATION_NOTIFICATIONS = [
+  'blockingLayerOpen',
+  'cancelMapGestures',
+  'clearRemovedContributor',
+  'closeLayer',
+  'closeSaveManager',
+  'focusWorkspaceNavigation',
+  'gameplayHUD',
+  'msg',
+  'openLayer',
+  'openSaveManager',
+  'persistPreferences',
+  'refreshToolView',
+  'resize',
+  'setAtlasExpanded',
+  'showAttentionEntity',
+  'showRemovedContributor',
+  'switchWorkspace',
+  'updateAttentionView',
+  'updateEconomyView',
+  'updateInfo',
+  'updateLogisticsView',
+  'updateReferenceContext',
+];
+
 /**
  * Compose subsystems into one runtime. Stubs are installed before composition —
  * factory constructors read collaborators such as input surfaces as they are
@@ -67,12 +95,15 @@ function createGame(options = {}) {
       : options.storage,
   };
   for (const [key, value] of Object.entries(stubs)) defineStub(game, key, value);
+  const notifications = new Set(PRESENTATION_NOTIFICATIONS.filter((key) => !(key in game)));
+  for (const key of notifications) defineStub(game, key, () => {});
   for (const name of modules) {
     const factory = MODULES[name];
     if (!factory) throw new Error(`Unknown test module: ${name}`);
     const hooks = { ...(options.internals?.[name] ?? {}) };
     const subsystem = factory(game, factoryOptions, hooks);
-    for (const key of Object.keys(subsystem)) if (key in stubs) delete game[key];
+    for (const key of Object.keys(subsystem))
+      if (key in stubs || notifications.has(key)) delete game[key];
     attachSubsystem(game, subsystem);
     for (const key of Object.keys(subsystem)) if (key in stubs) defineStub(game, key, stubs[key]);
     for (const key of Object.keys(hooks)) {

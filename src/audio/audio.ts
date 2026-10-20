@@ -186,7 +186,7 @@ export function createAudio(game: GameRuntime, internals?: AudioInternals): Audi
     if (!failureNotified) {
       failureNotified = true;
       try {
-        game.msg?.('Audio unavailable. Use the music or mute controls to retry.');
+        game.msg('Audio unavailable. Use the music or mute controls to retry.');
       } catch {}
     }
   }

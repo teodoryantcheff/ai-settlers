@@ -31,7 +31,7 @@ export interface PanDrag {
 export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsystem {
   let advOn = true,
     started = false;
-  const transientHelp = createTransientHelp({ canShow: () => !game.blockingLayerOpen?.() });
+  const transientHelp = createTransientHelp({ canShow: () => !game.blockingLayerOpen() });
   const resourceHelp = new Map<Good, HTMLElement>();
   const resourceHelpCleanup: Array<() => void> = [];
   const populationControl = requireElement('ppl');
@@ -246,8 +246,8 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
           link.textContent = context.workspace === 'attention' ? 'View issue' : 'View activity';
           link.onclick = () => {
             if (context.entity)
-              game.showAttentionEntity?.(context.entity.id, context.workspace === 'activity');
-            else game.switchWorkspace?.(context.workspace);
+              game.showAttentionEntity(context.entity.id, context.workspace === 'activity');
+            else game.switchWorkspace(context.workspace);
           };
           node.appendChild(link);
         }
@@ -267,9 +267,9 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     }
     advTick();
     game.gameplayHUD();
-    game.updateEconomyView?.();
-    game.updateLogisticsView?.();
-    game.updateAttentionView?.();
+    game.updateEconomyView();
+    game.updateLogisticsView();
+    game.updateAttentionView();
     updateInfo();
     updateHint();
     const suspended = modalOpen();
@@ -384,7 +384,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
       const spatial = preview
         ? ([preview.checks.ok, preview.checks.reason] as ReturnType<typeof game.canPlace>)
         : game.canPlace(game.mode.bt, game.ht.x, game.ht.y);
-      const spending = preview?.spending || game.buildingAffordability?.(game.mode.bt, game.ht);
+      const spending = preview?.spending || game.buildingAffordability(game.mode.bt, game.ht);
       if (spatial[0] && spending && !spending.affordable) {
         const missing = spending.materials.find(
           (material) => material.available < material.required,
@@ -703,7 +703,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     applyPresentationPrefs();
   }
   function applyPresentationPrefs() {
-    game.setAtlasExpanded?.(game.presentationPrefs.atlasExpanded, false);
+    game.setAtlasExpanded(game.presentationPrefs.atlasExpanded, false);
     requireElement('fps').hidden = !game.presentationPrefs.showFps;
     (requireElement('fpspref') as HTMLInputElement).checked = game.presentationPrefs.showFps;
     const atlasArt = requireElement<HTMLCanvasElement>('atlas-art');
@@ -790,7 +790,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     if (k === 'Escape') {
       if (game.workspace && game.workspace !== 'map') {
         game.switchWorkspace('map');
-        game.focusWorkspaceNavigation?.();
+        game.focusWorkspaceNavigation();
       } else {
         if (!requireElement('paletteitems').classList.contains('hidden')) {
           setPaletteExpanded(false);
@@ -948,14 +948,14 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     else openPanel('mix');
   };
   requireElement('savepanelb').onclick = function () {
-    game.openSaveManager?.();
+    game.openSaveManager();
   };
   requireElement('economyb').onclick = function () {
     openPanel('economy');
   };
   document.querySelectorAll<HTMLElement>('[data-close]').forEach(function (btn) {
     btn.onclick = function () {
-      if (btn.dataset.close === 'savedata') game.closeSaveManager?.();
+      if (btn.dataset.close === 'savedata') game.closeSaveManager();
       else if (btn.dataset.close === 'economy') game.switchWorkspace('map');
       else game.closeLayer(btn.dataset.close);
     };
@@ -991,7 +991,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
   fpsPref.onchange = function () {
     game.presentationPrefs.showFps = fpsPref.checked;
     requireElement('fps').hidden = !fpsPref.checked;
-    game.resize?.();
+    game.resize();
     savePrefs();
   };
   const weatherPref = requireElement('weatherpref') as HTMLInputElement;
@@ -1066,11 +1066,11 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
   };
   requireElement('saveb').onclick = function () {
     game.initAudio();
-    game.openSaveManager?.();
+    game.openSaveManager();
   };
   requireElement('loadb').onclick = function () {
     game.initAudio();
-    game.openSaveManager?.();
+    game.openSaveManager();
   };
   requireElement('mute').onclick = toggleMute;
   requireElement('helpb').onclick = toggleHelp;
@@ -1158,7 +1158,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
     }
   }
   function modalOpen() {
-    return !!game.blockingLayerOpen?.();
+    return !!game.blockingLayerOpen();
   }
   // A committed load replaced the world: reset every HUD-local view of it.
   observePresentation(game, 'territoryChanged', () => {
