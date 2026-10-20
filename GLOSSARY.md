@@ -4,6 +4,14 @@ Terms for colony production, goods accounting, natural resources, construction, 
 
 ## Language
 
+**Unexplored land**:
+Land the colony has not yet discovered in a colony with exploration enabled. Its terrain and resources remain unknown to the player; discovery is separate from territory ownership.
+_Avoid_: Unowned land, temporarily hidden land
+
+**Revealed land**:
+Land the colony has discovered. It remains revealed permanently, even if the colony later loses ownership of it.
+_Avoid_: Owned land, currently watched land
+
 **Stored stock**:
 Goods physically held in colony storage, including goods already reserved for collection.
 _Avoid_: Available stock, when reservations have not been subtracted; total goods, when goods outside storage are excluded.

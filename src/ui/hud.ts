@@ -418,6 +418,7 @@ export function createHud(game: GameRuntime, internals?: HudInternals): HudSubsy
         const t4 = game.tiles[i];
         if (
           t4.t === game.MTN &&
+          game.isRevealed(i) &&
           t4.deposit &&
           t4.deposit.kind === game.BSPEC[game.mode.bt].resKind &&
           t4.deposit.amt > 0

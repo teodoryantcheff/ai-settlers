@@ -73,6 +73,7 @@ export function createPreviews(game: PreviewsDependencies): PreviewsSubsystem {
     guardCache: GuardPostPreview | null = null;
   // Tile, territory and world replacement all change routes, reach and storage choice.
   const changed = () => revision++;
+  game.gameEvents.on('discoveryChanged', changed);
   game.gameEvents.on('tileChanged', changed);
   game.gameEvents.on('territoryChanged', changed);
   game.gameEvents.on('worldLoaded', changed);
@@ -138,13 +139,30 @@ export function createPreviews(game: PreviewsDependencies): PreviewsSubsystem {
       timeKey();
     if (placementCache && placementCache.key === key) return placementCache;
     const checks = game.placementChecks(type, site.x, site.y);
+    if (checks.reason?.code === 'unexplored')
+      return (placementCache = {
+        key,
+        x: site.x,
+        y: site.y,
+        checks,
+        spending: game.buildingAffordability(type),
+        resources: [],
+        canBuild: false,
+        operatingSupport: null,
+        path: null,
+        storage: null,
+        haulSeconds: null,
+        summary: 'Unexplored land',
+      });
     const spending = game.buildingAffordability(type, site);
     const sp = game.BSPEC[type],
-      resources = workTiles(game, type, site),
+      resources = game.isRevealed(game.idx(site.x, site.y))
+        ? workTiles(game, type, site).filter(game.isRevealed)
+        : [],
       storage = game.nearestStoragePos(site.x, site.y);
     const path =
-      storage && game.passI(game.idx(site.x, site.y))
-        ? game.findPath(storage.x, storage.y, site.x, site.y)
+      storage && game.isRevealed(game.idx(site.x, site.y)) && game.passI(game.idx(site.x, site.y))
+        ? game.findPath(storage.x, storage.y, site.x, site.y, game.isRevealed)
         : null;
     const haul =
       path && storage
@@ -247,7 +265,9 @@ export function createPreviews(game: PreviewsDependencies): PreviewsSubsystem {
   function previewGuardPost(site: TilePoint): GuardPostPreview {
     const key = site.x + ':' + site.y + ':' + worldKey();
     if (guardCache && guardCache.key === key) return guardCache;
-    const { fill, segs } = game.guardPostClaim(site.x, site.y);
+    const { fill, segs } = game.isRevealed(game.idx(site.x, site.y))
+      ? game.guardPostClaim(site.x, site.y)
+      : { fill: [], segs: [] };
     return (guardCache = { key, x: site.x, y: site.y, fill, segs });
   }
 
@@ -280,6 +300,6 @@ export interface PreviewsDependencies
       | 'storages'
     >,
     Pick<EventsSubsystem, 'gameEvents'>,
-    Pick<MapSubsystem, 'guardPostClaim' | 'owned'>,
+    Pick<MapSubsystem, 'guardPostClaim' | 'owned' | 'isRevealed'>,
     Pick<NavigationSubsystem, 'findPath' | 'moveCost'>,
     Pick<RoadsSubsystem, 'planRoad'> {}

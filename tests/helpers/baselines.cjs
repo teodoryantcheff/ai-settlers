@@ -75,6 +75,11 @@ function historicalEconomySnapshot(value) {
     from: job.kind === 'deliver' || job.kind === 'transfer' ? job.sourceId : 0,
     state: job.status === 'pending' ? 'p' : 't',
   }));
+  // Discovery metadata is inert for these unrestricted-colony economy baselines.
+  assert.equal(copy.st.explorationFog, false);
+  assert.ok(copy.revealed.every((v) => v === 1));
+  delete copy.revealed;
+  delete copy.st.explorationFog;
   delete copy.identity;
   delete copy.observations;
   delete copy.attention;

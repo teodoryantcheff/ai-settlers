@@ -42,7 +42,7 @@ export type BuildingType =
   | 'guard';
 /** Structured, transient placement failures; display copy is derived from the code. */
 export type PlacementRefusal =
-  | { code: 'out-of-bounds' | 'choose-map-tile' }
+  | { code: 'out-of-bounds' | 'choose-map-tile' | 'unexplored' }
   | { code: 'water' | 'mountain' | 'territory' | 'no-water' | 'meadow' }
   | { code: 'deposit'; good: 'coal' | 'iron' | 'gold' }
   | { code: 'no-rocks' | 'blocked' | 'unreachable-stock' }
@@ -160,6 +160,7 @@ export interface Unit {
   moving?: boolean;
 }
 export interface SimulationState {
+  explorationFog: boolean;
   paused: boolean;
   speed: 1 | 2 | 4 | 8;
   won: boolean;
@@ -281,6 +282,7 @@ export interface ArtAtlas {
   >;
 }
 export interface GameEvents {
+  discoveryChanged: Record<string, never>;
   simulationObserved: Record<string, never>;
   productionControlChanged: { building: Building };
   territoryChanged: Record<string, never>;
@@ -323,6 +325,7 @@ export interface GameEvents {
 export type SavedDeposit = ['gold' | 'iron' | 'coal', number, number?] | null;
 export type SavedUnit = Omit<Unit, 'job' | 'dead' | 'moving'> & { ji: number };
 export interface SaveData {
+  revealed: number[];
   identity: ColonyIdentity;
   observations: EconomicObservations;
   attention: import('./observations/attention.ts').AttentionData;

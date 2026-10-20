@@ -179,7 +179,11 @@ export function createRenderer(
     g.clip();
     g.translate(px, py);
     g.scale(game.ST, game.ST);
-    game.paintLandscapeTile(g, x, y, tl, h);
+    if (game.isRevealed(i)) game.paintLandscapeTile(g, x, y, tl, h);
+    else {
+      g.fillStyle = '#444c48';
+      g.fillRect(0, 0, game.TS, game.TS);
+    }
     g.restore();
   }
   function drawTile(g: CanvasRenderingContext2D, i: number) {
@@ -385,6 +389,10 @@ export function createRenderer(
     const parts: unknown[] = [game.seed];
     for (let i = 0; i < game.tiles.length; i++) {
       const tile = game.tiles[i];
+      if (!game.isRevealed(i)) {
+        parts.push('unknown');
+        continue;
+      }
       parts.push(
         tile.t,
         tile.tree,
@@ -1032,7 +1040,11 @@ export function createRenderer(
     ) {
       const groundX = Math.floor(u.x),
         groundY = Math.floor(u.y);
-      if (game.inB(groundX, groundY) && game.tiles[game.idx(groundX, groundY)].t !== game.WATER)
+      if (
+        game.inB(groundX, groundY) &&
+        game.isRevealed(game.idx(groundX, groundY)) &&
+        game.tiles[game.idx(groundX, groundY)].t !== game.WATER
+      )
         pushFX({ k: 'stepDust', x: u.x, y: u.y, t: now, i: u.id });
     }
     pose.dustStep = dustStep;
@@ -1103,7 +1115,8 @@ export function createRenderer(
     orderedObjects.length = 0;
     for (let row = vy0; row <= vy1; row++)
       for (const entry of natureRows[row])
-        if (entry.x >= vx0 && entry.x <= vx1) orderedObjects.push(entry);
+        if (entry.x >= vx0 && entry.x <= vx1 && game.isRevealed(game.idx(entry.x, entry.y)))
+          orderedObjects.push(entry);
     for (let bi = 0; bi < game.buildings.length; bi++) {
       const b = game.buildings[bi];
       if (b.x < vx0 - 1 || b.x > vx1 + 1 || b.y < vy0 - 1 || b.y > vy1 + 1) continue;
@@ -1114,6 +1127,7 @@ export function createRenderer(
     }
     for (let ui2 = 0; ui2 < game.units.length; ui2++) {
       const u = game.units[ui2];
+      if (!game.isRevealed(game.idx(Math.floor(u.x), Math.floor(u.y)))) continue;
       if (u.x < vx0 - 1 || u.x > vx1 + 1 || u.y < vy0 - 1 || u.y > vy1 + 1) continue;
       const ou = objGet();
       ou.k = u.y * game.TS + 3;
@@ -1198,7 +1212,12 @@ export function createRenderer(
           by = cy * cell + ((hash >>> 9) % (cell - 32)) + 16,
           tx = Math.floor(bx / game.TS),
           ty = Math.floor(by / game.TS);
-        if (!game.inB(tx, ty) || game.tiles[game.idx(tx, ty)].t !== game.GRASS) continue;
+        if (
+          !game.inB(tx, ty) ||
+          !game.isRevealed(game.idx(tx, ty)) ||
+          game.tiles[game.idx(tx, ty)].t !== game.GRASS
+        )
+          continue;
         for (let mote = 0; mote < (renderPrefs().quality < 1 ? 1 : 2) && count < limit; mote++) {
           const phase = (time / (9 + (hash % 7)) + (hash % 1000) / 1000 + mote * 0.5) % 1,
             px = bx + phase * 24 + Math.sin(time * 0.42 + hash + mote) * 5,
@@ -1385,7 +1404,7 @@ export function createRenderer(
       for (let x = vx0; x <= vx1; x++) {
         const i = game.idx(x, y),
           h = tileHash(i);
-        if (game.tiles[i].t !== game.WATER || h % 3 !== 0) continue;
+        if (!game.isRevealed(i) || game.tiles[i].t !== game.WATER || h % 3 !== 0) continue;
         const px = x * game.TS + 6,
           py = y * game.TS + 8 + (h % 8);
         const phase = now / 2600 + h * 0.17;
@@ -1847,7 +1866,7 @@ export function createRenderer(
           spec = game.BSPEC[rb.type];
         if (spec.store || spec.guard || !spec.rad || !visibleAt(rb.x, rb.y)) continue;
         if (++count > 18) break;
-        reachDraw(s, rb.type, rb.x, rb.y, workTiles(game, rb.type, rb));
+        reachDraw(s, rb.type, rb.x, rb.y, workTiles(game, rb.type, rb).filter(game.isRevealed));
       }
       _logisticsCaption = game.selected
         ? 'Resource reach · pale tiles can supply the selected building'
@@ -2203,6 +2222,14 @@ export function createRenderer(
     game.staticDirty = true;
     resetPresentation();
   });
+  observePresentation(game, 'discoveryChanged', () => {
+    fogDirty = true;
+    game.staticDirty = true;
+    game.landscapeCragMap = null;
+    shadowCache.reset();
+    miniDirty = true;
+    game.rebuildHighlights();
+  });
   observePresentation(game, 'territoryChanged', () => {
     borderDirty = true;
     for (let i = 0; i < game.owned.length; i++)
@@ -2211,6 +2238,7 @@ export function createRenderer(
   // A committed load clears every transient presentation cache through this one
   // sanctioned method; loaders never poke renderer internals field by field.
   function resetPresentation() {
+    fogDirty = true;
     for (const index of nature.keys()) releaseNature(index);
     for (let row = 0; row < game.H; row++) dirtyNatureRows.add(row);
     orderedObjects.length = objPool.length = 0;
@@ -2401,6 +2429,7 @@ export function createRenderer(
         cloudsDraw(s, decorativeNow);
         birdsDraw(s, decorativeNow);
       }
+      drawFog(s, decorativeNow);
     });
     // Night, dusk, rain and lightning veils reach the atmosphere pass as one tint.
     presentation.screenTint?.(composeScreenTint());
@@ -2417,6 +2446,49 @@ export function createRenderer(
     sampleRender(frameMs, performance.now() - drawStart);
   }
 
+  // A cached opaque mask conceals every unknown pixel. Feather only extends
+  // onto revealed land, so soft edges never expose unknown terrain.
+  const fogCanvas = game.Acan(game.W * game.TS, game.H * game.TS);
+  const fogContext = requireCanvas2D(fogCanvas, reportGraphicsFailure);
+  const fogOwner = {};
+  let fogDirty = true;
+  function drawFog(s: SceneLayer, now: number) {
+    if (!game.state.explorationFog) return;
+    const changed = fogDirty;
+    if (changed) {
+      fogContext.clearRect(0, 0, fogCanvas.width, fogCanvas.height);
+      fogContext.fillStyle = '#444c48';
+      fogContext.shadowColor = '#444c48';
+      fogContext.shadowBlur = game.TS * 0.45;
+      for (let y = 0; y < game.H; y++)
+        for (let x = 0; x < game.W;) {
+          if (game.isRevealed(game.idx(x, y))) {
+            x++;
+            continue;
+          }
+          const start = x++;
+          while (x < game.W && !game.isRevealed(game.idx(x, y))) x++;
+          fogContext.fillRect(start * game.TS, y * game.TS, (x - start) * game.TS, game.TS);
+        }
+      fogContext.shadowBlur = 0;
+      presentation.invalidate(fogCanvas);
+      fogDirty = false;
+    }
+    s.retain(
+      fogOwner,
+      changed
+        ? (view) => view.image(fogCanvas, 0, 0, fogCanvas.width, fogCanvas.height)
+        : undefined,
+    );
+    // Settlers preserve their usual sorting on known land; those crossing fog
+    // sit above the opaque veil and never change discovery.
+    const walkers = game.units.filter(
+      (u) => !game.isRevealed(game.idx(Math.floor(u.x), Math.floor(u.y))),
+    );
+    walkers.sort((a, b) => a.y - b.y);
+    for (const u of walkers) drawUnit(s, u, now);
+  }
+
   // ---------- minimap ----------
   const mscan = game.Acan(192, 192),
     msctx = requireCanvas2D(mscan, reportGraphicsFailure);
@@ -2429,6 +2501,11 @@ export function createRenderer(
       x = (i % game.W) * s,
       y = ((i / game.W) | 0) * s,
       tl = game.tiles[i];
+    if (!game.isRevealed(i)) {
+      msctx.fillStyle = '#444c48';
+      msctx.fillRect(x, y, s, s);
+      return;
+    }
     let c;
     if (tl.t === game.WATER) c = '#447b89';
     else if (tl.t === game.SAND) c = '#d7c39b';

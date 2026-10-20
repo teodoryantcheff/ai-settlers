@@ -38,6 +38,8 @@ export type InspectorViewDependencies = Pick<
   | 'hoverIn'
   | 'ht'
   | 'idx'
+  | 'isRevealed'
+  | 'units'
   | 'incomingDeliveryStages'
   | 'mode'
   | 'msg'
@@ -475,6 +477,19 @@ export function createInspectorView(game: InspectorViewDependencies, feedback: P
     game.dismissInspector();
   };
   function tileInfo(ht: TilePoint) {
+    const settlers = game.units.filter((u) => Math.hypot(u.x - ht.x, u.y - ht.y) < 1);
+    const people = settlers
+      .map(
+        (u) =>
+          u.kind +
+          ' #' +
+          u.id +
+          (u.job ? ' · ' + u.job.kind + ' (' + u.job.status + ')' : ' · idle') +
+          (u.carry ? ' carrying ' + game.GOODS[u.carry].name : ''),
+      )
+      .join(' · ');
+    if (!game.isRevealed(game.idx(ht.x, ht.y)))
+      return 'Unexplored land' + (people ? ' — ' + people : '');
     const tl = game.tiles[game.idx(ht.x, ht.y)];
     if (tl.t === game.WATER) return 'Water';
     if (tl.t === game.MTN)

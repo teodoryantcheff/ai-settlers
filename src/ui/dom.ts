@@ -202,6 +202,7 @@ export const PAGE_ELEMENT_IDS = [
   'new-colony-form',
   'new-colony-name',
   'new-colony-seed',
+  'new-colony-fog',
   'startb',
   'welcome-settings',
   'welcome-reference',

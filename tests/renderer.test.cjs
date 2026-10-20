@@ -1099,3 +1099,24 @@ test('cached static rows preserve full depth keys and stable ties against moving
   ]);
   assert.equal(e.SR.getState(), rng);
 });
+
+test('cosmetic meadow particles cannot disclose unexplored terrain', () => {
+  const e = renderer();
+  e.state.explorationFog = true;
+  e.revealed.fill(0);
+  e.vw = e.vh = 6000;
+  e.z = 0.55;
+  e.state.paused = false;
+  e.calls.length = 0;
+  e.meadowParticles(e.scene, 2300);
+  const grass = structuredClone(e.calls);
+  for (const tile of e.tiles) tile.t = e.WATER;
+  e.calls.length = 0;
+  e.meadowParticles(e.scene, 2300);
+  assert.deepEqual(
+    e.calls,
+    grass,
+    'changing hidden terrain cannot change visible particle evidence',
+  );
+  assert.equal(e.atmosphereCount, 0);
+});

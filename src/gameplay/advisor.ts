@@ -1,3 +1,4 @@
+import { goodsIn } from '../core/inventory.ts';
 import { countsAsWell, hasWellCoverage, wellRadius, wellReaches } from './colony-rules.ts';
 import { ingredientAlternatives, ingredientShortages } from './production-rules.ts';
 import type { SimulationStateSubsystem } from '../simulation/state.ts';
@@ -29,6 +30,26 @@ export interface AdvisorDecision {
 }
 
 export function createAdvisor(game: AdvisorDependencies): AdvisorSubsystem {
+  function explorationAdvice() {
+    const cost = game.BSPEC.guard.cost || {};
+    const supplies = goodsIn(cost)
+      .map((good) => cost[good] + ' ' + game.GOODS[good].name.toLowerCase())
+      .join(', ');
+    const missing = goodsIn(cost).flatMap((good) => {
+      const shortage = (cost[good] || 0) - game.spendableStock(good);
+      return shortage > 0 ? [shortage + ' ' + game.GOODS[good].name.toLowerCase()] : [];
+    });
+    return (
+      'Explore beyond revealed land with completed outposts. Expansion needs ' +
+      supplies +
+      '.' +
+      (missing.length
+        ? ' Waiting for ' +
+          missing.join(', ') +
+          '; keep the known economy running while supplies recover.'
+        : ' A soldier extends the outpost’s reach.')
+    );
+  }
   function advTargets() {
     const counts: Partial<Record<BuildingType, number>> = {},
       countsSite: Partial<Record<BuildingType, number>> = {};
@@ -199,6 +220,7 @@ export function createAdvisor(game: AdvisorDependencies): AdvisorSubsystem {
       for (let ti = 0; ti < game.tiles.length && !accessible; ti++) {
         const tile = game.tiles[ti];
         if (
+          !game.isRevealed(ti) ||
           !tile.deposit ||
           tile.deposit.kind !== game.BSPEC[r.bt].resKind ||
           tile.deposit.amt <= 0
@@ -221,7 +243,9 @@ export function createAdvisor(game: AdvisorDependencies): AdvisorSubsystem {
         have: counts.guard || 0,
         site: countsSite.guard || 0,
         target: have('guard') + (needExpand && !game.pendingOutpost() ? 1 : 0),
-        why: 'Expand toward a wanted deposit, then wait for the soldier to arrive.',
+        why: game.state.explorationFog
+          ? explorationAdvice()
+          : 'Expand toward a wanted deposit, then wait for the soldier to arrive.',
         def: needExpand && !game.pendingOutpost() ? 1 : 0,
         waiting: needExpand ? game.pendingOutpost() : null,
       });
@@ -235,10 +259,14 @@ export function createAdvisor(game: AdvisorDependencies): AdvisorSubsystem {
     return list;
   }
   function advisorDecision() {
-    const list = advTargets(),
-      action = list.find(function (r) {
-        return r.def > 0;
-      });
+    const list = advTargets();
+    let action = list.find(function (r) {
+      return r.def > 0;
+    });
+    if (game.state.explorationFog && action && game.BSPEC[action.bt].resKind) {
+      const expansion = list.find((r) => r.bt === 'guard' && r.def > 0);
+      if (expansion) action = expansion;
+    }
     if (
       game.buildings.some(function (b) {
         return b.done && !b.disabled && b.blockedReason === 'water';
@@ -316,10 +344,10 @@ export interface AdvisorSubsystem {
 
 export interface AdvisorDependencies
   extends
-    Pick<SimulationStateSubsystem, 'BSPEC' | 'buildings' | 'units'>,
+    Pick<SimulationStateSubsystem, 'BSPEC' | 'GOODS' | 'buildings' | 'units' | 'state'>,
     Pick<WorldSubsystem, 'DX' | 'DY' | 'GOAL' | 'W' | 'inB' | 'passI' | 'tiles'>,
     Pick<EconomySubsystem, 'canPlace' | 'nearestStoragePos' | 'stockTargetTotal'>,
-    Pick<StockLedgerSubsystem, 'storedStock'>,
+    Pick<StockLedgerSubsystem, 'storedStock' | 'spendableStock'>,
     Pick<ProgressionSubsystem, 'currentLesson' | 'pendingOutpost'>,
-    Pick<MapSubsystem, 'owned'>,
+    Pick<MapSubsystem, 'owned' | 'isRevealed'>,
     Pick<NavigationSubsystem, 'connectedLand'> {}

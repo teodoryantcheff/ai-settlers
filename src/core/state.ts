@@ -1,3 +1,4 @@
+import { visitDiscovery } from '../gameplay/discovery.ts';
 import { validateAttention } from '../observations/validate-attention.ts';
 import { saveName } from './save-catalog.ts';
 import { unpackSaveHistories } from './save-codec.ts';
@@ -472,6 +473,7 @@ export function validateSave(
     !oneOf(d.st.speed, [1, 2, 4, 8]) ||
     !num(d.st.time) ||
     !int(d.st.gold) ||
+    !bool(d.st.explorationFog) ||
     !bool(d.st.paused) ||
     !bool(d.st.won) ||
     !bool(d.st.auto) ||
@@ -499,6 +501,7 @@ export function validateSave(
   d.j = checkedJobs;
   d.u = checkedUnits;
   const state: SimulationState = {
+    explorationFog: d.st.explorationFog,
     paused: d.st.paused,
     speed: d.st.speed,
     won: d.st.won,
@@ -513,6 +516,24 @@ export function validateSave(
     roadsBuilt: d.st.roadsBuilt,
   };
   d.st = state;
+  if (
+    !array(d.revealed) ||
+    d.revealed.length !== width * height ||
+    !d.revealed.every((v) => v === 0 || v === 1)
+  )
+    fail('Invalid discovery data');
+  const revealed = d.revealed as number[];
+  if (!state.explorationFog && revealed.some((v) => v !== 1))
+    fail('Invalid unrestricted discovery');
+  for (let i = 0; i < revealed.length; i++)
+    if (checkedTerrain[3][i] && !revealed[i]) fail('Road on unexplored land');
+  for (const b of checkedBuildings) {
+    if (!revealed[b.y * width + b.x]) fail('Building site on unexplored land');
+    if (!b.done) continue;
+    visitDiscovery({ W: width, H: height, BSPEC: specs, buildings: checkedBuildings }, b, (i) => {
+      if (!revealed[i]) fail('Completed building has unexplored surroundings');
+    });
+  }
   const obs = d.observations;
   if (
     !object(obs) ||
@@ -598,6 +619,7 @@ export function validateSave(
   );
   d.attention = attention;
   return {
+    revealed: [...revealed],
     rng: d.rng,
     seed: d.seed,
     nextId: d.nextId,

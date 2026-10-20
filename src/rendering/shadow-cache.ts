@@ -98,7 +98,7 @@ export function createShadowCache(
       for (let x = x0; x <= x1; x++) {
         const i = game.idx(x, y),
           tile = game.tiles[i];
-        if (!tile.tree) continue;
+        if (!tile.tree || !game.isRevealed(i)) continue;
         const hash = game.tileHash(i),
           scale = 0.87 + ((hash >> 3) % 15) / 100;
         const jx = ((hash >> 2) % 7) - 3,

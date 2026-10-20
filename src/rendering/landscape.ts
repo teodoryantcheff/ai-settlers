@@ -49,7 +49,9 @@ export function createLandscape(
     return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
   }
   function landscapeIs(x: number, y: number, type: number): boolean {
-    return game.inB(x, y) && game.tiles[game.idx(x, y)].t === type;
+    return (
+      game.inB(x, y) && game.isRevealed(game.idx(x, y)) && game.tiles[game.idx(x, y)].t === type
+    );
   }
   function landscapeSides(x: number, y: number, type: number): boolean[] {
     return [

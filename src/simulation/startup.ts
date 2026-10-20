@@ -30,12 +30,14 @@ export function createEngineStartup(game: EngineStartupDependencies): EngineSubs
     for (let i = 0; i < 8; i++) game.spawnCarrier(hq);
     return hq;
   }
-  function resetColony(seed: number, name = 'Unnamed colony') {
+  function resetColony(seed: number, name = 'Unnamed colony', explorationFog = false) {
     if (!Number.isInteger(seed) || seed < 0 || seed > 2147483647)
       throw new Error('Seed must be an integer from 0 to 2147483647');
     const colonyName = saveName(name);
     const defaults = createSimulationState();
     Object.assign(game.state, defaults.state);
+    game.state.explorationFog = explorationFog;
+    game.revealed.fill(explorationFog ? 0 : 1);
     game.buildings = defaults.buildings;
     game.units = defaults.units;
     game.jobs = defaults.jobs;
@@ -64,7 +66,11 @@ export function createEngineStartup(game: EngineStartupDependencies): EngineSubs
 }
 export interface EngineSubsystem {
   initializeColony: () => import('../types.ts').Building;
-  resetColony: (seed: number, name?: string) => import('../types.ts').Building;
+  resetColony: (
+    seed: number,
+    name?: string,
+    explorationFog?: boolean,
+  ) => import('../types.ts').Building;
 }
 export interface EngineStartupDependencies
   extends
@@ -88,5 +94,5 @@ export interface EngineStartupDependencies
     Pick<ObservationSubsystem, 'observationData'>,
     Pick<PersistenceSubsystem, 'setColonyName'>,
     Pick<EventsSubsystem, 'emitGameEvent'>,
-    Pick<MapSubsystem, 'genMap' | 'recomputeTerritory'>,
+    Pick<MapSubsystem, 'genMap' | 'recomputeTerritory' | 'revealed'>,
     Pick<EconomySubsystem, 'newBuilding' | 'spawnCarrier'> {}

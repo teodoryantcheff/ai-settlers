@@ -51,6 +51,7 @@ import type {
 } from '../types.ts';
 
 const placementAdvice: Record<PlacementRefusal['code'], PlacementAdvice> = {
+  unexplored: 'complete buildings near the frontier to reveal more land',
   'out-of-bounds': '',
   'choose-map-tile': '',
   water: '',
@@ -470,6 +471,14 @@ export function createEconomy(
         ownership: { ok: null, reason: { code: 'choose-map-tile' } },
         resources: { ok: null, reason: { code: 'choose-map-tile' } },
       };
+    if (!game.isRevealed(game.idx(x, y)))
+      return {
+        ok: false,
+        reason: { code: 'unexplored' },
+        terrain: { ok: null, reason: { code: 'unexplored' } },
+        ownership: { ok: null, reason: { code: 'unexplored' } },
+        resources: { ok: null, reason: { code: 'unexplored' } },
+      };
     const i = game.idx(x, y),
       tl = game.tiles[i];
     if (tl.t === game.WATER) if (fail('terrain', { code: 'water' })) return checks;
@@ -480,13 +489,22 @@ export function createEconomy(
       let wa = false;
       for (let wy2 = y - 2; wy2 <= y + 2 && !wa; wy2++)
         for (let wx2 = x - 2; wx2 <= x + 2 && !wa; wx2++)
-          if (game.inB(wx2, wy2) && game.tiles[game.idx(wx2, wy2)].t === game.WATER) wa = true;
+          if (
+            game.inB(wx2, wy2) &&
+            game.isRevealed(game.idx(wx2, wy2)) &&
+            game.tiles[game.idx(wx2, wy2)].t === game.WATER
+          )
+            wa = true;
       if (!wa) if (fail('resources', { code: 'no-water' })) return checks;
       for (let d = 0; d < 4; d++) {
         const nx = x + game.DX[d],
           ny = y + game.DY[d];
         if (!game.inB(nx, ny)) continue;
         const n = game.idx(nx, ny);
+        if (!game.isRevealed(n)) {
+          if (fail('ownership', { code: 'territory' })) return checks;
+          continue;
+        }
         if (!game.passI(n)) continue;
         if (!game.owned[n]) if (fail('ownership', { code: 'territory' })) return checks;
       }
@@ -499,6 +517,10 @@ export function createEconomy(
           continue;
         }
         const n2 = game.idx(nx2, ny2);
+        if (!game.isRevealed(n2)) {
+          if (fail('ownership', { code: 'territory' })) return checks;
+          continue;
+        }
         if (!game.passI(n2)) continue;
         if (!game.owned[n2]) if (fail('ownership', { code: 'territory' })) return checks;
       }
@@ -508,7 +530,7 @@ export function createEconomy(
         for (let dd = 0; dd < 8; dd++) {
           const mx = x + game.DX[dd],
             my = y + game.DY[dd];
-          if (game.inB(mx, my)) {
+          if (game.inB(mx, my) && game.isRevealed(game.idx(mx, my))) {
             const mt = game.tiles[game.idx(mx, my)];
             if (
               mt.t === game.MTN &&
@@ -528,7 +550,8 @@ export function createEconomy(
           for (let xx = x - fr; xx <= x + fr && !found; xx++) {
             if (!game.inB(xx, yy)) continue;
             if ((x - xx) * (x - xx) + (y - yy) * (y - yy) > fr * fr) continue;
-            if (game.tiles[game.idx(xx, yy)].rock) found = true;
+            if (game.isRevealed(game.idx(xx, yy)) && game.tiles[game.idx(xx, yy)].rock)
+              found = true;
           }
         if (!found) if (fail('resources', { code: 'no-rocks' })) return checks;
       }
@@ -553,6 +576,8 @@ export function createEconomy(
   function placementText(reason: PlacementRefusal | null): string {
     if (!reason) return '';
     switch (reason.code) {
+      case 'unexplored':
+        return 'Unexplored land';
       case 'out-of-bounds':
         return 'Out of bounds';
       case 'choose-map-tile':
@@ -2036,6 +2061,7 @@ export interface EconomyInternals {
 
 /** Advice copy selected only by a placement refusal code. */
 export type PlacementAdvice =
+  | 'complete buildings near the frontier to reveal more land'
   | ''
   | 'build more producers — or inspect a demolition quote for exact recoverable goods'
   | 'build an Outpost toward that spot — it pushes your border out'
@@ -2155,7 +2181,7 @@ export interface EconomyDependencies
     >,
     Pick<EventsSubsystem, 'emitGameEvent'>,
     Pick<ProgressionSubsystem, 'gameTick'>,
-    Pick<MapSubsystem, 'owned' | 'recomputeTerritory' | 'projectTerritory'> {}
+    Pick<MapSubsystem, 'owned' | 'recomputeTerritory' | 'projectTerritory' | 'isRevealed'> {}
 
 /** Placement permission stays separate from click-time spending permission. */
 export interface PlacementCheck {

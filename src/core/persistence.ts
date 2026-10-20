@@ -156,6 +156,7 @@ export function createPersistence(
         };
       });
     return {
+      revealed: Array.from(game.revealed),
       identity: { name: colonyName },
       observations: structuredClone(game.observationData),
       attention: structuredClone(game.attentionData),
@@ -352,6 +353,7 @@ export function createPersistence(
   }
   function commitLoad(prepared: PreparedSave) {
     const d = prepared.data;
+    game.revealed.set(d.revealed);
     game.tiles = prepared.tiles;
     game.buildings = prepared.buildings;
     game.jobs = prepared.jobs;
@@ -540,4 +542,4 @@ export interface PersistenceDependencies
     Pick<AutoplaySubsystem, 'autoT'>,
     Pick<ObservationSubsystem, 'observationData'>,
     Pick<EventsSubsystem, 'emitGameEvent'>,
-    Pick<MapSubsystem, 'recomputeTerritory'> {}
+    Pick<MapSubsystem, 'recomputeTerritory' | 'revealed'> {}

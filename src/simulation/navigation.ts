@@ -111,11 +111,17 @@ export function createNavigation(game: NavigationDependencies): NavigationSubsys
     }
     return i;
   }
-  function findPath(sx: number, sy: number, tx: number, ty: number) {
+  function findPath(
+    sx: number,
+    sy: number,
+    tx: number,
+    ty: number,
+    allowed?: (i: number) => boolean,
+  ) {
     if (!game.inB(sx, sy) || !game.inB(tx, ty)) return null;
     const s = game.idx(sx, sy),
       g = game.idx(tx, ty);
-    if (!game.passI(s) || !game.passI(g)) return null;
+    if ((allowed && (!allowed(s) || !allowed(g))) || !game.passI(s) || !game.passI(g)) return null;
     if (s === g) return [];
     navStamp++;
     heapI.length = 0;
@@ -147,8 +153,14 @@ export function createNavigation(game: NavigationDependencies): NavigationSubsys
           ny = cy2 + game.DY[d];
         if (!game.inB(nx, ny)) continue;
         const n = game.idx(nx, ny);
-        if (!game.passI(n) || NAVCL[n] === navStamp) continue;
-        if (d >= 4 && (!game.passI(game.idx(cx2, ny)) || !game.passI(game.idx(nx, cy2)))) continue;
+        if ((allowed && !allowed(n)) || !game.passI(n) || NAVCL[n] === navStamp) continue;
+        if (
+          d >= 4 &&
+          ((allowed && (!allowed(game.idx(cx2, ny)) || !allowed(game.idx(nx, cy2)))) ||
+            !game.passI(game.idx(cx2, ny)) ||
+            !game.passI(game.idx(nx, cy2)))
+        )
+          continue;
         const step = moveCost(n) * (d >= 4 ? Math.SQRT2 : 1),
           ng = NAVG[cur] + step;
         if (NAVST[n] !== navStamp || ng < NAVG[n] - 1e-6) {
@@ -180,7 +192,13 @@ export interface NavigationSubsystem {
   connectedLand: (ax: number, ay: number, bx: number, by: number) => boolean;
   moveCost: (n: number) => 1 | typeof ROAD_COST | 1.6 | 1.15;
   /** Tile indexes from the first step after the start to the target, or null when unreachable. */
-  findPath: (sx: number, sy: number, tx: number, ty: number) => number[] | null;
+  findPath: (
+    sx: number,
+    sy: number,
+    tx: number,
+    ty: number,
+    allowed?: (i: number) => boolean,
+  ) => number[] | null;
 }
 
 export interface NavigationDependencies extends Pick<

@@ -27,7 +27,7 @@ export function createRoads(game: RoadsDependencies): RoadsSubsystem {
     );
   }
   function roadRoute(a: TilePoint, b: TilePoint): RoadRoute {
-    const path = game.findPath(a.x, a.y, b.x, b.y);
+    const path = game.findPath(a.x, a.y, b.x, b.y, game.isRevealed);
     // Preserve rejection precedence, including a blocked start with no route.
     if (!path) return { ok: false, reason: 'no-route' };
     if (!canPave(game.idx(a.x, a.y))) return { ok: false, reason: 'blocked-start' };
@@ -98,5 +98,5 @@ export interface RoadsDependencies
     Pick<EventsSubsystem, 'emitGameEvent'>,
     Pick<NavigationSubsystem, 'findPath'>,
     Pick<ProgressionSubsystem, 'gameTick'>,
-    Pick<MapSubsystem, 'owned'>,
+    Pick<MapSubsystem, 'owned' | 'isRevealed'>,
     Pick<SimulationStateSubsystem, 'state'> {}

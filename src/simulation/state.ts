@@ -186,6 +186,7 @@ export function createSimulationState(): SimulationStateSubsystem {
     },
   };
   const state: SimulationState = {
+    explorationFog: false,
     paused: true,
     speed: 1,
     won: false,

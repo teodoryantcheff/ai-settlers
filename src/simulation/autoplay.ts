@@ -1,3 +1,4 @@
+import { discoveryRadius } from '../gameplay/discovery.ts';
 import {
   countsAsWell,
   hasWellCoverage,
@@ -45,6 +46,7 @@ export function createAutoplay(
     for (let i = 0; i < game.tiles.length; i++) {
       const tl = game.tiles[i];
       if (
+        game.isRevealed(i) &&
         tl.t === game.MTN &&
         tl.deposit &&
         tl.deposit.amt > 0 &&
@@ -91,7 +93,7 @@ export function createAutoplay(
           let hit = false;
           for (let yy = y - rr2; yy <= y + rr2 && !hit; yy++)
             for (let xx = x - rr2; xx <= x + rr2 && !hit; xx++) {
-              if (!game.inB(xx, yy)) continue;
+              if (!game.inB(xx, yy) || !game.isRevealed(game.idx(xx, yy))) continue;
               if ((x - xx) * (x - xx) + (y - yy) * (y - yy) > rr2 * rr2) continue;
               const tv = game.tiles[game.idx(xx, yy)];
               if (needTree ? tv.tree >= 3 : tv.rock) hit = true;
@@ -101,12 +103,15 @@ export function createAutoplay(
       return null;
     }
     if (bt === 'guard') {
+      if (game.state.explorationFog && (!want?.length || !depositTiles(want).length))
+        return explorationSpot();
       const dep = want && want.length ? depositTiles(want) : null,
         top: Array<{ p: [number, number]; dd: number }> = [];
       for (let att = 0; att < 1200; att++) {
         const p = randTile(),
           gi = game.idx(p[0], p[1]);
         if (
+          !game.isRevealed(gi) ||
           !game.owned[gi] ||
           game.tiles[gi].t !== game.GRASS ||
           isFaceTile(p[0], p[1], want) ||
@@ -117,7 +122,12 @@ export function createAutoplay(
         for (d = 0; d < 8; d++) {
           nx = p[0] + game.DX[d];
           ny = p[1] + game.DY[d];
-          if (game.inB(nx, ny) && !game.owned[game.idx(nx, ny)] && game.passI(game.idx(nx, ny))) {
+          if (
+            game.inB(nx, ny) &&
+            game.isRevealed(game.idx(nx, ny)) &&
+            !game.owned[game.idx(nx, ny)] &&
+            game.passI(game.idx(nx, ny))
+          ) {
             frontier = true;
             break;
           }
@@ -234,6 +244,34 @@ export function createAutoplay(
     }
     return null;
   }
+  /** Choose a known buildable frontier by the unexplored area it would reveal.
+   * Stable coordinate ties make exploration reproducible without consulting terrain under fog. */
+  function explorationSpot(): [number, number] | null {
+    let best: [number, number] | null = null;
+    let score = 0;
+    const r = discoveryRadius(game, { type: 'guard', x: 0, y: 0, manned: true });
+    for (let y = 1; y < game.H - 1; y++)
+      for (let x = 1; x < game.W - 1; x++) {
+        if (
+          !game.isRevealed(game.idx(x, y)) ||
+          !game.owned[game.idx(x, y)] ||
+          !game.canPlace('guard', x, y)[0]
+        )
+          continue;
+        let unknown = 0;
+        for (let yy = Math.max(0, y - r); yy <= Math.min(game.H - 1, y + r); yy++)
+          for (let xx = Math.max(0, x - r); xx <= Math.min(game.W - 1, x + r); xx++)
+            if ((xx - x) ** 2 + (yy - y) ** 2 <= r * r && !game.isRevealed(game.idx(xx, yy)))
+              unknown++;
+        // Explore a coherent heading on ties rather than scattering scarce outposts.
+        const value = unknown * 10000 + x * 10 - Math.abs(y - game.H / 2);
+        if (unknown && value > score) {
+          score = value;
+          best = [x, y];
+        }
+      }
+    return best;
+  }
   function clearNeighbor(b: Building): TilePoint | null {
     for (let d = 0; d < 8; d++) {
       const nx = b.x + game.DX[d],
@@ -298,13 +336,13 @@ export function createAutoplay(
       for (let d = 0; d < 8; d++) {
         const nx = (di % game.W) + game.DX[d],
           ny = ((di / game.W) | 0) + game.DY[d];
-        if (game.inB(nx, ny) && game.passI(game.idx(nx, ny))) {
+        if (game.inB(nx, ny) && game.isRevealed(game.idx(nx, ny)) && game.passI(game.idx(nx, ny))) {
           dl = game.idx(nx, ny);
           break;
         }
       }
       if (dl < 0) continue;
-      const p = game.findPath(s.x, s.y, dl % game.W, (dl / game.W) | 0);
+      const p = game.findPath(s.x, s.y, dl % game.W, (dl / game.W) | 0, game.isRevealed);
       if (!p) continue;
       if (!path || game.tiles[di].deposit?.kind === 'gold') path = p;
     }
@@ -317,11 +355,16 @@ export function createAutoplay(
     if (!want || !want.length) return false;
     for (let fy = y - 1; fy <= y + 1; fy++)
       for (let fx = x - 1; fx <= x + 1; fx++) {
-        if (!game.inB(fx, fy) || game.tiles[game.idx(fx, fy)].t !== game.GRASS) continue;
+        if (
+          !game.inB(fx, fy) ||
+          !game.isRevealed(game.idx(fx, fy)) ||
+          game.tiles[game.idx(fx, fy)].t !== game.GRASS
+        )
+          continue;
         for (let d = 0; d < 8; d++) {
           const nx = fx + game.DX[d],
             ny = fy + game.DY[d];
-          if (!game.inB(nx, ny)) continue;
+          if (!game.inB(nx, ny) || !game.isRevealed(game.idx(nx, ny))) continue;
           const t = game.tiles[game.idx(nx, ny)];
           if (t.t === game.MTN && t.deposit && t.deposit.amt > 0 && want.includes(t.deposit.kind))
             return true;
@@ -344,7 +387,8 @@ export function createAutoplay(
     for (let d = 0; d < 4; d++) {
       const nx = gx + game.DX[d],
         ny = gy + game.DY[d];
-      if (!game.inB(nx, ny) || !game.passI(game.idx(nx, ny))) continue;
+      if (!game.inB(nx, ny) || !game.isRevealed(game.idx(nx, ny)) || !game.passI(game.idx(nx, ny)))
+        continue;
       critical.push(game.idx(nx, ny));
       if (!game.owned[game.idx(nx, ny)]) missing++;
     }
@@ -363,9 +407,10 @@ export function createAutoplay(
           candidates[site] = 1;
           if (!game.owned[site] || isFaceTile(x, y, want) || !game.canPlace('guard', x, y)[0])
             continue;
-          const projected = projectTerritory(game, [
-            { type: 'guard', x, y, done: true, manned: true },
-          ]);
+          const projected = projectTerritory(
+            { ...game, passI: (i) => game.isRevealed(i) && game.passI(i) },
+            [{ type: 'guard', x, y, done: true, manned: true }],
+          );
           let advance = -1,
             criticalHits = 0;
           for (let route = cor.length - 1; route >= 0; route--) {
@@ -408,6 +453,7 @@ export function createAutoplay(
         bAt = game.buildingAt(i % game.W, (i / game.W) | 0);
       if (bAt && game.BSPEC[bAt.type].prod === 'mine') keep = true;
       else if (
+        game.isRevealed(i) &&
         tl.t === game.MTN &&
         tl.deposit &&
         tl.deposit.amt > 0 &&
@@ -607,7 +653,7 @@ export interface AutoplaySubsystem {
 
 export interface AutoplayDependencies
   extends
-    Pick<SimulationStateSubsystem, 'BSPEC' | 'buildings' | 'soldierPool'>,
+    Pick<SimulationStateSubsystem, 'BSPEC' | 'buildings' | 'soldierPool' | 'state'>,
     Pick<
       WorldSubsystem,
       'DX' | 'DY' | 'GRASS' | 'H' | 'MTN' | 'SR' | 'W' | 'idx' | 'inB' | 'passI' | 'tiles'
@@ -627,4 +673,4 @@ export interface AutoplayDependencies
     Pick<StockLedgerSubsystem, 'spendableStock'>,
     Pick<RoadsSubsystem, 'commitRoad'>,
     Pick<NavigationSubsystem, 'findPath' | 'connectedLand'>,
-    Pick<MapSubsystem, 'owned'> {}
+    Pick<MapSubsystem, 'owned' | 'isRevealed'> {}

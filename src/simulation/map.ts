@@ -1,3 +1,4 @@
+import { visitDiscovery } from '../gameplay/discovery.ts';
 import { projectTerritory as projectColonyTerritory } from '../gameplay/colony-rules.ts';
 import type { SimulationStateSubsystem } from './state.ts';
 import type { WorldSubsystem } from '../core/world.ts';
@@ -175,6 +176,25 @@ export function createMap(game: MapDependencies): MapSubsystem {
           }
         }
     }
+    if (game.state.explorationFog) {
+      // Interior meadow sites can reach these resources from the initial claim.
+      for (const [dx, dy] of [
+        [-8, -3],
+        [-8, -2],
+        [-8, -1],
+      ])
+        game.tiles[game.idx(cx + dx, cy + dy)].tree = 4;
+      game.tiles[game.idx(cx + 8, cy - 3)].rock = { amt: 100 };
+      for (let dy = 6; dy <= 8; dy++)
+        for (let dx = -1; dx <= 1; dx++)
+          Object.assign(game.tiles[game.idx(cx + dx, cy + dy)], {
+            t: game.WATER,
+            tree: 0,
+            rock: null,
+            deposit: null,
+            road: false,
+          });
+    }
     const reach = new Uint8Array(game.W * game.H);
     function floodReach() {
       reach.fill(0);
@@ -320,6 +340,27 @@ export function createMap(game: MapDependencies): MapSubsystem {
     return true;
   }
   const owned = new Uint8Array(game.W * game.H);
+  const revealed = new Uint8Array(game.W * game.H).fill(1);
+  function isRevealed(i: number) {
+    return i >= 0 && i < revealed.length && (!game.state.explorationFog || revealed[i] === 1);
+  }
+  function revealBuildings() {
+    if (!game.state.explorationFog) {
+      revealed.fill(1);
+      return;
+    }
+    let changed = false;
+    for (const b of game.buildings) {
+      if (!b.done) continue;
+      visitDiscovery(game, b, (i) => {
+        if (!revealed[i]) {
+          revealed[i] = 1;
+          changed = true;
+        }
+      });
+    }
+    if (changed) game.emitGameEvent('discoveryChanged', {});
+  }
   function projectTerritory(excludedId?: number) {
     return projectColonyTerritory(
       game,
@@ -328,16 +369,17 @@ export function createMap(game: MapDependencies): MapSubsystem {
   }
   function recomputeTerritory() {
     owned.set(projectTerritory());
+    revealBuildings();
     game.emitGameEvent('territoryChanged', {});
   }
   // ---- guard-post territory claim (read-only projection; never mutates `owned`) ----
   // Project a hypothetical manned guard so previews show the eventual border,
   // including detours around water and ridges, without changing the live colony.
   function guardPostClaim(x: number, y: number): GuardPostClaim {
-    const claimed = projectColonyTerritory(game, [
-      ...game.buildings,
-      { type: 'guard', x, y, done: true, manned: true },
-    ]);
+    const claimed = projectColonyTerritory(
+      { ...game, passI: (i) => isRevealed(i) && game.passI(i) },
+      [...game.buildings, { type: 'guard', x, y, done: true, manned: true }],
+    );
     const fill: number[] = [],
       segs: GuardPreviewSegment[] = [];
     for (let i = 0; i < game.W * game.H; i++) if (claimed[i] && !owned[i]) fill.push(i); // newly claimed tiles
@@ -366,6 +408,8 @@ export function createMap(game: MapDependencies): MapSubsystem {
   // Live bindings preserve replacement of arrays and mutable subsystem state.
   return {
     genMap,
+    revealed,
+    isRevealed,
     get owned() {
       return owned;
     },
@@ -389,6 +433,8 @@ export interface GuardPostClaim {
 }
 
 export interface MapSubsystem {
+  readonly revealed: Uint8Array;
+  isRevealed: (i: number) => boolean;
   genMap: () => void;
   readonly owned: Uint8Array<ArrayBuffer>;
   recomputeTerritory: () => void;
@@ -399,7 +445,7 @@ export interface MapSubsystem {
 
 export interface MapDependencies
   extends
-    Pick<SimulationStateSubsystem, 'BSPEC' | 'buildings'>,
+    Pick<SimulationStateSubsystem, 'BSPEC' | 'buildings' | 'state'>,
     Pick<
       WorldSubsystem,
       | 'DX'

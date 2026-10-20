@@ -10,6 +10,7 @@ export function createSessionView(game: GameRuntime): SessionSubsystem {
   const continueButton = requireElement('continueb', HTMLButtonElement);
   const form = requireElement('new-colony-form');
   const nameInput = requireElement('new-colony-name', HTMLInputElement);
+  const fogInput = requireElement('new-colony-fog', HTMLInputElement);
   const seedInput = requireElement('new-colony-seed', HTMLInputElement);
   let liveColony = game.started;
   let saved: SaveMetadata[] = [];
@@ -93,14 +94,14 @@ export function createSessionView(game: GameRuntime): SessionSubsystem {
     seedInput.value = String(game.seed);
     nameInput.focus();
   }
-  function newColony(name = '', seed?: number): boolean {
+  function newColony(name = '', seed?: number, explorationFog = false): boolean {
     const colonyName = saveName(name);
     const chosenSeed = seed === undefined ? Math.floor(Math.random() * 2147483648) : seed;
     if (!Number.isInteger(chosenSeed) || chosenSeed < 0 || chosenSeed > 2147483647)
       throw new Error('World seed must be an integer from 0 to 2147483647');
     const start = () => {
       const speed = game.state.speed;
-      game.resetColony(chosenSeed, colonyName);
+      game.resetColony(chosenSeed, colonyName, explorationFog);
       game.state.speed = speed;
       game.state.paused = false;
       game.beginSession();
@@ -130,6 +131,7 @@ export function createSessionView(game: GameRuntime): SessionSubsystem {
       newColony(
         nameInput.value,
         seedInput.value.trim() === '' ? undefined : Number(seedInput.value),
+        fogInput.checked === true,
       ),
     );
   }
@@ -231,7 +233,7 @@ export interface SessionSubsystem {
   openWelcome: () => void;
   returnHome: () => void;
   continueColony: () => void;
-  newColony: (name?: string, seed?: number) => boolean;
+  newColony: (name?: string, seed?: number, explorationFog?: boolean) => boolean;
   startNewColonyFromForm: () => void;
   openSettings: () => void;
   openReference: (article?: string) => void;

@@ -31,7 +31,7 @@ function landscape() {
   installGlobals({ document, window });
   const { game: e } = createGame({
     seed: 2024,
-    modules: ['world', 'landscape', 'renderer'],
+    modules: ['world', 'state', 'map', 'landscape', 'renderer'],
     presentation: { available: true, invalidate: noop, begin: noop, layer: noop, end: noop },
     stubs: {
       Acan: canvas,
