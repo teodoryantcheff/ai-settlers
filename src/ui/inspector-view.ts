@@ -10,6 +10,7 @@ import { eligibleIngredients } from '../gameplay/production-rules.ts';
 import { resourceIcon } from './resource-icons.ts';
 import { buildingPurposes as buildingHelp } from './catalog-view.ts';
 import { observePresentation } from './domain-feedback.ts';
+import { goodsIn } from '../core/inventory.ts';
 
 /** Owns inspector evidence, mounted controls, refresh and native interaction retention. */
 /** The runtime members the inspector reads. */
@@ -107,7 +108,7 @@ export function createInspectorView(game: InspectorViewDependencies, feedback: P
     )}${trusted(work?.reason ? '</div>' : '')}</div>`;
     if (!b.done) {
       html += markup`<p><strong>Construction ${Math.round(b.constructionProgress * 100)}%</strong></p><progress max="1" value="${b.constructionProgress}"></progress>`;
-      for (const good of Object.keys(b.needs) as Good[])
+      for (const good of goodsIn(b.needs))
         html += markup`<p>${trusted(resourceIcon(good))}${game.GOODS[good].name}: ${b.got[good] || 0} / ${b.needs[good]} delivered</p>`;
     } else {
       if (work)
@@ -116,12 +117,12 @@ export function createInspectorView(game: InspectorViewDependencies, feedback: P
       if (sp.store)
         html += markup`<p>Reserved (part of stored): ${trusted(formatGoods(game.GOODS, b.reservedStock, { positiveOnly: true, separator: ' · ', empty: 'None', icons: true }))}</p>`;
       if (game.incomingDeliveryStages) {
-        const relevant = sp.store ? Object.keys(game.GOODS) : Object.keys(eligibleIngredients(sp));
+        const relevant = sp.store ? goodsIn(game.GOODS) : goodsIn(eligibleIngredients(sp));
         const inbound = relevant
           .map((g) => {
-            const s = game.incomingDeliveryStages(g as Good, b.id);
+            const s = game.incomingDeliveryStages(g, b.id);
             return s.queued + s.assigned + s.carrying + (s.unknown || 0)
-              ? markup`${game.GOODS[g as Good].name}: ${s.queued} queued · ${s.assigned} assigned · ${s.carrying} carrying${s.unknown ? ' · ' + s.unknown + ' assignments with unavailable carrier evidence' : ''}`
+              ? markup`${game.GOODS[g].name}: ${s.queued} queued · ${s.assigned} assigned · ${s.carrying} carrying${s.unknown ? ' · ' + s.unknown + ' assignments with unavailable carrier evidence' : ''}`
               : '';
           })
           .filter(Boolean);
@@ -235,11 +236,11 @@ export function createInspectorView(game: InspectorViewDependencies, feedback: P
       const allowed = sp.prod === 'mine' ? undefined : sp.in;
       const goods = [
         ...new Set([
-          ...Object.keys(allowed || {}),
-          ...Object.keys(rates.consumed),
-          ...Object.keys(rates.inputDelivered),
+          ...goodsIn(allowed || {}),
+          ...goodsIn(rates.consumed),
+          ...goodsIn(rates.inputDelivered),
         ]),
-      ].filter((g) => (!allowed || allowed[g as Good]) && game.GOODS[g as Good]) as Good[];
+      ].filter((g) => (!allowed || allowed[g]) && game.GOODS[g]);
       const perMinute = (record: Inventory, good: Good, elapsed: number) =>
         elapsed > 0 ? ((record[good] || 0) / elapsed) * 60 : 0;
       const max = Math.max(
@@ -359,8 +360,8 @@ export function createInspectorView(game: InspectorViewDependencies, feedback: P
       if (b.done && sp.store) {
         h +=
           '<details><summary>Warehouse stock targets</summary><p class="muted">Carriers replenish targets from other stores. Food, beer, tool, and weapon producers work toward requested reserves. Zero means no request.</p>';
-        for (const good in game.GOODS)
-          h += markup`<label>${game.GOODS[good as Good].name}<input type="number" min="0" max="500" step="1" data-target="${good}" value="${(b.targets && b.targets[good as Good]) || 0}"></label>`;
+        for (const good of goodsIn(game.GOODS))
+          h += markup`<label>${game.GOODS[good].name}<input type="number" min="0" max="500" step="1" data-target="${good}" value="${(b.targets && b.targets[good]) || 0}"></label>`;
         h += '</details>';
       }
       const m = b.metrics;

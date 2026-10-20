@@ -1,4 +1,5 @@
 import type { Building, BuildingSpec, Good, Inventory } from '../types.ts';
+import { goodsIn } from '../core/inventory.ts';
 
 /** Order is part of deterministic meal selection and ingredient job scheduling. */
 export const edibleGoods: readonly Good[] = Object.freeze(['bread', 'meat', 'fish', 'food']);
@@ -35,7 +36,7 @@ export function ingredientShortages(
 ): ReadonlyArray<{ good: Good; have: number; need: number }> {
   const inputs = ingredientsConsumedNext(building, spec);
   const missing: Array<{ good: Good; have: number; need: number }> = [];
-  for (const good of Object.keys(inputs) as Good[]) {
+  for (const good of goodsIn(inputs)) {
     const have = building.stock[good] || 0;
     const need = inputs[good] || 0;
     if (have < need) missing.push({ good, have, need });

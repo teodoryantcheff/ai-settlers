@@ -7,6 +7,7 @@ import type { BuildingType, Good } from '../types.ts';
 import { edibleGoods } from '../gameplay/production-rules.ts';
 import { buildingPurposes } from './catalog-view.ts';
 import { resourceIcon } from './resource-icons.ts';
+import { goodsIn } from '../core/inventory.ts';
 
 interface Article {
   id: string;
@@ -114,7 +115,7 @@ export function createReferenceView(game: GameRuntime): ReferenceViewSubsystem {
     ];
     for (const type of Object.keys(game.BSPEC) as BuildingType[])
       articles.push(buildingArticle(type));
-    for (const good of Object.keys(game.GOODS) as Good[]) {
+    for (const good of goodsIn(game.GOODS)) {
       const producers = (Object.keys(game.BSPEC) as BuildingType[])
         .filter((type) => game.BSPEC[type].out === good)
         .map((type) => game.BSPEC[type].name);

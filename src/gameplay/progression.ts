@@ -4,6 +4,7 @@ import type { SpendPurpose, StockLedgerSubsystem } from '../simulation/stock-led
 import type { SimulationStateSubsystem } from '../simulation/state.ts';
 import type { EventsSubsystem } from '../core/events.ts';
 import type { Building, BuildingType, Good, Inventory } from '../types.ts';
+import { goodsIn, inventoryEntries } from '../core/inventory.ts';
 
 export function createProgression(
   game: ProgressionDependencies,
@@ -79,8 +80,7 @@ export function createProgression(
     return n;
   }
   function actionAvailability(cost: Inventory): ActionAvailability {
-    const materials = Object.entries(cost).map(([name, required]) => {
-      const good = name as Good;
+    const materials = inventoryEntries(cost).map(([good, required]) => {
       const accounting = game.resourceAccounting(good);
       const spendable = game.spendableStock(good);
       return {
@@ -112,8 +112,8 @@ export function createProgression(
     }
     const store = game.anyStorage();
     if (!store) return;
-    for (const g in c.reward)
-      game.storeGoods(store, g as Good, c.reward[g as Good] || 0, 'external', 'contractReward');
+    for (const g of goodsIn(c.reward))
+      game.storeGoods(store, g, c.reward[g] || 0, 'external', 'contractReward');
     game.state.contracts.push(index);
     game.emitGameEvent('contractFulfilled', { index, name: c.name, x: store.x, y: store.y });
   }

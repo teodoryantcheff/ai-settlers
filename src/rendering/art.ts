@@ -1,6 +1,7 @@
 import { requireCanvas2D } from './canvas-context.ts';
 import type { GameRuntime } from '../runtime.ts';
 import type { ArtAtlas, Good } from '../types.ts';
+import { goodsIn } from '../core/inventory.ts';
 
 export function createArt(game: GameRuntime): ArtSubsystem {
   // Generated settlers, cargo and effect textures share stable anchors. Buildings,
@@ -471,7 +472,7 @@ export function createArt(game: GameRuntime): ArtSubsystem {
     ART.blade = texBlade();
     ART.unitDirections = {};
     ART.cargo = {};
-    for (const good in game.GOODS) ART.cargo[good as Good] = texCargo(good as Good);
+    for (const good of goodsIn(game.GOODS)) ART.cargo[good] = texCargo(good);
     for (let uk = 0; uk < 2; uk++) {
       const kind: 'carrier' | 'soldier' = uk ? 'soldier' : 'carrier',
         dirs: Record<string, { walk: HTMLCanvasElement[]; idle: HTMLCanvasElement }> = {};

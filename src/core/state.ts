@@ -22,6 +22,7 @@ import type {
   ValidatedSave,
   SimulationState,
 } from '../types.ts';
+import { goodsIn } from './inventory.ts';
 
 export interface EventBus<Events extends object> {
   on<K extends keyof Events>(name: K, listener: (payload: Events[K]) => void): () => boolean;
@@ -101,14 +102,13 @@ export function validateSave(
   // A cumulative sample never exceeds its total nor falls below the previous sample. Checked
   // records hold only nonnegative amounts, so a good absent from both is 0 and needs no visit.
   const bounded = (amounts: Inventory, total: Inventory | undefined, before?: Inventory) => {
-    for (const key in amounts) {
-      const good = key as Good;
+    for (const good of goodsIn(amounts)) {
       const amount = amounts[good] || 0;
       if (amount > (total?.[good] || 0) || amount < (before?.[good] || 0)) return false;
     }
     if (before)
-      for (const key in before)
-        if (!Object.hasOwn(amounts, key) && before[key as Good]) return false;
+      for (const good of goodsIn(before))
+        if (!Object.hasOwn(amounts, good) && before[good]) return false;
     return true;
   };
   const size = width * height;
@@ -456,7 +456,7 @@ export function validateSave(
     }
   }
   for (const b of checkedBuildings) {
-    for (const good of Object.keys(goods) as Good[]) {
+    for (const good of goodsIn(goods)) {
       if (
         (b.reservedStock[good] || 0) !== (reservations.get(b.id + '/' + good) || 0) ||
         (b.reservedStock[good] || 0) > (b.stock[good] || 0)

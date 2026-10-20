@@ -3,6 +3,7 @@ import { requireCanvas2D } from './canvas-context.ts';
 import type { GameRuntime } from '../runtime.ts';
 import type { Building, BuildingType, Good, Sprite } from '../types.ts';
 import type { SceneLayer } from './scene.ts';
+import { goodsIn } from '../core/inventory.ts';
 
 /** One displayed good pile on a building's stock heap. */
 export interface VillageStockSlot {
@@ -386,7 +387,7 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
       slots = view.slots;
     slots.length = 0;
     if (!b.done) {
-      (['planks', 'stone', 'tools', 'weapons'] as Good[]).forEach(function (good) {
+      (['planks', 'stone', 'tools', 'weapons'] satisfies Good[]).forEach(function (good) {
         const quantity = (b.got[good] ?? 0) | 0;
         if (quantity > 0) slots.push({ good: good, quantity: quantity });
       });
@@ -405,9 +406,9 @@ export function createVillage(game: GameRuntime, internals?: VillageInternals): 
       return slots;
     }
     if (sp.in) {
-      for (const input in sp.in) {
-        if (((b.stock[input as Good] ?? 0) | 0) > 0) {
-          slots.push({ good: input as Good, quantity: (b.stock[input as Good] ?? 0) | 0 });
+      for (const input of goodsIn(sp.in)) {
+        if (((b.stock[input] ?? 0) | 0) > 0) {
+          slots.push({ good: input, quantity: (b.stock[input] ?? 0) | 0 });
           break;
         }
       }

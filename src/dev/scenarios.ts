@@ -1,6 +1,7 @@
 import { requireElement } from '../ui/dom.ts';
 import type { GameRuntime } from '../runtime.ts';
-import type { Building, BuildingType, Good } from '../types.ts';
+import type { Building, BuildingType } from '../types.ts';
+import { goodsIn } from '../core/inventory.ts';
 
 /** Scenario failure evidence: the message and the frame that threw. */
 function failureDetail(e: unknown) {
@@ -120,7 +121,7 @@ export function runScenarios(game: GameRuntime) {
         const sampleSpec = game.BSPEC[sample.type];
         if (sampleSpec.out) sample.stock[sampleSpec.out] = 6;
         if (sampleSpec.in)
-          for (const ingredient in sampleSpec.in) sample.stock[ingredient as Good] = 4;
+          for (const ingredient of goodsIn(sampleSpec.in ?? {})) sample.stock[ingredient] = 4;
       }
       const stageMatch = location.search.match(/[?&]stage=(0|1|2|3)(?:&|$)/);
       if (nb2 && stageMatch) nb2.constructionProgress = [0.1, 0.4, 0.7, 0.93][+stageMatch[1]];
@@ -207,7 +208,7 @@ export function runScenarios(game: GameRuntime) {
       building.constructionProgress = 1;
       const spec = game.BSPEC[type];
       if (spec.out) building.stock[spec.out] = 4;
-      for (const good in spec.in) building.stock[good as Good] = 3;
+      for (const good of goodsIn(spec.in ?? {})) building.stock[good] = 3;
       game.buildings.push(building);
     });
     game.recomputeTerritory();
@@ -547,8 +548,8 @@ export function runScenarios(game: GameRuntime) {
       Object.assign(s, { th });
       let st = 0;
       for (let i2 = 0; i2 < game.buildings.length; i2++)
-        for (const k9 in game.buildings[i2].stock)
-          st += (game.buildings[i2].stock[k9 as Good] ?? 0) | 0;
+        for (const k9 of goodsIn(game.buildings[i2].stock))
+          st += (game.buildings[i2].stock[k9] ?? 0) | 0;
       Object.assign(s, { st });
       return JSON.stringify(s);
     }

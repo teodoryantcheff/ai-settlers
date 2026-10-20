@@ -1,3 +1,4 @@
+import { inventoryEntries } from '../core/inventory.ts';
 import { requireElement } from './dom.ts';
 import { html as markup, trusted } from './markup.ts';
 import { createLiveReportUpdater } from './live-report.ts';
@@ -159,8 +160,8 @@ export function createEconomyView(game: GameRuntime): EconomyViewSubsystem {
     const inputs = eligibleIngredients(spec);
     const link = (good: Good, quantity: number, role: string) =>
       markup`<button data-economy-resource="${good}" data-economy-key="recipe-${building.id}-${role}-${good}">${quantity} ${game.GOODS[good].name}</button>`;
-    const input = Object.entries(inputs)
-      .map(([good, quantity]) => link(good as Good, quantity, 'input'))
+    const input = inventoryEntries(inputs)
+      .map(([good, quantity]) => link(good, quantity, 'input'))
       .join(spec.prod === 'mine' ? ' or ' : ' + ');
     return markup`<p class="economy-recipe">${trusted(input || 'Natural resources')} → ${trusted(link(spec.out, spec.prod === 'gather' ? 2 : 1, 'output'))} per cycle${spec.prod === 'mine' ? ' · choose one edible alternative' : ''}${spec.water ? ' · working well within 6 tiles (local support, not cargo)' : ''}</p>`;
   }

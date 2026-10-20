@@ -1,5 +1,6 @@
 import { resourceIcon } from './resource-icons.ts';
 import type { Good, Inventory } from '../types.ts';
+import { inventoryEntries } from '../core/inventory.ts';
 
 /** Only use for fixed icons or fragments already produced by an escaping template. */
 class TrustedMarkup {
@@ -52,8 +53,7 @@ export function formatGoods(
 ): string {
   if (options.elapsed !== undefined && options.elapsed <= 0) return '—';
   const parts: string[] = [];
-  for (const [key, amount] of Object.entries(inventory || {})) {
-    const good = key as Good;
+  for (const [good, amount] of inventoryEntries(inventory || {})) {
     if (options.allowed && !options.allowed[good]) continue;
     if (options.positiveOnly && amount <= 0) continue;
     if (options.omitZero && !amount) continue;

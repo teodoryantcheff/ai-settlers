@@ -10,8 +10,9 @@ import type { NavigationSubsystem } from '../simulation/navigation.ts';
 import type { RoadsSubsystem } from '../simulation/roads.ts';
 import type { SimulationStateSubsystem } from '../simulation/state.ts';
 import { walkSeconds } from '../simulation/travel.ts';
-import type { Building, BuildingType, Good, Inventory, TilePoint } from '../types.ts';
+import type { Building, BuildingType, Inventory, TilePoint } from '../types.ts';
 import { workTiles } from './work-area.ts';
+import { goodsIn } from '../core/inventory.ts';
 
 /** Placement feedback for one building type at one site. */
 export interface PlacementPreview {
@@ -99,7 +100,7 @@ export function createPreviews(game: PreviewsDependencies): PreviewsSubsystem {
     return key;
   }
   function stockKey(type: BuildingType) {
-    const goods = Object.keys(game.BSPEC[type].cost || {}) as Good[];
+    const goods = goodsIn(game.BSPEC[type].cost || {});
     let key = '';
     for (const store of game.storages())
       for (const good of goods)

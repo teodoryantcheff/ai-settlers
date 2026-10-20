@@ -13,7 +13,8 @@ import type { StockLedgerSubsystem } from './stock-ledger.ts';
 import type { RoadsSubsystem } from './roads.ts';
 import type { NavigationSubsystem } from './navigation.ts';
 import type { MapSubsystem } from './map.ts';
-import type { Building, BuildingType, Good, TilePoint } from '../types.ts';
+import type { Building, BuildingType, TilePoint } from '../types.ts';
+import { goodsIn } from '../core/inventory.ts';
 
 /** Deposit kinds a mine can be sited against. */
 export type DepositKind = 'coal' | 'iron' | 'gold';
@@ -33,7 +34,7 @@ export function createAutoplay(
   }
   function afford(bt: BuildingType) {
     const c = game.BSPEC[bt].cost || {};
-    for (const g in c) if (game.spendableStock(g as Good) < (c[g as Good] || 0)) return false;
+    for (const g of goodsIn(c)) if (game.spendableStock(g) < (c[g] || 0)) return false;
     return true;
   }
   function randTile(): [number, number] {

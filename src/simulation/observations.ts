@@ -13,6 +13,7 @@ import type {
   ProductionRateWindow,
   ResourceAccounting,
 } from '../types.ts';
+import { goodsIn } from '../core/inventory.ts';
 
 export const ECONOMIC_FLOWS: readonly EconomicFlow[] = [
   'produced',
@@ -65,7 +66,7 @@ export function createObservations(game: ObservationDependencies): ObservationSu
     const elapsed = Math.max(0, now - baseline.time),
       totals: Inventory = {},
       rates: Inventory = {};
-    for (const good of Object.keys(cargo.totals) as Good[]) {
+    for (const good of goodsIn(cargo.totals)) {
       const amount = (cargo.totals[good] || 0) - (baseline.totals[good] || 0);
       totals[good] = amount;
       if (elapsed) rates[good] = (amount * 60) / elapsed;
@@ -97,7 +98,7 @@ export function createObservations(game: ObservationDependencies): ObservationSu
     const totals = emptyEconomicTotals(),
       rates = emptyEconomicTotals();
     for (const flow of ECONOMIC_FLOWS)
-      for (const good of Object.keys(observationData.totals[flow]) as Good[]) {
+      for (const good of goodsIn(observationData.totals[flow])) {
         totals[flow][good] =
           (observationData.totals[flow][good] || 0) - (baseline.totals[flow][good] || 0);
         if (elapsed > 0) rates[flow][good] = ((totals[flow][good] || 0) * 60) / elapsed;

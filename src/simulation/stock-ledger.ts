@@ -3,6 +3,7 @@ import type { SimulationStateSubsystem } from './state.ts';
 import type { NavigationSubsystem } from './navigation.ts';
 import type { EconomySubsystem } from './economy.ts';
 import type { ObservationSubsystem } from './observations.ts';
+import { goodsIn } from '../core/inventory.ts';
 
 type Place = Pick<Building, 'x' | 'y'>;
 
@@ -109,8 +110,7 @@ export function createStockLedger(game: StockLedgerDependencies): StockLedgerSub
     if (source === 'producer') game.state.goldDelivered = (game.state.goldDelivered || 0) + amount;
   }
   function withdrawStock(cost: Inventory, purpose: SpendPurpose) {
-    for (const name in cost) {
-      const good = name as Good;
+    for (const good of goodsIn(cost)) {
       let remaining = cost[good] ?? 0;
       for (const store of game.storages()) {
         if (remaining <= 0) break;

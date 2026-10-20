@@ -27,6 +27,7 @@ import {
 import type { SimulationStateSubsystem } from './state.ts';
 import { carrierSpeed } from './travel.ts';
 import type { WorldSubsystem } from '../core/world.ts';
+import { goodsIn, inventoryEntries } from '../core/inventory.ts';
 import type { AutoplaySubsystem } from './autoplay.ts';
 import type { NavigationSubsystem } from './navigation.ts';
 import type { EventsSubsystem } from '../core/events.ts';
@@ -257,10 +258,10 @@ export function createEconomy(
     return {
       elapsed: m.elapsed,
       inputBlocked: m.inputBlocked,
-      produced: copyObj(m.produced),
-      consumed: copyObj(m.consumed),
-      inputDelivered: copyObj(m.inputDelivered),
-      outputDelivered: copyObj(m.outputDelivered),
+      produced: { ...m.produced },
+      consumed: { ...m.consumed },
+      inputDelivered: { ...m.inputDelivered },
+      outputDelivered: { ...m.outputDelivered },
     };
   }
   function sampleProduction(m: ProductionMetrics) {
@@ -294,8 +295,8 @@ export function createEconomy(
       deliveryElapsed = Math.max(0, m.elapsed - Math.max(baseline.elapsed, m.deliveryStarted));
     function difference(current: Inventory, before: Inventory): Inventory {
       const out: Inventory = {};
-      for (const good in current)
-        out[good as Good] = Math.max(0, (current[good as Good] ?? 0) - (before[good as Good] || 0));
+      for (const good of goodsIn(current))
+        out[good] = Math.max(0, (current[good] ?? 0) - (before[good] || 0));
       return out;
     }
     return {
@@ -315,7 +316,7 @@ export function createEconomy(
     b.produced = (b.produced | 0) + accepted;
     b.metrics.produced[g] = ((b.metrics.produced[g] ?? 0) | 0) + accepted;
     game.recordEconomicFlow('produced', g, accepted);
-    if (accepted) gameEvent('goodsProduced', { building: b, good: g as Good, amount: accepted });
+    if (accepted) gameEvent('goodsProduced', { building: b, good: g, amount: accepted });
     return accepted;
   }
   function newBuilding(type: BuildingType, x: number, y: number): Building {
@@ -326,7 +327,7 @@ export function createEconomy(
       y: y,
       done: false,
       constructionProgress: 0,
-      needs: copyObj(game.BSPEC[type].cost || {}),
+      needs: { ...game.BSPEC[type].cost },
       got: {},
       stock: {},
       reservedStock: {},
@@ -343,14 +344,8 @@ export function createEconomy(
       metrics: productionMetrics(),
     };
   }
-  function copyObj(o: Inventory): Inventory {
-    const r: Inventory = {};
-    for (const k in o) r[k as Good] = o[k as Good];
-    return r;
-  }
   function siteReady(b: Building) {
-    for (const g in b.needs)
-      if (((b.got[g as Good] ?? 0) | 0) < (b.needs[g as Good] ?? 0)) return false;
+    for (const g of goodsIn(b.needs)) if (((b.got[g] ?? 0) | 0) < (b.needs[g] ?? 0)) return false;
     return true;
   }
   function onDone(b: Building) {
@@ -370,8 +365,7 @@ export function createEconomy(
     ref?: Pick<Building, 'x' | 'y'>,
   ): BuildingAffordability {
     const cost = game.BSPEC[type].cost || {};
-    const materials = Object.entries(cost).map(([name, required]) => {
-      const good = name as Good;
+    const materials = inventoryEntries(cost).map(([good, required]) => {
       const free = game.availableStock(good, ref);
       const available = game.spendableStock(good, ref);
       const optionalTransfers = Math.max(0, available - free);
@@ -393,10 +387,10 @@ export function createEconomy(
     const shortage: Inventory = {};
     // Validate every good before releasing anything: an unaffordable request must
     // not disturb existing logistics merely because one material was available.
-    for (const g in cost) {
-      const required = cost[g as Good] ?? 0;
-      if (game.spendableStock(g as Good, ref) < required) return false;
-      shortage[g as Good] = Math.max(0, required - game.availableStock(g as Good, ref));
+    for (const g of goodsIn(cost)) {
+      const required = cost[g] ?? 0;
+      if (game.spendableStock(g, ref) < required) return false;
+      shortage[g] = Math.max(0, required - game.availableStock(g, ref));
     }
     cancelJobs(function (job) {
       if (job.kind !== 'transfer' || !job.good || !shortage[job.good] || collectedJob(job))
@@ -601,10 +595,9 @@ export function createEconomy(
       return false;
     }
     const sp = game.BSPEC[type],
-      needs = copyObj(sp.cost || {});
-    for (const g in needs) {
-      const good = g as Good,
-        available = game.spendableStock(good, { x, y }),
+      needs = { ...sp.cost };
+    for (const good of goodsIn(needs)) {
+      const available = game.spendableStock(good, { x, y }),
         required = needs[good] ?? 0;
       if (available < required) {
         const r: PlacementRefusal = { code: 'stock', good, required, available };
@@ -659,14 +652,12 @@ export function createEconomy(
     const refund: Inventory = {},
       salvage: Inventory = {};
     if (allowed && receiver) {
-      for (const name in sp.cost) {
-        const good = name as Good;
+      for (const good of goodsIn(sp.cost ?? {})) {
         const amount = Math.floor((b.done ? (sp.cost?.[good] ?? 0) : (b.got[good] ?? 0) | 0) / 2);
         if (amount > 0) refund[good] = amount;
       }
-      for (const name in b.stock)
-        if (((b.stock[name as Good] ?? 0) | 0) > 0)
-          salvage[name as Good] = (b.stock[name as Good] ?? 0) | 0;
+      for (const good of goodsIn(b.stock))
+        if (((b.stock[good] ?? 0) | 0) > 0) salvage[good] = (b.stock[good] ?? 0) | 0;
     }
     const equipmentReceiver =
       allowed && b.type === 'guard' && b.manned ? nearestStoragePos(b.x, b.y) : null;
@@ -725,20 +716,14 @@ export function createEconomy(
     game.soldierPool += quote.returnedSoldiers - dispatched;
     const equipmentStore = quote.equipmentReceiver ? byId(quote.equipmentReceiver.id) : null;
     if (equipmentStore)
-      for (const name in quote.equipment) {
-        const good = name as Good;
-        game.storeGoods(equipmentStore, good, quote.equipment[good] ?? 0, 'external', 'salvage');
-      }
+      for (const [good, amount] of inventoryEntries(quote.equipment))
+        game.storeGoods(equipmentStore, good, amount, 'external', 'salvage');
     const sp = game.BSPEC[b.type];
     const receiver = quote.receiver ? byId(quote.receiver.id) : null;
     if (receiver) {
-      for (const name in quote.refund) {
-        const good = name as Good;
-        game.storeGoods(receiver, good, quote.refund[good] ?? 0, 'external', 'refund');
-      }
-      for (const name in quote.salvage) {
-        const good = name as Good;
-        const amount = quote.salvage[good] ?? 0;
+      for (const [good, amount] of inventoryEntries(quote.refund))
+        game.storeGoods(receiver, good, amount, 'external', 'refund');
+      for (const [good, amount] of inventoryEntries(quote.salvage)) {
         // A storehouse's goods were already stored stock; a producer's are delivered.
         game.storeGoods(receiver, good, amount, sp.store ? 'storage' : 'producer', 'salvage');
         if (good === 'gold' && !sp.store) {
@@ -1109,27 +1094,25 @@ export function createEconomy(
     for (let i = 0; i < ss.length; i++) {
       const target = ss[i],
         targets: Inventory = target.targets || {};
-      for (const g in targets) {
+      for (const g of goodsIn(targets)) {
         const missing = Math.max(
           0,
-          ((targets[g as Good] ?? 0) | 0) -
-            ((target.stock[g as Good] ?? 0) | 0) -
-            incomingStock(g as Good, target.id),
+          ((targets[g] ?? 0) | 0) - ((target.stock[g] ?? 0) | 0) - incomingStock(g, target.id),
         );
         // Keep a small queue: construction and producers retain first use of carriers.
         for (let k = 0; k < Math.min(2, missing); k++) {
           const source = nearestStorage(target, {
-            available: g as Good,
+            available: g,
             connected: true,
             exclude: target,
             retainTarget: true,
             euclidean: true,
           });
           if (!source) break;
-          game.reserveStock(source, g as Good);
+          game.reserveStock(source, g);
           game.jobs.push({
             kind: 'transfer',
-            good: g as Good,
+            good: g,
             sourceId: source.id,
             to: target.id,
             status: 'pending',
@@ -1189,7 +1172,7 @@ export function createEconomy(
             game.reserveStock(s, g);
             game.jobs.push({
               kind: 'fetch',
-              good: g as Good,
+              good: g,
               to: b.id,
               sourceId: s.id,
               status: 'pending',
@@ -1220,7 +1203,7 @@ export function createEconomy(
             game.reserveStock(s3, g);
             game.jobs.push({
               kind: 'fetch',
-              good: g as Good,
+              good: g,
               to: b.id,
               sourceId: s3.id,
               status: 'pending',
@@ -1526,7 +1509,7 @@ export function createEconomy(
       b.metrics.inputDelivered[g] = (b.metrics.inputDelivered[g] || 0) + 1;
       game.recordEconomicFlow('inputArrived', g, 1);
     }
-    gameEvent('goodsDelivered', { building: b, good: g as Good, amount: 1, transfer: !!transfer });
+    gameEvent('goodsDelivered', { building: b, good: g, amount: 1, transfer: !!transfer });
   }
   function recordOutputDelivery(u: Unit, g: Good) {
     // The pickup source survives a cancelled delivery job. Never count recovered
