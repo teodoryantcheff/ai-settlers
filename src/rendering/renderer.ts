@@ -18,6 +18,7 @@ import { workArea, workTiles } from '../gameplay/work-area.ts';
 import type { GameRuntime } from '../runtime.ts';
 import { requireCanvas2D } from './canvas-context.ts';
 import { createShadowCache } from './shadow-cache.ts';
+import { fogFields, paintFog } from './fog-art.ts';
 import { circlePoints, dashed, rotate, scale, translate } from './scene.ts';
 import type { PremultipliedTint, RendererPresentation, SceneLayer, SceneObject } from './scene.ts';
 
@@ -531,6 +532,10 @@ export function createRenderer(
   }
 
   // ---------- objects ----------
+  const buildingScale = 1.06,
+    buildingPivotX = 12,
+    buildingPivotY = 22,
+    buildingContourPadding = 3;
   function bldImg(b: Building): Sprite {
     const image = game.ART.bld[b.type];
     if (!image) throw new Error('Missing building artwork: ' + b.type);
@@ -542,7 +547,7 @@ export function createRenderer(
   function buildingContour(img: Sprite) {
     let variants = buildingContours.get(img.img);
     const clarity = renderPrefs().clarity ? 1 : 0,
-      pad = 3,
+      pad = buildingContourPadding,
       scale = 2;
     if (!variants) {
       variants = [];
@@ -713,9 +718,9 @@ export function createRenderer(
       bx = b.x * game.TS,
       by = b.y * game.TS;
     g.save();
-    translate(g, bx + 12, by + 22);
-    scale(g, 1.06);
-    translate(g, -bx - 12, -by - 22);
+    translate(g, bx + buildingPivotX, by + buildingPivotY);
+    scale(g, buildingScale);
+    translate(g, -bx - buildingPivotX, -by - buildingPivotY);
     try {
       const now = game.villageWorkTime(b);
       if (!b.done) {
@@ -758,7 +763,13 @@ export function createRenderer(
         10,
         renderPrefs().clarity ? 0.28 : 0.5,
       );
-      s.image(buildingContour(img2), bx + img2.ox - 3, by + img2.oy - 3, img2.w + 6, img2.h + 6);
+      s.image(
+        buildingContour(img2),
+        bx + img2.ox - buildingContourPadding,
+        by + img2.oy - buildingContourPadding,
+        img2.w + buildingContourPadding * 2,
+        img2.h + buildingContourPadding * 2,
+      );
       game.drawVillageDetails(s, b);
       const active = game.buildingWorking(b);
       const anc = game.ART.anchors[b.type];
@@ -2223,15 +2234,16 @@ export function createRenderer(
     resetPresentation();
   });
   observePresentation(game, 'discoveryChanged', () => {
-    fogDirty = true;
+    invalidateFog();
     game.staticDirty = true;
     game.landscapeCragMap = null;
     shadowCache.reset();
-    miniDirty = true;
     game.rebuildHighlights();
   });
+  observePresentation(game, 'buildingPlaced', invalidateFog);
   observePresentation(game, 'territoryChanged', () => {
     borderDirty = true;
+    invalidateFog();
     for (let i = 0; i < game.owned.length; i++)
       if (game.owned[i] !== borderOwned[i]) miniTiles.add(i);
   });
@@ -2448,38 +2460,59 @@ export function createRenderer(
 
   // A cached opaque mask conceals every unknown pixel. Feather only extends
   // onto revealed land, so soft edges never expose unknown terrain.
-  const fogCanvas = game.Acan(game.W * game.TS, game.H * game.TS);
+  const fogCanvas = game.Acan(game.W * 8, game.H * 8);
   const fogContext = requireCanvas2D(fogCanvas, reportGraphicsFailure);
+  const miniFogCanvas = game.Acan(192, 192);
+  const miniFogContext = requireCanvas2D(miniFogCanvas, reportGraphicsFailure);
   let fogDirty = true;
+  function invalidateFog() {
+    if (!game.state.explorationFog) return;
+    fogDirty = true;
+    miniDirty = true;
+  }
+  function refreshFog() {
+    if (!game.state.explorationFog || !fogDirty) return;
+    const protectedTiles = game.owned.slice();
+    // Include the installed sprite's bounds so roofs remain clear as well as
+    // their ground tiles. These are presentation bounds, never new discoveries.
+    for (const b of game.buildings) {
+      const img = bldImg(b);
+      const left =
+        b.x +
+        (buildingPivotX + (img.ox - buildingContourPadding - buildingPivotX) * buildingScale) /
+          game.TS;
+      const top =
+        b.y +
+        (buildingPivotY + (img.oy - buildingContourPadding - buildingPivotY) * buildingScale) /
+          game.TS;
+      const right = left + ((img.w + buildingContourPadding * 2) * buildingScale) / game.TS;
+      const bottom = top + ((img.h + buildingContourPadding * 2) * buildingScale) / game.TS;
+      for (let y = Math.max(0, Math.floor(top)); y < Math.min(game.H, Math.ceil(bottom)); y++)
+        for (let x = Math.max(0, Math.floor(left)); x < Math.min(game.W, Math.ceil(right)); x++) {
+          const i = game.idx(x, y);
+          if (game.isRevealed(i)) protectedTiles[i] = 1;
+        }
+    }
+    const fields = fogFields(game.W, game.H, game.isRevealed, protectedTiles);
+    paintFog(fogContext, fields, 2);
+    paintFog(miniFogContext, fields, 0.75);
+    presentation.invalidate(fogCanvas);
+    fogDirty = false;
+  }
   function drawFog(s: SceneLayer, now: number) {
     if (!game.state.explorationFog) return;
-    const changed = fogDirty;
-    if (changed) {
-      fogContext.clearRect(0, 0, fogCanvas.width, fogCanvas.height);
-      fogContext.fillStyle = '#444c48';
-      fogContext.shadowColor = '#444c48';
-      fogContext.shadowBlur = game.TS * 0.45;
-      for (let y = 0; y < game.H; y++)
-        for (let x = 0; x < game.W;) {
-          if (game.isRevealed(game.idx(x, y))) {
-            x++;
-            continue;
-          }
-          const start = x++;
-          while (x < game.W && !game.isRevealed(game.idx(x, y))) x++;
-          fogContext.fillRect(start * game.TS, y * game.TS, (x - start) * game.TS, game.TS);
-        }
-      fogContext.shadowBlur = 0;
-      presentation.invalidate(fogCanvas);
-      fogDirty = false;
-    }
+    refreshFog();
     // Mutable canvases use the same cache that invalidate() refreshes. Retained
     // artwork images are uploaded once and would keep the original fog forever.
+    const mapW = game.W * game.TS,
+      mapH = game.H * game.TS;
+    const ratio = fogCanvas.width / mapW;
     const sx = Math.max(0, cam.x),
       sy = Math.max(0, cam.y),
-      sw = Math.min(fogCanvas.width - sx, cam.x + vw / z - sx),
-      sh = Math.min(fogCanvas.height - sy, cam.y + vh / z - sy);
-    if (sw > 0 && sh > 0) s.blit(fogCanvas, sx, sy, sw, sh, sx, sy, sw, sh);
+      sw = Math.min(mapW - sx, cam.x + vw / z - sx),
+      sh = Math.min(mapH - sy, cam.y + vh / z - sy);
+    if (sw > 0 && sh > 0)
+      s.blit(fogCanvas, sx * ratio, sy * ratio, sw * ratio, sh * ratio, sx, sy, sw, sh);
     // Settlers preserve their usual sorting on known land; those crossing fog
     // sit above the opaque veil and never change discovery.
     const walkers = game.units.filter(
@@ -2536,6 +2569,7 @@ export function createRenderer(
     msctx.fillRect(x, y, s, s);
   }
   function drawMiniStatic() {
+    refreshFog();
     if (!miniVignette) {
       miniVignette = msctx.createRadialGradient(96, 96, 60, 96, 96, 140);
       miniVignette.addColorStop(0, 'rgba(0,0,0,0)');
@@ -2579,6 +2613,7 @@ export function createRenderer(
     if (miniDirty || miniTiles.size) drawMiniStatic();
     mctx.setTransform(1, 0, 0, 1, 0, 0);
     mctx.drawImage(mscan, 0, 0);
+    if (game.state.explorationFog) mctx.drawImage(miniFogCanvas, 0, 0);
     const s = 192 / game.W;
     for (let i = 0; i < game.buildings.length; i++) {
       const b = game.buildings[i],
@@ -2646,6 +2681,8 @@ export function createRenderer(
       paintTileFull,
       drawBorders,
       drawMiniStatic,
+      fogCanvas,
+      miniFogCanvas,
       buildingContour,
       drawBuilding,
       shadowCache,
@@ -2910,6 +2947,8 @@ export interface RendererInternals {
   paintTileFull: (g: CanvasRenderingContext2D, i: number) => void;
   drawBorders: (full?: boolean) => void;
   drawMiniStatic: () => void;
+  readonly fogCanvas: HTMLCanvasElement;
+  readonly miniFogCanvas: HTMLCanvasElement;
   buildingContour: (img: Sprite) => HTMLCanvasElement;
   drawBuilding: (s: SceneLayer, b: Building) => void;
   drawTree: (s: SceneObject, x: number, y: number, tl: Tile, now: number) => void;

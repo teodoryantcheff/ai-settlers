@@ -106,3 +106,13 @@ Use the glossary terms **unexplored land** and **revealed land**. Neither means 
 This is a medium-sized feature spanning generation, simulation, persistence, presentation, interaction and automation. Drawing the veil is a limited part of the work; consistent information concealment and viable autoplay exploration are the main integration risks.
 
 The complete design was confirmed by the user. The established subsystem harness and browser fixtures are the proposed testing seams; no additional seam is needed. Frontier scoring, storage encoding and GPU cache representation remain implementation choices within these requirements.
+
+## Confirmed soft-edge refinement
+
+Confirmed in the follow-up design interview on 2026-10-21:
+
+- Replace the visible tile staircase with smooth, rounded contours and a broad blurred transition, about two world tiles wide. Its screen width follows zoom.
+- Keep unknown terrain completely opaque. Feather into discovered land only; discovery and placement rules remain unchanged, including on partially veiled discovered land.
+- Keep owned territory and building silhouettes completely clear, smoothly narrowing the fade where necessary.
+- Give the minimap the same rounded silhouette with a narrower blur suited to its scale.
+- Preserve the static muted veil, Reduced Motion behavior and cached WebGL rendering.

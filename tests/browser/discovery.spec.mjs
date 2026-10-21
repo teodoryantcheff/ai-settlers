@@ -2,6 +2,99 @@ import { test, expect, frame, holdFrames, load, seedPrefs } from './helpers/test
 
 test.setTimeout(60000);
 
+test('frontier construction clears its silhouette without revealing new land', async ({ page }) => {
+  const result = await page.evaluate(() => {
+    const g = window.productionArtPreview.game;
+    g.resetColony(42, 'Frontier roofs', true);
+    g.draw();
+    const mask = window.productionArtPreview.internals.renderer.fogCanvas;
+    const alpha = () => {
+      const scale = mask.width / g.W;
+      return mask
+        .getContext('2d')
+        .getImageData(Math.floor(48.5 * scale), Math.floor(37.4 * scale), 1, 1).data[3];
+    };
+    const before = alpha();
+    const discovery = Array.from(g.revealed);
+    const allowed = g.canPlace('windmill', 48, 39);
+    g.placeBuilding('windmill', 48, 39);
+    g.draw();
+    return {
+      before,
+      after: alpha(),
+      allowed: allowed[0],
+      site: g.buildings.some((b) => b.type === 'windmill' && !b.done && b.x === 48 && b.y === 39),
+      discoveryUnchanged: JSON.stringify(discovery) === JSON.stringify(Array.from(g.revealed)),
+    };
+  });
+  expect(result.allowed).toBe(true);
+  expect(result.site).toBe(true);
+  expect(result.before).toBeGreaterThan(0);
+  expect(result.after).toBe(0);
+  expect(result.discoveryUnchanged).toBe(true);
+});
+
+test('fog has a broad smooth inward fade while unknown and owned land stay protected', async ({
+  page,
+}) => {
+  const result = await page.evaluate(() => {
+    const g = window.productionArtPreview.game;
+    g.resetColony(42, 'Soft exploration', true);
+    const b = g.newBuilding('guard', 59, 48);
+    Object.assign(b, { done: true, constructionProgress: 1, manned: true });
+    g.buildings.push(b);
+    g.recomputeTerritory();
+    g.demolish(b);
+    const rng = g.SR.getState();
+    const time = g.state.time;
+    const revealed = Array.from(g.revealed);
+    g.draw();
+    const masks = window.productionArtPreview.internals.renderer;
+    const measure = (canvas) => {
+      const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+      const scale = canvas.width / g.W;
+      const alpha = (x, y) =>
+        data[(Math.floor(y * scale) * canvas.width + Math.floor(x * scale)) * 4 + 3];
+      let hiddenLeaks = 0;
+      let ownedFog = 0;
+      for (let y = 0; y < canvas.height; y++)
+        for (let x = 0; x < canvas.width; x++) {
+          const i = g.idx(Math.floor(x / scale), Math.floor(y / scale));
+          const a = data[(y * canvas.width + x) * 4 + 3];
+          if (!g.isRevealed(i) && a !== 255) hiddenLeaks++;
+          if (g.owned[i] && a !== 0) ownedFog++;
+        }
+      const profile = [];
+      for (let x = 63 * scale; x < 71 * scale; x++) profile.push(alpha((x + 0.5) / scale, 48.5));
+      return { hiddenLeaks, ownedFog, profile, haze: alpha(66.2, 48.5) };
+    };
+    const world = measure(masks.fogCanvas);
+    const mini = measure(masks.miniFogCanvas);
+    const profile = world.profile;
+    return {
+      haze: world.haze,
+      jump: Math.max(...profile.slice(1).map((v, i) => Math.abs(v - profile[i]))),
+      intermediate: new Set(profile.filter((v) => v > 0 && v < 255)).size,
+      hiddenLeaks: world.hiddenLeaks,
+      ownedFog: world.ownedFog,
+      mini,
+      unchanged: rng === g.SR.getState() && time === g.state.time,
+      discoveryUnchanged: JSON.stringify(revealed) === JSON.stringify(Array.from(g.revealed)),
+    };
+  });
+  expect(result.haze).toBeGreaterThan(10);
+  expect(result.haze).toBeLessThan(255);
+  expect(result.jump).toBeLessThan(64);
+  expect(result.intermediate).toBeGreaterThanOrEqual(8);
+  expect(result.hiddenLeaks).toBe(0);
+  expect(result.ownedFog).toBe(0);
+  expect(result.mini.hiddenLeaks).toBe(0);
+  expect(result.mini.ownedFog).toBe(0);
+  expect(result.mini.haze).toBeLessThan(result.haze);
+  expect(result.unchanged).toBe(true);
+  expect(result.discoveryUnchanged).toBe(true);
+});
+
 test('outpost completion and manning clear the already uploaded fog', async ({ page }) => {
   const result = await page.evaluate(() => {
     const g = window.productionArtPreview.game;
@@ -28,17 +121,17 @@ test('outpost completion and manning clear the already uploaded fog', async ({ p
       return Array.from(data);
     };
     g.draw();
-    const before = [pixel(64, 48), pixel(68, 48), pixel(75, 48), pixel(65, 48)];
+    const before = [pixel(62, 48), pixel(66, 48), pixel(75, 48), pixel(65, 48)];
     const b = g.newBuilding('guard', 59, 48);
     Object.assign(b, { done: true, constructionProgress: 1 });
     g.buildings.push(b);
     g.recomputeTerritory();
     g.draw();
-    const completed = pixel(64, 48);
+    const completed = pixel(62, 48);
     b.manned = true;
     g.recomputeTerritory();
     g.draw();
-    const manned = pixel(68, 48);
+    const manned = pixel(66, 48);
     const owned = pixel(65, 48);
     const unknown = pixel(75, 48);
     const uploads = window.productionRendererStats.textureUpdates;
@@ -51,7 +144,7 @@ test('outpost completion and manning clear the already uploaded fog', async ({ p
       claimed: g.owned[g.idx(65, 48)],
       unknown,
       known: [g.isRevealed(g.idx(64, 48)), g.isRevealed(g.idx(68, 48))],
-      stable: pixel(68, 48),
+      stable: pixel(66, 48),
       uploads,
       unchangedUploads: window.productionRendererStats.textureUpdates,
     };
